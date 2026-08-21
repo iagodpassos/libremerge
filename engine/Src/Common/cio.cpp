@@ -51,14 +51,15 @@ ssize_t write(int fd, const void* buf, size_t size)
 
 int tsopen_s(int* fd, const String& filepath, int oflag, int shflag, int pmode)
 {
+	(void)shflag;
 	*fd = open(filepath.c_str(), oflag, pmode);
-	return errno;
+	return (*fd == -1) ? errno : 0;
 }
 
-int fopen_s(FILE** fp, const String& filepath, const String::value_type* mode)
+int tfopen_s(FILE** fp, const String& filepath, const String::value_type* mode)
 {
 	*fp = fopen(filepath.c_str(), mode);
-	return errno;
+	return (*fp == nullptr) ? errno : 0;
 }
 
 #endif

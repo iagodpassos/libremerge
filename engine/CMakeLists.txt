@@ -94,8 +94,20 @@ set(L2_SOURCES
   Src/FilterEngine/ReplaceList.cpp
   Src/RenameMoveDetection.cpp
   Src/SyntaxParserHelper.cpp
+  Src/PatchHTML.cpp
+  Src/FileVersion.cpp
+  Src/FileTextEncoding.cpp
+  Src/FileFlags.cpp
+  ports/debug_new.cpp
+  Externals/crystaledit/editlib/utils/string_util.cpp
+  Externals/crystaledit/editlib/utils/fpattern.cpp
+  Externals/crystaledit/editlib/utils/icu.cpp
+  Externals/crystaledit/editlib/TextDefinition.cpp
+  ports/exconverter_icu.cpp
+  ports/file_transform_posix.cpp
   ports/image_compare_stub.cpp
   ports/property_system_posix.cpp
+  ports/merge_app_posix.cpp
 )
 if(WIN32)
   list(APPEND L2_SOURCES Src/FilterEngine/FunctionNodeProperty.cpp)
@@ -124,9 +136,13 @@ add_custom_command(
   COMMAND ${LEMON_EXECUTABLE} ${LEMON_TEMPLATE_ARG} ${FILTER_GEN_DIR}/FilterParser.y
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Src/FilterEngine/FilterParser.y
   COMMENT "lemon: FilterParser.y -> FilterParser.c")
+file(GLOB CRYSTAL_PARSER_SOURCES CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/Externals/crystaledit/editlib/parsers/*.cpp)
 list(APPEND L2_SOURCES
   ${FILTER_GEN_DIR}/FilterLexer.cpp
   Externals/crystaledit/editlib/SyntaxParserRegistry.cpp
+  Externals/crystaledit/editlib/CrystalLineSyntaxParser.cpp
+  ${CRYSTAL_PARSER_SOURCES}
 )
 set_source_files_properties(Src/FilterEngine/FilterParser.cpp
   PROPERTIES OBJECT_DEPENDS ${FILTER_GEN_DIR}/FilterParser.c)

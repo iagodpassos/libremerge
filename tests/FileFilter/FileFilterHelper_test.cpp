@@ -174,7 +174,7 @@ namespace
 	TEST_F(FileFilterHelperTest, SetMaskOrExpression1)
 	{
 		DIFFITEM di{};
-		PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+		PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 		CDiffContext ctxt(paths, 0);
 
 		m_fileFilterHelper.SetMaskOrExpression(_T("simple include file"));

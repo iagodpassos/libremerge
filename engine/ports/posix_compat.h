@@ -56,6 +56,16 @@ typedef const wchar_t *LPCWSTR;
 #define WC_DEFAULtchar_t 0x00000040
 UINT GetACP(void);
 BOOL IsValidCodePage(UINT codepage);
+#ifdef __cplusplus
+/* UTF-16-unit variants: the engine's conversion pivot stores packed UTF-16LE
+   in byte buffers; on Windows wchar_t==2 bytes makes the Win32 APIs fit, on
+   POSIX these explicit char16_t APIs do (implemented in win_codepage.cpp). */
+int LmMultiByteToUtf16LE(UINT codepage, DWORD flags, const char *src, int srclen,
+                         char16_t *dst, int dstlen);
+int LmUtf16LEToMultiByte(UINT codepage, DWORD flags, const char16_t *src, int srclen,
+                         char *dst, int dstlen, const char *defaultChar,
+                         BOOL *usedDefaultChar);
+#endif
 int MultiByteToWideChar(UINT codepage, DWORD flags, const char *src, int srclen,
                         wchar_t *dst, int dstlen);
 int WideCharToMultiByte(UINT codepage, DWORD flags, const wchar_t *src, int srclen,
@@ -79,6 +89,9 @@ int WideCharToMultiByte(UINT codepage, DWORD flags, const wchar_t *src, int srcl
 
 #define _stricmp strcasecmp
 #define _strnicmp strncasecmp
+
+/* crystaledit dllexport decoration (empty in static builds) */
+#define EDITPADC_CLASS
 
 /* Win32 leftovers in the C diff core */
 #define VOID void
@@ -118,6 +131,12 @@ static inline int _memicmp(const void *a, const void *b, size_t n)
 /* MBCS legacy: the internal codepage is UTF-8, never a Windows DBCS page */
 static inline int _getmbcp(void) { return 0; }
 static inline int IsDBCSLeadByte(int ch) { (void)ch; return 0; }
+/* UTF-8 continuation byte check (callers test for < 0) */
+static inline int _ismbstrail(const unsigned char *start, const unsigned char *current)
+{
+	(void)start;
+	return ((*current & 0xC0) == 0x80) ? -1 : 0;
+}
 
 /* GetStringTypeW: only reached from dead branches when tchar_t is char */
 #define CT_CTYPE1 1
@@ -189,8 +208,40 @@ static inline unsigned long GetLastError(void)
 #define mywstat stat
 
 /* MSVC "secure" CRT */
+#ifdef __cplusplus
+#include <cstdarg>
+template<unsigned long N> static inline int sprintf_s(char (&dst)[N], const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	int r = vsnprintf(dst, N, fmt, ap);
+	va_end(ap);
+	return r;
+}
+static inline int sprintf_s(char *dst, size_t size, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	int r = vsnprintf(dst, size, fmt, ap);
+	va_end(ap);
+	return r;
+}
+#else
 #define sprintf_s snprintf
+#endif
 #define sscanf_s sscanf
+#ifdef __cplusplus
+template<unsigned long N> static inline int strcpy_s(char (&dst)[N], const char *src)
+{
+	snprintf(dst, N, "%s", src);
+	return 0;
+}
+static inline int strcpy_s(char *dst, size_t size, const char *src)
+{
+	snprintf(dst, size, "%s", src);
+	return 0;
+}
+#endif
 #define localtime_s(ptm, ptt) localtime_r((ptt), (ptm))
 
 /* Win32 profile (INI) API, implemented in ports/win_ini.cpp.

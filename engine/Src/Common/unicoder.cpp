@@ -33,6 +33,24 @@ typedef enum _NORM_FORM { NormalizationOther = 0, NormalizationC = 0x1, Normaliz
 extern "C" __declspec(dllimport) int WINAPI NormalizeString(NORM_FORM NormForm, LPCWSTR lpSrcString, int cwSrcLength, LPWSTR lpDstString, int cwDstLength);
 #endif
 
+// The conversion pivot stores packed UTF-16LE code units in byte buffers.
+// On Windows wchar_t is that unit; elsewhere use char16_t and the ports
+// layer's UTF-16 conversion API (same signatures as the Win32 pair).
+#ifdef _WIN32
+typedef wchar_t xchar_t;
+#define LmMultiByteToUtf16LE MultiByteToWideChar
+#define LmUtf16LEToMultiByte WideCharToMultiByte
+#else
+typedef char16_t xchar_t;
+#endif
+static size_t xcslen(const xchar_t *s)
+{
+	size_t n = 0;
+	while (s[n] != 0)
+		++n;
+	return n;
+}
+
 namespace ucr
 {
 
@@ -695,25 +713,25 @@ int CrossConvert(const char* src, unsigned srclen, char* dest, unsigned destsize
 	// Convert input to Unicode, using specified codepage
 	DWORD flags = 0;
 	int wlen = srclen * 2 + 6;
-	auto wbuff = std::make_unique<wchar_t[]>(wlen);
+	auto wbuff = std::make_unique<xchar_t[]>(wlen);
 	int n;
 	if (cpin == CP_UCS2LE)
 	{
 		if (srclen == -1)
-			srclen = static_cast<unsigned>(wcslen((wchar_t *)src) * sizeof(wchar_t));
+			srclen = static_cast<unsigned>(xcslen((const xchar_t *)src) * sizeof(xchar_t));
 		memcpy(wbuff.get(), src, srclen);
-		n = srclen / sizeof(wchar_t);
+		n = srclen / sizeof(xchar_t);
 	}
 	else if (cpin == CP_UCS2BE)
 	{
 		if (srclen == -1)
-			srclen = static_cast<unsigned>(wcslen((wchar_t *)src) * sizeof(wchar_t));
+			srclen = static_cast<unsigned>(xcslen((const xchar_t *)src) * sizeof(xchar_t));
 		_swab((char *)src, (char *)wbuff.get(), srclen);
-		n = srclen / sizeof(wchar_t);
+		n = srclen / sizeof(xchar_t);
 	}
 	else
 	{
-		n = MultiByteToWideChar(cpin, flags, (const char*)src, srclen, wbuff.get(), wlen - 1);
+		n = LmMultiByteToUtf16LE(cpin, flags, (const char*)src, srclen, wbuff.get(), wlen - 1);
 		if (!n)
 		{
 			int nsyserr = ::GetLastError();
@@ -756,7 +774,7 @@ int CrossConvert(const char* src, unsigned srclen, char* dest, unsigned destsize
 	}
 	else
 	{
-		n = WideCharToMultiByte(cpout, flags, wbuff.get(), n, dest, destsize - 1, nullptr, pdefaulted);
+		n = LmUtf16LEToMultiByte(cpout, flags, wbuff.get(), n, dest, destsize - 1, nullptr, pdefaulted);
 		if (!n)
 		{
 			int nsyserr = ::GetLastError();
@@ -1029,10 +1047,10 @@ bool convert(UNICODESET unicoding1, int codepage1, const unsigned char * src, si
 		if (destcp == CP_ACP || IsValidCodePage(destcp))
 		{
 			DWORD flags = 0;
-			int bytes = WideCharToMultiByte(destcp, flags, (LPCWSTR)src, static_cast<int>(srcbytes/2), 0, 0, nullptr, nullptr);
+			int bytes = LmUtf16LEToMultiByte(destcp, flags, (const xchar_t *)src, static_cast<int>(srcbytes/2), 0, 0, nullptr, nullptr);
 			dest->resize(bytes + 2);
 			int losses = 0;
-			bytes = WideCharToMultiByte(destcp, flags, (LPCWSTR)src, static_cast<int>(srcbytes/2), (char *)dest->ptr, static_cast<int>(dest->capacity), nullptr, nullptr);
+			bytes = LmUtf16LEToMultiByte(destcp, flags, (const xchar_t *)src, static_cast<int>(srcbytes/2), (char *)dest->ptr, static_cast<int>(dest->capacity), nullptr, nullptr);
 			dest->ptr[bytes] = 0;
 			dest->ptr[bytes+1] = 0;
 			dest->size = bytes;
@@ -1063,9 +1081,9 @@ bool convert(UNICODESET unicoding1, int codepage1, const unsigned char * src, si
 		if (srccp == CP_ACP || IsValidCodePage(srccp))
 		{
 			DWORD flags = 0;
-			int wchars = MultiByteToWideChar(srccp, flags, (LPCSTR)src, static_cast<int>(srcbytes), 0, 0);
+			int wchars = LmMultiByteToUtf16LE(srccp, flags, (LPCSTR)src, static_cast<int>(srcbytes), 0, 0);
 			dest->resize((wchars + 1) *2);
-			wchars = MultiByteToWideChar(srccp, flags, (LPCSTR)src, static_cast<int>(srcbytes), (LPWSTR)dest->ptr, static_cast<int>(dest->capacity/2));
+			wchars = LmMultiByteToUtf16LE(srccp, flags, (LPCSTR)src, static_cast<int>(srcbytes), (xchar_t *)dest->ptr, static_cast<int>(dest->capacity/2));
 			dest->ptr[wchars * 2] = 0;
 			dest->ptr[wchars * 2 + 1] = 0;
 			dest->size = wchars * 2;

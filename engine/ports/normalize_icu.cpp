@@ -11,7 +11,7 @@
 #include <unicode/unistr.h>
 #include <unicode/translit.h>
 
-namespace lm_ports
+namespace ucr { namespace lm_ports
 {
 
 String normalizeUtf8(const String& str, int winNormForm)
@@ -75,6 +75,6 @@ String icuTransliterate(const String& s, const char *translitId)
 	return out;
 }
 
-} // namespace lm_ports
+} } // namespace ucr::lm_ports
 
 #endif // !_WIN32

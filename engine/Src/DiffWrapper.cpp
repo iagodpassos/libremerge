@@ -764,8 +764,10 @@ bool CDiffWrapper::RunFileDiff()
 {
 	PathContext aFiles = m_files;
 	int file;
+#ifdef _WIN32
 	for (file = 0; file < m_files.GetSize(); file++)
 		aFiles[file] = paths::ToWindowsPath(aFiles[file]);
+#endif
 
 	bool bRet = true;
 	String strFileTemp[3];

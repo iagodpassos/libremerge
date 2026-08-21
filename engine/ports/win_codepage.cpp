@@ -16,11 +16,9 @@
 // Redeclare here what posix_compat.h (force-included) already declared;
 // this file provides the definitions.
 
-namespace
-{
-
 // Resolve a Windows codepage number to an ICU converter name.
-std::string codepageToConverterName(unsigned codepage)
+// (shared with ports/exconverter_icu.cpp via ports/lm_icu.h)
+std::string lmCodepageToConverterName(unsigned codepage)
 {
 	switch (codepage)
 	{
@@ -43,10 +41,10 @@ std::string codepageToConverterName(unsigned codepage)
 	}
 }
 
-UConverter *openConverter(unsigned codepage)
+UConverter *lmOpenConverter(unsigned codepage)
 {
 	UErrorCode err = U_ZERO_ERROR;
-	std::string name = codepageToConverterName(codepage);
+	std::string name = lmCodepageToConverterName(codepage);
 	UConverter *conv = ucnv_open(name.c_str(), &err);
 	if (U_FAILURE(err) && name.rfind("windows-", 0) == 0)
 	{
@@ -58,6 +56,9 @@ UConverter *openConverter(unsigned codepage)
 	return U_FAILURE(err) ? nullptr : conv;
 }
 
+namespace
+{
+inline UConverter *openConverter(unsigned codepage) { return lmOpenConverter(codepage); }
 } // namespace
 
 UINT GetACP(void)
@@ -72,6 +73,70 @@ BOOL IsValidCodePage(UINT codepage)
 		return FALSE;
 	ucnv_close(conv);
 	return TRUE;
+}
+
+int LmMultiByteToUtf16LE(UINT codepage, DWORD flags, const char *src, int srclen,
+                         char16_t *dst, int dstlen)
+{
+	if (src == nullptr)
+		return 0;
+	if (srclen < 0)
+		srclen = static_cast<int>(std::strlen(src));
+
+	UConverter *conv = lmOpenConverter(codepage);
+	if (conv == nullptr)
+		return 0;
+	UErrorCode err = U_ZERO_ERROR;
+	if (flags & MB_ERR_INVALID_CHARS)
+		ucnv_setToUCallBack(conv, UCNV_TO_U_CALLBACK_STOP, nullptr, nullptr, nullptr, &err);
+	err = U_ZERO_ERROR;
+	int32_t u16len = ucnv_toUChars(conv, reinterpret_cast<UChar *>(dst),
+	                               (dst == nullptr) ? 0 : dstlen, src, srclen, &err);
+	ucnv_close(conv);
+	if (dst == nullptr || dstlen == 0)
+		return (err == U_BUFFER_OVERFLOW_ERROR || U_SUCCESS(err)) ? u16len : 0;
+	return U_FAILURE(err) ? 0 : u16len;
+}
+
+int LmUtf16LEToMultiByte(UINT codepage, DWORD flags, const char16_t *src, int srclen,
+                         char *dst, int dstlen, const char *defaultChar,
+                         BOOL *usedDefaultChar)
+{
+	(void)flags; (void)defaultChar;
+	if (usedDefaultChar != nullptr)
+		*usedDefaultChar = FALSE;
+	if (src == nullptr)
+		return 0;
+	if (srclen < 0)
+	{
+		srclen = 0;
+		while (src[srclen] != 0)
+			++srclen;
+	}
+	UConverter *conv = lmOpenConverter(codepage);
+	if (conv == nullptr)
+		return 0;
+	// strict pass first to report lossy conversions
+	UErrorCode err = U_ZERO_ERROR;
+	ucnv_setFromUCallBack(conv, UCNV_FROM_U_CALLBACK_STOP, nullptr, nullptr, nullptr, &err);
+	err = U_ZERO_ERROR;
+	int32_t outlen = ucnv_fromUChars(conv, dst, (dst == nullptr) ? 0 : dstlen,
+	                                 reinterpret_cast<const UChar *>(src), srclen, &err);
+	if (U_FAILURE(err) && err != U_BUFFER_OVERFLOW_ERROR)
+	{
+		if (usedDefaultChar != nullptr)
+			*usedDefaultChar = TRUE;
+		err = U_ZERO_ERROR;
+		ucnv_setFromUCallBack(conv, UCNV_FROM_U_CALLBACK_SUBSTITUTE, nullptr, nullptr, nullptr, &err);
+		ucnv_resetFromUnicode(conv);
+		err = U_ZERO_ERROR;
+		outlen = ucnv_fromUChars(conv, dst, (dst == nullptr) ? 0 : dstlen,
+		                         reinterpret_cast<const UChar *>(src), srclen, &err);
+	}
+	ucnv_close(conv);
+	if (dst == nullptr || dstlen == 0)
+		return (err == U_BUFFER_OVERFLOW_ERROR || U_SUCCESS(err)) ? outlen : 0;
+	return U_FAILURE(err) ? 0 : outlen;
 }
 
 int MultiByteToWideChar(UINT codepage, DWORD flags, const char *src, int srclen,

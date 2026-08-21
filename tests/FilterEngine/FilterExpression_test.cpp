@@ -21,12 +21,12 @@ struct FilterTestParam { bool optimize; };
 // Helper function to create a simple DIFFITEM for testing
 static void CreateSimpleDiffItem(DIFFITEM& di)
 {
-	di.diffFileInfo[0].path = L"abc";
-	di.diffFileInfo[0].filename = L"Test.txt";
+	di.diffFileInfo[0].path = "abc";
+	di.diffFileInfo[0].filename = "Test.txt";
 	di.diffFileInfo[0].size = 1000;
-	di.diffFileInfo[1].path = L"abc";
-	di.diffFileInfo[2].path = L"abc";
-	di.diffFileInfo[2].filename = L"Test.txt";
+	di.diffFileInfo[1].path = "abc";
+	di.diffFileInfo[2].path = "abc";
+	di.diffFileInfo[2].filename = "Test.txt";
 	di.diffFileInfo[2].size = 1100;
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(2);
@@ -42,18 +42,18 @@ TEST_P(FilterExpressionTest, Literals)
 	// the behavior of the FilterExpression class.
 
 	// Initialize path context and diff context for the test.
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 
 	// Set up DIFFITEM object with file information and timestamps.
 	DIFFITEM di;
 	int tzd;
-	di.diffFileInfo[0].filename = L"Alice.txt";
+	di.diffFileInfo[0].filename = "Alice.txt";
 	di.diffFileInfo[0].size = 1000;
 	Poco::DateTime dt0 = Poco::DateTimeParser::parse("%Y-%m-%d %H:%M", "2025-05-16 15:34", tzd);
 	dt0 -= Poco::Timezone::tzd() * 1000;
 	di.diffFileInfo[0].mtime = dt0.timestamp();
-	di.diffFileInfo[1].filename = L"Alice.txt";
+	di.diffFileInfo[1].filename = "Alice.txt";
 	di.diffFileInfo[1].size = 1100;
 	Poco::DateTime dt1 = Poco::DateTimeParser::parse("%Y-%m-%d %H:%M:%S", "2025-05-16 15:34:57", tzd);
 	dt1 -= Poco::Timezone::tzd() * 1000;
@@ -771,12 +771,12 @@ TEST_P(FilterExpressionTest, Literals)
 
 TEST_P(FilterExpressionTest, FileAttributes)
 {
-	PathContext paths(L"C:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src", L"E:\\dev\\winmerge\\src");
+	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src", "E:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	int tzd;
-	di.diffFileInfo[0].path = L"abc";
-	di.diffFileInfo[0].filename = L"Alice.txt";
+	di.diffFileInfo[0].path = "abc";
+	di.diffFileInfo[0].filename = "Alice.txt";
 	di.diffFileInfo[0].size = 1000;
 	di.diffFileInfo[0].flags.attributes = FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_ARCHIVE;
 	Poco::DateTime dt0 = Poco::DateTimeParser::parse("%Y-%m-%d %H:%M:%S", "2025-05-16 15:34:56", tzd);
@@ -785,9 +785,9 @@ TEST_P(FilterExpressionTest, FileAttributes)
 	di.diffFileInfo[0].ctime = dt0.timestamp();
 	di.diffFileInfo[0].encoding.SetCodepage(65001);
 	di.diffFileInfo[0].version.SetFileVersion(0x00020010, 0x00300002);
-	di.diffFileInfo[1].path = L"abc";
-	di.diffFileInfo[2].path = L"abc";
-	di.diffFileInfo[2].filename = L"Alice.txt";
+	di.diffFileInfo[1].path = "abc";
+	di.diffFileInfo[2].path = "abc";
+	di.diffFileInfo[2].filename = "Alice.txt";
 	di.diffFileInfo[2].size = 1100;
 	di.diffFileInfo[2].flags.attributes = FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_ARCHIVE;
 	Poco::DateTime dt1 = Poco::DateTimeParser::parse("%Y-%m-%d %H:%M:%S", "2025-05-16 15:34:57", tzd);
@@ -921,12 +921,12 @@ TEST_P(FilterExpressionTest, FileAttributes)
 
 TEST_P(FilterExpressionTest, LineAttributes)
 {
-	PathContext paths(L"C:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src", L"E:\\dev\\winmerge\\src");
+	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src", "E:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	int tzd;
-	di.diffFileInfo[0].path = L"abc";
-	di.diffFileInfo[0].filename = L"Alice.txt";
+	di.diffFileInfo[0].path = "abc";
+	di.diffFileInfo[0].filename = "Alice.txt";
 	di.diffFileInfo[0].size = 1000;
 	di.diffFileInfo[0].flags.attributes = FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_ARCHIVE;
 	Poco::DateTime dt0 = Poco::DateTimeParser::parse("%Y-%m-%d %H:%M:%S", "2025-05-16 15:34:56", tzd);
@@ -935,9 +935,9 @@ TEST_P(FilterExpressionTest, LineAttributes)
 	di.diffFileInfo[0].ctime = dt0.timestamp();
 	di.diffFileInfo[0].encoding.SetCodepage(65001);
 	di.diffFileInfo[0].version.SetFileVersion(0x00020010, 0x00300002);
-	di.diffFileInfo[1].path = L"abc";
-	di.diffFileInfo[2].path = L"abc";
-	di.diffFileInfo[2].filename = L"Alice.txt";
+	di.diffFileInfo[1].path = "abc";
+	di.diffFileInfo[2].path = "abc";
+	di.diffFileInfo[2].filename = "Alice.txt";
 	di.diffFileInfo[2].size = 1100;
 	di.diffFileInfo[2].flags.attributes = FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_ARCHIVE;
 	Poco::DateTime dt1 = Poco::DateTimeParser::parse("%Y-%m-%d %H:%M:%S", "2025-05-16 15:34:57", tzd);
@@ -1445,7 +1445,7 @@ TEST_P(FilterExpressionTest, LineAttributes)
 
 TEST_P(FilterExpressionTest, Content1)
 {
-	const String dir = paths::ConcatPath(env::GetProgPath(), L"..\\TestData");
+	const String dir = paths::ConcatPath(env::GetProgPath(), "..\\TestData");
 	PathContext paths(dir, dir);
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
@@ -1453,8 +1453,8 @@ TEST_P(FilterExpressionTest, Content1)
 	fe.SetDiffContext(&ctxt);
 	fe.optimize = GetParam().optimize;
 
-	di.diffFileInfo[1].filename = L"LeftAndRight.WinMerge";
-	di.diffFileInfo[1].path = L"";
+	di.diffFileInfo[1].filename = "LeftAndRight.WinMerge";
+	di.diffFileInfo[1].path = "";
 	di.diffcode.setSideFlag(1);
 	
 	GetOptionsMgr()->InitOption(OPT_CP_DETECT, 0);
@@ -1493,7 +1493,7 @@ TEST_P(FilterExpressionTest, Content1)
 
 TEST_P(FilterExpressionTest, ContentEmpty)
 {
-	const String dir = paths::ConcatPath(env::GetProgPath(), L"..\\..\\Data\\Compare");
+	const String dir = paths::ConcatPath(env::GetProgPath(), "..\\..\\Data\\Compare");
 	PathContext paths(paths::ConcatPath(dir, _T("dir1")), paths::ConcatPath(dir, _T("dir2")));
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
@@ -1501,8 +1501,8 @@ TEST_P(FilterExpressionTest, ContentEmpty)
 	fe.SetDiffContext(&ctxt);
 	fe.optimize = GetParam().optimize;
 
-	di.diffFileInfo[1].filename = L"file123_0.txt";
-	di.diffFileInfo[1].path = L"";
+	di.diffFileInfo[1].filename = "file123_0.txt";
+	di.diffFileInfo[1].path = "";
 	di.diffcode.setSideFlag(1);
 	
 	GetOptionsMgr()->InitOption(OPT_CP_DETECT, 0);
@@ -1533,7 +1533,7 @@ TEST_P(FilterExpressionTest, ContentEmpty)
 
 TEST_P(FilterExpressionTest, ParseError)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	FilterExpression fe;
 	fe.SetDiffContext(&ctxt);
@@ -1631,7 +1631,7 @@ TEST_P(FilterExpressionTest, ParseError)
 
 TEST_P(FilterExpressionTest, IsWithinAndInRange)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	FilterExpression fe;
@@ -1801,12 +1801,12 @@ TEST_P(FilterExpressionTest, IsWithinAndInRange)
 
 TEST_P(FilterExpressionTest, StrCountAndRegexCount)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
 	di.diffFileInfo[0].size = 1000;
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffFileInfo[1].size = 1000;
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
@@ -1913,16 +1913,16 @@ TEST_P(FilterExpressionTest, StrCountAndRegexCount)
 
 TEST_P(FilterExpressionTest, Test1)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	int tzd = 0;
-	di.diffFileInfo[0].filename = L"Alice.txt";
+	di.diffFileInfo[0].filename = "Alice.txt";
 	di.diffFileInfo[0].size = 1000;
 	Poco::DateTime dt0 = Poco::DateTimeParser::parse("%Y-%m-%d %H:%M", "2025-05-16 15:34", tzd);
 	dt0.makeUTC(Poco::Timezone::tzd());
 	di.diffFileInfo[0].mtime = dt0.timestamp();
-	di.diffFileInfo[1].filename = L"Alice.txt";
+	di.diffFileInfo[1].filename = "Alice.txt";
 	di.diffFileInfo[1].size = 1100;
 	Poco::DateTime dt1 = Poco::DateTimeParser::parse("%Y-%m-%d %H:%M:%S", "2025-05-16 15:34:57", tzd);
 	dt1.makeUTC(Poco::Timezone::tzd());
@@ -1962,12 +1962,12 @@ TEST_P(FilterExpressionTest, Test1)
 
 TEST_P(FilterExpressionTest, ConditionalFunctions)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Alice.txt";
+	di.diffFileInfo[0].filename = "Alice.txt";
 	di.diffFileInfo[0].size = 1000;
-	di.diffFileInfo[1].filename = L"Bob.txt";
+	di.diffFileInfo[1].filename = "Bob.txt";
 	di.diffFileInfo[1].size = 2000;
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
@@ -2077,12 +2077,12 @@ TEST_P(FilterExpressionTest, ConditionalFunctions)
 
 TEST_P(FilterExpressionTest, StringTransformFunctions)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
 	di.diffFileInfo[0].size = 1000;
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffFileInfo[1].size = 1000;
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
@@ -2186,12 +2186,12 @@ TEST_P(FilterExpressionTest, StringTransformFunctions)
 
 TEST_P(FilterExpressionTest, StringFunctionsWithNonStringArguments)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
 	di.diffFileInfo[0].size = 1000;
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffFileInfo[1].size = 1000;
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
@@ -2317,11 +2317,11 @@ TEST_P(FilterExpressionTest, StringFunctionsWithNonStringArguments)
 
 TEST_P(FilterExpressionTest, RegexExtract)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -2503,11 +2503,11 @@ TEST_P(FilterExpressionTest, RegexExtract)
 
 TEST_P(FilterExpressionTest, TrimFunctions)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -2602,11 +2602,11 @@ TEST_P(FilterExpressionTest, TrimFunctions)
 
 TEST_P(FilterExpressionTest, ReplaceWithList)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -2616,20 +2616,20 @@ TEST_P(FilterExpressionTest, ReplaceWithList)
 
 	// Create temporary directory path
 	const String tempDir = env::GetTemporaryPath();
-	const String replaceListPath = paths::ConcatPath(tempDir, L"test_replacelist.txt");
-	const String regexReplaceListPath = paths::ConcatPath(tempDir, L"test_regex_replacelist.txt");
+	const String replaceListPath = paths::ConcatPath(tempDir, "test_replacelist.txt");
+	const String regexReplaceListPath = paths::ConcatPath(tempDir, "test_regex_replacelist.txt");
 
 	// Create replace list file
 	{
 		UniStdioFile file;
 		EXPECT_TRUE(file.OpenCreateUtf8(replaceListPath));
 		file.WriteBom();
-		file.WriteString(L"# Comment line\n");
-		file.WriteString(L"apple\tAPL\n");
-		file.WriteString(L"orange\tORG\n");
-		file.WriteString(L"banana\tBAN\n");
-		file.WriteString(L"# Another comment\n");
-		file.WriteString(L"grape\tGRP\n");
+		file.WriteString("# Comment line\n");
+		file.WriteString("apple\tAPL\n");
+		file.WriteString("orange\tORG\n");
+		file.WriteString("banana\tBAN\n");
+		file.WriteString("# Another comment\n");
+		file.WriteString("grape\tGRP\n");
 		file.Close();
 	}
 
@@ -2638,10 +2638,10 @@ TEST_P(FilterExpressionTest, ReplaceWithList)
 		UniStdioFile file;
 		EXPECT_TRUE(file.OpenCreateUtf8(regexReplaceListPath));
 		file.WriteBom();
-		file.WriteString(L"# Regex patterns\n");
-		file.WriteString(L"\\d+\t----\n");
-		file.WriteString(L"[a-z]+\t****\n");
-		file.WriteString(L"\\s+\t|\n");
+		file.WriteString("# Regex patterns\n");
+		file.WriteString("\\d+\t----\n");
+		file.WriteString("[a-z]+\t****\n");
+		file.WriteString("\\s+\t|\n");
 		file.Close();
 	}
 
@@ -2729,11 +2729,11 @@ TEST_P(FilterExpressionTest, ReplaceWithList)
 
 TEST_P(FilterExpressionTest, ReplaceWithListAdvanced)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -2742,20 +2742,20 @@ TEST_P(FilterExpressionTest, ReplaceWithListAdvanced)
 	fe.optimize = GetParam().optimize;
 
 	const String tempDir = env::GetTemporaryPath();
-	const String replaceListPath = paths::ConcatPath(tempDir, L"test_replacelist2.txt");
-	const String regexReplaceListPath = paths::ConcatPath(tempDir, L"test_regex_replacelist2.txt");
+	const String replaceListPath = paths::ConcatPath(tempDir, "test_replacelist2.txt");
+	const String regexReplaceListPath = paths::ConcatPath(tempDir, "test_regex_replacelist2.txt");
 
 	// Create replace list with edge cases
 	{
 		UniStdioFile file;
 		EXPECT_TRUE(file.OpenCreateUtf8(replaceListPath));
 		file.WriteBom();
-		file.WriteString(L"# Test special characters\n");
-		file.WriteString(L"C++\tCPlusPlus\n");
-		file.WriteString(L"a\tb\tc\td\n"); // Extra tabs should be ignored
-		file.WriteString(L"\n"); // Empty line should be skipped
-		file.WriteString(L"test\t\n"); // Replace with empty string
-		file.WriteString(L"# Comment at end\n");
+		file.WriteString("# Test special characters\n");
+		file.WriteString("C++\tCPlusPlus\n");
+		file.WriteString("a\tb\tc\td\n"); // Extra tabs should be ignored
+		file.WriteString("\n"); // Empty line should be skipped
+		file.WriteString("test\t\n"); // Replace with empty string
+		file.WriteString("# Comment at end\n");
 		file.Close();
 	}
 
@@ -2764,9 +2764,9 @@ TEST_P(FilterExpressionTest, ReplaceWithListAdvanced)
 		UniStdioFile file;
 		EXPECT_TRUE(file.OpenCreateUtf8(regexReplaceListPath));
 		file.WriteBom();
-		file.WriteString(L"# Regex with captures\n");
-		file.WriteString(L"(\\d{4})-(\\d{2})-(\\d{2})\t$3/$2/$1\n");
-		file.WriteString(L"\\b(\\w+)\\s+\\1\\b\t$1\n"); // Remove duplicate words
+		file.WriteString("# Regex with captures\n");
+		file.WriteString("(\\d{4})-(\\d{2})-(\\d{2})\t$3/$2/$1\n");
+		file.WriteString("\\b(\\w+)\\s+\\1\\b\t$1\n"); // Remove duplicate words
 		file.Close();
 	}
 
@@ -2806,11 +2806,11 @@ TEST_P(FilterExpressionTest, ReplaceWithListAdvanced)
 
 TEST_P(FilterExpressionTest, ReplaceWithListEncoding)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -2819,19 +2819,19 @@ TEST_P(FilterExpressionTest, ReplaceWithListEncoding)
 	fe.optimize = GetParam().optimize;
 
 	const String tempDir = env::GetTemporaryPath();
-	const String replaceListPath = paths::ConcatPath(tempDir, L"test_replacelist_utf8.txt");
+	const String replaceListPath = paths::ConcatPath(tempDir, "test_replacelist_utf8.txt");
 
 	// Create UTF-8 encoded file with word replacements
 	{
 		UniStdioFile file;
 		EXPECT_TRUE(file.OpenCreateUtf8(replaceListPath));
 		file.WriteBom();
-		file.WriteString(L"# UTF-8 encoding test\n");
-		file.WriteString(L"hello\tgreetings\n");
-		file.WriteString(L"goodbye\tfarewell\n");
-		file.WriteString(L"thanks\tgratitude\n");
-		file.WriteString(L"dog\tcanine\n");
-		file.WriteString(L"cat\tfeline\n");
+		file.WriteString("# UTF-8 encoding test\n");
+		file.WriteString("hello\tgreetings\n");
+		file.WriteString("goodbye\tfarewell\n");
+		file.WriteString("thanks\tgratitude\n");
+		file.WriteString("dog\tcanine\n");
+		file.WriteString("cat\tfeline\n");
 		file.Close();
 	}
 
@@ -2857,11 +2857,11 @@ TEST_P(FilterExpressionTest, ReplaceWithListEncoding)
 
 TEST_P(FilterExpressionTest, CaseSensitiveStringComparison)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -2913,11 +2913,11 @@ TEST_P(FilterExpressionTest, CaseSensitiveStringComparison)
 
 TEST_P(FilterExpressionTest, CaseSensitiveContains)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -2951,11 +2951,11 @@ TEST_P(FilterExpressionTest, CaseSensitiveContains)
 
 TEST_P(FilterExpressionTest, CaseSensitiveRegex)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -2999,11 +2999,11 @@ TEST_P(FilterExpressionTest, CaseSensitiveRegex)
 
 TEST_P(FilterExpressionTest, CaseSensitiveLike)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3035,11 +3035,11 @@ TEST_P(FilterExpressionTest, CaseSensitiveLike)
 
 TEST_P(FilterExpressionTest, CaseSensitiveReplace)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3071,11 +3071,11 @@ TEST_P(FilterExpressionTest, CaseSensitiveReplace)
 
 TEST_P(FilterExpressionTest, CaseSensitiveRegexReplace)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3107,11 +3107,11 @@ TEST_P(FilterExpressionTest, CaseSensitiveRegexReplace)
 
 TEST_P(FilterExpressionTest, CaseSensitiveIsWithinAndInRange)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3155,11 +3155,11 @@ TEST_P(FilterExpressionTest, CaseSensitiveIsWithinAndInRange)
 
 TEST_P(FilterExpressionTest, CaseSensitiveReplaceWithList)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3169,17 +3169,17 @@ TEST_P(FilterExpressionTest, CaseSensitiveReplaceWithList)
 	fe.caseSensitive = true;
 
 	const String tempDir = env::GetTemporaryPath();
-	const String replaceListPath = paths::ConcatPath(tempDir, L"test_replacelist_casesensitive.txt");
+	const String replaceListPath = paths::ConcatPath(tempDir, "test_replacelist_casesensitive.txt");
 
 	// Create replace list file
 	{
 		UniStdioFile file;
 		EXPECT_TRUE(file.OpenCreateUtf8(replaceListPath));
 		file.WriteBom();
-		file.WriteString(L"# Case-sensitive replacements\n");
-		file.WriteString(L"Hello\tHI\n");
-		file.WriteString(L"World\tEARTH\n");
-		file.WriteString(L"test\tEXAM\n");
+		file.WriteString("# Case-sensitive replacements\n");
+		file.WriteString("Hello\tHI\n");
+		file.WriteString("World\tEARTH\n");
+		file.WriteString("test\tEXAM\n");
 		file.Close();
 	}
 
@@ -3213,14 +3213,14 @@ TEST_P(FilterExpressionTest, CaseSensitiveReplaceWithList)
 
 TEST_P(FilterExpressionTest, CaseSensitiveFileAttributes)
 {
-	PathContext paths(L"C:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].path = L"abc";
-	di.diffFileInfo[0].filename = L"Test.TXT";
+	di.diffFileInfo[0].path = "abc";
+	di.diffFileInfo[0].filename = "Test.TXT";
 	di.diffFileInfo[0].size = 1000;
-	di.diffFileInfo[1].path = L"abc";
-	di.diffFileInfo[1].filename = L"test.txt";
+	di.diffFileInfo[1].path = "abc";
+	di.diffFileInfo[1].filename = "test.txt";
 	di.diffFileInfo[1].size = 1000;
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
@@ -3259,8 +3259,8 @@ TEST_P(FilterExpressionTest, CaseSensitiveFileAttributes)
 	EXPECT_TRUE(fe.Evaluate(di));
 
 	// Extension comparison
-	di.diffFileInfo[0].filename = L"file.TXT";
-	di.diffFileInfo[1].filename = L"file.txt";
+	di.diffFileInfo[0].filename = "file.TXT";
+	di.diffFileInfo[1].filename = "file.txt";
 	EXPECT_TRUE(fe.Parse("LeftExtension == \"TXT\""));
 	EXPECT_TRUE(fe.Evaluate(di));
 	EXPECT_TRUE(fe.Parse("LeftExtension == \"txt\""));
@@ -3273,11 +3273,11 @@ TEST_P(FilterExpressionTest, CaseSensitiveFileAttributes)
 
 TEST_P(FilterExpressionTest, DirectiveCaseSensitive)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3303,11 +3303,11 @@ TEST_P(FilterExpressionTest, DirectiveCaseSensitive)
 
 TEST_P(FilterExpressionTest, DirectiveCaseInsensitive)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3326,11 +3326,11 @@ TEST_P(FilterExpressionTest, DirectiveCaseInsensitive)
 
 TEST_P(FilterExpressionTest, DirectiveWithOperators)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3383,7 +3383,7 @@ TEST_P(FilterExpressionTest, DirectiveWithOperators)
 
 TEST_P(FilterExpressionTest, DirectiveInvalidSyntax)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	FilterExpression fe;
 	fe.SetDiffContext(&ctxt);
@@ -3450,14 +3450,14 @@ TEST_P(FilterExpressionTest, DirectiveInvalidSyntax)
 
 TEST_P(FilterExpressionTest, DirectiveWithFileAttributes)
 {
-	PathContext paths(L"C:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].path = L"abc";
-	di.diffFileInfo[0].filename = L"Test.TXT";
+	di.diffFileInfo[0].path = "abc";
+	di.diffFileInfo[0].filename = "Test.TXT";
 	di.diffFileInfo[0].size = 1000;
-	di.diffFileInfo[1].path = L"abc";
-	di.diffFileInfo[1].filename = L"test.txt";
+	di.diffFileInfo[1].path = "abc";
+	di.diffFileInfo[1].filename = "test.txt";
 	di.diffFileInfo[1].size = 1000;
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
@@ -3484,8 +3484,8 @@ TEST_P(FilterExpressionTest, DirectiveWithFileAttributes)
 	EXPECT_FALSE(fe.Evaluate(di));
 
 	// Extension with @cs
-	di.diffFileInfo[0].filename = L"file.TXT";
-	di.diffFileInfo[1].filename = L"file.txt";
+	di.diffFileInfo[0].filename = "file.TXT";
+	di.diffFileInfo[1].filename = "file.txt";
 
 	EXPECT_TRUE(fe.Parse("@cs LeftExtension == \"TXT\""));
 	EXPECT_TRUE(fe.Evaluate(di));
@@ -3497,8 +3497,8 @@ TEST_P(FilterExpressionTest, DirectiveWithFileAttributes)
 	EXPECT_TRUE(fe.Evaluate(di));
 
 	// Name contains with @cs
-	di.diffFileInfo[0].filename = L"TestFile.TXT";
-	di.diffFileInfo[1].filename = L"testfile.txt";
+	di.diffFileInfo[0].filename = "TestFile.TXT";
+	di.diffFileInfo[1].filename = "testfile.txt";
 
 	EXPECT_TRUE(fe.Parse("@cs LeftName contains \"Test\""));
 	EXPECT_TRUE(fe.Evaluate(di));
@@ -3515,11 +3515,11 @@ TEST_P(FilterExpressionTest, DirectiveWithFileAttributes)
 
 TEST_P(FilterExpressionTest, DirectiveWithArrays)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3561,11 +3561,11 @@ TEST_P(FilterExpressionTest, DirectiveWithArrays)
 
 TEST_P(FilterExpressionTest, DirectiveEmptyExpression)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3593,11 +3593,11 @@ TEST_P(FilterExpressionTest, DirectiveEmptyExpression)
 
 TEST_P(FilterExpressionTest, DirectiveIsWithinAndInRange)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
 
@@ -3641,12 +3641,12 @@ TEST_P(FilterExpressionTest, DirectiveIsWithinAndInRange)
 
 TEST_P(FilterExpressionTest, DirectiveOptimize)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
 	di.diffFileInfo[0].size = 1000;
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffFileInfo[1].size = 2000;
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
@@ -3711,7 +3711,7 @@ TEST_P(FilterExpressionTest, DirectiveOptimize)
 
 TEST_P(FilterExpressionTest, StatisticsAndMatchFunctions)
 {
-	PathContext paths(L"C:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src", L"E:\\dev\\winmerge\\src");
+	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src", "E:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	CreateSimpleDiffItem(di);
@@ -3991,7 +3991,7 @@ TEST_P(FilterExpressionTest, StatisticsAndMatchFunctions)
 
 TEST_P(FilterExpressionTest, BlockFunctions)
 {
-	PathContext paths(L"C:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src", L"E:\\dev\\winmerge\\src");
+	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src", "E:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	CreateSimpleDiffItem(di);
@@ -4364,7 +4364,7 @@ TEST_P(FilterExpressionTest, BlockFunctions)
 
 TEST_P(FilterExpressionTest, TransformLine)
 {
-	PathContext paths(L"C:\\dev\\winmerge\\src");
+	PathContext paths("C:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	CreateSimpleDiffItem(di);
@@ -4428,12 +4428,12 @@ TEST_P(FilterExpressionTest, TransformLine)
 
 TEST_P(FilterExpressionTest, StrFindAndRegexFindFunctions)
 {
-	PathContext paths(L"D:\\dev\\winmerge\\src", L"D:\\dev\\winmerge\\src");
+	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
-	di.diffFileInfo[0].filename = L"Test.txt";
+	di.diffFileInfo[0].filename = "Test.txt";
 	di.diffFileInfo[0].size = 1000;
-	di.diffFileInfo[1].filename = L"Test.txt";
+	di.diffFileInfo[1].filename = "Test.txt";
 	di.diffFileInfo[1].size = 1000;
 	di.diffcode.setSideFlag(0);
 	di.diffcode.setSideFlag(1);
