@@ -32,6 +32,7 @@ namespace cio
 #define _S_IREAD  (S_IRUSR | S_IRGRP | S_IROTH)
 #define _S_IWRITE (S_IWUSR | S_IWGRP | S_IWOTH)
 	typedef struct stat stat;
+	using ssize_t = ::ssize_t;
 	inline int read_i(int fd, void* buf, unsigned size) { return (int)::read(fd, buf, size); }
 	inline int write_i(int fd, const void* buf, unsigned size) { return (int)::write(fd, buf, size); }
 	constexpr auto read = ::read;

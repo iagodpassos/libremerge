@@ -13,7 +13,9 @@
 #include "pch.h"
 #include "DiffContext.h"
 #include "CompareOptions.h"
+#ifdef _WIN32
 #include "VersionInfo.h"
+#endif
 #include "paths.h"
 #include "codepage_detect.h"
 #include "IAbortable.h"
@@ -146,12 +148,18 @@ void CDiffContext::UpdateVersion(DIFFITEM &di, int nIndex) const
 	const String spath = paths::ConcatPath(
 		di.getFilepath(nIndex, GetNormalizedPath(nIndex)), di.diffFileInfo[nIndex].filename);
 	
+#ifdef _WIN32
 	// Get version info if it exists
 	CVersionInfo ver(spath.c_str());
 	unsigned verMS = 0;
 	unsigned verLS = 0;
 	if (ver.GetFixedFileVersion(verMS, verLS))
 		dfi.version.SetFileVersion(verMS, verLS);
+#else
+	// PE version resources do not exist on POSIX
+	(void)spath;
+	dfi.version.SetFileVersionNone();
+#endif
 }
 
 /**

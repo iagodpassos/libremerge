@@ -7,7 +7,12 @@
 
 #include "pch.h"
 #include "TempFile.h"
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include <signal.h>
+#include <cerrno>
+#endif
 #include "paths.h"
 #include "TFile.h"
 #include "DirTravel.h"
@@ -148,11 +153,15 @@ void CleanupWMtemp()
  */
 static bool WMrunning(int iPI)
 {
+#ifdef _WIN32
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, iPI);
 	if (!hProcess)
 		return (GetLastError() == ERROR_ACCESS_DENIED);
 	CloseHandle(hProcess);
 	return true;
+#else
+	return kill(iPI, 0) == 0 || errno == EPERM;
+#endif
 }
 
 /**

@@ -93,6 +93,10 @@ inline const varprop::VariantValue& COption::GetDefault() const
 
 typedef std::map<String, COption> OptionsMap;
 
+class COptionsMgr;
+/** @brief Global options manager, provided by the application (see ports/options_global.cpp). */
+COptionsMgr * GetOptionsMgr();
+
 /**
  * @brief Class to store list of options.
  * This class holds a list of all options (known to application). Options

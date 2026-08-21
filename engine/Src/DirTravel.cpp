@@ -10,12 +10,20 @@
 #include <algorithm>
 #include <Poco/DirectoryIterator.h>
 #include <Poco/Timestamp.h>
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include <dirent.h>
+#include <fnmatch.h>
+#include <sys/stat.h>
+#endif
 #include "TFile.h"
 #include "UnicodeString.h"
 #include "DirItem.h"
 #include "paths.h"
+#ifdef _WIN32
 #include "Win_VersionHelper.h"
+#endif
 #include "DebugNew.h"
 
 using Poco::DirectoryIterator;
@@ -54,6 +62,45 @@ void LoadFiles(const String& sDir, DirItemArray* dirs, DirItemArray* files, cons
 	boost::flyweight<String> dir(sDir);
 	String sPattern = paths::ConcatPath(sDir, pattern);
 
+#ifndef _WIN32
+	// POSIX implementation: readdir + fnmatch, stat for times/size/attributes
+	DIR *dp = opendir(sDir.c_str());
+	if (dp != nullptr)
+	{
+		const bool matchAll = pattern == _T("*.*") || pattern == _T("*");
+		struct dirent *de;
+		while ((de = readdir(dp)) != nullptr)
+		{
+			if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+				continue;
+			if (!matchAll && fnmatch(pattern.c_str(), de->d_name, 0) != 0)
+				continue;
+			String fullpath = paths::ConcatPath(sDir, de->d_name);
+			struct stat st;
+			if (stat(fullpath.c_str(), &st) != 0)
+				continue;
+			const bool bIsDirectory = S_ISDIR(st.st_mode);
+
+			DirItem ent;
+			ent.ctime = Timestamp::fromEpochTime(st.st_ctime);
+			ent.mtime = Timestamp::fromEpochTime(st.st_mtime);
+			ent.size = bIsDirectory ? DirItem::FILE_SIZE_NONE : (int64_t)st.st_size;
+			ent.path = dir;
+			ent.filename = de->d_name;
+			unsigned attrs = bIsDirectory ? FILE_ATTRIBUTE_DIRECTORY : 0;
+			if ((st.st_mode & S_IWUSR) == 0)
+				attrs |= FILE_ATTRIBUTE_READONLY;
+			if (de->d_name[0] == '.')
+				attrs |= FILE_ATTRIBUTE_HIDDEN;
+			if (attrs == 0)
+				attrs = FILE_ATTRIBUTE_NORMAL;
+			ent.flags.attributes = attrs;
+
+			(bIsDirectory ? dirs : files)->push_back(ent);
+		}
+		closedir(dp);
+	}
+#else
 	WIN32_FIND_DATA ff;
 	HANDLE h;
 	if (IsWin7_OrGreater())	// (also 'Windows Server 2008 R2' and greater) for FindExInfoBasic and FIND_FIRST_EX_LARGE_FETCH
@@ -92,6 +139,7 @@ void LoadFiles(const String& sDir, DirItemArray* dirs, DirItemArray* files, cons
 		} while (FindNextFile(h, &ff));
 		FindClose(h);
 	}
+#endif
 }
 }
 

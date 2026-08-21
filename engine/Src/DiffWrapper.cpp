@@ -32,7 +32,9 @@
 #include "unicoder.h"
 #include "TFile.h"
 #include "Exceptions.h"
+#ifdef _WIN32
 #include "SyntaxColors.h"
+#endif
 #include "Logger.h"
 #include "MergeApp.h"
 #include "SubstitutionList.h"
@@ -295,7 +297,7 @@ static bool iseolch(tchar_t ch)
 	return ch == '\n' || ch == '\r';
 }
 
-static size_t linelen(const tchar_t* string, size_t maxlen)
+static size_t linelen_dw(const tchar_t* string, size_t maxlen)
 {
 	const tchar_t* q = string + maxlen;
 	do
@@ -332,7 +334,7 @@ static std::unique_ptr<LangServices::ITextBuffer> CreateTextBuffer(const file_da
 				return 0;
 			if (m_lineCache[nLineIndex].empty())
 				m_lineCache[nLineIndex] = convertToTString(m_fileData.linbuf[nLineIndex + m_fileData.linbuf_base], m_fileData.linbuf[nLineIndex + 1 + m_fileData.linbuf_base]);
-			return static_cast<int>(linelen(m_lineCache[nLineIndex].c_str(), m_lineCache[nLineIndex].length()));
+			return static_cast<int>(linelen_dw(m_lineCache[nLineIndex].c_str(), m_lineCache[nLineIndex].length()));
 		}
 		int GetFullLineLength(int nLineIndex) const override
 		{

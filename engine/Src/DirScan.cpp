@@ -29,8 +29,12 @@
 #include "DirItem.h"
 #include "DirTravel.h"
 #include "paths.h"
+#ifdef _WIN32
 #include "Plugins.h"
+#endif
+#ifdef _WIN32
 #include "MergeAppCOMClass.h"
+#endif
 #include "PathContext.h"
 #include "DebugNew.h"
 
@@ -84,7 +88,9 @@ public:
 		FolderCmp fc(m_pCtxt);
 		// keep the scripts alive during the Rescan
 		// when we exit the thread, we delete this and release the scripts
+#ifdef _WIN32
 		CAssureScriptsForThread scriptsForRescan(new MergeAppCOMClass());
+#endif
 
 		while (!m_terminate)
 		{

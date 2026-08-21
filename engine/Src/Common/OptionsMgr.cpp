@@ -31,7 +31,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "UniFile.h"
 #include <algorithm>
 #include <cassert>
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 constexpr int MAX_PATH_FULL = 32767;
 

@@ -16,8 +16,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 #include "pch.h"
 #include "unicoder.h"
+#ifdef _WIN32
 #include <windows.h>
 #include <winnls.h>
+#endif
 #include <cassert>
 #include <memory>
 #include <Poco/UnicodeConverter.h>
@@ -26,7 +28,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 using Poco::UnicodeConverter;
 
-#if (WINVER < 0x0600)
+#if defined(_WIN32) && (WINVER < 0x0600)
 typedef enum _NORM_FORM { NormalizationOther = 0, NormalizationC = 0x1, NormalizationD = 0x2, NormalizationKC = 0x5, NormalizationKD = 0x6 } NORM_FORM;
 extern "C" __declspec(dllimport) int WINAPI NormalizeString(NORM_FORM NormForm, LPCWSTR lpSrcString, int cwSrcLength, LPWSTR lpDstString, int cwDstLength);
 #endif
@@ -1299,6 +1301,20 @@ void setDefaultCodepage(int cp)
 	f_nDefaultCodepage = cp;
 }
 
+#ifndef _WIN32
+
+// POSIX: Unicode normalization via ICU (ports/normalize_icu.cpp)
+namespace lm_ports { String normalizeUtf8(const String& str, int winNormForm); }
+
+String normalizeString(const String& str, NORMFORM form)
+{
+	if (str.empty())
+		return str;
+	return lm_ports::normalizeUtf8(str, static_cast<int>(form));
+}
+
+#else
+
 typedef int (WINAPI* PFN_NormalizeString)(_NORM_FORM NormForm, LPCWSTR lpSrcString, int cwSrcLength, LPWSTR lpDstString, int cwDstLength);
 
 static PFN_NormalizeString GetNormalizeStringProc()
@@ -1395,6 +1411,31 @@ String normalizeString(const String& str, NORMFORM form)
 #endif
 }
 
+#endif // _WIN32
+
+#ifndef _WIN32
+
+// POSIX: locale-independent text mappings via ICU (ports/normalize_icu.cpp)
+namespace lm_ports
+{
+String icuToUpper(const String& s);
+String icuToLower(const String& s);
+String icuTransliterate(const String& s, const char *translitId);
+}
+
+String toUpper(const String& s) { return lm_ports::icuToUpper(s); }
+String toLower(const String& s) { return lm_ports::icuToLower(s); }
+String toHalfWidth(const String& s) { return lm_ports::icuTransliterate(s, "Fullwidth-Halfwidth"); }
+String toFullWidth(const String& s) { return lm_ports::icuTransliterate(s, "Halfwidth-Fullwidth"); }
+String toKatakana(const String& s) { return lm_ports::icuTransliterate(s, "Hiragana-Katakana"); }
+String toHiragana(const String& s) { return lm_ports::icuTransliterate(s, "Katakana-Hiragana"); }
+String toSimplifiedChinese(const String& s) { return lm_ports::icuTransliterate(s, "Hant-Hans"); }
+String toTraditionalChinese(const String& s) { return lm_ports::icuTransliterate(s, "Hans-Hant"); }
+
+} // namespace ucr
+
+#else
+
 using LCMapStringEx_t = int (WINAPI*)(LPCWSTR lpLocaleName, DWORD dwMapFlags, LPCWSTR lpSrcStr, int cchSrc, LPWSTR lpDestStr, int cchDest, LPNLSVERSIONINFO lpVersionInformation, LPVOID lpReserved, LPARAM sortHandle);
 
 static String LCMapStringAuto(const String& input, unsigned mapFlags)
@@ -1475,3 +1516,5 @@ String toTraditionalChinese(const String& s)
 }
 
 } // namespace ucr
+
+#endif // _WIN32

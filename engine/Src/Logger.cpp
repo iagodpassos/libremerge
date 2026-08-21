@@ -9,11 +9,13 @@ void Logger::Log(LogLevel level, const String& msg)
 		m_func(level, std::chrono::system_clock::now(), msg);
 }
 
+#ifdef _UNICODE
 void Logger::Log(LogLevel level, const std::string& msg)
 {
 	if (m_func)
 		m_func(level, std::chrono::system_clock::now(), ucr::toTString(msg));
 }
+#endif
 
 
 String LogMessage::format(const String& dateTimePattern, bool milliseconds) const

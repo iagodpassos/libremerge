@@ -25,8 +25,13 @@ typedef enum
 	IS_EXISTING_DIR, /**< It is existing folder */
 } PATH_EXISTENCE;
 
-constexpr tchar_t* NATIVE_NULL_DEVICE_NAME = _T("NUL");
-constexpr tchar_t* NATIVE_NULL_DEVICE_NAME_LONG = _T("\\\\.\\NUL");
+#ifdef _WIN32
+constexpr const tchar_t* NATIVE_NULL_DEVICE_NAME = _T("NUL");
+constexpr const tchar_t* NATIVE_NULL_DEVICE_NAME_LONG = _T("\\\\.\\NUL");
+#else
+constexpr const tchar_t* NATIVE_NULL_DEVICE_NAME = _T("/dev/null");
+constexpr const tchar_t* NATIVE_NULL_DEVICE_NAME_LONG = _T("/dev/null");
+#endif
 
 bool EndsWithSlash(const String& s);
 
@@ -54,7 +59,11 @@ bool isFileURL(const String& path);
 String FromURL(const String& url);
 String urlEncodeFileName(const String& filename);
 bool IsDecendant(const String& path, const String& ancestor);
+#ifdef _WIN32
 inline String AddTrailingSlash(const String& path) { return !EndsWithSlash(path) ? path + _T("\\") : path; }
+#else
+inline String AddTrailingSlash(const String& path) { return !EndsWithSlash(path) ? path + _T("/") : path; }
+#endif
 String ToWindowsPath(const String& path);
 String ToUnixPath(const String& path);
 bool IsValidName(const String& name);

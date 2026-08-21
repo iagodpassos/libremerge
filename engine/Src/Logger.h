@@ -17,7 +17,9 @@ public:
 	template<class T> void Warn(const T& msg) { if (m_level >= LogLevel::WARN) Log(LogLevel::WARN, msg); }
 	template<class T> void Error(const T& msg) { if (m_level >= LogLevel::ERR) Log(LogLevel::ERR, msg); }
 	void Log(LogLevel level, const String& msg);
+#ifdef _UNICODE
 	void Log(LogLevel level, const std::string& msg);
+#endif
 	void SetLogLevel(LogLevel level) { m_level = level; }
 	void SetOutputFunction(std::function<void(LogLevel level, const std::chrono::system_clock::time_point& tp, const String& msg)> func) { m_func = func; }
 
