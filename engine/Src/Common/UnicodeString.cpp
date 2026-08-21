@@ -268,14 +268,22 @@ String format_arg_list(const tchar_t *fmt, va_list args)
 {
 	if (fmt == nullptr)
 		return _T("");
-	int result = -1;
+	// NB: MSVC's vsnprintf returns -1 on truncation, POSIX returns the
+	// needed length; handle both. va_list must be copied per attempt.
 	int length = 256;
 	std::vector<tchar_t> buffer(length, 0);
-	while (result == -1)
+	for (;;)
 	{
-		result = tc::vsntprintf_s(&buffer[0], length, _TRUNCATE, fmt, args);
+		va_list argsCopy;
+		va_copy(argsCopy, args);
+		int result = tc::vsntprintf_s(&buffer[0], length, _TRUNCATE, fmt, argsCopy);
+		va_end(argsCopy);
+		if (result >= 0 && result < length)
+			break;
+		if (result < 0 && length >= 1024 * 1024)
+			break; // persistent formatting error, not truncation
 		length *= 2;
-		buffer.resize(length, 0);
+		buffer.assign(length, 0);
 	}
 	String s(&buffer[0]);
 	return s;

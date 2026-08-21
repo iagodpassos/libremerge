@@ -17,6 +17,12 @@
 #include "stringdiffsi.h"
 #include "Diff3.h"
 
+#ifndef _UNICODE
+// Engine strings are UTF-8 here; the ICU wrapper would read them as UTF-16.
+#include "lm_utf8_break.h"
+#define ICUBreakIterator lm_ports::Utf8CharBreakIterator
+#endif
+
 using std::vector;
 
 namespace strdiff

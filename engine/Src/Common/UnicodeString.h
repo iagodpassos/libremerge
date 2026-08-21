@@ -115,8 +115,13 @@ inline String to_str(int val) { return strutils::format(_T("%d"), val); }
 inline String to_str(unsigned val) { return strutils::format(_T("%u"), val); }
 inline String to_str(long val) { return strutils::format(_T("%ld"), val); }
 inline String to_str(unsigned long val) { return strutils::format(_T("%lu"), val); }
+#ifdef _WIN32
 inline String to_str(long long val) { return strutils::format(_T("%I64d"), val); }
 inline String to_str(unsigned long long val) { return strutils::format(_T("%I64u"), val); }
+#else
+inline String to_str(long long val) { return strutils::format(_T("%lld"), val); }
+inline String to_str(unsigned long long val) { return strutils::format(_T("%llu"), val); }
+#endif
 inline String to_str(float val) { return strutils::format(_T("%f"), val); }
 inline String to_str(double val) { return strutils::format(_T("%f"), val); }
 inline String to_str(const StringView& val) { return { val.data(), val.size() }; }

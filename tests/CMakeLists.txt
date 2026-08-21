@@ -41,10 +41,11 @@ if(NOT WIN32)
     -include ${CMAKE_SOURCE_DIR}/engine/ports/posix_compat.h)
 endif()
 
-# Tests reference TestData/ relative to their own directory layout; run them
-# from the tests source dir so those relative paths resolve.
+# Tests use upstream-relative data paths (../TestData, ../../Data,
+# ../../Src, ...). tests/run plus the Src/Externals symlinks at the repo
+# root reproduce that layout.
 include(GoogleTest)
 gtest_discover_tests(libremerge-tests
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/run
   DISCOVERY_TIMEOUT 60
 )
