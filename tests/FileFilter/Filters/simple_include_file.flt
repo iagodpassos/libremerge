@@ -1,0 +1,7 @@
+name: simple include file
+desc: simple file filter long description
+def: include
+f: \.ext$
+fe: Name like "*.exp"
+f!: ex\.ext$
+fe!: Name = "exp.exp"
