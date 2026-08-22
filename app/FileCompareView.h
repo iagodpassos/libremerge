@@ -47,14 +47,23 @@ public:
 	/** Copy the current difference from sourceSide into the merge target
 	    (the other side in 2-way mode, the middle pane in 3-way mode). */
 	void copyCurrentDiff(int sourceSide);
+	/** Copy every remaining difference from sourceSide at once. */
+	void copyAllFrom(int sourceSide);
 	void gotoNextDiff();
 	void gotoPrevDiff();
+	void gotoFirstDiff();
+	void gotoLastDiff();
+	/** Swap the outer panes (and reload both sides). */
+	void swapSides();
+	void undoActive();
+	void redoActive();
 	void recompare();
 	bool saveModified(QString *error);
 
 signals:
 	void modifiedChanged(bool modified);
 	void pathsChanged();
+	void optionsRequested();
 
 private:
 	struct Block
@@ -109,6 +118,7 @@ private:
 	void updateHeaderStyles();
 	void gotoDiff(int blockIndex);
 	int nextActive(int from, int direction) const;
+	void applyBlockCopy(int blockIndex, int sourceSide, bool joinUndo);
 	void showHeaderMenu(int side);
 	void editCaption(int side);
 	void changeSideFile(int side, const QString &path);
@@ -136,6 +146,7 @@ private:
 	QList<int> m_lineNumbers[3];      // view line -> 1-based real number, -1 ghost
 	int m_diffCount = 0;
 	int m_current = -1; // index into m_blocks; -1 = none
+	int m_activePane = 0;
 	bool m_syncing = false;
 	bool m_diffStale = false;
 	QAction *m_actSave = nullptr;

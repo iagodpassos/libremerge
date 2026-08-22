@@ -54,28 +54,28 @@ void drawDiffBar(QPainter &p, int y)
 	p.drawRect(5, y, 22, 6);
 }
 
-void drawArrowVertical(QPainter &p, bool up)
+void drawArrowVertical(QPainter &p, bool up, int dy = 0)
 {
 	QPainterPath path;
 	if (up)
 	{
-		path.moveTo(16, 4);
-		path.lineTo(25, 13);
-		path.lineTo(20, 13);
-		path.lineTo(20, 20);
-		path.lineTo(12, 20);
-		path.lineTo(12, 13);
-		path.lineTo(7, 13);
+		path.moveTo(16, 4 + dy);
+		path.lineTo(25, 13 + dy);
+		path.lineTo(20, 13 + dy);
+		path.lineTo(20, 20 + dy);
+		path.lineTo(12, 20 + dy);
+		path.lineTo(12, 13 + dy);
+		path.lineTo(7, 13 + dy);
 	}
 	else
 	{
-		path.moveTo(16, 28);
-		path.lineTo(25, 19);
-		path.lineTo(20, 19);
-		path.lineTo(20, 12);
-		path.lineTo(12, 12);
-		path.lineTo(12, 19);
-		path.lineTo(7, 19);
+		path.moveTo(16, 28 + dy);
+		path.lineTo(25, 19 + dy);
+		path.lineTo(20, 19 + dy);
+		path.lineTo(20, 12 + dy);
+		path.lineTo(12, 12 + dy);
+		path.lineTo(12, 19 + dy);
+		path.lineTo(7, 19 + dy);
 	}
 	path.closeSubpath();
 	p.setPen(QPen(kBlueEdge, 1.2));
@@ -134,6 +134,11 @@ QIcon icon(Icon id)
 {
 	switch (id)
 	{
+	case Icon::FirstDiff:
+		return renderIcon([](QPainter &p) {
+			drawDiffBar(p, 3);
+			drawArrowVertical(p, true, 8);
+		});
 	case Icon::PrevDiff:
 		return renderIcon([](QPainter &p) {
 			drawDiffBar(p, 23);
@@ -143,6 +148,11 @@ QIcon icon(Icon id)
 		return renderIcon([](QPainter &p) {
 			drawDiffBar(p, 3);
 			drawArrowVertical(p, false);
+		});
+	case Icon::LastDiff:
+		return renderIcon([](QPainter &p) {
+			drawDiffBar(p, 23);
+			drawArrowVertical(p, false, -8);
 		});
 	case Icon::CopyRight:
 		return renderIcon([](QPainter &p) {
@@ -157,6 +167,95 @@ QIcon icon(Icon id)
 			p.setBrush(kGold);
 			p.drawRect(18, 7, 10, 18);
 			drawArrowHorizontal(p, false, 3, 16);
+		});
+	case Icon::CopyAllRight:
+		return renderIcon([](QPainter &p) {
+			p.setPen(QPen(kGoldEdge, 1.2));
+			p.setBrush(kGold);
+			p.drawRect(4, 4, 10, 9);
+			p.drawRect(4, 19, 10, 9);
+			drawArrowHorizontal(p, true, 16, 29);
+		});
+	case Icon::CopyAllLeft:
+		return renderIcon([](QPainter &p) {
+			p.setPen(QPen(kGoldEdge, 1.2));
+			p.setBrush(kGold);
+			p.drawRect(18, 4, 10, 9);
+			p.drawRect(18, 19, 10, 9);
+			drawArrowHorizontal(p, false, 3, 16);
+		});
+	case Icon::Undo:
+		return renderIcon([](QPainter &p) {
+			p.setPen(QPen(kBlue, 3.4, Qt::SolidLine, Qt::FlatCap));
+			p.setBrush(Qt::NoBrush);
+			p.drawArc(QRectF(7, 9, 18, 18), 0 * 16, 200 * 16);
+			QPainterPath head;
+			head.moveTo(2.5, 18);
+			head.lineTo(12, 15);
+			head.lineTo(8, 24);
+			head.closeSubpath();
+			p.setPen(Qt::NoPen);
+			p.setBrush(kBlue);
+			p.drawPath(head);
+		});
+	case Icon::Redo:
+		return renderIcon([](QPainter &p) {
+			p.setPen(QPen(kBlue, 3.4, Qt::SolidLine, Qt::FlatCap));
+			p.setBrush(Qt::NoBrush);
+			p.drawArc(QRectF(7, 9, 18, 18), 180 * 16, -200 * 16);
+			QPainterPath head;
+			head.moveTo(29.5, 18);
+			head.lineTo(20, 15);
+			head.lineTo(24, 24);
+			head.closeSubpath();
+			p.setPen(Qt::NoPen);
+			p.setBrush(kBlue);
+			p.drawPath(head);
+		});
+	case Icon::Swap:
+		return renderIcon([](QPainter &p) {
+			p.setPen(QPen(kBlueEdge, 1.2));
+			p.setBrush(kBlue);
+			QPainterPath top;
+			top.moveTo(28, 10);
+			top.lineTo(20, 3);
+			top.lineTo(20, 7);
+			top.lineTo(4, 7);
+			top.lineTo(4, 13);
+			top.lineTo(20, 13);
+			top.lineTo(20, 17);
+			top.closeSubpath();
+			p.drawPath(top);
+			QPainterPath bottom;
+			bottom.moveTo(4, 22);
+			bottom.lineTo(12, 15);
+			bottom.lineTo(12, 19);
+			bottom.lineTo(28, 19);
+			bottom.lineTo(28, 25);
+			bottom.lineTo(12, 25);
+			bottom.lineTo(12, 29);
+			bottom.closeSubpath();
+			p.drawPath(bottom);
+		});
+	case Icon::Options:
+		return renderIcon([](QPainter &p) {
+			p.setPen(QPen(kGray, 2.6, Qt::SolidLine, Qt::RoundCap));
+			p.drawLine(4, 8, 28, 8);
+			p.drawLine(4, 16, 28, 16);
+			p.drawLine(4, 24, 28, 24);
+			p.setPen(QPen(kGoldEdge, 1.2));
+			p.setBrush(kGold);
+			p.drawEllipse(QPointF(11, 8), 3.6, 3.6);
+			p.drawEllipse(QPointF(21, 16), 3.6, 3.6);
+			p.drawEllipse(QPointF(8, 24), 3.6, 3.6);
+		});
+	case Icon::Find:
+		return renderIcon([](QPainter &p) {
+			p.setPen(QPen(kBlue, 3.0));
+			p.setBrush(Qt::NoBrush);
+			p.drawEllipse(QPointF(13, 13), 7.5, 7.5);
+			p.setPen(QPen(kBlueEdge, 4.0, Qt::SolidLine, Qt::RoundCap));
+			p.drawLine(QPointF(19, 19), QPointF(27, 27));
 		});
 	case Icon::Refresh:
 		return renderIcon([](QPainter &p) {

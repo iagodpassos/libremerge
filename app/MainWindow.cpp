@@ -47,19 +47,98 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(m_tabs, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
 	setCentralWidget(m_tabs);
 
+	// shortcuts live here (window scope) and route to the current tab
+	auto fileView = [this]() {
+		return qobject_cast<FileCompareView *>(m_tabs->currentWidget());
+	};
+	auto addMenuAction = [this](QMenu *menu, const QString &text,
+		const QKeySequence &shortcut, auto slot) -> QAction * {
+		QAction *action = menu->addAction(text);
+		if (!shortcut.isEmpty())
+			action->setShortcut(shortcut);
+		connect(action, &QAction::triggered, this, slot);
+		return action;
+	};
+
 	QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
-	QAction *newAction = fileMenu->addAction(tr("&New Comparison..."));
-	newAction->setShortcut(QKeySequence::New);
-	connect(newAction, &QAction::triggered, this, &MainWindow::newComparison);
+	addMenuAction(fileMenu, tr("&New Comparison..."), QKeySequence::New,
+		[this]() { newComparison(); });
 	fileMenu->addSeparator();
-	QAction *quitAction = fileMenu->addAction(tr("&Quit"));
-	quitAction->setShortcut(QKeySequence::Quit);
-	connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
+	addMenuAction(fileMenu, tr("&Save"), QKeySequence::Save, [fileView]() {
+		if (auto *view = fileView())
+		{
+			QString error;
+			view->saveModified(&error);
+		}
+	});
+	addMenuAction(fileMenu, tr("&Close Tab"), QKeySequence::Close,
+		[this]() { closeTab(m_tabs->currentIndex()); });
+	fileMenu->addSeparator();
+	addMenuAction(fileMenu, tr("&Quit"), QKeySequence::Quit,
+		[]() { QApplication::quit(); });
 
 	QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
+	addMenuAction(editMenu, tr("&Undo"), QKeySequence::Undo, [fileView]() {
+		if (auto *view = fileView())
+			view->undoActive();
+	});
+	addMenuAction(editMenu, tr("&Redo"), QKeySequence::Redo, [fileView]() {
+		if (auto *view = fileView())
+			view->redoActive();
+	});
+	editMenu->addSeparator();
 	QAction *optionsAction = editMenu->addAction(tr("Comparison &Options..."));
 	optionsAction->setMenuRole(QAction::PreferencesRole); // macOS app menu
 	connect(optionsAction, &QAction::triggered, this, &MainWindow::showOptions);
+
+	QMenu *mergeMenu = menuBar()->addMenu(tr("&Merge"));
+	addMenuAction(mergeMenu, tr("&First Difference"),
+		QKeySequence(Qt::ALT | Qt::Key_Home), [fileView]() {
+			if (auto *view = fileView()) view->gotoFirstDiff();
+		});
+	addMenuAction(mergeMenu, tr("&Previous Difference"),
+		QKeySequence(Qt::ALT | Qt::Key_Up), [fileView]() {
+			if (auto *view = fileView()) view->gotoPrevDiff();
+		});
+	addMenuAction(mergeMenu, tr("&Next Difference"),
+		QKeySequence(Qt::ALT | Qt::Key_Down), [fileView]() {
+			if (auto *view = fileView()) view->gotoNextDiff();
+		});
+	addMenuAction(mergeMenu, tr("&Last Difference"),
+		QKeySequence(Qt::ALT | Qt::Key_End), [fileView]() {
+			if (auto *view = fileView()) view->gotoLastDiff();
+		});
+	mergeMenu->addSeparator();
+	addMenuAction(mergeMenu, tr("Copy to &Right"),
+		QKeySequence(Qt::ALT | Qt::Key_Right), [fileView]() {
+			if (auto *view = fileView()) view->copyCurrentDiff(0);
+		});
+	addMenuAction(mergeMenu, tr("Copy to &Left"),
+		QKeySequence(Qt::ALT | Qt::Key_Left), [fileView]() {
+			if (auto *view = fileView())
+				view->copyCurrentDiff(view->paneCount() == 3 ? 2 : 1);
+		});
+	addMenuAction(mergeMenu, tr("Copy All to Righ&t"),
+		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right), [fileView]() {
+			if (auto *view = fileView()) view->copyAllFrom(0);
+		});
+	addMenuAction(mergeMenu, tr("Copy All to Le&ft"),
+		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left), [fileView]() {
+			if (auto *view = fileView())
+				view->copyAllFrom(view->paneCount() == 3 ? 2 : 1);
+		});
+	mergeMenu->addSeparator();
+	addMenuAction(mergeMenu, tr("S&wap Panes"), QKeySequence(), [fileView]() {
+		if (auto *view = fileView()) view->swapSides();
+	});
+	addMenuAction(mergeMenu, tr("Re&compare"), QKeySequence(Qt::Key_F5),
+		[this, fileView]() {
+			if (auto *view = fileView())
+				view->recompare();
+			else if (auto *folder = qobject_cast<FolderCompareView *>(
+					m_tabs->currentWidget()))
+				folder->recompare();
+		});
 
 	QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
 	QAction *aboutAction = helpMenu->addAction(tr("&About LibreMerge"));
@@ -114,6 +193,8 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 		[view, refreshTab](bool) { refreshTab(view); });
 	connect(view, &FileCompareView::pathsChanged, this,
 		[view, refreshTab]() { refreshTab(view); });
+	connect(view, &FileCompareView::optionsRequested,
+		this, &MainWindow::showOptions);
 }
 
 void MainWindow::openFolderComparison(const QString &leftDir, const QString &rightDir)

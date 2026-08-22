@@ -11,12 +11,21 @@ namespace lm
     blue navigation arrows, green refresh. */
 enum class Icon
 {
+	FirstDiff,
 	PrevDiff,
 	NextDiff,
+	LastDiff,
 	CopyRight,
 	CopyLeft,
+	CopyAllRight,
+	CopyAllLeft,
+	Undo,
+	Redo,
+	Swap,
 	Refresh,
 	Save,
+	Options,
+	Find,
 	TreeView,
 	DeleteLeft,
 	DeleteRight,

@@ -43,7 +43,28 @@ int main(int argc, char *argv[])
 	QCommandLineOption gotoFirstOpt(QStringLiteral("goto-first-diff"),
 		QStringLiteral("Select the first difference after opening (for testing)"));
 	parser.addOption(gotoFirstOpt);
+	QCommandLineOption selftestMergeAllOpt(QStringLiteral("selftest-merge-all"),
+		QStringLiteral("Copy all differences at once left-to-right and verify (for testing)"));
+	parser.addOption(selftestMergeAllOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestMergeAllOpt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 2)
+			return 2;
+		FileCompareView view;
+		QString error;
+		if (!view.compare(files.at(0), files.at(1), &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		view.copyAllFrom(0);
+		view.recompare();
+		printf("remaining diffs: %d\n", view.diffCount());
+		return view.diffCount() == 0 ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestFileOpsOpt))
 	{

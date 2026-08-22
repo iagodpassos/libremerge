@@ -35,6 +35,9 @@ public:
 	/** Start the comparison asynchronously. */
 	void start(const QString &leftDir, const QString &rightDir);
 
+public slots:
+	void recompare();
+
 signals:
 	void openFileComparisonRequested(const QString &leftPath, const QString &rightPath);
 
@@ -42,7 +45,6 @@ private slots:
 	void itemActivated(QTreeWidgetItem *item, int column);
 	void updateProgress();
 	void compareFinished();
-	void recompare();
 	void copySelected(int sourceSide);
 	void deleteSelected(bool leftSide, bool rightSide);
 

@@ -141,11 +141,9 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	m_filterEdit->setMaximumWidth(340);
 	m_filterEdit->setText(QSettings().value(kFilterSettingsKey, QStringLiteral("*.*")).toString());
 	toolbar->addWidget(m_filterEdit);
+	// F5 arrives via the main window's Merge menu
 	QAction *applyAction = toolbar->addAction(lm::icon(lm::Icon::Refresh), tr("Recompare"));
-	applyAction->setShortcut(QKeySequence(Qt::Key_F5));
-	applyAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
 	applyAction->setToolTip(tr("Recompare (F5)"));
-	addAction(applyAction);
 	connect(applyAction, &QAction::triggered, this, &FolderCompareView::recompare);
 	connect(m_filterEdit, &QLineEdit::returnPressed, this, &FolderCompareView::recompare);
 	toolbar->addSeparator();

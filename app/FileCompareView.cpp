@@ -175,37 +175,51 @@ FileCompareView::FileCompareView(QWidget *parent)
 	auto *toolbar = new QToolBar(this);
 	toolbar->setIconSize(QSize(16, 16));
 	toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+	// keyboard shortcuts live on the main window's menu (they route to
+	// the current tab); the toolbar only mentions them in tooltips
 	auto addToolAction = [this, toolbar](lm::Icon icon, const QString &text,
-		const QKeySequence &shortcut, auto slot) -> QAction * {
+		const QString &shortcutHint, auto slot) -> QAction * {
 		QAction *action = toolbar->addAction(lm::icon(icon), text);
-		action->setShortcut(shortcut);
-		action->setShortcutContext(Qt::WidgetWithChildrenShortcut);
-		action->setToolTip(shortcut.isEmpty() ? text
-			: QStringLiteral("%1 (%2)").arg(text,
-				shortcut.toString(QKeySequence::NativeText)));
-		addAction(action);
+		action->setToolTip(shortcutHint.isEmpty() ? text
+			: QStringLiteral("%1 (%2)").arg(text, shortcutHint));
 		connect(action, &QAction::triggered, this, slot);
 		return action;
 	};
+	addToolAction(lm::Icon::FirstDiff, tr("First Difference"),
+		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x96"), [this]() { gotoFirstDiff(); });
 	addToolAction(lm::Icon::PrevDiff, tr("Previous Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Up), [this]() { gotoPrevDiff(); });
+		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x91"), [this]() { gotoPrevDiff(); });
 	addToolAction(lm::Icon::NextDiff, tr("Next Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Down), [this]() { gotoNextDiff(); });
+		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x93"), [this]() { gotoNextDiff(); });
+	addToolAction(lm::Icon::LastDiff, tr("Last Difference"),
+		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x98"), [this]() { gotoLastDiff(); });
 	toolbar->addSeparator();
 	m_actCopyFromLeft = addToolAction(lm::Icon::CopyRight, tr("Copy to Right"),
-		QKeySequence(Qt::ALT | Qt::Key_Right), [this]() { copyCurrentDiff(0); });
+		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyCurrentDiff(0); });
 	m_actCopyFromRight = addToolAction(lm::Icon::CopyLeft, tr("Copy to Left"),
-		QKeySequence(Qt::ALT | Qt::Key_Left),
+		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x90"),
 		[this]() { copyCurrentDiff(m_paneCount == 3 ? 2 : 1); });
+	addToolAction(lm::Icon::CopyAllRight, tr("Copy All to Right"),
+		QString(), [this]() { copyAllFrom(0); });
+	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"),
+		QString(), [this]() { copyAllFrom(m_paneCount == 3 ? 2 : 1); });
 	toolbar->addSeparator();
-	addToolAction(lm::Icon::Refresh, tr("Recompare"), QKeySequence(Qt::Key_F5),
+	addToolAction(lm::Icon::Undo, tr("Undo"), QStringLiteral("\xE2\x8C\x98Z"),
+		[this]() { undoActive(); });
+	addToolAction(lm::Icon::Redo, tr("Redo"),
+		QStringLiteral("\xE2\x87\xA7\xE2\x8C\x98Z"), [this]() { redoActive(); });
+	toolbar->addSeparator();
+	addToolAction(lm::Icon::Swap, tr("Swap Panes"), QString(),
+		[this]() { swapSides(); });
+	addToolAction(lm::Icon::Refresh, tr("Recompare"), QStringLiteral("F5"),
 		[this]() { recompare(); });
-	m_actSave = addToolAction(lm::Icon::Save, tr("Save"), QKeySequence::Save,
+	m_actSave = addToolAction(lm::Icon::Save, tr("Save"),
+		QStringLiteral("\xE2\x8C\x98S"),
 		[this]() { QString error; saveModified(&error); });
 	m_actSave->setEnabled(false);
 	toolbar->addSeparator();
 	m_actDiffPane = addToolAction(lm::Icon::DiffPane, tr("Diff Pane"),
-		QKeySequence(), [this]() {});
+		QString(), [this]() {});
 	m_actDiffPane->setCheckable(true);
 	m_actDiffPane->setChecked(
 		QSettings().value(QStringLiteral("FileCompare/DiffPane"), true).toBool());
@@ -214,6 +228,8 @@ FileCompareView::FileCompareView(QWidget *parent)
 		m_diffPaneWidget->setVisible(on);
 		updateDiffPane();
 	});
+	addToolAction(lm::Icon::Options, tr("Comparison Options"), QString(),
+		[this]() { emit optionsRequested(); });
 	layout->addWidget(toolbar);
 
 	auto *panes = new QHBoxLayout;
@@ -361,7 +377,10 @@ FileCompareView::FileCompareView(QWidget *parent)
 		[this](QWidget *, QWidget *now) {
 			for (int i = 0; i < m_paneCount; ++i)
 				if (now == m_panes[i])
+				{
+					m_activePane = i;
 					updateHeaderStyles();
+				}
 		});
 	updateHeaderStyles();
 
@@ -370,11 +389,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 	captionAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
 	addAction(captionAction);
 	connect(captionAction, &QAction::triggered, this, [this]() {
-		int active = 0;
-		for (int i = 0; i < m_paneCount; ++i)
-			if (m_panes[i]->hasFocus())
-				active = i;
-		editCaption(active);
+		editCaption(m_activePane);
 	});
 
 	m_status = new QLabel(this);
@@ -1006,10 +1021,7 @@ void FileCompareView::updateHeader(int side)
 
 void FileCompareView::updateHeaderStyles()
 {
-	int active = 0;
-	for (int i = 0; i < m_paneCount; ++i)
-		if (m_panes[i]->hasFocus())
-			active = i;
+	const int active = m_activePane;
 	for (int i = 0; i < 3; ++i)
 	{
 		m_headerRows[i]->setStyleSheet(i == active
@@ -1181,25 +1193,13 @@ void FileCompareView::recompare()
 	updateStatus();
 }
 
-void FileCompareView::copyCurrentDiff(int sourceSide)
+/** Merge one block from sourceSide into the target pane, updating the
+    model in place (a full recompare would rebuild the documents and
+    clear the undo history). The caller refreshes maps/highlights. */
+void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide, bool joinUndo)
 {
-	if (m_diffStale)
-		recompare();
-	if (sourceSide >= m_paneCount)
-		return;
-	if (m_current < 0)
-		m_current = nextActive(-1, +1);
-	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
-		return;
-	Block &block = m_blocks[m_current];
-	if (block.trivial || block.resolved)
-		return;
+	Block &block = m_blocks[blockIndex];
 	const int target = mergeTarget(sourceSide);
-	if (m_readOnly[target])
-	{
-		m_status->setText(tr("The merge target is read-only."));
-		return;
-	}
 
 	// the panes are ghost-aligned: the block occupies the same view range
 	// everywhere, so the merge is an equal-length line replacement
@@ -1220,7 +1220,10 @@ void FileCompareView::copyCurrentDiff(int sourceSide)
 		return;
 	m_syncing = true;
 	QTextCursor cursor(tgtDoc);
-	cursor.beginEditBlock();
+	if (joinUndo)
+		cursor.joinPreviousEditBlock();
+	else
+		cursor.beginEditBlock();
 	cursor.setPosition(firstBlock.position());
 	cursor.setPosition(lastBlock.position() + lastBlock.length() - 1,
 		QTextCursor::KeepAnchor);
@@ -1231,13 +1234,11 @@ void FileCompareView::copyCurrentDiff(int sourceSide)
 			ghost.at(v - block.viewBegin) ? new GhostBlockData : nullptr);
 	m_syncing = false;
 
-	// update the model in place (a full recompare would rebuild the
-	// documents and clear the undo history)
 	const int srcLen = qMax(0, block.end[sourceSide] - block.begin[sourceSide] + 1);
 	const int tgtLen = qMax(0, block.end[target] - block.begin[target] + 1);
 	const int delta = srcLen - tgtLen;
 	block.end[target] = block.begin[target] + srcLen - 1;
-	for (size_t b2 = m_current + 1; b2 < m_blocks.size(); ++b2)
+	for (size_t b2 = blockIndex + 1; b2 < m_blocks.size(); ++b2)
 	{
 		m_blocks[b2].begin[target] += delta;
 		m_blocks[b2].end[target] += delta;
@@ -1245,12 +1246,34 @@ void FileCompareView::copyCurrentDiff(int sourceSide)
 	block.resolved = true;
 	--m_diffCount;
 	m_wordSpans.erase(std::remove_if(m_wordSpans.begin(), m_wordSpans.end(),
-		[this](const WordSpan &s) { return s.blockIndex == m_current; }),
+		[blockIndex](const WordSpan &s) { return s.blockIndex == blockIndex; }),
 		m_wordSpans.end());
 	// spans of later blocks reference real line numbers, which shifted
 	for (WordSpan &s : m_wordSpans)
-		if (s.blockIndex > m_current && s.side == target)
+		if (s.blockIndex > blockIndex && s.side == target)
 			s.line += delta;
+}
+
+void FileCompareView::copyCurrentDiff(int sourceSide)
+{
+	if (m_diffStale)
+		recompare();
+	if (sourceSide >= m_paneCount)
+		return;
+	if (m_current < 0)
+		m_current = nextActive(-1, +1);
+	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
+		return;
+	if (m_blocks[m_current].trivial || m_blocks[m_current].resolved)
+		return;
+	const int target = mergeTarget(sourceSide);
+	if (m_readOnly[target])
+	{
+		m_status->setText(tr("The merge target is read-only."));
+		return;
+	}
+
+	applyBlockCopy(m_current, sourceSide, false);
 	refreshSideMaps(target);
 	setSideModified(target, true);
 
@@ -1266,6 +1289,98 @@ void FileCompareView::copyCurrentDiff(int sourceSide)
 		applyHighlights();
 		updateStatus();
 	}
+}
+
+void FileCompareView::copyAllFrom(int sourceSide)
+{
+	if (m_diffStale)
+		recompare();
+	if (sourceSide >= m_paneCount)
+		return;
+	const int target = mergeTarget(sourceSide);
+	if (m_readOnly[target])
+	{
+		m_status->setText(tr("The merge target is read-only."));
+		return;
+	}
+
+	bool first = true;
+	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+	{
+		if (m_blocks[b].trivial || m_blocks[b].resolved)
+			continue;
+		// one undoable step for the whole merge
+		applyBlockCopy(b, sourceSide, !first);
+		first = false;
+	}
+	if (first)
+		return; // nothing to copy
+	refreshSideMaps(target);
+	setSideModified(target, true);
+	m_current = -1;
+	applyHighlights();
+	updateStatus();
+}
+
+void FileCompareView::gotoFirstDiff()
+{
+	if (m_diffStale)
+		recompare();
+	const int firstBlock = nextActive(-1, +1);
+	if (firstBlock >= 0)
+		gotoDiff(firstBlock);
+}
+
+void FileCompareView::gotoLastDiff()
+{
+	if (m_diffStale)
+		recompare();
+	const int lastBlock = nextActive(static_cast<int>(m_blocks.size()), -1);
+	if (lastBlock >= 0)
+		gotoDiff(lastBlock);
+}
+
+void FileCompareView::swapSides()
+{
+	if (m_paneCount < 2)
+		return;
+	if (isModified() && QMessageBox::question(this, tr("LibreMerge"),
+		tr("Swapping reloads both files. Discard unsaved changes?"))
+			!= QMessageBox::Yes)
+		return;
+
+	QStringList newPaths = paths();
+	const int last = newPaths.size() - 1;
+	newPaths.swapItemsAt(0, last);
+	std::swap(m_readOnly[0], m_readOnly[last]);
+	QString captions[3];
+	for (int i = 0; i < m_paneCount; ++i)
+		captions[i] = m_sides[i].caption;
+	std::swap(captions[0], captions[last]);
+
+	QString error;
+	if (!compare(newPaths, &error))
+	{
+		QMessageBox::warning(this, tr("LibreMerge"), error);
+		return;
+	}
+	for (int i = 0; i < m_paneCount; ++i)
+	{
+		m_sides[i].caption = captions[i];
+		updateHeader(i);
+	}
+	setSideModified(0, false);
+	emit pathsChanged();
+}
+
+void FileCompareView::undoActive()
+{
+	m_panes[m_activePane]->undo();
+}
+
+void FileCompareView::redoActive()
+{
+	m_panes[m_activePane]->redo();
 }
 
 void FileCompareView::setReadOnlySides(const QList<bool> &readOnly)
