@@ -4,6 +4,7 @@
 #include <QCommandLineParser>
 #include <QFileInfo>
 #include <QTimer>
+#include "FileCompareView.h"
 #include "MainWindow.h"
 #include "EngineOptions.h"
 
@@ -27,7 +28,30 @@ int main(int argc, char *argv[])
 		QStringLiteral("Render the comparison to <file> and exit (for testing)"),
 		QStringLiteral("file"));
 	parser.addOption(screenshotOpt);
+	QCommandLineOption selftestMergeOpt(QStringLiteral("selftest-merge"),
+		QStringLiteral("Copy all differences left-to-right in memory and verify (for testing)"));
+	parser.addOption(selftestMergeOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestMergeOpt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 2)
+			return 2;
+		FileCompareView view;
+		QString error;
+		if (!view.compare(files.at(0), files.at(1), &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		int guard = 0;
+		while (view.diffCount() > 0 && guard++ < 1000)
+			view.copyCurrentDiff(0);
+		view.recompare();
+		printf("remaining diffs: %d\n", view.diffCount());
+		return view.diffCount() == 0 ? 0 : 1;
+	}
 
 	MainWindow window;
 	const QStringList args = parser.positionalArguments();

@@ -4,14 +4,15 @@
 #include <QWidget>
 #include <vector>
 
-class QPlainTextEdit;
+class QAction;
 class QLabel;
+class QPlainTextEdit;
 
 /**
- * Two-way file comparison view (v0): side-by-side read-only panes with
- * diff-block highlighting and synchronized scrolling, driven by the
- * engine's CDiffWrapper. Inline editing and merge operations are the
- * next Phase 1 milestones.
+ * Two-way file comparison and merge view: editable side-by-side panes
+ * driven by the engine's CDiffWrapper. Supports difference navigation,
+ * copying diff blocks between sides (undoable), free editing with
+ * recompare, and saving with the original encoding/EOL preserved.
  */
 class FileCompareView : public QWidget
 {
@@ -19,10 +20,21 @@ class FileCompareView : public QWidget
 public:
 	explicit FileCompareView(QWidget *parent = nullptr);
 
-	/** Run the comparison; false + error message on failure. */
+	/** Load both files and run the initial comparison. */
 	bool compare(const QString &leftPath, const QString &rightPath, QString *error);
 
+	bool isModified() const;
 	int diffCount() const { return m_diffCount; }
+
+	/** Copy the current difference into the other side. 0 = left→right, 1 = right→left source side. */
+	void copyCurrentDiff(int sourceSide);
+	void gotoNextDiff();
+	void gotoPrevDiff();
+	void recompare();
+	bool saveModified(QString *error);
+
+signals:
+	void modifiedChanged(bool modified);
 
 private:
 	struct Block
@@ -32,12 +44,35 @@ private:
 		bool trivial;
 	};
 
+	struct Side
+	{
+		QString path;
+		int unicoding = 0;   // ucr::UNICODESET
+		int codepage = 65001;
+		bool bom = false;
+		QString eol = QStringLiteral("\n");
+		bool hadFinalEol = true;
+		bool modified = false;
+	};
+
+	bool loadSide(int side, const QString &path, QString *error);
+	bool runDiff(QString *error);
 	void applyHighlights();
+	void updateStatus();
+	void gotoDiff(int blockIndex);
+	int nextNonTrivial(int from, int direction) const;
+	void spliceLines(int side, int firstLine, int lastLine, const QStringList &newLines);
+	bool saveSide(int side, QString *error);
+	void setSideModified(int side, bool modified);
 	void syncScroll(int pane, int value);
 
 	QPlainTextEdit *m_panes[2];
+	Side m_sides[2];
 	QLabel *m_status;
 	std::vector<Block> m_blocks;
 	int m_diffCount = 0;
+	int m_current = -1; // index into m_blocks; -1 = none
 	bool m_syncing = false;
+	bool m_diffStale = false;
+	QAction *m_actSave = nullptr;
 };

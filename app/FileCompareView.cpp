@@ -3,13 +3,16 @@
 
 #include "FileCompareView.h"
 
+#include <QAction>
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPlainTextEdit>
 #include <QScrollBar>
 #include <QStringList>
+#include <QTemporaryFile>
 #include <QTextBlock>
+#include <QToolBar>
 #include <QVBoxLayout>
 
 // engine
@@ -22,28 +25,8 @@
 namespace
 {
 
-/** Read a text file with the engine's encoding handling (BOM, codepage
-    detection input) into UTF-8 lines. */
-bool readLines(const QString &path, QStringList *lines, QString *error)
-{
-	UniMemFile file;
-	const String enginePath = path.toStdString();
-	if (!file.OpenReadOnly(enginePath))
-	{
-		if (error != nullptr)
-			*error = QObject::tr("cannot open %1").arg(path);
-		return false;
-	}
-	file.ReadBom();
-	String line, eol;
-	bool lossy = false;
-	while (file.ReadString(line, eol, &lossy))
-		lines->append(QString::fromUtf8(line.data(), static_cast<int>(line.size())));
-	file.Close();
-	return true;
-}
-
 const QColor kDiffColor(255, 243, 176);        // changed lines
+const QColor kCurrentDiffColor(255, 213, 100); // the selected difference
 const QColor kTrivialColor(230, 230, 230);     // whitespace-only/trivial
 const QColor kMissingColor(224, 236, 255);     // block exists only on other side
 
@@ -56,6 +39,34 @@ FileCompareView::FileCompareView(QWidget *parent)
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(0);
 
+	auto *toolbar = new QToolBar(this);
+	toolbar->setIconSize(QSize(16, 16));
+	auto addToolAction = [this, toolbar](const QString &text, const QKeySequence &shortcut,
+		auto slot) -> QAction * {
+		QAction *action = toolbar->addAction(text);
+		action->setShortcut(shortcut);
+		action->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+		addAction(action);
+		connect(action, &QAction::triggered, this, slot);
+		return action;
+	};
+	addToolAction(tr("\xE2\x96\xB2 Prev"), QKeySequence(Qt::ALT | Qt::Key_Up),
+		[this]() { gotoPrevDiff(); });
+	addToolAction(tr("\xE2\x96\xBC Next"), QKeySequence(Qt::ALT | Qt::Key_Down),
+		[this]() { gotoNextDiff(); });
+	toolbar->addSeparator();
+	addToolAction(tr("Copy \xE2\x86\x92 Right"), QKeySequence(Qt::ALT | Qt::Key_Right),
+		[this]() { copyCurrentDiff(0); });
+	addToolAction(tr("Copy \xE2\x86\x90 Left"), QKeySequence(Qt::ALT | Qt::Key_Left),
+		[this]() { copyCurrentDiff(1); });
+	toolbar->addSeparator();
+	addToolAction(tr("Recompare"), QKeySequence(Qt::Key_F5),
+		[this]() { recompare(); });
+	m_actSave = addToolAction(tr("Save"), QKeySequence::Save,
+		[this]() { QString error; saveModified(&error); });
+	m_actSave->setEnabled(false);
+	layout->addWidget(toolbar);
+
 	auto *panes = new QHBoxLayout;
 	panes->setContentsMargins(0, 0, 0, 0);
 	panes->setSpacing(1);
@@ -63,12 +74,18 @@ FileCompareView::FileCompareView(QWidget *parent)
 	for (int i = 0; i < 2; ++i)
 	{
 		m_panes[i] = new QPlainTextEdit(this);
-		m_panes[i]->setReadOnly(true);
 		m_panes[i]->setLineWrapMode(QPlainTextEdit::NoWrap);
 		m_panes[i]->setFont(mono);
 		panes->addWidget(m_panes[i]);
 		connect(m_panes[i]->verticalScrollBar(), &QScrollBar::valueChanged,
 			this, [this, i](int value) { syncScroll(i, value); });
+		connect(m_panes[i]->document(), &QTextDocument::contentsChanged,
+			this, [this, i]() {
+				if (m_syncing)
+					return;
+				m_diffStale = true;
+				setSideModified(i, true);
+			});
 	}
 	layout->addLayout(panes, 1);
 
@@ -79,25 +96,96 @@ FileCompareView::FileCompareView(QWidget *parent)
 
 bool FileCompareView::compare(const QString &leftPath, const QString &rightPath, QString *error)
 {
-	// Run the engine diff
+	if (!loadSide(0, leftPath, error) || !loadSide(1, rightPath, error))
+		return false;
+	if (!runDiff(error))
+		return false;
+	m_current = nextNonTrivial(-1, +1);
+	applyHighlights();
+	updateStatus();
+	if (m_current >= 0)
+		gotoDiff(m_current);
+	return true;
+}
+
+bool FileCompareView::loadSide(int side, const QString &path, QString *error)
+{
+	UniMemFile file;
+	if (!file.OpenReadOnly(path.toStdString()))
+	{
+		if (error != nullptr)
+			*error = tr("cannot open %1").arg(path);
+		return false;
+	}
+	file.ReadBom();
+
+	Side &s = m_sides[side];
+	s.path = path;
+	s.unicoding = file.GetUnicoding();
+	s.codepage = file.GetCodepage();
+	s.bom = file.HasBom();
+
+	QStringList lines;
+	int crlf = 0, lf = 0, cr = 0;
+	String line, eol;
+	bool lossy = false;
+	bool lastHadEol = true;
+	while (file.ReadString(line, eol, &lossy))
+	{
+		lines.append(QString::fromUtf8(line.data(), static_cast<int>(line.size())));
+		if (eol == "\r\n") ++crlf;
+		else if (eol == "\n") ++lf;
+		else if (eol == "\r") ++cr;
+		lastHadEol = !eol.empty();
+	}
+	file.Close();
+
+	s.hadFinalEol = lines.isEmpty() ? false : lastHadEol;
+	if (crlf >= lf && crlf >= cr && crlf > 0)
+		s.eol = QStringLiteral("\r\n");
+	else if (cr > lf)
+		s.eol = QStringLiteral("\r");
+	else
+		s.eol = QStringLiteral("\n");
+
+	m_syncing = true;
+	m_panes[side]->setPlainText(lines.join(QChar('\n')));
+	m_syncing = false;
+	s.modified = false;
+	return true;
+}
+
+bool FileCompareView::runDiff(QString *error)
+{
+	// Diff the current pane contents through temp files (the engine's
+	// diff core operates on files, like upstream does for edited buffers).
+	QTemporaryFile temp[2];
+	for (int i = 0; i < 2; ++i)
+	{
+		if (!temp[i].open())
+		{
+			if (error != nullptr)
+				*error = tr("cannot create temporary file");
+			return false;
+		}
+		const QByteArray bytes = m_panes[i]->toPlainText().toUtf8();
+		temp[i].write(bytes);
+		temp[i].flush();
+	}
+
 	CDiffWrapper wrapper;
 	DIFFOPTIONS options{};
 	DiffList diffList;
 	wrapper.SetCreateDiffList(&diffList);
-	wrapper.SetPaths({ leftPath.toStdString(), rightPath.toStdString() }, false);
+	wrapper.SetPaths({ temp[0].fileName().toStdString(),
+		temp[1].fileName().toStdString() }, false);
 	wrapper.SetOptions(&options);
 	if (!wrapper.RunFileDiff())
 	{
 		if (error != nullptr)
-			*error = tr("the diff engine failed on these files");
+			*error = tr("the diff engine failed");
 		return false;
 	}
-
-	QStringList lines[2];
-	if (!readLines(leftPath, &lines[0], error) || !readLines(rightPath, &lines[1], error))
-		return false;
-	m_panes[0]->setPlainText(lines[0].join(QChar('\n')));
-	m_panes[1]->setPlainText(lines[1].join(QChar('\n')));
 
 	m_blocks.clear();
 	m_diffCount = 0;
@@ -116,11 +204,7 @@ bool FileCompareView::compare(const QString &leftPath, const QString &rightPath,
 			++m_diffCount;
 		m_blocks.push_back(block);
 	}
-	applyHighlights();
-
-	m_status->setText(m_diffCount == 0
-		? tr("Files are identical")
-		: tr("%n difference(s)", nullptr, m_diffCount));
+	m_diffStale = false;
 	return true;
 }
 
@@ -130,16 +214,18 @@ void FileCompareView::applyHighlights()
 	{
 		QList<QTextEdit::ExtraSelection> selections;
 		QTextDocument *doc = m_panes[side]->document();
-		for (const Block &block : m_blocks)
+		for (size_t b = 0; b < m_blocks.size(); ++b)
 		{
+			const Block &block = m_blocks[b];
+			const bool current = (static_cast<int>(b) == m_current);
 			const bool empty = block.end[side] < block.begin[side];
-			QColor color = block.trivial ? kTrivialColor : kDiffColor;
+			QColor color = block.trivial ? kTrivialColor
+				: (current ? kCurrentDiffColor : kDiffColor);
 			int first = block.begin[side];
 			int last = empty ? block.begin[side] - 1 : block.end[side];
 			if (empty)
 			{
-				// mark the line where the other side's block would insert
-				color = kMissingColor;
+				color = current ? kCurrentDiffColor : kMissingColor;
 				first = last = qMax(0, block.begin[side] - 1);
 			}
 			for (int line = first; line <= last; ++line)
@@ -156,6 +242,241 @@ void FileCompareView::applyHighlights()
 		}
 		m_panes[side]->setExtraSelections(selections);
 	}
+}
+
+void FileCompareView::updateStatus()
+{
+	QString text;
+	if (m_diffStale)
+		text = tr("Edited \xE2\x80\x94 press F5 to recompare");
+	else if (m_diffCount == 0)
+		text = tr("Files are identical");
+	else
+	{
+		int index = 0;
+		if (m_current >= 0)
+		{
+			for (int b = 0; b <= m_current && b < static_cast<int>(m_blocks.size()); ++b)
+				if (!m_blocks[b].trivial)
+					++index;
+		}
+		text = index > 0
+			? tr("Difference %1 of %2").arg(index).arg(m_diffCount)
+			: tr("%n difference(s)", nullptr, m_diffCount);
+	}
+	if (m_sides[0].modified || m_sides[1].modified)
+		text += tr("  \xE2\x80\xA2 unsaved changes");
+	m_status->setText(text);
+}
+
+int FileCompareView::nextNonTrivial(int from, int direction) const
+{
+	for (int b = from + direction; b >= 0 && b < static_cast<int>(m_blocks.size()); b += direction)
+		if (!m_blocks[b].trivial)
+			return b;
+	return -1;
+}
+
+void FileCompareView::gotoDiff(int blockIndex)
+{
+	if (blockIndex < 0 || blockIndex >= static_cast<int>(m_blocks.size()))
+		return;
+	m_current = blockIndex;
+	for (int side = 0; side < 2; ++side)
+	{
+		const int line = m_blocks[blockIndex].begin[side];
+		QTextCursor cursor(m_panes[side]->document()->findBlockByNumber(qMax(0, line)));
+		m_syncing = true;
+		m_panes[side]->setTextCursor(cursor);
+		m_panes[side]->centerCursor();
+		m_syncing = false;
+	}
+	applyHighlights();
+	updateStatus();
+}
+
+void FileCompareView::gotoNextDiff()
+{
+	if (m_diffStale)
+		recompare();
+	const int next = nextNonTrivial(m_current, +1);
+	if (next >= 0)
+		gotoDiff(next);
+}
+
+void FileCompareView::gotoPrevDiff()
+{
+	if (m_diffStale)
+		recompare();
+	const int prev = nextNonTrivial(m_current < 0 ? static_cast<int>(m_blocks.size()) : m_current, -1);
+	if (prev >= 0)
+		gotoDiff(prev);
+}
+
+void FileCompareView::recompare()
+{
+	QString error;
+	if (!runDiff(&error))
+		return;
+	if (m_current >= static_cast<int>(m_blocks.size()) || m_current < 0
+		|| m_blocks.empty())
+		m_current = nextNonTrivial(-1, +1);
+	else if (m_blocks[m_current].trivial)
+		m_current = nextNonTrivial(m_current, +1);
+	applyHighlights();
+	updateStatus();
+}
+
+void FileCompareView::copyCurrentDiff(int sourceSide)
+{
+	if (m_diffStale)
+		recompare();
+	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
+		return;
+	const Block block = m_blocks[m_current];
+	const int target = 1 - sourceSide;
+
+	// Collect the source block's lines
+	QStringList newLines;
+	if (block.end[sourceSide] >= block.begin[sourceSide])
+	{
+		QTextDocument *doc = m_panes[sourceSide]->document();
+		for (int line = block.begin[sourceSide]; line <= block.end[sourceSide]; ++line)
+			newLines.append(doc->findBlockByNumber(line).text());
+	}
+
+	spliceLines(target, block.begin[target], block.end[target], newLines);
+	setSideModified(target, true);
+
+	recompare();
+	// land on the difference that now occupies this position (or the next one)
+	int next = -1;
+	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+	{
+		if (!m_blocks[b].trivial && m_blocks[b].begin[sourceSide] >= block.begin[sourceSide])
+		{
+			next = b;
+			break;
+		}
+	}
+	if (next < 0)
+		next = nextNonTrivial(static_cast<int>(m_blocks.size()), -1);
+	if (next >= 0)
+		gotoDiff(next);
+}
+
+/** Replace lines [firstLine..lastLine] (inclusive; last < first inserts at
+    firstLine) with newLines, as a single undoable edit. */
+void FileCompareView::spliceLines(int side, int firstLine, int lastLine,
+	const QStringList &newLines)
+{
+	QTextDocument *doc = m_panes[side]->document();
+	const int blockCount = doc->blockCount();
+	const bool removing = lastLine >= firstLine;
+
+	QTextCursor cursor(doc);
+	cursor.beginEditBlock();
+	m_syncing = true; // suppress per-keystroke stale marking; we recompare below
+
+	if (removing)
+	{
+		const QTextBlock firstBlock = doc->findBlockByNumber(firstLine);
+		cursor.setPosition(firstBlock.position());
+		if (lastLine + 1 < blockCount)
+		{
+			cursor.setPosition(doc->findBlockByNumber(lastLine + 1).position(),
+				QTextCursor::KeepAnchor);
+		}
+		else
+		{
+			cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
+			// also remove the newline preceding the removed tail block
+			if (firstLine > 0 && newLines.isEmpty())
+			{
+				const int prevEnd = doc->findBlockByNumber(firstLine - 1).position()
+					+ doc->findBlockByNumber(firstLine - 1).length() - 1;
+				cursor.setPosition(prevEnd);
+				cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
+			}
+		}
+		cursor.removeSelectedText();
+		if (!newLines.isEmpty())
+		{
+			const bool atEnd = lastLine + 1 >= blockCount;
+			cursor.insertText(newLines.join(QChar('\n')) + (atEnd ? QString() : QStringLiteral("\n")));
+		}
+	}
+	else if (!newLines.isEmpty())
+	{
+		// pure insertion before firstLine (or append at the end)
+		if (firstLine < blockCount)
+		{
+			cursor.setPosition(doc->findBlockByNumber(firstLine).position());
+			cursor.insertText(newLines.join(QChar('\n')) + QStringLiteral("\n"));
+		}
+		else
+		{
+			cursor.movePosition(QTextCursor::End);
+			cursor.insertText(QStringLiteral("\n") + newLines.join(QChar('\n')));
+		}
+	}
+
+	m_syncing = false;
+	cursor.endEditBlock();
+}
+
+bool FileCompareView::isModified() const
+{
+	return m_sides[0].modified || m_sides[1].modified;
+}
+
+void FileCompareView::setSideModified(int side, bool modified)
+{
+	const bool was = isModified();
+	m_sides[side].modified = modified;
+	if (m_actSave != nullptr)
+		m_actSave->setEnabled(isModified());
+	updateStatus();
+	if (was != isModified())
+		emit modifiedChanged(isModified());
+}
+
+bool FileCompareView::saveModified(QString *error)
+{
+	for (int side = 0; side < 2; ++side)
+	{
+		if (m_sides[side].modified && !saveSide(side, error))
+			return false;
+	}
+	return true;
+}
+
+bool FileCompareView::saveSide(int side, QString *error)
+{
+	const Side &s = m_sides[side];
+	UniStdioFile file;
+	if (!file.OpenCreate(s.path.toStdString()))
+	{
+		if (error != nullptr)
+			*error = tr("cannot write %1").arg(s.path);
+		return false;
+	}
+	file.SetUnicoding(static_cast<ucr::UNICODESET>(s.unicoding));
+	file.SetCodepage(s.codepage);
+	file.SetBom(s.bom);
+	file.WriteBom();
+
+	const QStringList lines = m_panes[side]->toPlainText().split(QChar('\n'));
+	const std::string eol = s.eol.toStdString();
+	for (int i = 0; i < lines.size(); ++i)
+	{
+		file.WriteString(lines.at(i).toStdString());
+		if (i + 1 < lines.size() || s.hadFinalEol)
+			file.WriteString(eol);
+	}
+	file.Close();
+	setSideModified(side, false);
+	return true;
 }
 
 void FileCompareView::syncScroll(int pane, int value)

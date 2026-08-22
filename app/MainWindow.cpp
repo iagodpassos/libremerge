@@ -98,6 +98,12 @@ void MainWindow::openFileComparison(const QString &leftPath, const QString &righ
 	const int index = m_tabs->addTab(view, title);
 	m_tabs->setTabToolTip(index, leftPath + QStringLiteral("\n") + rightPath);
 	m_tabs->setCurrentIndex(index);
+	connect(view, &FileCompareView::modifiedChanged, this, [this, view, title](bool modified) {
+		const int tabIndex = m_tabs->indexOf(view);
+		if (tabIndex >= 0)
+			m_tabs->setTabText(tabIndex, modified
+				? QStringLiteral("\xE2\x80\xA2 ") + title : title);
+	});
 }
 
 void MainWindow::openFolderComparison(const QString &leftDir, const QString &rightDir)
@@ -162,6 +168,24 @@ void MainWindow::newComparison()
 void MainWindow::closeTab(int index)
 {
 	QWidget *page = m_tabs->widget(index);
+	if (auto *view = qobject_cast<FileCompareView *>(page); view != nullptr && view->isModified())
+	{
+		const auto choice = QMessageBox::question(this, tr("LibreMerge"),
+			tr("This comparison has unsaved changes. Save before closing?"),
+			QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+		if (choice == QMessageBox::Cancel)
+			return;
+		if (choice == QMessageBox::Save)
+		{
+			QString error;
+			if (!view->saveModified(&error))
+			{
+				QMessageBox::warning(this, tr("LibreMerge"),
+					tr("Could not save:\n%1").arg(error));
+				return;
+			}
+		}
+	}
 	m_tabs->removeTab(index);
 	delete page;
 }
