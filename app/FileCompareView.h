@@ -118,6 +118,7 @@ private:
 	void updateStatus();
 	void updateDiffPane();
 	void updatePaneStatus(int side);
+	void applyTheme();
 	void updateHeader(int side);
 	void updateHeaderStyles();
 	void gotoDiff(int blockIndex);

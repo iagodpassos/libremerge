@@ -35,6 +35,7 @@
 #include "Icons.h"
 #include "LocationPane.h"
 #include "SyntaxHighlighter.h"
+#include "Theme.h"
 
 // engine
 #include "DiffWrapper.h"
@@ -46,18 +47,6 @@
 
 namespace
 {
-
-// WinMerge's default difference colors (Src/OptionsDiffColors.cpp)
-const QColor kDiff(239, 203, 5);
-const QColor kDiffDeleted(192, 192, 192);
-const QColor kSelDiff(239, 119, 116);
-const QColor kSelDiffDeleted(240, 192, 192);
-const QColor kTrivial(251, 242, 191);
-const QColor kTrivialDeleted(233, 233, 233);
-const QColor kWordDiff(241, 226, 173);
-const QColor kWordDiffDeleted(255, 170, 130);
-const QColor kSelWordDiff(255, 160, 160);
-const QColor kSelWordDiffDeleted(200, 129, 108);
 
 // upstream breaks words at punctuation too (OPT_BREAK_TYPE default 1)
 constexpr int kBreakType = 1;
@@ -294,10 +283,6 @@ FileCompareView::FileCompareView(QWidget *parent)
 	panes->setSpacing(1);
 
 	m_locationPane = new LocationPane(this);
-	QPalette locPal = m_locationPane->palette();
-	locPal.setColor(QPalette::Base, Qt::white);
-	locPal.setColor(QPalette::Mid, QColor(0xc0, 0xc0, 0xc0));
-	m_locationPane->setPalette(locPal);
 	panes->addWidget(m_locationPane);
 	connect(m_locationPane, &LocationPane::jumpRequested, this, [this](int line) {
 		for (int side = 0; side < m_paneCount; ++side)
@@ -344,16 +329,6 @@ FileCompareView::FileCompareView(QWidget *parent)
 		m_panes[i] = new DiffTextEdit(this);
 		m_panes[i]->setLineWrapMode(QPlainTextEdit::NoWrap);
 		m_panes[i]->setFont(mono);
-		// diff backgrounds and the syntax palette are light-theme colors;
-		// keep the panes light in dark mode too (as WinMerge's editor is)
-		QPalette pal = m_panes[i]->palette();
-		pal.setColor(QPalette::Base, Qt::white);
-		pal.setColor(QPalette::Text, Qt::black);
-		pal.setColor(QPalette::Window, QColor(0xf0, 0xf0, 0xf0));
-		pal.setColor(QPalette::PlaceholderText, QColor(0x88, 0x88, 0x88));
-		pal.setColor(QPalette::Highlight, QColor(0xb5, 0xd5, 0xff));
-		pal.setColor(QPalette::HighlightedText, Qt::black);
-		m_panes[i]->setPalette(pal);
 		column->addWidget(m_panes[i], 1);
 
 		auto *statusRow = new QHBoxLayout;
@@ -363,10 +338,6 @@ FileCompareView::FileCompareView(QWidget *parent)
 		m_posLabels[i]->setContentsMargins(6, 1, 6, 1);
 		m_encLabels[i] = new QLabel(this);
 		m_encLabels[i]->setContentsMargins(6, 1, 6, 1);
-		const QString statusStyle = QStringLiteral(
-			"QLabel { background: #ececec; color: #303030; }");
-		m_posLabels[i]->setStyleSheet(statusStyle);
-		m_encLabels[i]->setStyleSheet(statusStyle);
 		statusRow->addWidget(m_posLabels[i], 1);
 		statusRow->addWidget(m_encLabels[i]);
 		column->addLayout(statusRow);
@@ -414,7 +385,6 @@ FileCompareView::FileCompareView(QWidget *parent)
 		edit->setReadOnly(true);
 		edit->setLineWrapMode(QPlainTextEdit::NoWrap);
 		edit->setFont(diffPaneFont);
-		edit->setPalette(m_panes[i]->palette());
 		edit->setMinimumHeight(24);
 		m_diffPaneEdits[i] = edit;
 		diffPaneLayout->addWidget(edit);
@@ -452,6 +422,10 @@ FileCompareView::FileCompareView(QWidget *parent)
 	m_status = new QLabel(this);
 	m_status->setContentsMargins(6, 3, 6, 3);
 	layout->addWidget(m_status);
+
+	applyTheme();
+	connect(lm::Theme::instance(), &lm::Theme::changed,
+		this, [this]() { applyTheme(); });
 }
 
 bool FileCompareView::compare(const QStringList &paths, QString *error)
@@ -842,6 +816,7 @@ void FileCompareView::computeWordSpans()
 
 void FileCompareView::applyHighlights()
 {
+	const lm::DiffColors &C = lm::diffColors();
 	for (int side = 0; side < m_paneCount; ++side)
 	{
 		QList<QTextEdit::ExtraSelection> selections;
@@ -870,17 +845,17 @@ void FileCompareView::applyHighlights()
 				const bool ghost = (v - block.viewBegin) >= len;
 				QColor color;
 				if (block.trivial)
-					color = ghost ? kTrivialDeleted : kTrivial;
+					color = ghost ? C.trivialDeleted : C.trivial;
 				else if (block.resolved)
 				{
 					if (!ghost)
 						continue; // merged: real lines look like common text
-					color = kTrivialDeleted;
+					color = C.trivialDeleted;
 				}
 				else if (current)
-					color = ghost ? kSelDiffDeleted : kSelDiff;
+					color = ghost ? C.selDiffDeleted : C.selDiff;
 				else
-					color = ghost ? kDiffDeleted : kDiff;
+					color = ghost ? C.diffDeleted : C.diff;
 				addLineSelection(v, color);
 			}
 		}
@@ -898,8 +873,8 @@ void FileCompareView::applyHighlights()
 			const bool current = (span.blockIndex == m_current);
 			QTextEdit::ExtraSelection selection;
 			selection.format.setBackground(current
-				? (span.oneSided ? kSelWordDiffDeleted : kSelWordDiff)
-				: (span.oneSided ? kWordDiffDeleted : kWordDiff));
+				? (span.oneSided ? C.selWordDiffDeleted : C.selWordDiff)
+				: (span.oneSided ? C.wordDiffDeleted : C.wordDiff));
 			QTextCursor cursor(textBlock);
 			cursor.setPosition(textBlock.position() + span.start);
 			cursor.setPosition(textBlock.position() + span.start + span.length,
@@ -926,8 +901,8 @@ void FileCompareView::applyHighlights()
 				band.side = side;
 				band.firstLine = block.viewBegin;
 				band.lastLine = block.viewBegin + len - 1;
-				band.color = block.trivial ? kTrivial
-					: (current ? kSelDiff : kDiff);
+				band.color = block.trivial ? C.trivial
+					: (current ? C.selDiff : C.diff);
 				bands.push_back(band);
 			}
 			if (len <= block.viewEnd - block.viewBegin)
@@ -937,8 +912,8 @@ void FileCompareView::applyHighlights()
 				band.firstLine = block.viewBegin + len;
 				band.lastLine = block.viewEnd;
 				band.color = block.trivial || block.resolved
-					? kTrivialDeleted
-					: (current ? kSelDiffDeleted : kDiffDeleted);
+					? C.trivialDeleted
+					: (current ? C.selDiffDeleted : C.diffDeleted);
 				bands.push_back(band);
 			}
 		}
@@ -957,6 +932,7 @@ void FileCompareView::updateDiffPane()
 {
 	if (!m_actDiffPane->isChecked())
 		return;
+	const lm::DiffColors &C = lm::diffColors();
 	const bool valid = m_current >= 0
 		&& m_current < static_cast<int>(m_blocks.size())
 		&& !m_blocks[m_current].trivial && !m_blocks[m_current].resolved;
@@ -993,7 +969,7 @@ void FileCompareView::updateDiffPane()
 			if (!textBlock.isValid())
 				continue;
 			QTextEdit::ExtraSelection selection;
-			selection.format.setBackground(kSelDiff);
+			selection.format.setBackground(C.selDiff);
 			selection.format.setProperty(QTextFormat::FullWidthSelection, true);
 			selection.cursor = QTextCursor(textBlock);
 			selections.append(selection);
@@ -1008,7 +984,7 @@ void FileCompareView::updateDiffPane()
 				continue;
 			QTextEdit::ExtraSelection selection;
 			selection.format.setBackground(
-				span.oneSided ? kSelWordDiffDeleted : kSelWordDiff);
+				span.oneSided ? C.selWordDiffDeleted : C.selWordDiff);
 			QTextCursor cursor(textBlock);
 			cursor.setPosition(textBlock.position() + span.start);
 			cursor.setPosition(textBlock.position() + span.start + span.length,
@@ -1076,19 +1052,75 @@ void FileCompareView::updateHeader(int side)
 		(s.modified ? QStringLiteral("* ") : QString()) + display);
 }
 
+/** Apply the light (WinMerge classic) or dark palette to every themed
+    part of the view: editor panes, gutters, diff pane, location pane,
+    status strips, headers, syntax colors and diff highlights. */
+void FileCompareView::applyTheme()
+{
+	const bool dark = lm::Theme::instance()->dark();
+	QPalette pal;
+	if (dark)
+	{
+		pal.setColor(QPalette::Base, QColor(0x1e, 0x1e, 0x1e));
+		pal.setColor(QPalette::Text, QColor(0xd4, 0xd4, 0xd4));
+		pal.setColor(QPalette::Window, QColor(0x2a, 0x2a, 0x2a));
+		pal.setColor(QPalette::PlaceholderText, QColor(0x70, 0x70, 0x70));
+		pal.setColor(QPalette::Highlight, QColor(0x26, 0x4f, 0x78));
+		pal.setColor(QPalette::HighlightedText, QColor(0xe6, 0xe6, 0xe6));
+	}
+	else
+	{
+		pal.setColor(QPalette::Base, Qt::white);
+		pal.setColor(QPalette::Text, Qt::black);
+		pal.setColor(QPalette::Window, QColor(0xf0, 0xf0, 0xf0));
+		pal.setColor(QPalette::PlaceholderText, QColor(0x88, 0x88, 0x88));
+		pal.setColor(QPalette::Highlight, QColor(0xb5, 0xd5, 0xff));
+		pal.setColor(QPalette::HighlightedText, Qt::black);
+	}
+	const QString statusStyle = dark
+		? QStringLiteral("QLabel { background: #2c2c2c; color: #b8b8b8; }")
+		: QStringLiteral("QLabel { background: #ececec; color: #303030; }");
+	for (int i = 0; i < 3; ++i)
+	{
+		m_panes[i]->setPalette(pal);
+		m_diffPaneEdits[i]->setPalette(pal);
+		m_posLabels[i]->setStyleSheet(statusStyle);
+		m_encLabels[i]->setStyleSheet(statusStyle);
+		// syntax palettes are theme-specific: rebuild and rehighlight
+		if (m_highlighters[i] != nullptr)
+			m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
+				m_panes[i]->document(), m_sides[i].path);
+	}
+	QPalette locPal = m_locationPane->palette();
+	locPal.setColor(QPalette::Base,
+		dark ? QColor(0x24, 0x24, 0x24) : QColor(Qt::white));
+	locPal.setColor(QPalette::Mid,
+		dark ? QColor(0x50, 0x50, 0x50) : QColor(0xc0, 0xc0, 0xc0));
+	m_locationPane->setPalette(locPal);
+	updateHeaderStyles();
+	applyHighlights();
+}
+
 void FileCompareView::updateHeaderStyles()
 {
 	const int active = m_activePane;
+	const bool dark = lm::Theme::instance()->dark();
+	const QString activeStyle = dark
+		? QStringLiteral("QWidget { background: #2d4a6b; border: 1px solid #46689a; }"
+			" QLabel { background: transparent; border: none; color: #e8e8e8; font-weight: 600; }"
+			" QToolButton { background: transparent; border: none; color: #e8e8e8; }")
+		: QStringLiteral("QWidget { background: #d6e4f5; border: 1px solid #a0b0c8; }"
+			" QLabel { background: transparent; border: none; color: #101010; font-weight: 600; }"
+			" QToolButton { background: transparent; border: none; color: #101010; }");
+	const QString inactiveStyle = dark
+		? QStringLiteral("QWidget { background: #303030; border: 1px solid #454545; }"
+			" QLabel { background: transparent; border: none; color: #b0b0b0; }"
+			" QToolButton { background: transparent; border: none; color: #b0b0b0; }")
+		: QStringLiteral("QWidget { background: #ececec; border: 1px solid #c0c0c0; }"
+			" QLabel { background: transparent; border: none; color: #404040; }"
+			" QToolButton { background: transparent; border: none; color: #404040; }");
 	for (int i = 0; i < 3; ++i)
-	{
-		m_headerRows[i]->setStyleSheet(i == active
-			? QStringLiteral("QWidget { background: #d6e4f5; border: 1px solid #a0b0c8; }"
-				" QLabel { background: transparent; border: none; color: #101010; font-weight: 600; }"
-				" QToolButton { background: transparent; border: none; color: #101010; }")
-			: QStringLiteral("QWidget { background: #ececec; border: 1px solid #c0c0c0; }"
-				" QLabel { background: transparent; border: none; color: #404040; }"
-				" QToolButton { background: transparent; border: none; color: #404040; }"));
-	}
+		m_headerRows[i]->setStyleSheet(i == active ? activeStyle : inactiveStyle);
 }
 
 QStringList FileCompareView::paths() const

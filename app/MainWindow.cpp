@@ -2,6 +2,7 @@
 #include "MainWindow.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
@@ -21,6 +22,7 @@
 #include <QTabWidget>
 
 #include "FileCompareView.h"
+#include "Theme.h"
 #include "FolderCompareView.h"
 #include "NewComparisonView.h"
 
@@ -104,6 +106,22 @@ MainWindow::MainWindow(QWidget *parent)
 	QAction *optionsAction = editMenu->addAction(tr("Comparison &Options..."));
 	optionsAction->setMenuRole(QAction::PreferencesRole); // macOS app menu
 	connect(optionsAction, &QAction::triggered, this, &MainWindow::showOptions);
+
+	QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
+	QMenu *themeMenu = viewMenu->addMenu(tr("&Theme"));
+	auto *themeGroup = new QActionGroup(this);
+	auto addThemeAction = [themeMenu, themeGroup](const QString &text,
+		lm::ThemeMode mode) {
+		QAction *action = themeMenu->addAction(text);
+		action->setCheckable(true);
+		themeGroup->addAction(action);
+		action->setChecked(lm::Theme::instance()->mode() == mode);
+		connect(action, &QAction::triggered,
+			[mode]() { lm::Theme::instance()->setMode(mode); });
+	};
+	addThemeAction(tr("&System"), lm::ThemeMode::System);
+	addThemeAction(tr("&Light"), lm::ThemeMode::Light);
+	addThemeAction(tr("&Dark"), lm::ThemeMode::Dark);
 
 	QMenu *mergeMenu = menuBar()->addMenu(tr("&Merge"));
 	addMenuAction(mergeMenu, tr("&First Difference"),

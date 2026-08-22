@@ -8,6 +8,7 @@
 
 #include "SyntaxColors.h"
 #include "TextDefinition.h"
+#include "Theme.h"
 
 namespace
 {
@@ -52,8 +53,8 @@ SyntaxHighlighter::SyntaxHighlighter(QTextDocument *document, const QString &fil
 		return;
 	m_languageName = QString::fromUtf8(def->name);
 
-	// classic light-theme palette, foreground only (diff colors own the
-	// background)
+	// foreground only (diff colors own the background); classic light
+	// palette or a dark-editor equivalent, per the active theme
 	auto set = [this](int index, const QColor &color, bool bold = false) {
 		if (index < 0 || index >= 16)
 			return;
@@ -61,15 +62,30 @@ SyntaxHighlighter::SyntaxHighlighter(QTextDocument *document, const QString &fil
 		if (bold)
 			m_formats[index].setFontWeight(QFont::DemiBold);
 	};
-	set(COLORINDEX_KEYWORD, QColor(0x00, 0x00, 0xbf), true);
-	set(COLORINDEX_FUNCNAME, QColor(0x6f, 0x00, 0x8a));
-	set(COLORINDEX_COMMENT, QColor(0x00, 0x80, 0x00));
-	set(COLORINDEX_NUMBER, QColor(0xa8, 0x40, 0x00));
-	set(COLORINDEX_OPERATOR, QColor(0x40, 0x40, 0x40));
-	set(COLORINDEX_STRING, QColor(0xa3, 0x15, 0x15));
-	set(COLORINDEX_PREPROCESSOR, QColor(0x00, 0x60, 0x70));
-	set(COLORINDEX_USER1, QColor(0x00, 0x70, 0x70));
-	set(COLORINDEX_USER2, QColor(0x70, 0x40, 0x00));
+	if (lm::Theme::instance()->dark())
+	{
+		set(COLORINDEX_KEYWORD, QColor(0x56, 0x9c, 0xd6), true);
+		set(COLORINDEX_FUNCNAME, QColor(0xdc, 0xdc, 0xaa));
+		set(COLORINDEX_COMMENT, QColor(0x6a, 0x99, 0x55));
+		set(COLORINDEX_NUMBER, QColor(0xb5, 0xce, 0xa8));
+		set(COLORINDEX_OPERATOR, QColor(0xc8, 0xc8, 0xc8));
+		set(COLORINDEX_STRING, QColor(0xce, 0x91, 0x78));
+		set(COLORINDEX_PREPROCESSOR, QColor(0x4e, 0xc9, 0xb0));
+		set(COLORINDEX_USER1, QColor(0x4f, 0xc1, 0xff));
+		set(COLORINDEX_USER2, QColor(0xd7, 0xba, 0x7d));
+	}
+	else
+	{
+		set(COLORINDEX_KEYWORD, QColor(0x00, 0x00, 0xbf), true);
+		set(COLORINDEX_FUNCNAME, QColor(0x6f, 0x00, 0x8a));
+		set(COLORINDEX_COMMENT, QColor(0x00, 0x80, 0x00));
+		set(COLORINDEX_NUMBER, QColor(0xa8, 0x40, 0x00));
+		set(COLORINDEX_OPERATOR, QColor(0x40, 0x40, 0x40));
+		set(COLORINDEX_STRING, QColor(0xa3, 0x15, 0x15));
+		set(COLORINDEX_PREPROCESSOR, QColor(0x00, 0x60, 0x70));
+		set(COLORINDEX_USER1, QColor(0x00, 0x70, 0x70));
+		set(COLORINDEX_USER2, QColor(0x70, 0x40, 0x00));
+	}
 }
 
 void SyntaxHighlighter::highlightBlock(const QString &text)
