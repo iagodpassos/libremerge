@@ -4,14 +4,17 @@
 
 LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winmerge.org/) (file diff, folder diff, filters, moved-block detection) and rebuilds the user interface with Qt 6, since the original UI is written in MFC and cannot leave Windows.
 
-> **Status: Phase 0 largely complete on macOS.**
+> **Status: Phase 0 complete; Phase 1 in progress.**
 > WinMerge's comparison engine builds as a native library
-> (`libremerge-engine`) on macOS arm64, and the upstream GoogleTest suite
-> passes **369/369** on it — file diff (GNU diffutils + git xdiff), folder
-> scan and compare engines, file/line/substitution filters, the filter
-> expression language, moved-block detection and Unicode handling all
-> validated. Linux CI is configured but not yet verified. No usable GUI
-> exists yet — that is Phase 1.
+> (`libremerge-engine`) and the upstream GoogleTest suite passes
+> **369/369 on both macOS arm64 and Ubuntu** (see CI) — file diff
+> (GNU diffutils + git xdiff), folder scan and compare engines,
+> file/line/substitution filters, the filter expression language,
+> moved-block detection and Unicode handling all validated.
+> The Qt 6 application already opens 2-way **file comparisons**
+> (side-by-side diff highlighting, encoding-aware loading) and 2-way
+> **folder comparisons** (recursive content compare with classification);
+> editing/merge operations are the next milestone.
 
 ## Building (macOS)
 
