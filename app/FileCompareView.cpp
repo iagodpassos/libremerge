@@ -427,6 +427,44 @@ FileCompareView::FileCompareView(QWidget *parent)
 	applyTheme();
 	connect(lm::Theme::instance(), &lm::Theme::changed,
 		this, [this]() { applyTheme(); });
+
+	const qreal savedSize = QSettings()
+		.value(QStringLiteral("FileCompare/FontPointSize")).toReal();
+	if (savedSize > 0)
+		applyZoom(savedSize);
+}
+
+/** Set the comparison text size on the panes, gutters, tab stops and
+    the diff pane (which stays one point smaller). */
+void FileCompareView::applyZoom(qreal pointSize)
+{
+	pointSize = qBound<qreal>(6.0, pointSize, 36.0);
+	for (int i = 0; i < 3; ++i)
+	{
+		QFont font = m_panes[i]->font();
+		font.setPointSizeF(pointSize);
+		m_panes[i]->setFont(font);
+		m_panes[i]->setTabStopDistance(
+			4 * QFontMetricsF(font).horizontalAdvance(QLatin1Char(' ')));
+		font.setPointSizeF(qMax<qreal>(6.0, pointSize - 1));
+		m_diffPaneEdits[i]->setFont(font);
+	}
+	QSettings().setValue(QStringLiteral("FileCompare/FontPointSize"), pointSize);
+}
+
+void FileCompareView::zoomIn()
+{
+	applyZoom(m_panes[0]->font().pointSizeF() + 1);
+}
+
+void FileCompareView::zoomOut()
+{
+	applyZoom(m_panes[0]->font().pointSizeF() - 1);
+}
+
+void FileCompareView::zoomReset()
+{
+	applyZoom(QFontDatabase::systemFont(QFontDatabase::FixedFont).pointSizeF());
 }
 
 bool FileCompareView::compare(const QStringList &paths, QString *error)

@@ -112,6 +112,12 @@
         <translation>Direita → Meio</translation>
     </message>
     <message>
+        <source>%1 appears to be a binary file.
+LibreMerge compares text files; binary comparison is not supported yet.</source>
+        <translation>%1 parece ser um arquivo binário.
+O LibreMerge compara arquivos de texto; comparação binária ainda não é suportada.</translation>
+    </message>
+    <message>
         <source>cannot open %1</source>
         <translation>não foi possível abrir %1</translation>
     </message>
@@ -122,6 +128,14 @@
     <message>
         <source>the diff engine failed</source>
         <translation>o motor de comparação falhou</translation>
+    </message>
+    <message>
+        <source>the files could not be compared as text</source>
+        <translation>os arquivos não puderam ser comparados como texto</translation>
+    </message>
+    <message>
+        <source>Binary content — comparison not supported</source>
+        <translation>Conteúdo binário — comparação não suportada</translation>
     </message>
     <message>
         <source>… (%1 more lines)</source>
@@ -445,6 +459,18 @@
     <message>
         <source>&amp;Dark</source>
         <translation>&amp;Escuro</translation>
+    </message>
+    <message>
+        <source>Zoom &amp;In</source>
+        <translation>&amp;Aumentar Zoom</translation>
+    </message>
+    <message>
+        <source>Zoom &amp;Out</source>
+        <translation>&amp;Reduzir Zoom</translation>
+    </message>
+    <message>
+        <source>&amp;Actual Size</source>
+        <translation>Tamanho &amp;Original</translation>
     </message>
     <message>
         <source>&amp;Merge</source>

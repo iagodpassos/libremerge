@@ -59,6 +59,9 @@ public:
 	void swapSides();
 	void undoActive();
 	void redoActive();
+	void zoomIn();
+	void zoomOut();
+	void zoomReset();
 	void showFindBar();
 	void findNext(bool backward);
 	void recompare();
@@ -119,6 +122,7 @@ private:
 	void updateDiffPane();
 	void updatePaneStatus(int side);
 	void applyTheme();
+	void applyZoom(qreal pointSize);
 	void updateHeader(int side);
 	void updateHeaderStyles();
 	void gotoDiff(int blockIndex);

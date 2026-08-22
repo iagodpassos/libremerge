@@ -122,6 +122,22 @@ MainWindow::MainWindow(QWidget *parent)
 	addThemeAction(tr("&System"), lm::ThemeMode::System);
 	addThemeAction(tr("&Light"), lm::ThemeMode::Light);
 	addThemeAction(tr("&Dark"), lm::ThemeMode::Dark);
+	viewMenu->addSeparator();
+	QAction *zoomInAction = addMenuAction(viewMenu, tr("Zoom &In"),
+		QKeySequence::ZoomIn, [fileView]() {
+			if (auto *view = fileView()) view->zoomIn();
+		});
+	// pt-BR and US keyboards type "+" as Shift+= — accept Cmd+= too
+	zoomInAction->setShortcuts({ QKeySequence::ZoomIn,
+		QKeySequence(Qt::CTRL | Qt::Key_Equal) });
+	addMenuAction(viewMenu, tr("Zoom &Out"), QKeySequence::ZoomOut,
+		[fileView]() {
+			if (auto *view = fileView()) view->zoomOut();
+		});
+	addMenuAction(viewMenu, tr("&Actual Size"),
+		QKeySequence(Qt::CTRL | Qt::Key_0), [fileView]() {
+			if (auto *view = fileView()) view->zoomReset();
+		});
 
 	QMenu *mergeMenu = menuBar()->addMenu(tr("&Merge"));
 	addMenuAction(mergeMenu, tr("&First Difference"),
