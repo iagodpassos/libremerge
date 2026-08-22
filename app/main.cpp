@@ -67,7 +67,8 @@ int main(int argc, char *argv[])
 	if (parser.isSet(screenshotOpt))
 	{
 		const QString target = parser.value(screenshotOpt);
-		QTimer::singleShot(0, &window, [&window, target]() {
+		// give async comparisons a moment to finish before capturing
+		QTimer::singleShot(1500, &window, [&window, target]() {
 			window.resize(1100, 700);
 			window.grab().save(target);
 			QApplication::quit();

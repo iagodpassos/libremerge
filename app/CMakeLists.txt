@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent)
 
 qt_standard_project_setup()
 
@@ -20,6 +20,7 @@ set_target_properties(LibreMerge PROPERTIES
 
 target_link_libraries(LibreMerge PRIVATE
   Qt6::Widgets
+  Qt6::Concurrent
   libremerge-engine
 )
 

@@ -3,11 +3,16 @@
 
 #include "FolderCompareView.h"
 
+#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLocale>
+#include <QProgressBar>
+#include <QPushButton>
+#include <QTimer>
 #include <QTreeWidget>
 #include <QVBoxLayout>
+#include <QtConcurrent/QtConcurrent>
 
 namespace
 {
@@ -88,19 +93,84 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	connect(m_tree, &QTreeWidget::itemActivated, this, &FolderCompareView::itemActivated);
 	layout->addWidget(m_tree, 1);
 
+	auto *statusRow = new QHBoxLayout;
+	statusRow->setContentsMargins(6, 3, 6, 3);
 	m_status = new QLabel(this);
-	m_status->setContentsMargins(6, 3, 6, 3);
-	layout->addWidget(m_status);
+	statusRow->addWidget(m_status, 1);
+	m_progress = new QProgressBar(this);
+	m_progress->setMaximumWidth(240);
+	m_progress->setVisible(false);
+	statusRow->addWidget(m_progress);
+	m_cancelButton = new QPushButton(tr("Cancel"), this);
+	m_cancelButton->setVisible(false);
+	connect(m_cancelButton, &QPushButton::clicked, this, [this]() {
+		if (m_job)
+			m_job->requestAbort();
+		m_cancelButton->setEnabled(false);
+		m_status->setText(tr("Cancelling\xE2\x80\xA6"));
+	});
+	statusRow->addWidget(m_cancelButton);
+	layout->addLayout(statusRow);
+
+	m_progressTimer = new QTimer(this);
+	m_progressTimer->setInterval(150);
+	connect(m_progressTimer, &QTimer::timeout, this, &FolderCompareView::updateProgress);
+	connect(&m_watcher, &QFutureWatcher<lm::FolderCompareResult>::finished,
+		this, &FolderCompareView::compareFinished);
 }
 
-bool FolderCompareView::compare(const QString &leftDir, const QString &rightDir, QString *error)
+FolderCompareView::~FolderCompareView()
 {
-	const lm::FolderCompareResult result = lm::compareFolders(leftDir, rightDir, true);
+	if (m_job)
+		m_job->requestAbort();
+	m_watcher.waitForFinished();
+}
+
+void FolderCompareView::start(const QString &leftDir, const QString &rightDir)
+{
+	m_job = std::make_shared<lm::FolderCompareJob>();
+	m_status->setText(tr("Scanning\xE2\x80\xA6"));
+	m_progress->setRange(0, 0); // busy until totals are known
+	m_progress->setVisible(true);
+	m_cancelButton->setVisible(true);
+	m_cancelButton->setEnabled(true);
+	m_progressTimer->start();
+
+	auto job = m_job;
+	m_watcher.setFuture(QtConcurrent::run([leftDir, rightDir, job]() {
+		return lm::compareFolders(leftDir, rightDir, true, job);
+	}));
+}
+
+void FolderCompareView::updateProgress()
+{
+	if (!m_job)
+		return;
+	const int total = m_job->totalItems();
+	const int done = m_job->comparedItems();
+	if (total > 0)
+	{
+		m_progress->setRange(0, total);
+		m_progress->setValue(done);
+		m_status->setText(tr("Comparing\xE2\x80\xA6 %1 of %2 items").arg(done).arg(total));
+	}
+}
+
+void FolderCompareView::compareFinished()
+{
+	m_progressTimer->stop();
+	m_progress->setVisible(false);
+	m_cancelButton->setVisible(false);
+	populate(m_watcher.result());
+	m_job.reset();
+}
+
+void FolderCompareView::populate(const lm::FolderCompareResult &result)
+{
 	if (!result.ok)
 	{
-		if (error != nullptr)
-			*error = result.error;
-		return false;
+		m_status->setText(tr("Comparison failed: %1").arg(result.error));
+		return;
 	}
 
 	m_tree->setSortingEnabled(false);
@@ -134,10 +204,12 @@ bool FolderCompareView::compare(const QString &leftDir, const QString &rightDir,
 	for (int col = 0; col < ColCount; ++col)
 		m_tree->resizeColumnToContents(col);
 
-	m_status->setText(tr("%1 item(s): %2 different, %3 unique, %4 identical")
+	QString text = tr("%1 item(s): %2 different, %3 unique, %4 identical")
 		.arg(result.items.size()).arg(result.different).arg(result.unique)
-		.arg(result.identical));
-	return true;
+		.arg(result.identical);
+	if (result.aborted)
+		text = tr("Cancelled \xE2\x80\x94 partial results. ") + text;
+	m_status->setText(text);
 }
 
 void FolderCompareView::itemActivated(QTreeWidgetItem *item, int column)

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Synchronous driver over the engine's folder compare: DirScan_GetItems
-// collects the item tree into CDiffContext, DirScan_CompareItems runs the
-// content compare. Upstream drives the same functions from CDiffThread;
-// a background-thread version is a later Phase 1 refinement.
+// Driver over the engine's folder compare: DirScan_GetItems collects the
+// item tree into CDiffContext, DirScan_CompareItems runs the content
+// compare. Upstream drives the same functions from CDiffThread; here the
+// caller supplies the thread (FolderCompareView runs it via QtConcurrent)
+// and polls progress through FolderCompareJob.
 #include "pch.h"
 
 #include "FolderCompareDriver.h"
@@ -17,6 +18,7 @@
 #include "DiffWrapper.h"
 #include "DirScan.h"
 #include "FileFilterHelper.h"
+#include "IAbortable.h"
 #include "PathContext.h"
 #include "paths.h"
 
@@ -46,20 +48,54 @@ FolderCompareItem::Category classify(const DIFFITEM &di)
 	return FolderCompareItem::Different;
 }
 
+class JobAbortable : public IAbortable
+{
+public:
+	explicit JobAbortable(const FolderCompareJob *job) : m_job(job) {}
+	bool ShouldAbort() const override
+	{
+		return m_job != nullptr && m_job->abortRequested();
+	}
+private:
+	const FolderCompareJob *m_job;
+};
+
 } // namespace
 
+FolderCompareJob::FolderCompareJob()
+	: m_stats(new CompareStats(2))
+{
+	m_stats->SetCompareThreadCount(1);
+}
+
+FolderCompareJob::~FolderCompareJob() = default;
+
+int FolderCompareJob::comparedItems() const
+{
+	return m_stats->GetComparedItems();
+}
+
+int FolderCompareJob::totalItems() const
+{
+	return m_stats->GetTotalItems();
+}
+
 FolderCompareResult compareFolders(const QString &leftDir, const QString &rightDir,
-	bool recursive)
+	bool recursive, const std::shared_ptr<FolderCompareJob> &jobIn)
 {
 	FolderCompareResult result;
+	std::shared_ptr<FolderCompareJob> job = jobIn;
+	if (!job)
+		job = std::make_shared<FolderCompareJob>();
 
 	PathContext paths(leftDir.toStdString(), rightDir.toStdString());
 	CDiffContext ctxt(paths, CMP_CONTENT);
 
-	CompareStats stats(2);
-	stats.SetCompareThreadCount(1);
-	ctxt.m_pCompareStats = &stats;
+	ctxt.m_pCompareStats = job->stats();
 	ctxt.m_bRecursive = recursive;
+
+	JobAbortable abortable(job.get());
+	ctxt.SetAbortable(&abortable);
 
 	DIFFOPTIONS options{};
 	if (!ctxt.CreateCompareOptions(CMP_CONTENT, options))
@@ -130,10 +166,12 @@ FolderCompareResult compareFolders(const QString &leftDir, const QString &rightD
 		result.items.append(item);
 	}
 
-	// context holds pointers to the stack objects above; clear before return
+	// context holds pointers to objects owned here/by the job; detach them
+	ctxt.SetAbortable(nullptr);
 	ctxt.m_piFilterGlobal = nullptr;
 	ctxt.m_pCompareStats = nullptr;
 
+	result.aborted = job->abortRequested();
 	result.ok = true;
 	return result;
 }
