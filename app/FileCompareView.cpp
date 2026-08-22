@@ -186,6 +186,7 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 	{
 		if (!loadSide(i, paths.at(i), error))
 			return false;
+		m_panes[i]->setReadOnly(m_readOnly[i]);
 	}
 	if (!runDiff(error))
 		return false;
@@ -555,6 +556,11 @@ void FileCompareView::copyCurrentDiff(int sourceSide)
 		return;
 	const Block block = m_blocks[m_current];
 	const int target = mergeTarget(sourceSide);
+	if (m_readOnly[target])
+	{
+		m_status->setText(tr("The merge target is read-only."));
+		return;
+	}
 
 	// Collect the source block's lines
 	QStringList newLines;
@@ -643,6 +649,12 @@ void FileCompareView::spliceLines(int side, int firstLine, int lastLine,
 
 	m_syncing = false;
 	cursor.endEditBlock();
+}
+
+void FileCompareView::setReadOnlySides(const QList<bool> &readOnly)
+{
+	for (int i = 0; i < 3 && i < readOnly.size(); ++i)
+		m_readOnly[i] = readOnly.at(i);
 }
 
 bool FileCompareView::isModified() const

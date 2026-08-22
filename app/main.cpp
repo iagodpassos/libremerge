@@ -109,6 +109,10 @@ int main(int argc, char *argv[])
 	{
 		window.openFileComparison(args);
 	}
+	else
+	{
+		window.openSelector(args);
+	}
 
 	if (parser.isSet(screenshotOpt))
 	{

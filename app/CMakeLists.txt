@@ -12,6 +12,7 @@ qt_add_executable(LibreMerge
   ${LM_APP_ICON}
   main.cpp
   MainWindow.cpp
+  NewComparisonView.cpp
   FileCompareView.cpp
   DiffTextEdit.cpp
   LocationPane.cpp
@@ -27,6 +28,8 @@ set_target_properties(LibreMerge PROPERTIES
   MACOSX_BUNDLE_BUNDLE_VERSION 0.1.0
   MACOSX_BUNDLE_SHORT_VERSION_STRING 0.1.0
   MACOSX_BUNDLE_ICON_FILE AppIcon.icns
+  MACOSX_BUNDLE_BUNDLE_NAME LibreMerge
+  MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/packaging/Info.plist.in
 )
 
 target_link_libraries(LibreMerge PRIVATE

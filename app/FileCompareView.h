@@ -34,6 +34,10 @@ public:
 	int diffCount() const { return m_diffCount; }
 	int paneCount() const { return m_paneCount; }
 
+	/** Mark sides as read-only before compare(): the pane rejects edits
+	    and merge operations refuse to target it. */
+	void setReadOnlySides(const QList<bool> &readOnly);
+
 	/** Copy the current difference from sourceSide into the merge target
 	    (the other side in 2-way mode, the middle pane in 3-way mode). */
 	void copyCurrentDiff(int sourceSide);
@@ -91,6 +95,7 @@ private:
 	void syncScroll(int pane, int value);
 
 	int m_paneCount = 2;
+	bool m_readOnly[3] = {};
 	DiffTextEdit *m_panes[3];
 	LocationPane *m_locationPane;
 	Side m_sides[3];

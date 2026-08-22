@@ -6,6 +6,9 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
+#include <QDragEnterEvent>
+#include <QFileOpenEvent>
+#include <QMimeData>
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -19,6 +22,7 @@
 
 #include "FileCompareView.h"
 #include "FolderCompareView.h"
+#include "NewComparisonView.h"
 
 // engine
 #include "OptionsMgr.h"
@@ -27,29 +31,6 @@
 namespace
 {
 
-/** One row of the "New Comparison" dialog: path box + browse buttons. */
-QLineEdit *addPathRow(QGridLayout *grid, int row, const QString &label, QWidget *parent)
-{
-	grid->addWidget(new QLabel(label, parent), row, 0);
-	auto *edit = new QLineEdit(parent);
-	grid->addWidget(edit, row, 1);
-	auto *fileButton = new QPushButton(QObject::tr("File..."), parent);
-	QObject::connect(fileButton, &QPushButton::clicked, parent, [edit, parent]() {
-		const QString path = QFileDialog::getOpenFileName(parent);
-		if (!path.isEmpty())
-			edit->setText(path);
-	});
-	grid->addWidget(fileButton, row, 2);
-	auto *dirButton = new QPushButton(QObject::tr("Folder..."), parent);
-	QObject::connect(dirButton, &QPushButton::clicked, parent, [edit, parent]() {
-		const QString path = QFileDialog::getExistingDirectory(parent);
-		if (!path.isEmpty())
-			edit->setText(path);
-	});
-	grid->addWidget(dirButton, row, 3);
-	return edit;
-}
-
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
@@ -57,6 +38,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
 	setWindowTitle(QStringLiteral("LibreMerge"));
 	resize(1100, 700);
+	setAcceptDrops(true);
+	qApp->installEventFilter(this); // QFileOpenEvent from Finder/Dock
 
 	m_tabs = new QTabWidget(this);
 	m_tabs->setTabsClosable(true);
@@ -98,9 +81,10 @@ void MainWindow::openFileComparison(const QString &leftPath, const QString &righ
 	openFileComparison(QStringList{ leftPath, rightPath });
 }
 
-void MainWindow::openFileComparison(const QStringList &paths)
+void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> &readOnly)
 {
 	auto *view = new FileCompareView(this);
+	view->setReadOnlySides(readOnly);
 	QString error;
 	if (!view->compare(paths, &error))
 	{
@@ -197,51 +181,109 @@ void MainWindow::showOptions()
 
 void MainWindow::newComparison()
 {
-	QDialog dialog(this);
-	dialog.setWindowTitle(tr("New Comparison"));
-	auto *grid = new QGridLayout(&dialog);
-	QLineEdit *leftEdit = addPathRow(grid, 0, tr("Left:"), &dialog);
-	QLineEdit *middleEdit = addPathRow(grid, 1, tr("Middle (3-way, optional):"), &dialog);
-	QLineEdit *rightEdit = addPathRow(grid, 2, tr("Right:"), &dialog);
-	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-	buttons->button(QDialogButtonBox::Ok)->setText(tr("Compare"));
-	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-	grid->addWidget(buttons, 3, 0, 1, 4);
+	openSelector();
+}
 
-	if (dialog.exec() != QDialog::Accepted)
-		return;
-
-	const QString left = leftEdit->text().trimmed();
-	const QString middle = middleEdit->text().trimmed();
-	const QString right = rightEdit->text().trimmed();
-	if (left.isEmpty() || right.isEmpty())
-		return;
-
-	const QFileInfo leftInfo(left), rightInfo(right);
-	if (!middle.isEmpty())
+void MainWindow::openSelector(const QStringList &paths)
+{
+	// reuse an existing selector tab if one is open
+	for (int i = 0; i < m_tabs->count(); ++i)
 	{
-		if (leftInfo.isFile() && QFileInfo(middle).isFile() && rightInfo.isFile())
+		if (auto *selector = qobject_cast<NewComparisonView *>(m_tabs->widget(i)))
 		{
-			openFileComparison(QStringList{ left, middle, right });
+			selector->addPaths(paths);
+			m_tabs->setCurrentIndex(i);
 			return;
 		}
-		QMessageBox::warning(this, tr("LibreMerge"),
-			tr("3-way comparison needs three files."));
-		return;
 	}
-	if (leftInfo.isDir() && rightInfo.isDir())
+
+	auto *selector = new NewComparisonView(this);
+	selector->addPaths(paths);
+	connect(selector, &NewComparisonView::compareRequested, this,
+		[this, selector](const QStringList &selected, const QList<bool> &readOnly,
+			bool folders) {
+			if (folders)
+				openFolderComparison(selected.at(0), selected.at(1));
+			else
+				openFileComparison(selected, readOnly);
+			const int index = m_tabs->indexOf(selector);
+			if (index >= 0 && m_tabs->count() > 1)
+				closeTab(index);
+		});
+	connect(selector, &NewComparisonView::cancelled, this, [this, selector]() {
+		const int index = m_tabs->indexOf(selector);
+		if (index >= 0)
+			closeTab(index);
+	});
+	const int index = m_tabs->addTab(selector, tr("Select Files or Folders"));
+	m_tabs->setCurrentIndex(index);
+}
+
+void MainWindow::handleIncomingPaths(const QStringList &paths)
+{
+	if (paths.isEmpty())
+		return;
+
+	// a selector tab that is open collects the drops
+	for (int i = 0; i < m_tabs->count(); ++i)
 	{
-		openFolderComparison(left, right);
-		return;
+		if (auto *selector = qobject_cast<NewComparisonView *>(m_tabs->widget(i)))
+		{
+			selector->addPaths(paths);
+			m_tabs->setCurrentIndex(i);
+			return;
+		}
 	}
-	if (leftInfo.isFile() && rightInfo.isFile())
+
+	// like WinMerge: dropping a complete pair/triple starts the comparison
+	int files = 0, dirs = 0;
+	for (const QString &path : paths)
 	{
-		openFileComparison(left, right);
+		const QFileInfo info(path);
+		if (info.isFile()) ++files;
+		else if (info.isDir()) ++dirs;
+	}
+	if (paths.size() == 2 && dirs == 2)
+	{
+		openFolderComparison(paths.at(0), paths.at(1));
 		return;
 	}
-	QMessageBox::warning(this, tr("LibreMerge"),
-		tr("Select two files or two folders."));
+	if ((paths.size() == 2 || paths.size() == 3) && files == paths.size())
+	{
+		openFileComparison(paths);
+		return;
+	}
+	openSelector(paths);
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent *event)
+{
+	if (event->mimeData()->hasUrls())
+		event->acceptProposedAction();
+}
+
+void MainWindow::dropEvent(QDropEvent *event)
+{
+	QStringList paths;
+	for (const QUrl &url : event->mimeData()->urls())
+	{
+		if (url.isLocalFile())
+			paths.append(url.toLocalFile());
+	}
+	handleIncomingPaths(paths);
+	event->acceptProposedAction();
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+	if (event->type() == QEvent::FileOpen)
+	{
+		const auto *fileEvent = static_cast<QFileOpenEvent *>(event);
+		if (!fileEvent->file().isEmpty())
+			handleIncomingPaths({ fileEvent->file() });
+		return true;
+	}
+	return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::closeTab(int index)
