@@ -29,7 +29,7 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #define GDIFF_MAIN
 #include "diff.h" 
 #include "io.h"
-#include "diffwrapper.h"
+#include "DiffWrapper.h"
 
 
 /* Nonzero for -r: if comparing two directories,
