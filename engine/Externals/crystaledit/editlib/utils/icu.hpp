@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <cwctype> // iswspace and friends (not transitive on glibc)
 #include "string_util.h"
 
 #ifndef ICU_EXTERN
