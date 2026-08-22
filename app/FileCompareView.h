@@ -47,8 +47,10 @@ public:
 	void setReadOnlySides(const QList<bool> &readOnly);
 
 	/** Copy the current difference from sourceSide into the merge target
-	    (the other side in 2-way mode, the middle pane in 3-way mode). */
-	void copyCurrentDiff(int sourceSide);
+	    (the other side in 2-way mode, the middle pane in 3-way mode).
+	    Like WinMerge, plain copy stays on the merged spot; pass
+	    advance=true for the "copy and advance" variant. */
+	void copyCurrentDiff(int sourceSide, bool advance = false);
 	/** Copy every remaining difference from sourceSide at once. */
 	void copyAllFrom(int sourceSide);
 	void gotoNextDiff();

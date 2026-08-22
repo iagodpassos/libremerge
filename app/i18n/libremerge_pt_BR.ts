@@ -501,6 +501,14 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Copiar para a &amp;Esquerda</translation>
     </message>
     <message>
+        <source>Copy to Right and Ad&amp;vance</source>
+        <translation>Copiar para a Direita e A&amp;vançar</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advanc&amp;e</source>
+        <translation>Copiar para a Esquerda e Avança&amp;r</translation>
+    </message>
+    <message>
         <source>Copy All to Righ&amp;t</source>
         <translation>Copiar &amp;Tudo para a Direita</translation>
     </message>

@@ -1415,7 +1415,7 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide, bool joinUn
 			s.line += delta;
 }
 
-void FileCompareView::copyCurrentDiff(int sourceSide)
+void FileCompareView::copyCurrentDiff(int sourceSide, bool advance)
 {
 	if (m_diffStale)
 		recompare();
@@ -1434,22 +1434,35 @@ void FileCompareView::copyCurrentDiff(int sourceSide)
 		return;
 	}
 
+	const int mergedViewBegin = m_blocks[m_current].viewBegin;
 	applyBlockCopy(m_current, sourceSide, false);
 	refreshSideMaps(target);
 	setSideModified(target, true);
 
-	// land on the next remaining difference
-	int next = nextActive(m_current, +1);
-	if (next < 0)
-		next = nextActive(m_current, -1);
-	if (next >= 0)
-		gotoDiff(next);
-	else
+	if (advance)
 	{
-		m_current = -1;
-		applyHighlights();
-		updateStatus();
+		// "copy and advance": land on the next remaining difference
+		int next = nextActive(m_current, +1);
+		if (next < 0)
+			next = nextActive(m_current, -1);
+		if (next >= 0)
+		{
+			gotoDiff(next);
+			return;
+		}
 	}
+	// like WinMerge's plain copy: stay on the merged spot
+	m_current = -1;
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		QTextCursor cursor(m_panes[side]->document()->findBlockByNumber(
+			qMax(0, mergedViewBegin)));
+		m_syncing = true;
+		m_panes[side]->setTextCursor(cursor);
+		m_syncing = false;
+	}
+	applyHighlights();
+	updateStatus();
 }
 
 void FileCompareView::copyAllFrom(int sourceSide)

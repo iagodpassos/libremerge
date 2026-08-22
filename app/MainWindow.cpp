@@ -166,12 +166,22 @@ MainWindow::MainWindow(QWidget *parent)
 			if (auto *view = fileView())
 				view->copyCurrentDiff(view->paneCount() == 3 ? 2 : 1);
 		});
-	addMenuAction(mergeMenu, tr("Copy All to Righ&t"),
+	// WinMerge's Ctrl+Alt variants copy and jump to the next difference
+	addMenuAction(mergeMenu, tr("Copy to Right and Ad&vance"),
 		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right), [fileView]() {
+			if (auto *view = fileView()) view->copyCurrentDiff(0, true);
+		});
+	addMenuAction(mergeMenu, tr("Copy to Left and Advanc&e"),
+		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left), [fileView]() {
+			if (auto *view = fileView())
+				view->copyCurrentDiff(view->paneCount() == 3 ? 2 : 1, true);
+		});
+	addMenuAction(mergeMenu, tr("Copy All to Righ&t"), QKeySequence(),
+		[fileView]() {
 			if (auto *view = fileView()) view->copyAllFrom(0);
 		});
-	addMenuAction(mergeMenu, tr("Copy All to Le&ft"),
-		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left), [fileView]() {
+	addMenuAction(mergeMenu, tr("Copy All to Le&ft"), QKeySequence(),
+		[fileView]() {
 			if (auto *view = fileView())
 				view->copyAllFrom(view->paneCount() == 3 ? 2 : 1);
 		});
