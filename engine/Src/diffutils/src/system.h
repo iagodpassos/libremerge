@@ -187,9 +187,16 @@ char *memchr ();
 extern int errno;
 #endif
 
+#ifdef __cplusplus
+/* function-style min/max macros break libstdc++ headers included later */
+#include <algorithm>
+using std::min;
+using std::max;
+#else
 #ifndef min
 #define min(a,b) ((a) <= (b) ? (a) : (b))
 #define max(a,b) ((a) >= (b) ? (a) : (b))
+#endif
 #endif
 
 #ifdef __MSDOS__
