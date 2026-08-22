@@ -3,6 +3,8 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFileDialog>
@@ -17,6 +19,10 @@
 
 #include "FileCompareView.h"
 #include "FolderCompareView.h"
+
+// engine
+#include "OptionsMgr.h"
+#include "OptionsDef.h"
 
 namespace
 {
@@ -66,6 +72,11 @@ MainWindow::MainWindow(QWidget *parent)
 	QAction *quitAction = fileMenu->addAction(tr("&Quit"));
 	quitAction->setShortcut(QKeySequence::Quit);
 	connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
+
+	QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
+	QAction *optionsAction = editMenu->addAction(tr("Comparison &Options..."));
+	optionsAction->setMenuRole(QAction::PreferencesRole); // macOS app menu
+	connect(optionsAction, &QAction::triggered, this, &MainWindow::showOptions);
 
 	QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
 	QAction *aboutAction = helpMenu->addAction(tr("&About LibreMerge"));
@@ -117,6 +128,64 @@ void MainWindow::openFolderComparison(const QString &leftDir, const QString &rig
 	m_tabs->setTabToolTip(index, leftDir + QStringLiteral("\n") + rightDir);
 	m_tabs->setCurrentIndex(index);
 	view->start(leftDir, rightDir);
+}
+
+void MainWindow::showOptions()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr)
+		return;
+
+	QDialog dialog(this);
+	dialog.setWindowTitle(tr("Comparison Options"));
+	auto *grid = new QGridLayout(&dialog);
+
+	grid->addWidget(new QLabel(tr("Whitespace:"), &dialog), 0, 0);
+	auto *whitespace = new QComboBox(&dialog);
+	whitespace->addItems({ tr("Compare"), tr("Ignore changes"), tr("Ignore all") });
+	whitespace->setCurrentIndex(mgr->GetInt(OPT_CMP_IGNORE_WHITESPACE));
+	grid->addWidget(whitespace, 0, 1);
+
+	auto *ignoreCase = new QCheckBox(tr("Ignore case"), &dialog);
+	ignoreCase->setChecked(mgr->GetBool(OPT_CMP_IGNORE_CASE));
+	grid->addWidget(ignoreCase, 1, 0, 1, 2);
+	auto *ignoreBlank = new QCheckBox(tr("Ignore blank lines"), &dialog);
+	ignoreBlank->setChecked(mgr->GetBool(OPT_CMP_IGNORE_BLANKLINES));
+	grid->addWidget(ignoreBlank, 2, 0, 1, 2);
+	auto *ignoreEol = new QCheckBox(tr("Ignore carriage return differences"), &dialog);
+	ignoreEol->setChecked(mgr->GetBool(OPT_CMP_IGNORE_EOL));
+	grid->addWidget(ignoreEol, 3, 0, 1, 2);
+	auto *ignoreNumbers = new QCheckBox(tr("Ignore numbers"), &dialog);
+	ignoreNumbers->setChecked(mgr->GetBool(OPT_CMP_IGNORE_NUMBERS));
+	grid->addWidget(ignoreNumbers, 4, 0, 1, 2);
+
+	grid->addWidget(new QLabel(tr("Diff algorithm:"), &dialog), 5, 0);
+	auto *algorithm = new QComboBox(&dialog);
+	algorithm->addItems({ tr("Default"), tr("Minimal"), tr("Patience"),
+		tr("Histogram"), tr("None") });
+	algorithm->setCurrentIndex(mgr->GetInt(OPT_CMP_DIFF_ALGORITHM));
+	grid->addWidget(algorithm, 5, 1);
+
+	auto *note = new QLabel(tr("Open comparisons pick the new options up on "
+		"Recompare (F5) or when reopened."), &dialog);
+	note->setWordWrap(true);
+	grid->addWidget(note, 6, 0, 1, 2);
+
+	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+	grid->addWidget(buttons, 7, 0, 1, 2);
+
+	if (dialog.exec() != QDialog::Accepted)
+		return;
+
+	mgr->SaveOption(OPT_CMP_IGNORE_WHITESPACE, whitespace->currentIndex());
+	mgr->SaveOption(OPT_CMP_IGNORE_CASE, ignoreCase->isChecked());
+	mgr->SaveOption(OPT_CMP_IGNORE_BLANKLINES, ignoreBlank->isChecked());
+	mgr->SaveOption(OPT_CMP_IGNORE_EOL, ignoreEol->isChecked());
+	mgr->SaveOption(OPT_CMP_IGNORE_NUMBERS, ignoreNumbers->isChecked());
+	mgr->SaveOption(OPT_CMP_DIFF_ALGORITHM, algorithm->currentIndex());
+	mgr->FlushOptions();
 }
 
 void MainWindow::newComparison()

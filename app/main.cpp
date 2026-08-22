@@ -31,7 +31,26 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestMergeOpt(QStringLiteral("selftest-merge"),
 		QStringLiteral("Copy all differences left-to-right in memory and verify (for testing)"));
 	parser.addOption(selftestMergeOpt);
+	QCommandLineOption selftestCountOpt(QStringLiteral("selftest-count"),
+		QStringLiteral("Print the number of differences and exit (for testing)"));
+	parser.addOption(selftestCountOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestCountOpt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 2)
+			return 2;
+		FileCompareView view;
+		QString error;
+		if (!view.compare(files.at(0), files.at(1), &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		printf("diffs: %d\n", view.diffCount());
+		return 0;
+	}
 
 	if (parser.isSet(selftestMergeOpt))
 	{

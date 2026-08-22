@@ -15,6 +15,8 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+#include "EngineOptions.h"
+
 // engine
 #include "DiffWrapper.h"
 #include "DiffList.h"
@@ -174,7 +176,7 @@ bool FileCompareView::runDiff(QString *error)
 	}
 
 	CDiffWrapper wrapper;
-	DIFFOPTIONS options{};
+	DIFFOPTIONS options = lm::currentDiffOptions();
 	DiffList diffList;
 	wrapper.SetCreateDiffList(&diffList);
 	wrapper.SetPaths({ temp[0].fileName().toStdString(),

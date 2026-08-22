@@ -16,6 +16,7 @@ public:
 
 private slots:
 	void newComparison();
+	void showOptions();
 	void closeTab(int index);
 
 private:

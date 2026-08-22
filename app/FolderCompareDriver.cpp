@@ -7,6 +7,7 @@
 #include "pch.h"
 
 #include "FolderCompareDriver.h"
+#include "EngineOptions.h"
 
 #include <climits>
 #include <Poco/Semaphore.h>
@@ -97,7 +98,7 @@ FolderCompareResult compareFolders(const QString &leftDir, const QString &rightD
 	JobAbortable abortable(job.get());
 	ctxt.SetAbortable(&abortable);
 
-	DIFFOPTIONS options{};
+	const DIFFOPTIONS options = currentDiffOptions();
 	if (!ctxt.CreateCompareOptions(CMP_CONTENT, options))
 	{
 		result.error = QObject::tr("could not create compare options");
