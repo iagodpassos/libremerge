@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <memory>
 #include <QStringList>
 #include <QWidget>
 #include <vector>
@@ -9,6 +10,7 @@ class QAction;
 class QLabel;
 class DiffTextEdit;
 class LocationPane;
+class SyntaxHighlighter;
 
 /**
  * File comparison and merge view for 2 or 3 files: editable side-by-side
@@ -22,6 +24,7 @@ class FileCompareView : public QWidget
 	Q_OBJECT
 public:
 	explicit FileCompareView(QWidget *parent = nullptr);
+	~FileCompareView() override;
 
 	/** Load 2 or 3 files and run the initial comparison. */
 	bool compare(const QStringList &paths, QString *error);
@@ -97,6 +100,7 @@ private:
 	int m_paneCount = 2;
 	bool m_readOnly[3] = {};
 	DiffTextEdit *m_panes[3];
+	std::unique_ptr<SyntaxHighlighter> m_highlighters[3];
 	LocationPane *m_locationPane;
 	Side m_sides[3];
 	QLabel *m_status;

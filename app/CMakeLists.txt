@@ -16,6 +16,7 @@ qt_add_executable(LibreMerge
   FileCompareView.cpp
   DiffTextEdit.cpp
   LocationPane.cpp
+  SyntaxHighlighter.cpp
   FolderCompareView.cpp
   FolderCompareDriver.cpp
   FileOps.cpp

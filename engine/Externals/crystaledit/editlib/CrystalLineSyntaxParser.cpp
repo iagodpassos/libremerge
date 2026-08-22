@@ -68,6 +68,16 @@ bool CrystalLineSyntaxParserFactory::IsSupported(LanguageId textType) const
 /**
  * @brief Construct a parser adapter for a specific text type.
  */
+ParseFunc GetParseFunc(LangServices::LanguageId type)
+{
+	for (const auto& pair : m_ParseXDef)
+	{
+		if (type == pair.first)
+			return pair.second;
+	}
+	return nullptr;
+}
+
 CrystalLineSyntaxParser::CrystalLineSyntaxParser(LanguageId textType)
 	: m_pTextBuffer(nullptr)
 	, m_textType(textType)

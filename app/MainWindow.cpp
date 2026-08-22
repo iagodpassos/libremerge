@@ -104,7 +104,7 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 		const int tabIndex = m_tabs->indexOf(view);
 		if (tabIndex >= 0)
 			m_tabs->setTabText(tabIndex, modified
-				? QStringLiteral("\xE2\x80\xA2 ") + title : title);
+				? QString::fromUtf8("\xE2\x80\xA2 ") + title : title);
 	});
 }
 

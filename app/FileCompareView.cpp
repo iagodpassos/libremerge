@@ -17,6 +17,7 @@
 #include "DiffTextEdit.h"
 #include "EngineOptions.h"
 #include "LocationPane.h"
+#include "SyntaxHighlighter.h"
 
 // engine
 #include "DiffWrapper.h"
@@ -78,6 +79,8 @@ void byteRangeToU16(const QString &line, int beginByte, int endByte,
 }
 
 } // namespace
+
+FileCompareView::~FileCompareView() = default;
 
 FileCompareView::FileCompareView(QWidget *parent)
 	: QWidget(parent)
@@ -143,12 +146,17 @@ FileCompareView::FileCompareView(QWidget *parent)
 		panes->addWidget(m_panes[i]);
 		connect(m_panes[i]->verticalScrollBar(), &QScrollBar::valueChanged,
 			this, [this, i](int value) { syncScroll(i, value); });
-		connect(m_panes[i]->document(), &QTextDocument::contentsChanged,
-			this, [this, i]() {
+		m_panes[i]->setTabStopDistance(
+			4 * QFontMetricsF(mono).horizontalAdvance(QLatin1Char(' ')));
+		// QTextDocument's own modified tracking ignores syntax-highlight
+		// format changes, unlike contentsChange
+		connect(m_panes[i]->document(), &QTextDocument::modificationChanged,
+			this, [this, i](bool modified) {
 				if (m_syncing)
 					return;
-				m_diffStale = true;
-				setSideModified(i, true);
+				if (modified)
+					m_diffStale = true;
+				setSideModified(i, modified);
 			});
 	}
 	connect(m_panes[0]->verticalScrollBar(), &QScrollBar::valueChanged,
@@ -187,6 +195,8 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 		if (!loadSide(i, paths.at(i), error))
 			return false;
 		m_panes[i]->setReadOnly(m_readOnly[i]);
+		m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
+			m_panes[i]->document(), paths.at(i));
 	}
 	if (!runDiff(error))
 		return false;
@@ -240,6 +250,7 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 
 	m_syncing = true;
 	m_panes[side]->setPlainText(lines.join(QChar('\n')));
+	m_panes[side]->document()->setModified(false);
 	m_syncing = false;
 	s.modified = false;
 	return true;
@@ -710,6 +721,9 @@ bool FileCompareView::saveSide(int side, QString *error)
 			file.WriteString(eol);
 	}
 	file.Close();
+	m_syncing = true;
+	m_panes[side]->document()->setModified(false);
+	m_syncing = false;
 	setSideModified(side, false);
 	return true;
 }

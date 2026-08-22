@@ -6,6 +6,10 @@
 
 using ParseFunc = unsigned (*)(unsigned, const tchar_t*, int, std::vector<LangServices::TEXTBLOCK>*);
 
+/** Resolve the legacy line-parser function for a language (nullptr when
+    the language has no CrystalEdit parser). */
+ParseFunc GetParseFunc(LangServices::LanguageId type);
+
 /**
  * @brief Adapter that wraps legacy CrystalEdit line-based parsers.
  *
