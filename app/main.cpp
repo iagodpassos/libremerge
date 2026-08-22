@@ -40,6 +40,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFileOpsOpt(QStringLiteral("selftest-fileops"),
 		QStringLiteral("Copy <left> recursively onto <right> and verify (for testing)"));
 	parser.addOption(selftestFileOpsOpt);
+	QCommandLineOption gotoFirstOpt(QStringLiteral("goto-first-diff"),
+		QStringLiteral("Select the first difference after opening (for testing)"));
+	parser.addOption(gotoFirstOpt);
 	parser.process(app);
 
 	if (parser.isSet(selftestFileOpsOpt))
@@ -113,6 +116,9 @@ int main(int argc, char *argv[])
 	{
 		window.openSelector(args);
 	}
+
+	if (parser.isSet(gotoFirstOpt))
+		window.gotoFirstDifference();
 
 	if (parser.isSet(screenshotOpt))
 	{

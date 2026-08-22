@@ -9,6 +9,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QScrollBar>
+#include <QSettings>
+#include <QSplitter>
 #include <QStringList>
 #include <QTemporaryFile>
 #include <QTextBlock>
@@ -17,6 +19,7 @@
 
 #include "DiffTextEdit.h"
 #include "EngineOptions.h"
+#include "Icons.h"
 #include "LocationPane.h"
 #include "SyntaxHighlighter.h"
 
@@ -161,31 +164,46 @@ FileCompareView::FileCompareView(QWidget *parent)
 
 	auto *toolbar = new QToolBar(this);
 	toolbar->setIconSize(QSize(16, 16));
-	auto addToolAction = [this, toolbar](const QString &text, const QKeySequence &shortcut,
-		auto slot) -> QAction * {
-		QAction *action = toolbar->addAction(text);
+	toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+	auto addToolAction = [this, toolbar](lm::Icon icon, const QString &text,
+		const QKeySequence &shortcut, auto slot) -> QAction * {
+		QAction *action = toolbar->addAction(lm::icon(icon), text);
 		action->setShortcut(shortcut);
 		action->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+		action->setToolTip(shortcut.isEmpty() ? text
+			: QStringLiteral("%1 (%2)").arg(text,
+				shortcut.toString(QKeySequence::NativeText)));
 		addAction(action);
 		connect(action, &QAction::triggered, this, slot);
 		return action;
 	};
-	addToolAction(tr("\xE2\x96\xB2 Prev"), QKeySequence(Qt::ALT | Qt::Key_Up),
-		[this]() { gotoPrevDiff(); });
-	addToolAction(tr("\xE2\x96\xBC Next"), QKeySequence(Qt::ALT | Qt::Key_Down),
-		[this]() { gotoNextDiff(); });
+	addToolAction(lm::Icon::PrevDiff, tr("Previous Difference"),
+		QKeySequence(Qt::ALT | Qt::Key_Up), [this]() { gotoPrevDiff(); });
+	addToolAction(lm::Icon::NextDiff, tr("Next Difference"),
+		QKeySequence(Qt::ALT | Qt::Key_Down), [this]() { gotoNextDiff(); });
 	toolbar->addSeparator();
-	m_actCopyFromLeft = addToolAction(tr("Copy \xE2\x86\x92 Right"),
+	m_actCopyFromLeft = addToolAction(lm::Icon::CopyRight, tr("Copy to Right"),
 		QKeySequence(Qt::ALT | Qt::Key_Right), [this]() { copyCurrentDiff(0); });
-	m_actCopyFromRight = addToolAction(tr("Copy \xE2\x86\x90 Left"),
+	m_actCopyFromRight = addToolAction(lm::Icon::CopyLeft, tr("Copy to Left"),
 		QKeySequence(Qt::ALT | Qt::Key_Left),
 		[this]() { copyCurrentDiff(m_paneCount == 3 ? 2 : 1); });
 	toolbar->addSeparator();
-	addToolAction(tr("Recompare"), QKeySequence(Qt::Key_F5),
+	addToolAction(lm::Icon::Refresh, tr("Recompare"), QKeySequence(Qt::Key_F5),
 		[this]() { recompare(); });
-	m_actSave = addToolAction(tr("Save"), QKeySequence::Save,
+	m_actSave = addToolAction(lm::Icon::Save, tr("Save"), QKeySequence::Save,
 		[this]() { QString error; saveModified(&error); });
 	m_actSave->setEnabled(false);
+	toolbar->addSeparator();
+	m_actDiffPane = addToolAction(lm::Icon::DiffPane, tr("Diff Pane"),
+		QKeySequence(), [this]() {});
+	m_actDiffPane->setCheckable(true);
+	m_actDiffPane->setChecked(
+		QSettings().value(QStringLiteral("FileCompare/DiffPane"), true).toBool());
+	connect(m_actDiffPane, &QAction::toggled, this, [this](bool on) {
+		QSettings().setValue(QStringLiteral("FileCompare/DiffPane"), on);
+		m_diffPaneWidget->setVisible(on);
+		updateDiffPane();
+	});
 	layout->addWidget(toolbar);
 
 	auto *panes = new QHBoxLayout;
@@ -278,7 +296,37 @@ FileCompareView::FileCompareView(QWidget *parent)
 			m_locationPane->setViewport(m_panes[0]->firstVisibleLine(),
 				m_panes[0]->visibleLineCount());
 		});
-	layout->addLayout(panes, 1);
+
+	// WinMerge's diff pane: the current difference's content, one row per
+	// file, in a resizable bottom panel
+	auto *panesWidget = new QWidget(this);
+	panesWidget->setLayout(panes);
+	m_diffPaneWidget = new QWidget(this);
+	auto *diffPaneLayout = new QVBoxLayout(m_diffPaneWidget);
+	diffPaneLayout->setContentsMargins(0, 1, 0, 0);
+	diffPaneLayout->setSpacing(1);
+	QFont diffPaneFont = mono;
+	diffPaneFont.setPointSizeF(qMax(9.0, mono.pointSizeF() - 1));
+	for (int i = 0; i < 3; ++i)
+	{
+		auto *edit = new QPlainTextEdit(m_diffPaneWidget);
+		edit->setReadOnly(true);
+		edit->setLineWrapMode(QPlainTextEdit::NoWrap);
+		edit->setFont(diffPaneFont);
+		edit->setPalette(m_panes[i]->palette());
+		edit->setMinimumHeight(24);
+		m_diffPaneEdits[i] = edit;
+		diffPaneLayout->addWidget(edit);
+	}
+	auto *splitter = new QSplitter(Qt::Vertical, this);
+	splitter->addWidget(panesWidget);
+	splitter->addWidget(m_diffPaneWidget);
+	splitter->setStretchFactor(0, 1);
+	splitter->setStretchFactor(1, 0);
+	splitter->setCollapsible(0, false);
+	splitter->setSizes({ 560, 140 });
+	m_diffPaneWidget->setVisible(m_actDiffPane->isChecked());
+	layout->addWidget(splitter, 1);
 
 	// highlight the header of the pane that owns the focus, like WinMerge
 	connect(qApp, &QApplication::focusChanged, this,
@@ -311,6 +359,7 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 		m_panes[i]->setVisible(visible);
 		m_posLabels[i]->setVisible(visible);
 		m_encLabels[i]->setVisible(visible);
+		m_diffPaneEdits[i]->setVisible(visible);
 	}
 	if (m_paneCount == 3)
 	{
@@ -786,6 +835,77 @@ void FileCompareView::applyHighlights()
 		qMax(1, m_panes[0]->document()->blockCount()));
 	m_locationPane->setViewport(m_panes[0]->firstVisibleLine(),
 		m_panes[0]->visibleLineCount());
+
+	updateDiffPane();
+}
+
+/** Fill the bottom diff pane with the current difference's content, one
+    read-only row per file, using the selected-difference colors. */
+void FileCompareView::updateDiffPane()
+{
+	if (!m_actDiffPane->isChecked())
+		return;
+	const bool valid = m_current >= 0
+		&& m_current < static_cast<int>(m_blocks.size())
+		&& !m_blocks[m_current].trivial && !m_blocks[m_current].resolved;
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		QPlainTextEdit *edit = m_diffPaneEdits[side];
+		if (!valid)
+		{
+			edit->setPlainText(QString());
+			edit->setExtraSelections({});
+			continue;
+		}
+		const Block &block = m_blocks[m_current];
+		QStringList lines;
+		constexpr int kMaxDiffPaneLines = 500;
+		for (int line = block.begin[side];
+			line <= block.end[side] && line < m_realLines[side].size(); ++line)
+		{
+			if (lines.size() >= kMaxDiffPaneLines)
+			{
+				lines.append(tr("\xE2\x80\xA6 (%1 more lines)")
+					.arg(block.end[side] - line + 1));
+				break;
+			}
+			lines.append(m_realLines[side].at(qMax(0, line)));
+		}
+		edit->setPlainText(lines.join(QChar('\n')));
+
+		QList<QTextEdit::ExtraSelection> selections;
+		QTextDocument *doc = edit->document();
+		for (int i = 0; i < qMax(1, static_cast<int>(lines.size())); ++i)
+		{
+			const QTextBlock textBlock = doc->findBlockByNumber(i);
+			if (!textBlock.isValid())
+				continue;
+			QTextEdit::ExtraSelection selection;
+			selection.format.setBackground(kSelDiff);
+			selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+			selection.cursor = QTextCursor(textBlock);
+			selections.append(selection);
+		}
+		for (const WordSpan &span : m_wordSpans)
+		{
+			if (span.side != side || span.blockIndex != m_current)
+				continue;
+			const QTextBlock textBlock = doc->findBlockByNumber(
+				span.line - block.begin[side]);
+			if (!textBlock.isValid())
+				continue;
+			QTextEdit::ExtraSelection selection;
+			selection.format.setBackground(
+				span.oneSided ? kSelWordDiffDeleted : kSelWordDiff);
+			QTextCursor cursor(textBlock);
+			cursor.setPosition(textBlock.position() + span.start);
+			cursor.setPosition(textBlock.position() + span.start + span.length,
+				QTextCursor::KeepAnchor);
+			selection.cursor = cursor;
+			selections.append(selection);
+		}
+		edit->setExtraSelections(selections);
+	}
 }
 
 void FileCompareView::updateStatus()

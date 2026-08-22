@@ -3,6 +3,7 @@
 
 #include "FolderCompareView.h"
 #include "FileOps.h"
+#include "Icons.h"
 
 #include <QAction>
 #include <QDir>
@@ -133,37 +134,45 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 
 	auto *toolbar = new QToolBar(this);
 	toolbar->setIconSize(QSize(16, 16));
+	toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
 	toolbar->addWidget(new QLabel(tr(" Filter: "), this));
 	m_filterEdit = new QLineEdit(this);
 	m_filterEdit->setPlaceholderText(tr("*.* \xE2\x80\x94 masks (*.cpp;*.h), f:/d: regexes or expressions"));
 	m_filterEdit->setMaximumWidth(340);
 	m_filterEdit->setText(QSettings().value(kFilterSettingsKey, QStringLiteral("*.*")).toString());
 	toolbar->addWidget(m_filterEdit);
-	QAction *applyAction = toolbar->addAction(tr("Recompare"));
+	QAction *applyAction = toolbar->addAction(lm::icon(lm::Icon::Refresh), tr("Recompare"));
 	applyAction->setShortcut(QKeySequence(Qt::Key_F5));
 	applyAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+	applyAction->setToolTip(tr("Recompare (F5)"));
 	addAction(applyAction);
 	connect(applyAction, &QAction::triggered, this, &FolderCompareView::recompare);
 	connect(m_filterEdit, &QLineEdit::returnPressed, this, &FolderCompareView::recompare);
 	toolbar->addSeparator();
-	m_actTreeMode = toolbar->addAction(tr("Tree View"));
+	m_actTreeMode = toolbar->addAction(lm::icon(lm::Icon::TreeView), tr("Tree View"));
 	m_actTreeMode->setCheckable(true);
+	m_actTreeMode->setToolTip(tr("Tree View"));
 	m_actTreeMode->setChecked(QSettings().value(kTreeSettingsKey, true).toBool());
 	connect(m_actTreeMode, &QAction::toggled, this, [this](bool on) {
 		QSettings().setValue(kTreeSettingsKey, on);
 		rebuildRows();
 	});
 	toolbar->addSeparator();
-	m_actCopyRight = toolbar->addAction(tr("Copy \xE2\x86\x92 Right"));
+	m_actCopyRight = toolbar->addAction(lm::icon(lm::Icon::CopyRight), tr("Copy to Right"));
+	m_actCopyRight->setToolTip(tr("Copy to Right"));
 	connect(m_actCopyRight, &QAction::triggered, this, [this]() { copySelected(0); });
-	m_actCopyLeft = toolbar->addAction(tr("Copy \xE2\x86\x90 Left"));
+	m_actCopyLeft = toolbar->addAction(lm::icon(lm::Icon::CopyLeft), tr("Copy to Left"));
+	m_actCopyLeft->setToolTip(tr("Copy to Left"));
 	connect(m_actCopyLeft, &QAction::triggered, this, [this]() { copySelected(1); });
 	toolbar->addSeparator();
-	m_actDeleteLeft = toolbar->addAction(tr("Delete Left"));
+	m_actDeleteLeft = toolbar->addAction(lm::icon(lm::Icon::DeleteLeft), tr("Delete Left"));
+	m_actDeleteLeft->setToolTip(tr("Delete Left"));
 	connect(m_actDeleteLeft, &QAction::triggered, this, [this]() { deleteSelected(true, false); });
-	m_actDeleteRight = toolbar->addAction(tr("Delete Right"));
+	m_actDeleteRight = toolbar->addAction(lm::icon(lm::Icon::DeleteRight), tr("Delete Right"));
+	m_actDeleteRight->setToolTip(tr("Delete Right"));
 	connect(m_actDeleteRight, &QAction::triggered, this, [this]() { deleteSelected(false, true); });
-	m_actDeleteBoth = toolbar->addAction(tr("Delete Both"));
+	m_actDeleteBoth = toolbar->addAction(lm::icon(lm::Icon::DeleteBoth), tr("Delete Both"));
+	m_actDeleteBoth->setToolTip(tr("Delete Both"));
 	connect(m_actDeleteBoth, &QAction::triggered, this, [this]() { deleteSelected(true, true); });
 	layout->addWidget(toolbar);
 

@@ -8,6 +8,7 @@
 
 class QAction;
 class QLabel;
+class QPlainTextEdit;
 class DiffTextEdit;
 class LocationPane;
 class SyntaxHighlighter;
@@ -98,6 +99,7 @@ private:
 	void computeWordSpans();
 	void applyHighlights();
 	void updateStatus();
+	void updateDiffPane();
 	void updatePaneStatus(int side);
 	void updateHeader(int side);
 	void updateHeaderStyles();
@@ -130,4 +132,7 @@ private:
 	QAction *m_actSave = nullptr;
 	QAction *m_actCopyFromLeft = nullptr;
 	QAction *m_actCopyFromRight = nullptr;
+	QAction *m_actDiffPane = nullptr;
+	QWidget *m_diffPaneWidget = nullptr;
+	QPlainTextEdit *m_diffPaneEdits[3] = {};
 };

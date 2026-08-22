@@ -23,6 +23,10 @@ public:
 	/** Route paths dropped on the window or opened via Finder/Dock. */
 	void handleIncomingPaths(const QStringList &paths);
 
+	/** Jump to the first difference of the current file comparison
+	    (used by tests; same as pressing Next after opening). */
+	void gotoFirstDifference();
+
 protected:
 	void dragEnterEvent(QDragEnterEvent *event) override;
 	void dropEvent(QDropEvent *event) override;

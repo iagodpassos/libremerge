@@ -219,6 +219,12 @@ void MainWindow::openSelector(const QStringList &paths)
 	m_tabs->setCurrentIndex(index);
 }
 
+void MainWindow::gotoFirstDifference()
+{
+	if (auto *view = qobject_cast<FileCompareView *>(m_tabs->currentWidget()))
+		view->gotoNextDiff();
+}
+
 void MainWindow::handleIncomingPaths(const QStringList &paths)
 {
 	if (paths.isEmpty())
