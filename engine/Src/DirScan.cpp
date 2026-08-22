@@ -155,7 +155,11 @@ int DirScan_GetItems(const PathContext &paths, const String subdir[],
 		bool casesensitive, int depth, DIFFITEM *parent,
 		bool bUniques)
 {
+#ifdef _WIN32
 	static const tchar_t backslash[] = _T("\\");
+#else
+	static const tchar_t backslash[] = _T("/");
+#endif
 	int nDirs = paths.GetSize();
 	CDiffContext *pCtxt = myStruct->context;
 	String sDir[3];
