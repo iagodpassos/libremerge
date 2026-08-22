@@ -12,6 +12,9 @@
 #include "FolderCompareDriver.h"
 #include "MainWindow.h"
 #include "EngineOptions.h"
+#ifdef Q_OS_MACOS
+#include "MacServices.h"
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -175,6 +178,9 @@ int main(int argc, char *argv[])
 	}
 
 	MainWindow window;
+#ifdef Q_OS_MACOS
+	lm::installMacServices(&window);
+#endif
 	const QStringList args = parser.positionalArguments();
 	if (args.size() == 2)
 	{

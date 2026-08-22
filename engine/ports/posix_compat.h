@@ -13,7 +13,12 @@
 #include <wchar.h>
 
 /* Minimal Win32 type vocabulary (tchar_t == char on POSIX builds) */
+#ifdef __OBJC__
+/* Objective-C(++) translation units bring their own BOOL */
+#include <objc/objc.h>
+#else
 typedef int BOOL;
+#endif
 typedef unsigned int UINT;
 typedef unsigned int DWORD;
 typedef unsigned short WORD;

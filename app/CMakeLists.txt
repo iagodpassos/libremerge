@@ -31,6 +31,12 @@ qt_add_resources(LibreMerge "i18n"
   FILES i18n/libremerge_pt_BR.qm
 )
 
+if(APPLE)
+  enable_language(OBJCXX)
+  target_sources(LibreMerge PRIVATE MacServices.mm)
+  target_link_libraries(LibreMerge PRIVATE "-framework AppKit")
+endif()
+
 set_target_properties(LibreMerge PROPERTIES
   MACOSX_BUNDLE TRUE
   MACOSX_BUNDLE_GUI_IDENTIFIER org.libremerge.LibreMerge

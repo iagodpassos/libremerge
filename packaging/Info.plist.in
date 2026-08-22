@@ -26,6 +26,28 @@
 	<true/>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
+	<!-- Finder context menu (Services): select files/folders and compare,
+	     like WinMerge's shell extension on Windows -->
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Compare with LibreMerge</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>compareFilesService</string>
+			<key>NSPortName</key>
+			<string>LibreMerge</string>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.item</string>
+			</array>
+			<key>NSRequiredContext</key>
+			<dict/>
+		</dict>
+	</array>
 	<!-- accept any file or folder dragged onto the app/Dock icon -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
