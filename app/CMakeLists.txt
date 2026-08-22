@@ -6,6 +6,8 @@ qt_add_executable(LibreMerge
   main.cpp
   MainWindow.cpp
   FileCompareView.cpp
+  DiffTextEdit.cpp
+  LocationPane.cpp
   FolderCompareView.cpp
   FolderCompareDriver.cpp
   EngineOptions.cpp

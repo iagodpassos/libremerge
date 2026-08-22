@@ -6,7 +6,8 @@
 
 class QAction;
 class QLabel;
-class QPlainTextEdit;
+class DiffTextEdit;
+class LocationPane;
 
 /**
  * Two-way file comparison and merge view: editable side-by-side panes
@@ -76,7 +77,8 @@ private:
 	void setSideModified(int side, bool modified);
 	void syncScroll(int pane, int value);
 
-	QPlainTextEdit *m_panes[2];
+	DiffTextEdit *m_panes[2];
+	LocationPane *m_locationPane;
 	Side m_sides[2];
 	QLabel *m_status;
 	std::vector<Block> m_blocks;

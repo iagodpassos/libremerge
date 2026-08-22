@@ -8,6 +8,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPlainTextEdit>
+#include "DiffTextEdit.h"
+#include "LocationPane.h"
 #include <QScrollBar>
 #include <QStringList>
 #include <QTemporaryFile>
@@ -116,15 +118,38 @@ FileCompareView::FileCompareView(QWidget *parent)
 	auto *panes = new QHBoxLayout;
 	panes->setContentsMargins(0, 0, 0, 0);
 	panes->setSpacing(1);
+
+	m_locationPane = new LocationPane(this);
+	panes->addWidget(m_locationPane);
+	connect(m_locationPane, &LocationPane::jumpRequested, this, [this](int line) {
+		for (int side = 0; side < 2; ++side)
+		{
+			QTextCursor cursor(m_panes[side]->document()->findBlockByNumber(
+				qMin(line, m_panes[side]->document()->blockCount() - 1)));
+			m_syncing = true;
+			m_panes[side]->setTextCursor(cursor);
+			m_panes[side]->centerCursor();
+			m_syncing = false;
+		}
+	});
+
 	const QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
 	for (int i = 0; i < 2; ++i)
 	{
-		m_panes[i] = new QPlainTextEdit(this);
+		m_panes[i] = new DiffTextEdit(this);
 		m_panes[i]->setLineWrapMode(QPlainTextEdit::NoWrap);
 		m_panes[i]->setFont(mono);
 		panes->addWidget(m_panes[i]);
 		connect(m_panes[i]->verticalScrollBar(), &QScrollBar::valueChanged,
 			this, [this, i](int value) { syncScroll(i, value); });
+		if (i == 0)
+		{
+			connect(m_panes[0]->verticalScrollBar(), &QScrollBar::valueChanged,
+				this, [this]() {
+					m_locationPane->setViewport(m_panes[0]->firstVisibleLine(),
+						m_panes[0]->visibleLineCount());
+				});
+		}
 		connect(m_panes[i]->document(), &QTextDocument::contentsChanged,
 			this, [this, i]() {
 				if (m_syncing)
@@ -346,6 +371,18 @@ void FileCompareView::applyHighlights()
 				selections.append(selection);
 			}
 		}
+		// mirror the line colors in the gutter
+		QHash<int, QColor> gutterColors;
+		for (const Block &block : m_blocks)
+		{
+			if (block.end[side] < block.begin[side])
+				continue;
+			const QColor color = block.trivial ? kTrivialColor : kDiffColor;
+			for (int line = block.begin[side]; line <= block.end[side]; ++line)
+				gutterColors.insert(line, color);
+		}
+		m_panes[side]->setGutterLineColors(gutterColors);
+
 		// word-level spans on top of the line backgrounds
 		for (const WordSpan &span : m_wordSpans)
 		{
@@ -366,6 +403,30 @@ void FileCompareView::applyHighlights()
 		}
 		m_panes[side]->setExtraSelections(selections);
 	}
+
+	// location pane: one band per block side
+	std::vector<LocationPane::Band> bands;
+	for (size_t b = 0; b < m_blocks.size(); ++b)
+	{
+		const Block &block = m_blocks[b];
+		for (int side = 0; side < 2; ++side)
+		{
+			LocationPane::Band band;
+			band.side = side;
+			const bool empty = block.end[side] < block.begin[side];
+			band.firstLine = empty ? qMax(0, block.begin[side] - 1) : block.begin[side];
+			band.lastLine = empty ? band.firstLine : block.end[side];
+			band.color = block.trivial ? kTrivialColor
+				: (static_cast<int>(b) == m_current ? kWordDiffCurrentColor
+					: (empty ? kMissingColor : kDiffColor));
+			bands.push_back(band);
+		}
+	}
+	const int totalLines = qMax(m_panes[0]->document()->blockCount(),
+		m_panes[1]->document()->blockCount());
+	m_locationPane->setBands(std::move(bands), totalLines);
+	m_locationPane->setViewport(m_panes[0]->firstVisibleLine(),
+		m_panes[0]->visibleLineCount());
 }
 
 void FileCompareView::updateStatus()
