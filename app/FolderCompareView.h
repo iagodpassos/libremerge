@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <QFutureWatcher>
+#include <QHash>
 #include <QWidget>
 #include "FolderCompareDriver.h"
 
@@ -17,9 +18,10 @@ class QTreeWidgetItem;
 
 /**
  * Two-way folder comparison view: runs the engine comparison on a worker
- * thread with live progress and cancellation, then shows a flat recursive
- * result list. Supports file filters (engine mask/regex/expression
- * syntax), multi-selection copy between sides and delete-to-trash.
+ * thread with live progress and cancellation, then shows the recursive
+ * result as a hierarchical tree (folders as expandable nodes) or a flat
+ * list. Supports file filters (engine mask/regex/expression syntax),
+ * multi-selection copy between sides and delete-to-trash.
  * Double-clicking a file that exists on both sides asks the main window
  * to open a file comparison.
  */
@@ -46,18 +48,23 @@ private slots:
 
 private:
 	void populate(const lm::FolderCompareResult &result);
+	void rebuildRows();
+	QTreeWidgetItem *folderNode(const QString &folder,
+		QHash<QString, QTreeWidgetItem *> &nodes);
 	void updateRowFromDisk(QTreeWidgetItem *row);
 	void updateActions();
 	QString sidePath(QTreeWidgetItem *row, int side) const;
 	QString intendedSidePath(QTreeWidgetItem *row, int side) const;
 
 	QString m_roots[2];
+	lm::FolderCompareResult m_result;
 	QLineEdit *m_filterEdit;
 	QTreeWidget *m_tree;
 	QLabel *m_status;
 	QProgressBar *m_progress;
 	QPushButton *m_cancelButton;
 	QTimer *m_progressTimer;
+	QAction *m_actTreeMode;
 	QAction *m_actCopyRight;
 	QAction *m_actCopyLeft;
 	QAction *m_actDeleteLeft;

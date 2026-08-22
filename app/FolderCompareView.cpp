@@ -49,6 +49,7 @@ enum ItemRole
 };
 
 const QString kFilterSettingsKey = QStringLiteral("FolderCompare/Filter");
+const QString kTreeSettingsKey = QStringLiteral("FolderCompare/TreeView");
 
 QString categoryText(lm::FolderCompareItem::Category category)
 {
@@ -96,6 +97,26 @@ void setRowCategory(QTreeWidgetItem *row, lm::FolderCompareItem::Category catego
 		row->setBackground(col, color.isValid() ? QBrush(color) : QBrush());
 }
 
+void fillRow(QTreeWidgetItem *row, const lm::FolderCompareItem &item)
+{
+	row->setText(ColName, item.name);
+	row->setText(ColFolder, item.folder);
+	row->setText(ColLeftSize, sizeText(item.size[0]));
+	row->setText(ColRightSize, sizeText(item.size[1]));
+	row->setText(ColLeftDate, dateText(item.mtime[0]));
+	row->setText(ColRightDate, dateText(item.mtime[1]));
+	row->setTextAlignment(ColLeftSize, Qt::AlignRight | Qt::AlignVCenter);
+	row->setTextAlignment(ColRightSize, Qt::AlignRight | Qt::AlignVCenter);
+	setRowCategory(row, item.category, item.isDir);
+	row->setData(0, RoleLeftPath, item.leftPath);
+	row->setData(0, RoleRightPath, item.rightPath);
+	row->setData(0, RoleIsFile, !item.isDir);
+	row->setData(0, RoleBothSides,
+		!item.leftPath.isEmpty() && !item.rightPath.isEmpty());
+	row->setData(0, RoleFolder, item.folder);
+	row->setData(0, RoleName, item.name);
+}
+
 } // namespace
 
 FolderCompareView::FolderCompareView(QWidget *parent)
@@ -119,6 +140,14 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	addAction(applyAction);
 	connect(applyAction, &QAction::triggered, this, &FolderCompareView::recompare);
 	connect(m_filterEdit, &QLineEdit::returnPressed, this, &FolderCompareView::recompare);
+	toolbar->addSeparator();
+	m_actTreeMode = toolbar->addAction(tr("Tree View"));
+	m_actTreeMode->setCheckable(true);
+	m_actTreeMode->setChecked(QSettings().value(kTreeSettingsKey, true).toBool());
+	connect(m_actTreeMode, &QAction::toggled, this, [this](bool on) {
+		QSettings().setValue(kTreeSettingsKey, on);
+		rebuildRows();
+	});
 	toolbar->addSeparator();
 	m_actCopyRight = toolbar->addAction(tr("Copy \xE2\x86\x92 Right"));
 	connect(m_actCopyRight, &QAction::triggered, this, [this]() { copySelected(0); });
@@ -196,6 +225,7 @@ void FolderCompareView::start(const QString &leftDir, const QString &rightDir)
 {
 	m_roots[0] = leftDir;
 	m_roots[1] = rightDir;
+	m_result = lm::FolderCompareResult();
 	m_tree->clear();
 	updateActions();
 
@@ -256,31 +286,8 @@ void FolderCompareView::populate(const lm::FolderCompareResult &result)
 		return;
 	}
 
-	m_tree->setSortingEnabled(false);
-	for (const lm::FolderCompareItem &item : result.items)
-	{
-		auto *row = new QTreeWidgetItem(m_tree);
-		row->setText(ColName, item.name);
-		row->setText(ColFolder, item.folder);
-		row->setText(ColLeftSize, sizeText(item.size[0]));
-		row->setText(ColRightSize, sizeText(item.size[1]));
-		row->setText(ColLeftDate, dateText(item.mtime[0]));
-		row->setText(ColRightDate, dateText(item.mtime[1]));
-		row->setTextAlignment(ColLeftSize, Qt::AlignRight | Qt::AlignVCenter);
-		row->setTextAlignment(ColRightSize, Qt::AlignRight | Qt::AlignVCenter);
-		setRowCategory(row, item.category, item.isDir);
-		row->setData(0, RoleLeftPath, item.leftPath);
-		row->setData(0, RoleRightPath, item.rightPath);
-		row->setData(0, RoleIsFile, !item.isDir);
-		row->setData(0, RoleBothSides,
-			!item.leftPath.isEmpty() && !item.rightPath.isEmpty());
-		row->setData(0, RoleFolder, item.folder);
-		row->setData(0, RoleName, item.name);
-	}
-	m_tree->setSortingEnabled(true);
-	m_tree->sortByColumn(ColFolder, Qt::AscendingOrder);
-	for (int col = 0; col < ColCount; ++col)
-		m_tree->resizeColumnToContents(col);
+	m_result = result;
+	rebuildRows();
 
 	QString text = tr("%1 item(s): %2 different, %3 unique, %4 identical")
 		.arg(result.items.size()).arg(result.different).arg(result.unique)
@@ -288,6 +295,83 @@ void FolderCompareView::populate(const lm::FolderCompareResult &result)
 	if (result.aborted)
 		text = tr("Cancelled \xE2\x80\x94 partial results. ") + text;
 	m_status->setText(text);
+}
+
+void FolderCompareView::rebuildRows()
+{
+	const bool treeMode = m_actTreeMode->isChecked();
+	m_tree->clear();
+	m_tree->setRootIsDecorated(treeMode);
+	m_tree->setColumnHidden(ColFolder, treeMode);
+	if (!m_result.ok)
+		return;
+
+	m_tree->setSortingEnabled(false);
+	QHash<QString, QTreeWidgetItem *> folderNodes;
+	for (const lm::FolderCompareItem &item : m_result.items)
+	{
+		QTreeWidgetItem *row = nullptr;
+		if (treeMode)
+		{
+			const QString relPath = item.folder.isEmpty()
+				? item.name : item.folder + QLatin1Char('/') + item.name;
+			if (item.isDir)
+				row = folderNodes.value(relPath); // placeholder made earlier
+			if (row == nullptr)
+			{
+				QTreeWidgetItem *parent = folderNode(item.folder, folderNodes);
+				row = parent != nullptr
+					? new QTreeWidgetItem(parent) : new QTreeWidgetItem(m_tree);
+			}
+			if (item.isDir)
+				folderNodes.insert(relPath, row);
+		}
+		else
+		{
+			row = new QTreeWidgetItem(m_tree);
+		}
+		fillRow(row, item);
+	}
+	m_tree->setSortingEnabled(true);
+	m_tree->sortByColumn(treeMode ? ColName : ColFolder, Qt::AscendingOrder);
+	if (treeMode)
+		m_tree->expandAll();
+	for (int col = 0; col < ColCount; ++col)
+		m_tree->resizeColumnToContents(col);
+	updateActions();
+}
+
+/** Tree-mode parent node for a relative folder path (nullptr = top level),
+    synthesizing plain folder rows the comparison result did not list. */
+QTreeWidgetItem *FolderCompareView::folderNode(const QString &folder,
+	QHash<QString, QTreeWidgetItem *> &nodes)
+{
+	if (folder.isEmpty())
+		return nullptr;
+	if (QTreeWidgetItem *existing = nodes.value(folder))
+		return existing;
+
+	const int slash = folder.lastIndexOf(QLatin1Char('/'));
+	const QString parentFolder = slash < 0 ? QString() : folder.left(slash);
+	const QString name = slash < 0 ? folder : folder.mid(slash + 1);
+	QTreeWidgetItem *parent = folderNode(parentFolder, nodes);
+	auto *row = parent != nullptr
+		? new QTreeWidgetItem(parent) : new QTreeWidgetItem(m_tree);
+	row->setText(ColName, name);
+	row->setText(ColFolder, parentFolder);
+	const QString paths[2] = {
+		m_roots[0] + QLatin1Char('/') + folder,
+		m_roots[1] + QLatin1Char('/') + folder,
+	};
+	const bool exists[2] = { QFileInfo(paths[0]).isDir(), QFileInfo(paths[1]).isDir() };
+	row->setData(0, RoleLeftPath, exists[0] ? paths[0] : QString());
+	row->setData(0, RoleRightPath, exists[1] ? paths[1] : QString());
+	row->setData(0, RoleIsFile, false);
+	row->setData(0, RoleBothSides, exists[0] && exists[1]);
+	row->setData(0, RoleFolder, parentFolder);
+	row->setData(0, RoleName, name);
+	nodes.insert(folder, row);
+	return row;
 }
 
 QString FolderCompareView::sidePath(QTreeWidgetItem *row, int side) const
