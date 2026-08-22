@@ -35,4 +35,57 @@ LibreMerge vendors the comparison engine of **WinMerge**.
 
 ### Modifications so far
 
-- (none yet — pristine copy of upstream)
+All vendored-file changes are `_WIN32`/`_UNICODE` guards or portable fixes,
+kept small so the engine stays diffable against upstream. The build also
+force-includes `ports/posix_compat.h` on POSIX (MSVC/Win32 name mapping),
+so most portability lives outside the vendored files entirely.
+
+**Guarded includes/sections** (`#ifdef _WIN32` around windows.h and
+Windows-only code paths): `diffutils/src/util.c`, `unicoder.cpp`,
+`UniFile.cpp` (GetCompressedFileSize fallback), `OptionsMgr.cpp`,
+`IniOptionsMgr.cpp`, `stringdiffs.cpp`, `DirTravel.cpp`, `TempFile.cpp`
+(WMrunning via kill() on POSIX), `FolderStats.cpp` (+ POSIX readdir
+branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
+(SyntaxColors include, ToWindowsPath call), `DiffContext.cpp`
+(CVersionInfo), `FileFlags.cpp`, `Exceptions.h` came pre-guarded.
+
+**POSIX additions inside vendored files:**
+- `DirTravel.cpp`: POSIX `LoadFiles` (readdir + fnmatch + stat)
+- `FolderStats.cpp`: POSIX `ScanFolder`
+- `cio.h`: `ssize_t` alias in the POSIX branch
+- `cio.cpp`: POSIX branch fixes — `tfopen_s` was misnamed `fopen_s`, and
+  both open helpers returned stale errno on success (upstream bug in a
+  branch that never compiled before)
+- `TFile.h`: `wpath()` accessor on POSIX (returns the narrow path)
+- `paths.h`: `/dev/null` as the native null device, `/` trailing slash,
+  `constexpr const` fix
+- `unicoder.cpp`: the conversion pivot uses `xchar_t` (UTF-16 code unit:
+  `wchar_t` on Windows, `char16_t` elsewhere) with the ports-layer ICU
+  API — Win32 casts packed UTF-16LE buffers to `wchar_t*`, which only
+  works when `wchar_t` is 2 bytes; POSIX normalization/case-mapping route
+  to ICU (`ports/normalize_icu.cpp`)
+- `stringdiffs.cpp`: UTF-8 character break iterator
+  (`ports/lm_utf8_break.h`) replaces the UChar-based one when tchar_t is
+  char; static `linelen` renamed `linelen_dw` (collides with coretools
+  under tchar_t == char)
+- `Logger.h/.cpp`: `std::string` overload is `_UNICODE`-only (same
+  signature as `String` otherwise)
+- `UnicodeString.h`: `%lld`/`%llu` instead of MSVC `%I64d`/`%I64u` on
+  POSIX; `UnicodeString.cpp` `format_arg_list` handles both truncation
+  conventions and copies the va_list per attempt
+- `OptionsMgr.h`: declares `GetOptionsMgr()` (upstream gets it from the
+  MFC app layer)
+
+**Portable fixes (bugs on all platforms, hidden by Win32 behavior):**
+- `DirItem::SetFile`: no longer appends a trailing dot to extensionless
+  filenames (Win32 strips trailing dots at open time, POSIX does not)
+- `strdiff::Compare`: result normalized to -1/0/1 (libc++/libstdc++
+  return the character difference; MSVC returns the sign)
+- `FileFilterHelper.cpp` / `FileFilter.cpp`: filter match paths
+  canonicalized with `paths::ToWindowsPath` — `.flt` regexes use `\\` as
+  the separator and existing filters keep working unchanged
+
+**Test-suite adaptations** are listed in the commit history; the most
+notable is that upstream `paths_test.cpp` (Windows path semantics) is
+compiled only on Windows, with `paths_posix_test.cpp` covering the POSIX
+implementation.

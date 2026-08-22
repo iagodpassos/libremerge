@@ -1,0 +1,449 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+  "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+  <title>readme-developers.html</title>
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+  <style type="text/css">
+  <!--
+    body {
+      font-family: Verdana,Helvetica,Arial,sans-serif;
+      font-size: small;
+    }
+    code,pre {
+      font-family: "Courier New",Courier,monospace;
+      font-size: 1em;
+    }
+    h3 {
+      padding: 2px;
+      border-left: 4px solid #FFCC00;
+      border-bottom: 1px solid #FFCC00;
+    }
+    h4 {
+      padding: 2px;
+      border-left: 8px solid #FF9933;
+      border-bottom: 1px solid #FF9933;
+    }
+    h5 {
+      font-size: small;
+    }
+    pre {
+      margin-left: 25px;
+      margin-right: 25px;
+      padding: 5px;
+      background-color: #EEEEEE;
+      border-left: 10px solid #CCCCCC;
+    }
+    p.note {
+      padding: 5px;
+      background-color: #DDDDFF;
+      border: 1px solid #6666FF;
+    }
+    acronym {
+      cursor: help;
+      border-bottom: 1px dotted black;
+    }
+  -->
+  </style>
+</head>
+<body>
+<h2>readme-developers.html</h2>
+
+<h3>Table of Contents</h3>
+<ol>
+  <li><a href="#Code_changes">Code changes</a></li>
+  <li><a href="#Minor_code_changes_and_bug_fixes">Minor code changes and bug fixes</a></li>
+  <li><a href="#Coding_conventions">Coding conventions</a></li>
+  <li><a href="#Doxygen_comments">Doxygen comments</a></li>
+  <li><a href="#Revision_Ids">Revision Ids</a></li>
+  <li><a href="#File_release_numbers">File release numbers</a></li>
+  <li><a href="#Packaging_file_releases">Packaging file releases</a></li>
+  <li><a href="#Tagging_SVN_when_releasing_files">Tagging Subversion when releasing files</a></li>
+  <li><a href="#Localization">Localization</a></li>
+  <li><a href="#Logging">Logging</a></li>
+  <li><a href="#ShellExt">Shell Extension</a></li>
+</ol>
+
+
+<h3><a name="Code_changes">Code changes</a></h3>
+
+<p>Please follow these guidelines when submitting changes to WinMerge sources
+as patches.</p>
+
+<p class="note">Do not waste yours and our time by submitting large feature
+patches before you have made sure the feature is a desired addition to WinMerge. Communicate with
+our developers,
+either in bug/feature request(rfe) items or preferably in the Developers-forum or Developers-
+mailing list.</p>
+
+<ol>
+  <li><p>Post development intentions:</p>
+    <ul>
+      <li>
+        If you are fixing a bug, put a note in the SourceForge bug report that you're
+        fixing it. If there is no SourceForge bug report, create one.
+      </li>
+      <li>
+        If you are implementing a new feature, put a note in the SourceForge Feature
+        Request item that you're implementing it. If there is no SourceForge Feature
+		Request item, create one. Alternatively you can discuss	new features
+		in the Developers-forum or Developers-mailing list. Please use this! It is a lot
+		less work wasted when we agree about design first.
+      </li>
+    </ul>
+  </li>
+  <li>
+    <p>Before you start developing, make sure to capture
+    a snapshot of your starting sources (presumably a pristine copy of sources from
+    subversion, or of a source zip from a distribution).</p>
+
+    <p><b>DO NOT</b> submit a patch against a year-old version. The latest experimental/beta version
+    is at most a few weeks old. Stable releases should only get bug fixes. And even then
+    the bugfix
+    is usually first applied to development versions. So there should be no reason to submit
+    a patch against an old version.</p>
+  </li>
+  <li>
+    <p>Review the sections on <a href="#Coding_conventions">Coding conventions</a>
+    and <a href="#Doxygen_comments">Doxygen comments</a></p>
+  </li>
+  <li><p>Develop your new version.</p></li>
+  <li>
+    <p>Post your changes as a patch, to the SourceForge patch list. Try to give an
+    informative patch title of course. Post to any relevant SourceForge bugs
+    or RFEs, giving the patch number and title.</p>
+    <p>If the bug/rfe item is already assigned to you (or you submitted it), you can
+    also attach patch into that item. Remember to add a comment so others notice the
+    new attachment.</p>
+    <p>The active developers have often been posting entire original and modified
+    files rather than traditional diffs, because obviously all developers
+    have access to WinMerge to compare original and modified files, and this
+    may be viewed as an infinite line context diff :)</p>
+    <p><b>HINT:</b> If you have archive support installed in WinMerge you can do a folder
+    compare of your original and changed source trees. And then select <code>Zip - Differences</code>
+    from context menu and WinMerge creates a zip-file for you. Ready to be posted!</p>
+  </li>
+  <li>
+    <p>Wait for reactions from other developers (and sometimes active users).<br>
+    Usually this means one of the active developers approves your patch before
+    you commit.</p>
+  </li>
+  <li>
+    <p>After a reasonable amount of time has passed, and one of active developers
+    has approved the patch, apply the patch to Subversion. (Or ask a
+    project member to do so, if you don't have developer access to
+    the project.)</p>
+    <p>What is a reasonable amount of time? That is somewhat subjective, and
+    we need to rely on your expertise as the patch developer, but let us
+    suggest waiting a few days for minor patches, and at least a week for
+    major patches.</p>
+  </li>
+  <li>
+    <p>Add a note in <code>Src/Changes.txt</code> telling what files you committed,
+    and what bug/RFE/patch you solved. This is very important so everybody else
+    has a chance to figure out who did what and when.</p>
+  </li>
+</ol>
+
+<p>Note that <code>Src/Changes.txt</code> was split from <code>Src/readme.txt</code> after
+2.4.0 release. So <code>Src/readme.txt</code> contains older changelog entries. Also, many
+subfolders have their own <code>Changes.txt</code> -file. If the file exists in the folder, it must be
+used instead of "global" <code>Src/Changes.txt</code>.
+
+<h3><a name="Minor_code_changes_and_bug_fixes">Minor code changes and bug fixes</a></h3>
+
+<p>It is reasonable to post small snippets of code showing small changes
+directly in the text in bug postings, or patch postings. For example, see
+<a href="http://sourceforge.net/tracker/?group_id=13216&amp;atid=313216&amp;func=detail&amp;aid=824987">PATCH [ 824987 ] "Change binary-file detection (look only for zeros)"</a>,
+which gives the change directly in the text.</p>
+
+<p>Note, however, that sourceforge trackers currently ignore tabs, so if you
+can convert tabs to spaces in your posting, it helps greatly.</p>
+
+<p>Bugfixes may be treated less formally, especially for simple ones, or for
+fixes to code you know well -- eg, you caused the bug yourself with a
+recent patch :)</p>
+
+<p>Consider still posting something to the tracker lists, even if it is
+simply a summary in English. If the fix is something like
+"misspelled variable name foo as fooz in many places", it is quite
+understandable that you prefer to just fix the instances rather than
+doing a full patch for it.</p>
+
+<h3><a name="Coding_conventions">Coding conventions</a></h3>
+
+<p>Please conform to the prevalent coding conventions. There are quite a number of
+files which originated elsewhere, and have their own coding conventions; please
+conform to the local one, in whichever files you are at work.</p>
+
+<ol>
+  <li>
+    <p>WinMerge itself uses Microsoft MFC style coding.</p>
+    <ul>
+      <li>Code indents are purely tabs.</li>
+      <li>
+        Curly braces are on their own line, indented at the level of the outer code, and
+        code inside the braces is indented one further level.
+      </li>
+      <li>Class member variables are usually prefixed with <code>m_</code>.</li>
+    </ul>
+  </li>
+  <li>
+    <p>Crystal Text Editor (<code>WinMerge/editlib/*</code>) and diffutils code (<code>io.c</code>,
+    <code>normal.c</code>, <code>util.c</code>) use traditional Unix style coding.
+    <code>analyze.c</code> should be in this format, but we have made a mess of it :(</p>
+    <ul>
+      <li>Code indents are spaces, with tabs used to abbreviate eight consecutive spaces.</li>
+      <li>
+        Curly braces are on their own line, indented two spaces, and then the code inside
+        the curly braces is indented an additional two spaces.
+      </li>
+    </ul>
+  </li>
+</ol>
+
+<h3><a name="Doxygen_comments">Doxygen comments</a></h3>
+
+<p>We have adopted <a href="http://www.doxygen.org">doxygen</a> style as our desired
+commenting style for functions, classes, files, and so forth, in WinMerge code
+(this applies only to native WinMerge code, not imported files).</p>
+
+<ul>
+  <li>We're using JavaDoc style comments.</li>
+  <li>
+    It is probably easiest to simply imitate existing examples. The functions in
+    <code>DiffThread.cpp</code> are fully doxygen commented (<em>TODO: it would be better to give a
+    class example, if anyone knows a fully doxygen commented class</em>).
+  </li>
+  <li>There is ready to use doxygen config file in <code>docs/developers/doxygen.cfg</code></li>
+</ul>
+
+<h3><a name="File_release_numbers">File release numbers</a></h3>
+
+<p>We are trying to keep a consistent numbering scheme on our file releases,
+so everybody can figure out what we have released by just looking at the
+release number. Unfortunately the original 4-number version numbering didn't
+work as well as we thought and caused a lot of confusion. So WinMerge 2.13.x
+and later use new 3-number version numbers:</p>
+
+<pre>
+2.14.2
+|  | |
+|  | |
+|  | |
+|  | `--------- Denotes a beta release, an experimental release
+|  |             or a minor bug fix of a major release.
+|  |             For experimental and stable releases this number increases by
+|  |             one. For beta releases we may increase few numbers more.
+|  `----------- Denotes a major release.
+|                even numbers means "stable".
+|                odd numbers means "unstable".
+`------------- Denotes a major release with major changes.
+</pre>
+
+<p>In this case:</p>
+<ul>
+  <li>The next experimental release will have the number 2.15.1 (and then
+    2.15.2 and then 2.15.3 and so on)</li>
+  <li>The next beta release will likely have the number 2.15.10 or 2.15.20</li>
+  <li>The next major release will have the number 2.16.0</li>
+</ul>
+
+<p>And if we decide to rewrite most of the code, the next major release will
+have the number 3.0.0. This is something big like cross-platform support, 3-way
+merge etc.</p>
+
+<p>WinMerge 2.12.x and earlier releases used a four-number version numbers:
+
+<pre>
+2.1.2.0
+| | | |
+| | | `------- This number increases for each experimental,
+| | |          and it is reset after each beta or major release.
+| | `--------- Denotes a beta release, an experimental release
+| |            or a minor bug fix of a major release.
+| |              even numbers means "stable" (i.e. a beta).
+| |              odd numbers means "unstable" (i.e. an experimental).
+| `----------- Denotes a major release.
+|                even numbers means "stable".
+|                odd numbers means "unstable".
+`------------- Denotes a major release with major changes.
+</pre>
+
+<h3><a name="Packaging_file_releases">Packaging file releases</a></h3>
+
+<p>On SourceForge there is some space to enter Release Notes and Change Notes.
+For experimental releases make sure to put in a note telling people that this is indeed experimental,
+so they should not expect everything to work perfectly.
+For beta builds we paste in all the changes since the last beta release, so that people can see exactly what changed.
+For major releases, we paste in the list of changes since the last major release, and this list can become very long.</p>
+
+<p>We are using <a href="http://www.jrsoftware.org/isinfo.php">InnoSetup</a> to make
+the installer for WinMerge.
+See <a href="readme-developers-InnoSetup.html">readme-developers-InnoSetup.html</a> for more information.
+Also zip-packages for releases are provided, zip up these files:</p>
+
+<ul>
+  <li><code>WinMerge.exe</code> and <code>WinMergeU.exe</code></li>
+  <li><code>ShellExtension.dll</code>, <code>ShellExtensionU.dll</code>, <code>register.bat</code>
+  and <code>unregister.bat</code> to register/unregister it.</li>
+  <li>All filters from the <code>filters/</code> directory (remember template file!)</li>
+  <li>All plugins from the <code>plugins/dlls/</code> directory. Create a <code>MergePlugins/</code> directory and copy the plugins to it</li>
+  <li>All <code>*.lang</code> files (currently we have 21 languages, counting both Chinese versions)</li>
+</ul>
+
+<p>Please remember to put the version number into both executables. You may use
+any of the following three methods at least.</p>
+<ol>
+ <li>
+ You may run Src/SetResourceVersions.bat, which will prompt for the new
+ version number, and set it both in Merge.rc and in all the translated rc files.
+ </li><li>
+ You may use
+ <a href="http://www.elphin.com/products/stampver.html">StampVer</a> to stamp
+ the version number into the executables after they are compiled.
+ </li><li>
+ You may also use the old-fashioned process
+ of simply copying all the sources, changing the <code>Merge.rc</code> in the copy using
+ the MSVC6 resource editor, and compiling that (many releases have been made in this
+ manual, low-tech fashion).
+ </li>
+</ol>
+<p>Whatever method you use, please double-check the
+executable version numbers before uploading and releasing them.</p>
+
+<p>
+  Since WinMerge 2.4 we have translations for Shell Extension and must also version it
+  carefully. If we don't update version number, installer won't install updated version.
+  There are no scripts or other tools to update version number, it must be done by hand
+  to <code>ShellExtension.rc</code> file (make sure you update all four numbers!). Version numbers
+  follow the rule:
+</p>
+<pre>
+1.6.1.0
+| | | |
+| | | `------- Not used - 0 (or your own build version?)
+| | `--------- Translation updates or other minor changes increase this by one
+| `----------- New features, bug fixes and other changes affecting to behavior
+|                increase this number by one
+`------------- Denotes a major release with major changes.
+</pre>
+<ul>
+  <li>Make sure that version number is updated every time you do a new release!</li>
+  <li>If there are only small changes not affecting behaviour or translation updates<br>
+    - increase 3rd number by one</li>
+  <li>If there's been new features, bug fixes or other non-minor changes<br>
+    - increase 2nd number by one</li>
+</ul>
+
+<p>Filenames in file releases follow this standard:</p>
+<ul>
+  <li><code>WinMerge-2.1.6.0-exe.zip</code></li>
+  <li><code>WinMerge-2.1.6.0-src.zip</code></li>
+  <li><code>WinMerge-2.1.6.0-Setup.exe</code></li>
+</ul>
+
+<p>That is, dots are used only inside the version number and before the final extension.</p>
+
+<h3><a name="Tagging_SVN_when_releasing_files">Tagging Subversion when releasing files</a></h3>
+
+<p>When we make a release we always put a note in <code>Src/Changes.txt</code> in SVN.</p>
+
+<p>It is recommended to create a tag to the repository when making a stable- or beta- releases.
+Although with subversion we have kind of tags for every commit (revision numbers) it is still a lot
+easier to handle and remember them with human-readable names (R2_6_0) than with revision numbers
+(revision 3637 (not a real revision number!)). Experimental or other testing releases don't need
+tags since they are not intended for wide use and are usually just one-time snapshots.</p>
+
+<p>The tag should follow the same numbering scheme as used above, with the dots replaced by underscores
+and prefixed with an <code>R</code>, so the example experimental above would have a tag named <code>R2_1_3_0</code>,
+the next beta would be named <code>R2_1_4</code>, and the next major release would be named <code>R2_2</code>.</p>
+
+<h3><a name="Localization">Localization</a></h3>
+
+<p><code>WinMerge.exe</code> and <code>WinMergeU.exe</code> are always compiled with the english resources.
+Custom languages are in per-language PO files in <code>Languages</code> subfolder of WinMerge folder.
+Language may be changed dynamically through the menu.</p>
+
+<p>WinMerge localization is achieved by loading translated strings from per-language PO files. There is only one rc
+file in the project <code>Merge.rc</code>, which is used to generate  POT (PO template) file. Per-language PO files
+are updated (after <code>Merge.rc</code> changes) from generated POT file. All PO files are in same
+<code>Languages</code> subfolder.
+
+<p>Unlike with 2.6.x versions of WinMerge, there is no anymore need to compile language files. The same PO files
+are used for translation and in runtime to load translated strings. This helps translating WinMerge a lot.
+
+<p>If you have done changes to the <code>Merge.rc</code> file you must call <code>UpdateTranslations.bat</code>
+to create the latest version from the file <code>English.pot</code> and update the language PO files from this PO template.
+And for strings, who should not appear in the PO files just add a line in the <code>Languages/StringBlacklist.txt</code> file.</p>
+
+<p class="note">Besides the resources files you could also translate things like the
+<a href="http://svn.sourceforge.net/viewvc/winmerge/trunk/WinMerge/InnoSetup/Languages/">installer</a>
+(the ISL files are just INI files) and the <a href="http://svn.sourceforge.net/viewvc/winmerge/trunk/WinMerge/Docs/Users/Languages/">readme files</a>.</p>
+
+<h4>Tips for developers :</h4>
+<ul>
+  <li><p>The code must use resource strings for all messages, or displayed text (column title ...).</p></li>
+  <li>
+    <p><strong>Strings ID</strong>: when applying a patch, you may define new strings (with as ID the first free ID).
+    But probably you wrote your patch from an old version, and someone may have already inserted a patch for this ID.
+    You need to adapt the ID in resource.h to avoid overlapping ID.</p>
+  </li>
+  <li>
+    <p><strong>Strings order</strong>: that is really annoying with MSVC. It is important to keep the order of strings unchanged,
+    because merging rc files with WinMerge is then a lot easier. Strings are grouped in block according to their ID masked by <code>0xFFF0</code>.
+    So there are at most 16 strings in a block, but maybe less. MSVC reorders strings between and inside blocks, but never reorders blocks
+    (when a new blocks is created, MSVC always put it at the last position).</p>
+    <p>Typical method to merge strings in a <code>Merge.rc</code> from a patch with a <code>Merge.rc</code> in SVN :</p>
+    <ol>
+      <li>Add your new strings with WinMerge : <code>resource.h</code> for ID, and <code>Merge.rc</code>.</li>
+      <li>If no overlapping ID, you are finished.</li>
+      <li>Update your ID in <code>resource.h</code>.</li>
+      <li>
+        Open your resource file in MSVC. Force compilation (I just change a string twice, add a space, delete this space,
+        then save). So MSVC classes new strings in blocks (possibly creating new blocks) according to the ID updated in 3.
+      </li>
+    </ol>
+    <p><b>Note:</b> Blocks are not really ordered (there order comes from history), it is not a problem as MSVC never reorders
+    blocks after creation. If you use another tool to change resources, please make sure that the blocks order is unchanged.</p>
+  </li>
+</ul>
+
+<h3><a name="Logging">Logging</a></h3>
+
+<p>Logs are a good tool for tracing errors. But logs must be first written. Its always
+a good habit to write error message to logfile also.</p>
+
+<h4>Writing to log:</h4>
+<p>Simplest way to write errormessage to log is using
+<code>void LogErrorString(LPCTSTR sz)</code> defined in <code>stdafx.h</code>. Another
+way is to directly use <code>gLog</code> which is global instance of
+<code>CLogFile</code>. Log is written to users temporary directory (<code>$temp</code>) with name
+<code>WinMerge.log</code>.</p>
+
+<h4>Enabling/disabling log writing</h4>
+<p>Log writing is controlled by registry value:</p>
+<pre>HKEY_CURRENT_USER\Software\Thingamahoochie\WinMerge\Settings\Logging</pre>
+
+<p>Possible values are:</p>
+<ul>
+  <li>0 - no logging</li>
+  <li>1 - all logging enabled</li>
+  <li>2 - only errormessages and warnings written to log</li>
+</ul>
+
+<h3><a name="ShellExt">Shell Extension</a></h3>
+
+<p>WinMerge sets executable path (<code>WinMerge.exe</code>) which shellextension starts every
+time when options-dialog is closed. This can cause problems when testing
+several versions of WinMerge. There is registry value to overwrite path to
+WinMerge executable:</p>
+
+<pre>HKEY_CURRENT_USER\Software\Thingamahoochie\WinMerge\PriExecutable</pre>
+
+<p>It does not exist by default, so create <code>PriExecutable</code> as string value and type
+path of <code>WinMerge.exe</code> you mainly use as its value. If this value exists
+ShellExtension does not care about another path value.</p>
+
+</body>
+</html>

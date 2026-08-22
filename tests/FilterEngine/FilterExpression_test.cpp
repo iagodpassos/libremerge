@@ -42,7 +42,7 @@ TEST_P(FilterExpressionTest, Literals)
 	// the behavior of the FilterExpression class.
 
 	// Initialize path context and diff context for the test.
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 
 	// Set up DIFFITEM object with file information and timestamps.
@@ -771,7 +771,7 @@ TEST_P(FilterExpressionTest, Literals)
 
 TEST_P(FilterExpressionTest, FileAttributes)
 {
-	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src", "E:\\dev\\winmerge\\src");
+	PathContext paths("/c/dev/winmerge/src", "/d/dev/winmerge/src", "/e/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	int tzd;
@@ -873,9 +873,9 @@ TEST_P(FilterExpressionTest, FileAttributes)
 	EXPECT_TRUE(fe.Evaluate(di));
 	EXPECT_TRUE(fe.Parse("IgnoredDiffs = 2"));
 	EXPECT_TRUE(fe.Evaluate(di));
-	EXPECT_TRUE(fe.Parse("LeftFullPath = \"C:\\dev\\winmerge\\src\\abc\\Alice.txt\""));
+	EXPECT_TRUE(fe.Parse("LeftFullPath = \"/c/dev/winmerge/src/abc/Alice.txt\""));
 	EXPECT_TRUE(fe.Evaluate(di));
-	EXPECT_TRUE(fe.Parse("MiddleFullPath != \"D:\\dev\\winmerge\\src\\abc\\Alice.txt\""));
+	EXPECT_TRUE(fe.Parse("MiddleFullPath != \"/d/dev/winmerge/src/abc/Alice.txt\""));
 	EXPECT_TRUE(fe.Evaluate(di));
 	EXPECT_TRUE(fe.Parse("RightAttributes > 0"));
 	EXPECT_TRUE(fe.Evaluate(di));
@@ -921,7 +921,7 @@ TEST_P(FilterExpressionTest, FileAttributes)
 
 TEST_P(FilterExpressionTest, LineAttributes)
 {
-	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src", "E:\\dev\\winmerge\\src");
+	PathContext paths("/c/dev/winmerge/src", "/d/dev/winmerge/src", "/e/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	int tzd;
@@ -1445,7 +1445,7 @@ TEST_P(FilterExpressionTest, LineAttributes)
 
 TEST_P(FilterExpressionTest, Content1)
 {
-	const String dir = paths::ConcatPath(env::GetProgPath(), "..\\TestData");
+	const String dir = paths::ConcatPath(env::GetProgPath(), "../TestData");
 	PathContext paths(dir, dir);
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
@@ -1493,7 +1493,7 @@ TEST_P(FilterExpressionTest, Content1)
 
 TEST_P(FilterExpressionTest, ContentEmpty)
 {
-	const String dir = paths::ConcatPath(env::GetProgPath(), "..\\..\\Data\\Compare");
+	const String dir = paths::ConcatPath(env::GetProgPath(), "../../Data/Compare");
 	PathContext paths(paths::ConcatPath(dir, _T("dir1")), paths::ConcatPath(dir, _T("dir2")));
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
@@ -1533,7 +1533,7 @@ TEST_P(FilterExpressionTest, ContentEmpty)
 
 TEST_P(FilterExpressionTest, ParseError)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	FilterExpression fe;
 	fe.SetDiffContext(&ctxt);
@@ -1631,7 +1631,7 @@ TEST_P(FilterExpressionTest, ParseError)
 
 TEST_P(FilterExpressionTest, IsWithinAndInRange)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	FilterExpression fe;
@@ -1801,7 +1801,7 @@ TEST_P(FilterExpressionTest, IsWithinAndInRange)
 
 TEST_P(FilterExpressionTest, StrCountAndRegexCount)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -1913,7 +1913,7 @@ TEST_P(FilterExpressionTest, StrCountAndRegexCount)
 
 TEST_P(FilterExpressionTest, Test1)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	int tzd = 0;
@@ -1962,7 +1962,7 @@ TEST_P(FilterExpressionTest, Test1)
 
 TEST_P(FilterExpressionTest, ConditionalFunctions)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Alice.txt";
@@ -2077,7 +2077,7 @@ TEST_P(FilterExpressionTest, ConditionalFunctions)
 
 TEST_P(FilterExpressionTest, StringTransformFunctions)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -2186,7 +2186,7 @@ TEST_P(FilterExpressionTest, StringTransformFunctions)
 
 TEST_P(FilterExpressionTest, StringFunctionsWithNonStringArguments)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -2317,7 +2317,7 @@ TEST_P(FilterExpressionTest, StringFunctionsWithNonStringArguments)
 
 TEST_P(FilterExpressionTest, RegexExtract)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -2503,7 +2503,7 @@ TEST_P(FilterExpressionTest, RegexExtract)
 
 TEST_P(FilterExpressionTest, TrimFunctions)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -2602,7 +2602,7 @@ TEST_P(FilterExpressionTest, TrimFunctions)
 
 TEST_P(FilterExpressionTest, ReplaceWithList)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -2729,7 +2729,7 @@ TEST_P(FilterExpressionTest, ReplaceWithList)
 
 TEST_P(FilterExpressionTest, ReplaceWithListAdvanced)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -2806,7 +2806,7 @@ TEST_P(FilterExpressionTest, ReplaceWithListAdvanced)
 
 TEST_P(FilterExpressionTest, ReplaceWithListEncoding)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -2857,7 +2857,7 @@ TEST_P(FilterExpressionTest, ReplaceWithListEncoding)
 
 TEST_P(FilterExpressionTest, CaseSensitiveStringComparison)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -2913,7 +2913,7 @@ TEST_P(FilterExpressionTest, CaseSensitiveStringComparison)
 
 TEST_P(FilterExpressionTest, CaseSensitiveContains)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -2951,7 +2951,7 @@ TEST_P(FilterExpressionTest, CaseSensitiveContains)
 
 TEST_P(FilterExpressionTest, CaseSensitiveRegex)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -2999,7 +2999,7 @@ TEST_P(FilterExpressionTest, CaseSensitiveRegex)
 
 TEST_P(FilterExpressionTest, CaseSensitiveLike)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3035,7 +3035,7 @@ TEST_P(FilterExpressionTest, CaseSensitiveLike)
 
 TEST_P(FilterExpressionTest, CaseSensitiveReplace)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3071,7 +3071,7 @@ TEST_P(FilterExpressionTest, CaseSensitiveReplace)
 
 TEST_P(FilterExpressionTest, CaseSensitiveRegexReplace)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3107,7 +3107,7 @@ TEST_P(FilterExpressionTest, CaseSensitiveRegexReplace)
 
 TEST_P(FilterExpressionTest, CaseSensitiveIsWithinAndInRange)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3155,7 +3155,7 @@ TEST_P(FilterExpressionTest, CaseSensitiveIsWithinAndInRange)
 
 TEST_P(FilterExpressionTest, CaseSensitiveReplaceWithList)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3213,7 +3213,7 @@ TEST_P(FilterExpressionTest, CaseSensitiveReplaceWithList)
 
 TEST_P(FilterExpressionTest, CaseSensitiveFileAttributes)
 {
-	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/c/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].path = "abc";
@@ -3273,7 +3273,7 @@ TEST_P(FilterExpressionTest, CaseSensitiveFileAttributes)
 
 TEST_P(FilterExpressionTest, DirectiveCaseSensitive)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3303,7 +3303,7 @@ TEST_P(FilterExpressionTest, DirectiveCaseSensitive)
 
 TEST_P(FilterExpressionTest, DirectiveCaseInsensitive)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3326,7 +3326,7 @@ TEST_P(FilterExpressionTest, DirectiveCaseInsensitive)
 
 TEST_P(FilterExpressionTest, DirectiveWithOperators)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3383,7 +3383,7 @@ TEST_P(FilterExpressionTest, DirectiveWithOperators)
 
 TEST_P(FilterExpressionTest, DirectiveInvalidSyntax)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	FilterExpression fe;
 	fe.SetDiffContext(&ctxt);
@@ -3450,7 +3450,7 @@ TEST_P(FilterExpressionTest, DirectiveInvalidSyntax)
 
 TEST_P(FilterExpressionTest, DirectiveWithFileAttributes)
 {
-	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/c/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].path = "abc";
@@ -3515,7 +3515,7 @@ TEST_P(FilterExpressionTest, DirectiveWithFileAttributes)
 
 TEST_P(FilterExpressionTest, DirectiveWithArrays)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3561,7 +3561,7 @@ TEST_P(FilterExpressionTest, DirectiveWithArrays)
 
 TEST_P(FilterExpressionTest, DirectiveEmptyExpression)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3593,7 +3593,7 @@ TEST_P(FilterExpressionTest, DirectiveEmptyExpression)
 
 TEST_P(FilterExpressionTest, DirectiveIsWithinAndInRange)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3641,7 +3641,7 @@ TEST_P(FilterExpressionTest, DirectiveIsWithinAndInRange)
 
 TEST_P(FilterExpressionTest, DirectiveOptimize)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";
@@ -3711,7 +3711,7 @@ TEST_P(FilterExpressionTest, DirectiveOptimize)
 
 TEST_P(FilterExpressionTest, StatisticsAndMatchFunctions)
 {
-	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src", "E:\\dev\\winmerge\\src");
+	PathContext paths("/c/dev/winmerge/src", "/d/dev/winmerge/src", "/e/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	CreateSimpleDiffItem(di);
@@ -3991,7 +3991,7 @@ TEST_P(FilterExpressionTest, StatisticsAndMatchFunctions)
 
 TEST_P(FilterExpressionTest, BlockFunctions)
 {
-	PathContext paths("C:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src", "E:\\dev\\winmerge\\src");
+	PathContext paths("/c/dev/winmerge/src", "/d/dev/winmerge/src", "/e/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	CreateSimpleDiffItem(di);
@@ -4364,7 +4364,7 @@ TEST_P(FilterExpressionTest, BlockFunctions)
 
 TEST_P(FilterExpressionTest, TransformLine)
 {
-	PathContext paths("C:\\dev\\winmerge\\src");
+	PathContext paths("/c/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	CreateSimpleDiffItem(di);
@@ -4428,7 +4428,7 @@ TEST_P(FilterExpressionTest, TransformLine)
 
 TEST_P(FilterExpressionTest, StrFindAndRegexFindFunctions)
 {
-	PathContext paths("D:\\dev\\winmerge\\src", "D:\\dev\\winmerge\\src");
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	di.diffFileInfo[0].filename = "Test.txt";

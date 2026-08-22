@@ -4,10 +4,23 @@
 
 LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winmerge.org/) (file diff, folder diff, filters, moved-block detection) and rebuilds the user interface with Qt 6, since the original UI is written in MFC and cannot leave Windows.
 
-> **Status: early development — Phase 0.**
-> The current goal is to extract WinMerge's comparison engine into a portable,
-> CMake-built library (`libremerge-engine`) that compiles and passes the
-> upstream unit tests on macOS (arm64) and Linux. No usable GUI exists yet.
+> **Status: Phase 0 largely complete on macOS.**
+> WinMerge's comparison engine builds as a native library
+> (`libremerge-engine`) on macOS arm64, and the upstream GoogleTest suite
+> passes **369/369** on it — file diff (GNU diffutils + git xdiff), folder
+> scan and compare engines, file/line/substitution filters, the filter
+> expression language, moved-block detection and Unicode handling all
+> validated. Linux CI is configured but not yet verified. No usable GUI
+> exists yet — that is Phase 1.
+
+## Building (macOS)
+
+```sh
+brew install cmake ninja poco boost icu4c googletest re2c lemon
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
 
 ## Why
 

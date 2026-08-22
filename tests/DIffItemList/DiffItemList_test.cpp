@@ -62,24 +62,24 @@ namespace
 		DIFFITEM *pFile4 = list.AddNewDiff(pDir2);
 		SetFile(*pDir1, _T("Dir1"));
 		SetFile(*pDir2, _T("Dir2"));
-		SetFile(*pFile1, _T("Dir1\\File1"));
-		SetFile(*pFile2, _T("Dir1\\File2"));
-		SetFile(*pFile3, _T("Dir2\\File3"));
-		SetFile(*pFile4, _T("Dir2\\File4"));
+		SetFile(*pFile1, _T("Dir1/File1"));
+		SetFile(*pFile2, _T("Dir1/File2"));
+		SetFile(*pFile3, _T("Dir2/File3"));
+		SetFile(*pFile4, _T("Dir2/File4"));
 
 		DIFFITEM *pdi = list.GetFirstDiffPosition();
 		EXPECT_EQ(String(_T("Dir1")), pdi->diffFileInfo[0].GetFile());
 		list.GetNextSiblingDiffPosition(pdi);
 		EXPECT_EQ(String(_T("Dir2")), pdi->diffFileInfo[0].GetFile());
 		pdi = list.GetFirstChildDiffPosition(pdi);
-		EXPECT_EQ(String(_T("Dir2\\File3")), pdi->diffFileInfo[0].GetFile());
+		EXPECT_EQ(String(_T("Dir2/File3")), pdi->diffFileInfo[0].GetFile());
 		list.GetNextSiblingDiffPosition(pdi);
-		EXPECT_EQ(String(_T("Dir2\\File4")), pdi->diffFileInfo[0].GetFile());
+		EXPECT_EQ(String(_T("Dir2/File4")), pdi->diffFileInfo[0].GetFile());
 
 		pdi = list.GetFirstChildDiffPosition(list.GetFirstDiffPosition());
-		EXPECT_EQ(String(_T("Dir1\\File1")), pdi->diffFileInfo[0].GetFile());
+		EXPECT_EQ(String(_T("Dir1/File1")), pdi->diffFileInfo[0].GetFile());
 		list.GetNextSiblingDiffPosition(pdi);
-		EXPECT_EQ(String(_T("Dir1\\File2")), pdi->diffFileInfo[0].GetFile());
+		EXPECT_EQ(String(_T("Dir1/File2")), pdi->diffFileInfo[0].GetFile());
 	}
 
 

@@ -16,7 +16,6 @@ set(TEST_SOURCES
   FullQuickCompare/FullQuickCompare_test.cpp
   MoveDetection/RenameMoveDetection_test.cpp
   OptionsMgr/VariantValue_test.cpp
-  Paths/paths_test.cpp
   StringDiffs/stringdiffs_test.cpp
   StringDiffs/stringdiffs_test_adds.cpp
   StringDiffs/stringdiffs_test_bugs.cpp
@@ -29,7 +28,24 @@ set(TEST_SOURCES
   xdiff/xutils_test.cpp
 )
 
+if(WIN32)
+  # upstream test asserts Windows path semantics (drive letters, backslash)
+  list(APPEND TEST_SOURCES Paths/paths_test.cpp)
+else()
+  list(APPEND TEST_SOURCES Paths/paths_posix_test.cpp)
+endif()
+
 add_executable(libremerge-tests ${TEST_SOURCES})
+
+# Fixtures resolved relative to the test binary (env::GetProgPath())
+add_custom_command(TARGET libremerge-tests POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_CURRENT_SOURCE_DIR}/TestData $<TARGET_FILE_DIR:libremerge-tests>/../TestData
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_CURRENT_SOURCE_DIR}/FileFilter/Filters $<TARGET_FILE_DIR:libremerge-tests>/../FileFilter/Filters
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_CURRENT_SOURCE_DIR}/Data $<TARGET_FILE_DIR:libremerge-tests>/../../Data
+)
 
 target_link_libraries(libremerge-tests PRIVATE
   libremerge-engine
@@ -46,6 +62,6 @@ endif()
 # root reproduce that layout.
 include(GoogleTest)
 gtest_discover_tests(libremerge-tests
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/run
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/gtest/run
   DISCOVERY_TIMEOUT 60
 )

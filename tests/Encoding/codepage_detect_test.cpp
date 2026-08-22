@@ -29,15 +29,18 @@ namespace
 
 		virtual void SetUp()
 		{
-			// Code	here will be called	immediately	after the constructor (right
-			// before each test).
+			// The expectations below assume a Windows-ANSI default codepage;
+			// on POSIX the natural default is UTF-8, so pin one for the test.
+			m_oldCodepage = ucr::getDefaultCodepage();
+			ucr::setDefaultCodepage(1252);
 		}
 
 		virtual void TearDown()
 		{
-			// Code	here will be called	immediately	after each test	(right
-			// before the destructor).
+			ucr::setDefaultCodepage(m_oldCodepage);
 		}
+
+		int m_oldCodepage = 0;
 
 		// Objects declared here can be used by all tests in the test case for Foo.
 	};

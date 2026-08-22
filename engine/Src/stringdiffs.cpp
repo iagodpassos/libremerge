@@ -201,8 +201,13 @@ ComputeWordDiffs(int nFiles, const String *str,
 int Compare(const String& str1, const String& str2,
 	bool case_sensitive, EolCompareMode eol_mode, int whitespace, bool ignore_numbers)
 {
+	// NB: keep the result normalized to -1/0/1: MSVC's compare() returns
+	// that already, but libc++/libstdc++ return the character difference.
 	if (case_sensitive && eol_mode == EOL_STRICT && whitespace == WHITESPACE_COMPARE_ALL && !ignore_numbers)
-		return str2.compare(str1);
+	{
+		const int result = str2.compare(str1);
+		return (result > 0) - (result < 0);
+	}
 	String s1 = str1, s2 = str2;
 	if (!case_sensitive)
 	{
@@ -236,7 +241,8 @@ int Compare(const String& str1, const String& str2,
 		strutils::replace_chars(s1, _T("0123456789"), _T(""));
 		strutils::replace_chars(s2, _T("0123456789"), _T(""));
 	}
-	return s2.compare(s1);
+	const int result = s2.compare(s1);
+	return (result > 0) - (result < 0);
 }
 
 /**

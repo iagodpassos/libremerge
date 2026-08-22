@@ -211,7 +211,7 @@ bool FileFilterHelper::includeFile(const DIFFITEM& di) const
 	bool result = true;
 	if (i < nDirs)
 	{
-		String szFileName = paths::ConcatPath(di.diffFileInfo[i].path, di.diffFileInfo[i].filename);
+		String szFileName = paths::ToWindowsPath(paths::ConcatPath(di.diffFileInfo[i].path, di.diffFileInfo[i].filename)); // .flt regexes expect backslash separators
 		// preprend a backslash if there is none
 		String strFileName = strutils::makelower(szFileName);
 		if (strFileName.empty() || strFileName[0] != '\\')
@@ -299,7 +299,7 @@ bool FileFilterHelper::includeDir(const DIFFITEM& di) const
 	bool result = true;
 	if (i < nDirs)
 	{
-		String szDirName = paths::ConcatPath(di.diffFileInfo[i].path, di.diffFileInfo[i].filename);
+		String szDirName = paths::ToWindowsPath(paths::ConcatPath(di.diffFileInfo[i].path, di.diffFileInfo[i].filename)); // .flt regexes expect backslash separators
 		// preprend a backslash if there is none
 		String strDirName = strutils::makelower(szDirName);
 		if (strDirName.empty() || strDirName[0] != '\\')

@@ -22,8 +22,13 @@ void DirItem::SetFile(const String &fullPath)
 {
 	String ext, filename2, path2;
 	paths::SplitFilename(fullPath, &path2, &filename2, &ext);
-	filename2 += _T(".");
-	filename2 += ext;
+	// NB: only re-append a dot when there is an extension; "A" + "." would
+	// open fine on Windows (which strips trailing dots) but not on POSIX.
+	if (!ext.empty())
+	{
+		filename2 += _T(".");
+		filename2 += ext;
+	}
 	filename = filename2;
 	path = path2;
 }

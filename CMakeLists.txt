@@ -8,15 +8,28 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Homebrew keg-only ICU
-if(APPLE AND EXISTS /opt/homebrew/opt/icu4c@78)
-  list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/icu4c@78)
+if(APPLE)
+  foreach(_icu_prefix /opt/homebrew/opt/icu4c@78 /opt/homebrew/opt/icu4c /usr/local/opt/icu4c)
+    if(EXISTS ${_icu_prefix})
+      list(APPEND CMAKE_PREFIX_PATH ${_icu_prefix})
+      break()
+    endif()
+  endforeach()
 endif()
 
 find_package(Poco REQUIRED COMPONENTS Foundation)
-find_package(Boost REQUIRED CONFIG)
+find_package(Boost REQUIRED)
 find_package(ICU REQUIRED COMPONENTS uc i18n)
 
 enable_testing()
 add_subdirectory(engine)
-find_package(GTest CONFIG REQUIRED)
+
+find_package(GTest CONFIG QUIET)
+if(NOT GTest_FOUND)
+  include(FetchContent)
+  FetchContent_Declare(googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.zip)
+  FetchContent_MakeAvailable(googletest)
+  add_library(GTest::gtest ALIAS gtest)
+endif()
 add_subdirectory(tests)
