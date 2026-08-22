@@ -123,6 +123,10 @@ FileCompareView::FileCompareView(QWidget *parent)
 	panes->setSpacing(1);
 
 	m_locationPane = new LocationPane(this);
+	QPalette locPal = m_locationPane->palette();
+	locPal.setColor(QPalette::Base, Qt::white);
+	locPal.setColor(QPalette::Mid, QColor(0xc0, 0xc0, 0xc0));
+	m_locationPane->setPalette(locPal);
 	panes->addWidget(m_locationPane);
 	connect(m_locationPane, &LocationPane::jumpRequested, this, [this](int line) {
 		for (int side = 0; side < m_paneCount; ++side)
@@ -142,6 +146,16 @@ FileCompareView::FileCompareView(QWidget *parent)
 		m_panes[i] = new DiffTextEdit(this);
 		m_panes[i]->setLineWrapMode(QPlainTextEdit::NoWrap);
 		m_panes[i]->setFont(mono);
+		// diff backgrounds and the syntax palette are light-theme colors;
+		// keep the panes light in dark mode too (as WinMerge's editor is)
+		QPalette pal = m_panes[i]->palette();
+		pal.setColor(QPalette::Base, Qt::white);
+		pal.setColor(QPalette::Text, Qt::black);
+		pal.setColor(QPalette::Window, QColor(0xf0, 0xf0, 0xf0));
+		pal.setColor(QPalette::PlaceholderText, QColor(0x88, 0x88, 0x88));
+		pal.setColor(QPalette::Highlight, QColor(0xb5, 0xd5, 0xff));
+		pal.setColor(QPalette::HighlightedText, Qt::black);
+		m_panes[i]->setPalette(pal);
 		m_panes[i]->setVisible(i < m_paneCount);
 		panes->addWidget(m_panes[i]);
 		connect(m_panes[i]->verticalScrollBar(), &QScrollBar::valueChanged,

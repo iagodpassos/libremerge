@@ -94,7 +94,12 @@ void setRowCategory(QTreeWidgetItem *row, lm::FolderCompareItem::Category catego
 		? QObject::tr("Folder: %1").arg(categoryText(category)) : categoryText(category));
 	const QColor color = categoryColor(category);
 	for (int col = 0; col < ColCount; ++col)
+	{
 		row->setBackground(col, color.isValid() ? QBrush(color) : QBrush());
+		// category backgrounds are light pastels; keep the text readable
+		// when the system theme is dark
+		row->setForeground(col, color.isValid() ? QBrush(Qt::black) : QBrush());
+	}
 }
 
 void fillRow(QTreeWidgetItem *row, const lm::FolderCompareItem &item)
