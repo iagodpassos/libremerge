@@ -93,19 +93,27 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 			tr("Could not compare files:\n%1").arg(error));
 		return;
 	}
-	QStringList names;
-	for (const QString &path : paths)
-		names.append(QFileInfo(path).fileName());
-	const QString title = names.join(QString::fromUtf8(" \xE2\x86\x94 "));
-	const int index = m_tabs->addTab(view, title);
+	auto viewTitle = [](FileCompareView *v) {
+		QStringList names;
+		for (const QString &path : v->paths())
+			names.append(QFileInfo(path).fileName());
+		return names.join(QString::fromUtf8(" \xE2\x86\x94 "));
+	};
+	auto refreshTab = [this, viewTitle](FileCompareView *v) {
+		const int tabIndex = m_tabs->indexOf(v);
+		if (tabIndex < 0)
+			return;
+		m_tabs->setTabText(tabIndex, (v->isModified()
+			? QString::fromUtf8("\xE2\x80\xA2 ") : QString()) + viewTitle(v));
+		m_tabs->setTabToolTip(tabIndex, v->paths().join(QStringLiteral("\n")));
+	};
+	const int index = m_tabs->addTab(view, viewTitle(view));
 	m_tabs->setTabToolTip(index, paths.join(QStringLiteral("\n")));
 	m_tabs->setCurrentIndex(index);
-	connect(view, &FileCompareView::modifiedChanged, this, [this, view, title](bool modified) {
-		const int tabIndex = m_tabs->indexOf(view);
-		if (tabIndex >= 0)
-			m_tabs->setTabText(tabIndex, modified
-				? QString::fromUtf8("\xE2\x80\xA2 ") + title : title);
-	});
+	connect(view, &FileCompareView::modifiedChanged, this,
+		[view, refreshTab](bool) { refreshTab(view); });
+	connect(view, &FileCompareView::pathsChanged, this,
+		[view, refreshTab]() { refreshTab(view); });
 }
 
 void MainWindow::openFolderComparison(const QString &leftDir, const QString &rightDir)

@@ -9,6 +9,7 @@
 class QAction;
 class QLabel;
 class QPlainTextEdit;
+class QToolButton;
 class DiffTextEdit;
 class LocationPane;
 class SyntaxHighlighter;
@@ -37,6 +38,7 @@ public:
 	bool isModified() const;
 	int diffCount() const { return m_diffCount; }
 	int paneCount() const { return m_paneCount; }
+	QStringList paths() const;
 
 	/** Mark sides as read-only before compare(): the pane rejects edits
 	    and merge operations refuse to target it. */
@@ -52,6 +54,7 @@ public:
 
 signals:
 	void modifiedChanged(bool modified);
+	void pathsChanged();
 
 private:
 	struct Block
@@ -78,6 +81,7 @@ private:
 	struct Side
 	{
 		QString path;
+		QString caption;     // user override for the header text
 		int unicoding = 0;   // ucr::UNICODESET
 		int codepage = 65001;
 		bool bom = false;
@@ -105,6 +109,9 @@ private:
 	void updateHeaderStyles();
 	void gotoDiff(int blockIndex);
 	int nextActive(int from, int direction) const;
+	void showHeaderMenu(int side);
+	void editCaption(int side);
+	void changeSideFile(int side, const QString &path);
 	bool saveSide(int side, QString *error);
 	void setSideModified(int side, bool modified);
 	void syncScroll(int pane, int value);
@@ -114,6 +121,8 @@ private:
 	bool m_readOnly[3] = {};
 	DiffTextEdit *m_panes[3];
 	QLabel *m_headers[3];
+	QWidget *m_headerRows[3] = {};
+	QToolButton *m_headerButtons[3] = {};
 	QLabel *m_posLabels[3];
 	QLabel *m_encLabels[3];
 	std::unique_ptr<SyntaxHighlighter> m_highlighters[3];
