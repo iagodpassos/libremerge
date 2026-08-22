@@ -18,7 +18,7 @@ if(APPLE)
 endif()
 
 find_package(Poco REQUIRED COMPONENTS Foundation)
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED CONFIG)
 find_package(ICU REQUIRED COMPONENTS uc i18n)
 
 enable_testing()
@@ -30,6 +30,8 @@ if(NOT GTest_FOUND)
   FetchContent_Declare(googletest
     URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.zip)
   FetchContent_MakeAvailable(googletest)
-  add_library(GTest::gtest ALIAS gtest)
+  if(NOT TARGET GTest::gtest)
+    add_library(GTest::gtest ALIAS gtest)
+  endif()
 endif()
 add_subdirectory(tests)
