@@ -56,17 +56,22 @@ private:
 	struct Block
 	{
 		int begin[3];
-		int end[3]; // inclusive; end < begin means "no lines on this side"
+		int end[3]; // inclusive, real lines; end < begin means "no lines on this side"
 		bool trivial;
+		bool resolved = false; // merged in place since the last recompare
+		// view coordinates (shared by all panes once ghost-aligned)
+		int viewBegin = 0;
+		int viewEnd = -1;
 	};
 
 	struct WordSpan
 	{
 		int side;
-		int line;      // document line number
+		int line;      // real line number on this side
 		int start;     // UTF-16 offset within the line
 		int length;    // UTF-16 length
 		int blockIndex;
+		bool oneSided; // content exists only on this side
 	};
 
 	struct Side
@@ -87,25 +92,37 @@ private:
 
 	bool loadSide(int side, const QString &path, QString *error);
 	bool runDiff(QString *error);
+	void rebuildAlignment();
+	void refreshSideMaps(int side);
+	QStringList collectRealLines(int side, QList<bool> *ghostFlags = nullptr) const;
 	void computeWordSpans();
 	void applyHighlights();
 	void updateStatus();
+	void updatePaneStatus(int side);
+	void updateHeader(int side);
+	void updateHeaderStyles();
 	void gotoDiff(int blockIndex);
-	int nextNonTrivial(int from, int direction) const;
-	void spliceLines(int side, int firstLine, int lastLine, const QStringList &newLines);
+	int nextActive(int from, int direction) const;
 	bool saveSide(int side, QString *error);
 	void setSideModified(int side, bool modified);
 	void syncScroll(int pane, int value);
+	void syncHScroll(int pane, int value);
 
 	int m_paneCount = 2;
 	bool m_readOnly[3] = {};
 	DiffTextEdit *m_panes[3];
+	QLabel *m_headers[3];
+	QLabel *m_posLabels[3];
+	QLabel *m_encLabels[3];
 	std::unique_ptr<SyntaxHighlighter> m_highlighters[3];
 	LocationPane *m_locationPane;
 	Side m_sides[3];
 	QLabel *m_status;
 	std::vector<Block> m_blocks;
 	std::vector<WordSpan> m_wordSpans;
+	QStringList m_realLines[3];      // side's real lines as of the last diff run
+	std::vector<int> m_realToView[3]; // real line -> view line, ditto
+	QList<int> m_lineNumbers[3];      // view line -> 1-based real number, -1 ghost
 	int m_diffCount = 0;
 	int m_current = -1; // index into m_blocks; -1 = none
 	bool m_syncing = false;

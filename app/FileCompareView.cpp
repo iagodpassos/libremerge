@@ -4,6 +4,7 @@
 #include "FileCompareView.h"
 
 #include <QAction>
+#include <QApplication>
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -30,16 +31,56 @@
 namespace
 {
 
-const QColor kDiffColor(255, 243, 176);        // changed lines
-const QColor kCurrentDiffColor(255, 213, 100); // the selected difference
-const QColor kTrivialColor(230, 230, 230);     // whitespace-only/trivial
-const QColor kMissingColor(224, 236, 255);     // block exists only on other side
-const QColor kWordDiffColor(255, 199, 90);     // changed words within a line
-const QColor kWordDiffCurrentColor(255, 158, 40);
+// WinMerge's default difference colors (Src/OptionsDiffColors.cpp)
+const QColor kDiff(239, 203, 5);
+const QColor kDiffDeleted(192, 192, 192);
+const QColor kSelDiff(239, 119, 116);
+const QColor kSelDiffDeleted(240, 192, 192);
+const QColor kTrivial(251, 242, 191);
+const QColor kTrivialDeleted(233, 233, 233);
+const QColor kWordDiff(241, 226, 173);
+const QColor kWordDiffDeleted(255, 170, 130);
+const QColor kSelWordDiff(255, 160, 160);
+const QColor kSelWordDiffDeleted(200, 129, 108);
 
-// performance guards for intra-line highlighting
-constexpr int kMaxWordDiffLinesPerBlock = 400;
-constexpr int kMaxWordDiffLineLength = 2048;
+// upstream breaks words at punctuation too (OPT_BREAK_TYPE default 1)
+constexpr int kBreakType = 1;
+// skip intra-line marks for pathologically large blocks
+constexpr int kMaxWordDiffBlockBytes = 256 * 1024;
+
+/** QLabel that elides its text in the middle to fit the available width. */
+class ElidedLabel : public QLabel
+{
+public:
+	explicit ElidedLabel(QWidget *parent = nullptr) : QLabel(parent)
+	{
+		setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+	}
+
+	void setFullText(const QString &text)
+	{
+		m_fullText = text;
+		setToolTip(text);
+		updateElision();
+	}
+
+protected:
+	void resizeEvent(QResizeEvent *event) override
+	{
+		QLabel::resizeEvent(event);
+		updateElision();
+	}
+
+private:
+	void updateElision()
+	{
+		const int margin = contentsMargins().left() + contentsMargins().right() + 4;
+		setText(fontMetrics().elidedText(m_fullText, Qt::ElideMiddle,
+			qMax(20, width() - margin)));
+	}
+
+	QString m_fullText;
+};
 
 /** Map an inclusive UTF-8 byte range from the engine onto UTF-16 offsets
     of the QString it was encoded from. */
@@ -76,6 +117,35 @@ void byteRangeToU16(const QString &line, int beginByte, int endByte,
 		end = size;
 	*startU16 = start;
 	*lengthU16 = qMax(0, end - start);
+}
+
+QString encodingName(int unicoding, int codepage, bool bom)
+{
+	switch (unicoding)
+	{
+	case ucr::UCS2LE: return QStringLiteral("UTF-16LE");
+	case ucr::UCS2BE: return QStringLiteral("UTF-16BE");
+	case ucr::UTF8:
+		return bom ? QStringLiteral("UTF-8 BOM") : QStringLiteral("UTF-8");
+	default:
+		break;
+	}
+	if (codepage == 65001)
+		return QStringLiteral("UTF-8");
+	if (codepage >= 1250 && codepage <= 1258)
+		return QStringLiteral("Windows-%1").arg(codepage);
+	if (codepage == 20127)
+		return QStringLiteral("US-ASCII");
+	return QStringLiteral("CP%1").arg(codepage);
+}
+
+QString eolName(const QString &eol)
+{
+	if (eol == QStringLiteral("\r\n"))
+		return QStringLiteral("Windows");
+	if (eol == QStringLiteral("\r"))
+		return QStringLiteral("Mac");
+	return QStringLiteral("Unix");
 }
 
 } // namespace
@@ -143,6 +213,15 @@ FileCompareView::FileCompareView(QWidget *parent)
 	const QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
 	for (int i = 0; i < 3; ++i)
 	{
+		auto *column = new QVBoxLayout;
+		column->setContentsMargins(0, 0, 0, 0);
+		column->setSpacing(0);
+
+		auto *header = new ElidedLabel(this);
+		header->setContentsMargins(6, 2, 6, 2);
+		m_headers[i] = header;
+		column->addWidget(header);
+
 		m_panes[i] = new DiffTextEdit(this);
 		m_panes[i]->setLineWrapMode(QPlainTextEdit::NoWrap);
 		m_panes[i]->setFont(mono);
@@ -156,10 +235,31 @@ FileCompareView::FileCompareView(QWidget *parent)
 		pal.setColor(QPalette::Highlight, QColor(0xb5, 0xd5, 0xff));
 		pal.setColor(QPalette::HighlightedText, Qt::black);
 		m_panes[i]->setPalette(pal);
-		m_panes[i]->setVisible(i < m_paneCount);
-		panes->addWidget(m_panes[i]);
+		column->addWidget(m_panes[i], 1);
+
+		auto *statusRow = new QHBoxLayout;
+		statusRow->setContentsMargins(0, 0, 0, 0);
+		statusRow->setSpacing(0);
+		m_posLabels[i] = new QLabel(this);
+		m_posLabels[i]->setContentsMargins(6, 1, 6, 1);
+		m_encLabels[i] = new QLabel(this);
+		m_encLabels[i]->setContentsMargins(6, 1, 6, 1);
+		const QString statusStyle = QStringLiteral(
+			"QLabel { background: #ececec; color: #303030; }");
+		m_posLabels[i]->setStyleSheet(statusStyle);
+		m_encLabels[i]->setStyleSheet(statusStyle);
+		statusRow->addWidget(m_posLabels[i], 1);
+		statusRow->addWidget(m_encLabels[i]);
+		column->addLayout(statusRow);
+
+		panes->addLayout(column, 1);
+
 		connect(m_panes[i]->verticalScrollBar(), &QScrollBar::valueChanged,
 			this, [this, i](int value) { syncScroll(i, value); });
+		connect(m_panes[i]->horizontalScrollBar(), &QScrollBar::valueChanged,
+			this, [this, i](int value) { syncHScroll(i, value); });
+		connect(m_panes[i], &QPlainTextEdit::cursorPositionChanged,
+			this, [this, i]() { updatePaneStatus(i); });
 		m_panes[i]->setTabStopDistance(
 			4 * QFontMetricsF(mono).horizontalAdvance(QLatin1Char(' ')));
 		// QTextDocument's own modified tracking ignores syntax-highlight
@@ -180,6 +280,15 @@ FileCompareView::FileCompareView(QWidget *parent)
 		});
 	layout->addLayout(panes, 1);
 
+	// highlight the header of the pane that owns the focus, like WinMerge
+	connect(qApp, &QApplication::focusChanged, this,
+		[this](QWidget *, QWidget *now) {
+			for (int i = 0; i < m_paneCount; ++i)
+				if (now == m_panes[i])
+					updateHeaderStyles();
+		});
+	updateHeaderStyles();
+
 	m_status = new QLabel(this);
 	m_status->setContentsMargins(6, 3, 6, 3);
 	layout->addWidget(m_status);
@@ -196,7 +305,13 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 	m_paneCount = paths.size();
 	m_locationPane->setPaneCount(m_paneCount);
 	for (int i = 0; i < 3; ++i)
-		m_panes[i]->setVisible(i < m_paneCount);
+	{
+		const bool visible = i < m_paneCount;
+		m_headers[i]->setVisible(visible);
+		m_panes[i]->setVisible(visible);
+		m_posLabels[i]->setVisible(visible);
+		m_encLabels[i]->setVisible(visible);
+	}
 	if (m_paneCount == 3)
 	{
 		// pane order on screen: left, middle, right; merges land in the middle
@@ -214,11 +329,11 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 	}
 	if (!runDiff(error))
 		return false;
-	m_current = nextNonTrivial(-1, +1);
+	// like WinMerge, open with no difference selected
+	m_current = -1;
 	applyHighlights();
 	updateStatus();
-	if (m_current >= 0)
-		gotoDiff(m_current);
+	updateHeaderStyles();
 	return true;
 }
 
@@ -267,25 +382,48 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 	m_panes[side]->document()->setModified(false);
 	m_syncing = false;
 	s.modified = false;
+
+	updateHeader(side);
+	m_encLabels[side]->setText(QStringLiteral("%1  %2")
+		.arg(encodingName(s.unicoding, s.codepage, s.bom), eolName(s.eol)));
+	updatePaneStatus(side);
 	return true;
+}
+
+/** The side's real lines (skipping alignment ghosts); optionally also the
+    per-view-line ghost flags. */
+QStringList FileCompareView::collectRealLines(int side, QList<bool> *ghostFlags) const
+{
+	QStringList lines;
+	for (QTextBlock block = m_panes[side]->document()->begin();
+		block.isValid(); block = block.next())
+	{
+		const bool ghost = isGhostBlock(block);
+		if (ghostFlags != nullptr)
+			ghostFlags->append(ghost);
+		if (!ghost)
+			lines.append(block.text());
+	}
+	return lines;
 }
 
 bool FileCompareView::runDiff(QString *error)
 {
-	// Diff the current pane contents through temp files (the engine's
-	// diff core operates on files, like upstream does for edited buffers).
+	// Diff the real pane contents through temp files (the engine's diff
+	// core operates on files, like upstream does for edited buffers).
 	QTemporaryFile temp[3];
 	PathContext paths;
 	paths.SetSize(m_paneCount);
 	for (int i = 0; i < m_paneCount; ++i)
 	{
+		m_realLines[i] = collectRealLines(i);
 		if (!temp[i].open())
 		{
 			if (error != nullptr)
 				*error = tr("cannot create temporary file");
 			return false;
 		}
-		const QByteArray bytes = m_panes[i]->toPlainText().toUtf8();
+		const QByteArray bytes = m_realLines[i].join(QChar('\n')).toUtf8();
 		temp[i].write(bytes);
 		temp[i].flush();
 		paths.SetPath(i, temp[i].fileName().toStdString(), false);
@@ -322,12 +460,146 @@ bool FileCompareView::runDiff(QString *error)
 		m_blocks.push_back(block);
 	}
 	m_diffStale = false;
+	rebuildAlignment();
 	computeWordSpans();
 	return true;
 }
 
-/** Intra-line (word-level) diff spans for every changed block, computed
-    once per diff run with the engine's stringdiffs. */
+/** Pad every diff block with ghost lines so the panes stay aligned
+    line-by-line, WinMerge style. Rebuilds the pane documents only when
+    the alignment actually changed (a rebuild clears the undo history). */
+void FileCompareView::rebuildAlignment()
+{
+	QStringList newLines[3];
+	QList<bool> newFlags[3];
+	int realPos[3] = {};
+	int viewPos = 0;
+	for (int side = 0; side < m_paneCount; ++side)
+		m_realToView[side].clear();
+
+	for (Block &block : m_blocks)
+	{
+		// identical region before this block: every side advances equally
+		const int commonLen = qMax(0, block.begin[0] - realPos[0]);
+		for (int side = 0; side < m_paneCount; ++side)
+		{
+			for (int k = 0; k < commonLen && realPos[side] < m_realLines[side].size(); ++k)
+			{
+				m_realToView[side].push_back(viewPos + k);
+				newLines[side].append(m_realLines[side].at(realPos[side]++));
+				newFlags[side].append(false);
+			}
+		}
+		viewPos += commonLen;
+
+		int maxLen = 0;
+		for (int side = 0; side < m_paneCount; ++side)
+			maxLen = qMax(maxLen, block.end[side] - block.begin[side] + 1);
+		block.viewBegin = viewPos;
+		block.viewEnd = viewPos + maxLen - 1;
+		for (int side = 0; side < m_paneCount; ++side)
+		{
+			const int len = qMax(0, block.end[side] - block.begin[side] + 1);
+			for (int k = 0; k < len; ++k)
+			{
+				m_realToView[side].push_back(viewPos + k);
+				newLines[side].append(m_realLines[side].at(realPos[side]++));
+				newFlags[side].append(false);
+			}
+			for (int k = len; k < maxLen; ++k)
+			{
+				newLines[side].append(QString());
+				newFlags[side].append(true);
+			}
+		}
+		viewPos += maxLen;
+	}
+	// identical tail
+	int tailLen = 0;
+	for (int side = 0; side < m_paneCount; ++side)
+		tailLen = qMax(tailLen, static_cast<int>(m_realLines[side].size()) - realPos[side]);
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		while (realPos[side] < m_realLines[side].size())
+		{
+			m_realToView[side].push_back(newLines[side].size());
+			newLines[side].append(m_realLines[side].at(realPos[side]++));
+			newFlags[side].append(false);
+		}
+		while (newLines[side].size() < viewPos + tailLen)
+		{
+			newLines[side].append(QString());
+			newFlags[side].append(true);
+		}
+	}
+
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		QTextDocument *doc = m_panes[side]->document();
+		QList<bool> oldFlags;
+		const QStringList oldLines = collectRealLines(side, &oldFlags);
+		Q_UNUSED(oldLines);
+		QStringList currentViewLines;
+		for (QTextBlock b = doc->begin(); b.isValid(); b = b.next())
+			currentViewLines.append(b.text());
+
+		const bool changed = currentViewLines != newLines[side]
+			|| oldFlags != newFlags[side];
+		if (changed)
+		{
+			const bool wasModified = doc->isModified();
+			const int vScroll = m_panes[side]->verticalScrollBar()->value();
+			const int hScroll = m_panes[side]->horizontalScrollBar()->value();
+			m_syncing = true;
+			m_panes[side]->setPlainText(newLines[side].join(QChar('\n')));
+			int idx = 0;
+			for (QTextBlock b = doc->begin(); b.isValid(); b = b.next(), ++idx)
+				b.setUserData(idx < newFlags[side].size() && newFlags[side].at(idx)
+					? new GhostBlockData : nullptr);
+			doc->setModified(wasModified);
+			m_panes[side]->verticalScrollBar()->setValue(vScroll);
+			m_panes[side]->horizontalScrollBar()->setValue(hScroll);
+			m_syncing = false;
+		}
+
+		// gutter numbering: real numbers, blanks on ghosts
+		m_lineNumbers[side].clear();
+		int realNo = 0;
+		for (int v = 0; v < newFlags[side].size(); ++v)
+			m_lineNumbers[side].append(newFlags[side].at(v) ? -1 : ++realNo);
+		m_panes[side]->setLineNumbers(m_lineNumbers[side]);
+		updatePaneStatus(side);
+	}
+}
+
+/** Rebuild the real<->view maps of one side from the live document (used
+    after in-place merges, when the alignment is known to be unchanged). */
+void FileCompareView::refreshSideMaps(int side)
+{
+	m_realToView[side].clear();
+	m_lineNumbers[side].clear();
+	int view = 0, realNo = 0;
+	for (QTextBlock block = m_panes[side]->document()->begin();
+		block.isValid(); block = block.next(), ++view)
+	{
+		if (isGhostBlock(block))
+		{
+			m_lineNumbers[side].append(-1);
+		}
+		else
+		{
+			m_realToView[side].push_back(view);
+			m_lineNumbers[side].append(++realNo);
+		}
+	}
+	m_panes[side]->setLineNumbers(m_lineNumbers[side]);
+	m_realLines[side] = collectRealLines(side);
+}
+
+/** Intra-line (word-level) diff spans, computed like upstream's
+    CMergeDoc::GetWordDiffArrayInRange: the whole diff block is joined per
+    side and diffed once, so the marks stay meaningful even when the sides
+    have different line counts. */
 void FileCompareView::computeWordSpans()
 {
 	m_wordSpans.clear();
@@ -336,54 +608,68 @@ void FileCompareView::computeWordSpans()
 	for (size_t b = 0; b < m_blocks.size(); ++b)
 	{
 		const Block &block = m_blocks[b];
-		if (block.trivial)
+		if (block.trivial || block.resolved)
 			continue;
-		int pairs = INT_MAX;
+
+		QList<QByteArray> lineBytes[3];
+		String joined[3];
+		std::vector<int> lineStart[3];
+		bool tooBig = false;
+		int nonEmptySides = 0;
 		for (int side = 0; side < m_paneCount; ++side)
 		{
-			const int count = block.end[side] - block.begin[side] + 1;
-			pairs = qMin(pairs, count);
+			String &text = joined[side];
+			for (int line = block.begin[side]; line <= block.end[side]; ++line)
+			{
+				if (line < 0 || line >= m_realLines[side].size())
+					continue;
+				lineStart[side].push_back(static_cast<int>(text.size()));
+				const QByteArray utf8 = m_realLines[side].at(line).toUtf8();
+				lineBytes[side].append(utf8);
+				text.append(utf8.constData(), utf8.size());
+				text += '\n';
+			}
+			if (!text.empty())
+				++nonEmptySides;
+			if (text.size() > kMaxWordDiffBlockBytes)
+				tooBig = true;
 		}
-		if (pairs <= 0 || pairs > kMaxWordDiffLinesPerBlock)
-			continue; // insertion/deletion: whole-line highlight is enough
+		if (tooBig || nonEmptySides < 2)
+			continue;
 
-		for (int k = 0; k < pairs; ++k)
+		const std::vector<strdiff::wdiff> wdiffs = strdiff::ComputeWordDiffs(
+			m_paneCount, joined,
+			!options.bIgnoreCase, strdiff::EOL_STRICT,
+			options.nIgnoreWhitespace, options.bIgnoreNumbers,
+			kBreakType, false /*byte_level*/);
+
+		for (const strdiff::wdiff &wd : wdiffs)
 		{
-			int lineNo[3] = {};
-			QString lines[3];
-			String engineLines[3];
-			bool tooLong = false, allEqual = true;
+			int sidesWithText = 0;
+			for (int side = 0; side < m_paneCount; ++side)
+				if (wd.end[side] >= wd.begin[side])
+					++sidesWithText;
+			const bool oneSided = (sidesWithText == 1);
+
 			for (int side = 0; side < m_paneCount; ++side)
 			{
-				lineNo[side] = block.begin[side] + k;
-				lines[side] = m_panes[side]->document()
-					->findBlockByNumber(lineNo[side]).text();
-				if (lines[side].size() > kMaxWordDiffLineLength)
-					tooLong = true;
-				if (side > 0 && lines[side] != lines[0])
-					allEqual = false;
-				engineLines[side] = lines[side].toStdString();
-			}
-			if (tooLong || allEqual)
-				continue;
-
-			const std::vector<strdiff::wdiff> wdiffs = strdiff::ComputeWordDiffs(
-				m_paneCount, engineLines,
-				!options.bIgnoreCase, strdiff::EOL_STRICT,
-				options.nIgnoreWhitespace, options.bIgnoreNumbers,
-				0 /*breakType*/, false /*byte_level*/);
-
-			for (const strdiff::wdiff &wd : wdiffs)
-			{
-				for (int side = 0; side < m_paneCount; ++side)
+				if (wd.end[side] < wd.begin[side])
+					continue;
+				// split the byte range on the '\n' joins, one span per line
+				for (int li = 0; li < static_cast<int>(lineStart[side].size()); ++li)
 				{
-					if (wd.end[side] < wd.begin[side])
-						continue; // nothing on this side
+					const int start = lineStart[side][li];
+					const int len = lineBytes[side].at(li).size();
+					const int b0 = qMax(wd.begin[side], start) - start;
+					const int b1 = qMin(wd.end[side], start + len - 1) - start;
+					if (b1 < b0 || b0 >= len)
+						continue;
 					WordSpan span;
 					span.side = side;
-					span.line = lineNo[side];
+					span.line = block.begin[side] + li;
 					span.blockIndex = static_cast<int>(b);
-					byteRangeToU16(lines[side], wd.begin[side], wd.end[side],
+					span.oneSided = oneSided;
+					byteRangeToU16(m_realLines[side].at(span.line), b0, b1,
 						&span.start, &span.length);
 					if (span.length > 0)
 						m_wordSpans.push_back(span);
@@ -398,57 +684,61 @@ void FileCompareView::applyHighlights()
 	for (int side = 0; side < m_paneCount; ++side)
 	{
 		QList<QTextEdit::ExtraSelection> selections;
+		QHash<int, QColor> gutterColors;
 		QTextDocument *doc = m_panes[side]->document();
+
+		auto addLineSelection = [&](int viewLine, const QColor &color) {
+			const QTextBlock textBlock = doc->findBlockByNumber(viewLine);
+			if (!textBlock.isValid())
+				return;
+			QTextEdit::ExtraSelection selection;
+			selection.format.setBackground(color);
+			selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+			selection.cursor = QTextCursor(textBlock);
+			selections.append(selection);
+			gutterColors.insert(viewLine, color);
+		};
+
 		for (size_t b = 0; b < m_blocks.size(); ++b)
 		{
 			const Block &block = m_blocks[b];
 			const bool current = (static_cast<int>(b) == m_current);
-			const bool empty = block.end[side] < block.begin[side];
-			QColor color = block.trivial ? kTrivialColor
-				: (current ? kCurrentDiffColor : kDiffColor);
-			int first = block.begin[side];
-			int last = empty ? block.begin[side] - 1 : block.end[side];
-			if (empty)
+			const int len = qMax(0, block.end[side] - block.begin[side] + 1);
+			for (int v = block.viewBegin; v <= block.viewEnd; ++v)
 			{
-				color = current ? kCurrentDiffColor : kMissingColor;
-				first = last = qMax(0, block.begin[side] - 1);
-			}
-			for (int line = first; line <= last; ++line)
-			{
-				const QTextBlock textBlock = doc->findBlockByNumber(line);
-				if (!textBlock.isValid())
-					continue;
-				QTextEdit::ExtraSelection selection;
-				selection.format.setBackground(color);
-				selection.format.setProperty(QTextFormat::FullWidthSelection, true);
-				selection.cursor = QTextCursor(textBlock);
-				selections.append(selection);
+				const bool ghost = (v - block.viewBegin) >= len;
+				QColor color;
+				if (block.trivial)
+					color = ghost ? kTrivialDeleted : kTrivial;
+				else if (block.resolved)
+				{
+					if (!ghost)
+						continue; // merged: real lines look like common text
+					color = kTrivialDeleted;
+				}
+				else if (current)
+					color = ghost ? kSelDiffDeleted : kSelDiff;
+				else
+					color = ghost ? kDiffDeleted : kDiff;
+				addLineSelection(v, color);
 			}
 		}
-
-		// mirror the line colors in the gutter
-		QHash<int, QColor> gutterColors;
-		for (const Block &block : m_blocks)
-		{
-			if (block.end[side] < block.begin[side])
-				continue;
-			const QColor color = block.trivial ? kTrivialColor : kDiffColor;
-			for (int line = block.begin[side]; line <= block.end[side]; ++line)
-				gutterColors.insert(line, color);
-		}
-		m_panes[side]->setGutterLineColors(gutterColors);
 
 		// word-level spans on top of the line backgrounds
 		for (const WordSpan &span : m_wordSpans)
 		{
-			if (span.side != side)
+			if (span.side != side
+				|| span.line >= static_cast<int>(m_realToView[side].size()))
 				continue;
-			const QTextBlock textBlock = doc->findBlockByNumber(span.line);
+			const QTextBlock textBlock = doc->findBlockByNumber(
+				m_realToView[side][span.line]);
 			if (!textBlock.isValid())
 				continue;
+			const bool current = (span.blockIndex == m_current);
 			QTextEdit::ExtraSelection selection;
-			selection.format.setBackground(span.blockIndex == m_current
-				? kWordDiffCurrentColor : kWordDiffColor);
+			selection.format.setBackground(current
+				? (span.oneSided ? kSelWordDiffDeleted : kSelWordDiff)
+				: (span.oneSided ? kWordDiffDeleted : kWordDiff));
 			QTextCursor cursor(textBlock);
 			cursor.setPosition(textBlock.position() + span.start);
 			cursor.setPosition(textBlock.position() + span.start + span.length,
@@ -457,30 +747,43 @@ void FileCompareView::applyHighlights()
 			selections.append(selection);
 		}
 		m_panes[side]->setExtraSelections(selections);
+		m_panes[side]->setGutterLineColors(gutterColors);
 	}
 
-	// location pane: one band per block side
+	// location pane: real content and ghost filler get separate bands
 	std::vector<LocationPane::Band> bands;
 	for (size_t b = 0; b < m_blocks.size(); ++b)
 	{
 		const Block &block = m_blocks[b];
+		const bool current = (static_cast<int>(b) == m_current);
 		for (int side = 0; side < m_paneCount; ++side)
 		{
-			LocationPane::Band band;
-			band.side = side;
-			const bool empty = block.end[side] < block.begin[side];
-			band.firstLine = empty ? qMax(0, block.begin[side] - 1) : block.begin[side];
-			band.lastLine = empty ? band.firstLine : block.end[side];
-			band.color = block.trivial ? kTrivialColor
-				: (static_cast<int>(b) == m_current ? kWordDiffCurrentColor
-					: (empty ? kMissingColor : kDiffColor));
-			bands.push_back(band);
+			const int len = qMax(0, block.end[side] - block.begin[side] + 1);
+			if (len > 0 && !block.resolved)
+			{
+				LocationPane::Band band;
+				band.side = side;
+				band.firstLine = block.viewBegin;
+				band.lastLine = block.viewBegin + len - 1;
+				band.color = block.trivial ? kTrivial
+					: (current ? kSelDiff : kDiff);
+				bands.push_back(band);
+			}
+			if (len <= block.viewEnd - block.viewBegin)
+			{
+				LocationPane::Band band;
+				band.side = side;
+				band.firstLine = block.viewBegin + len;
+				band.lastLine = block.viewEnd;
+				band.color = block.trivial || block.resolved
+					? kTrivialDeleted
+					: (current ? kSelDiffDeleted : kDiffDeleted);
+				bands.push_back(band);
+			}
 		}
 	}
-	int totalLines = 1;
-	for (int side = 0; side < m_paneCount; ++side)
-		totalLines = qMax(totalLines, m_panes[side]->document()->blockCount());
-	m_locationPane->setBands(std::move(bands), totalLines);
+	m_locationPane->setBands(std::move(bands),
+		qMax(1, m_panes[0]->document()->blockCount()));
 	m_locationPane->setViewport(m_panes[0]->firstVisibleLine(),
 		m_panes[0]->visibleLineCount());
 }
@@ -498,12 +801,12 @@ void FileCompareView::updateStatus()
 		if (m_current >= 0)
 		{
 			for (int b = 0; b <= m_current && b < static_cast<int>(m_blocks.size()); ++b)
-				if (!m_blocks[b].trivial)
+				if (!m_blocks[b].trivial && !m_blocks[b].resolved)
 					++index;
 		}
 		text = index > 0
 			? tr("Difference %1 of %2").arg(index).arg(m_diffCount)
-			: tr("%n difference(s)", nullptr, m_diffCount);
+			: tr("%n difference(s) found", nullptr, m_diffCount);
 	}
 	bool modified = false;
 	for (int side = 0; side < m_paneCount; ++side)
@@ -513,10 +816,53 @@ void FileCompareView::updateStatus()
 	m_status->setText(text);
 }
 
-int FileCompareView::nextNonTrivial(int from, int direction) const
+void FileCompareView::updatePaneStatus(int side)
+{
+	const QTextCursor cursor = m_panes[side]->textCursor();
+	const int viewLine = cursor.blockNumber();
+	int realLine = viewLine + 1;
+	if (!m_lineNumbers[side].isEmpty() && viewLine < m_lineNumbers[side].size())
+	{
+		realLine = m_lineNumbers[side].at(viewLine);
+		for (int v = viewLine; realLine < 0 && v >= 0; --v)
+			realLine = m_lineNumbers[side].at(v);
+		if (realLine < 0)
+			realLine = 1;
+	}
+	const int col = cursor.positionInBlock() + 1;
+	// like WinMerge, the maximum column is the line length + 1
+	const int maxCol = qMax(1, cursor.block().length());
+	m_posLabels[side]->setText(tr("Lin: %1  Col: %2/%3  Car: %2/%3")
+		.arg(realLine).arg(col).arg(maxCol));
+}
+
+void FileCompareView::updateHeader(int side)
+{
+	const Side &s = m_sides[side];
+	static_cast<ElidedLabel *>(m_headers[side])->setFullText(
+		(s.modified ? QStringLiteral("* ") : QString()) + s.path);
+}
+
+void FileCompareView::updateHeaderStyles()
+{
+	int active = 0;
+	for (int i = 0; i < m_paneCount; ++i)
+		if (m_panes[i]->hasFocus())
+			active = i;
+	for (int i = 0; i < 3; ++i)
+	{
+		m_headers[i]->setStyleSheet(i == active
+			? QStringLiteral("QLabel { background: #d6e4f5; color: #101010;"
+				" border: 1px solid #a0b0c8; font-weight: 600; }")
+			: QStringLiteral("QLabel { background: #ececec; color: #404040;"
+				" border: 1px solid #c0c0c0; }"));
+	}
+}
+
+int FileCompareView::nextActive(int from, int direction) const
 {
 	for (int b = from + direction; b >= 0 && b < static_cast<int>(m_blocks.size()); b += direction)
-		if (!m_blocks[b].trivial)
+		if (!m_blocks[b].trivial && !m_blocks[b].resolved)
 			return b;
 	return -1;
 }
@@ -528,8 +874,8 @@ void FileCompareView::gotoDiff(int blockIndex)
 	m_current = blockIndex;
 	for (int side = 0; side < m_paneCount; ++side)
 	{
-		const int line = m_blocks[blockIndex].begin[side];
-		QTextCursor cursor(m_panes[side]->document()->findBlockByNumber(qMax(0, line)));
+		QTextCursor cursor(m_panes[side]->document()->findBlockByNumber(
+			qMax(0, m_blocks[blockIndex].viewBegin)));
 		m_syncing = true;
 		m_panes[side]->setTextCursor(cursor);
 		m_panes[side]->centerCursor();
@@ -543,7 +889,7 @@ void FileCompareView::gotoNextDiff()
 {
 	if (m_diffStale)
 		recompare();
-	const int next = nextNonTrivial(m_current, +1);
+	const int next = nextActive(m_current, +1);
 	if (next >= 0)
 		gotoDiff(next);
 }
@@ -552,7 +898,7 @@ void FileCompareView::gotoPrevDiff()
 {
 	if (m_diffStale)
 		recompare();
-	const int prev = nextNonTrivial(m_current < 0 ? static_cast<int>(m_blocks.size()) : m_current, -1);
+	const int prev = nextActive(m_current < 0 ? static_cast<int>(m_blocks.size()) : m_current, -1);
 	if (prev >= 0)
 		gotoDiff(prev);
 }
@@ -562,11 +908,7 @@ void FileCompareView::recompare()
 	QString error;
 	if (!runDiff(&error))
 		return;
-	if (m_current >= static_cast<int>(m_blocks.size()) || m_current < 0
-		|| m_blocks.empty())
-		m_current = nextNonTrivial(-1, +1);
-	else if (m_blocks[m_current].trivial)
-		m_current = nextNonTrivial(m_current, +1);
+	m_current = -1;
 	applyHighlights();
 	updateStatus();
 }
@@ -577,9 +919,13 @@ void FileCompareView::copyCurrentDiff(int sourceSide)
 		recompare();
 	if (sourceSide >= m_paneCount)
 		return;
+	if (m_current < 0)
+		m_current = nextActive(-1, +1);
 	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
 		return;
-	const Block block = m_blocks[m_current];
+	Block &block = m_blocks[m_current];
+	if (block.trivial || block.resolved)
+		return;
 	const int target = mergeTarget(sourceSide);
 	if (m_readOnly[target])
 	{
@@ -587,93 +933,71 @@ void FileCompareView::copyCurrentDiff(int sourceSide)
 		return;
 	}
 
-	// Collect the source block's lines
+	// the panes are ghost-aligned: the block occupies the same view range
+	// everywhere, so the merge is an equal-length line replacement
+	QTextDocument *srcDoc = m_panes[sourceSide]->document();
+	QTextDocument *tgtDoc = m_panes[target]->document();
 	QStringList newLines;
-	if (block.end[sourceSide] >= block.begin[sourceSide])
+	QList<bool> ghost;
+	for (int v = block.viewBegin; v <= block.viewEnd; ++v)
 	{
-		QTextDocument *doc = m_panes[sourceSide]->document();
-		for (int line = block.begin[sourceSide]; line <= block.end[sourceSide]; ++line)
-			newLines.append(doc->findBlockByNumber(line).text());
+		const QTextBlock b = srcDoc->findBlockByNumber(v);
+		newLines.append(b.text());
+		ghost.append(isGhostBlock(b));
 	}
 
-	spliceLines(target, block.begin[target], block.end[target], newLines);
+	const QTextBlock firstBlock = tgtDoc->findBlockByNumber(block.viewBegin);
+	const QTextBlock lastBlock = tgtDoc->findBlockByNumber(block.viewEnd);
+	if (!firstBlock.isValid() || !lastBlock.isValid())
+		return;
+	m_syncing = true;
+	QTextCursor cursor(tgtDoc);
+	cursor.beginEditBlock();
+	cursor.setPosition(firstBlock.position());
+	cursor.setPosition(lastBlock.position() + lastBlock.length() - 1,
+		QTextCursor::KeepAnchor);
+	cursor.insertText(newLines.join(QChar('\n')));
+	cursor.endEditBlock();
+	for (int v = block.viewBegin; v <= block.viewEnd; ++v)
+		tgtDoc->findBlockByNumber(v).setUserData(
+			ghost.at(v - block.viewBegin) ? new GhostBlockData : nullptr);
+	m_syncing = false;
+
+	// update the model in place (a full recompare would rebuild the
+	// documents and clear the undo history)
+	const int srcLen = qMax(0, block.end[sourceSide] - block.begin[sourceSide] + 1);
+	const int tgtLen = qMax(0, block.end[target] - block.begin[target] + 1);
+	const int delta = srcLen - tgtLen;
+	block.end[target] = block.begin[target] + srcLen - 1;
+	for (size_t b2 = m_current + 1; b2 < m_blocks.size(); ++b2)
+	{
+		m_blocks[b2].begin[target] += delta;
+		m_blocks[b2].end[target] += delta;
+	}
+	block.resolved = true;
+	--m_diffCount;
+	m_wordSpans.erase(std::remove_if(m_wordSpans.begin(), m_wordSpans.end(),
+		[this](const WordSpan &s) { return s.blockIndex == m_current; }),
+		m_wordSpans.end());
+	// spans of later blocks reference real line numbers, which shifted
+	for (WordSpan &s : m_wordSpans)
+		if (s.blockIndex > m_current && s.side == target)
+			s.line += delta;
+	refreshSideMaps(target);
 	setSideModified(target, true);
 
-	recompare();
-	// land on the difference that now occupies this position (or the next one)
-	int next = -1;
-	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
-	{
-		if (!m_blocks[b].trivial && m_blocks[b].begin[sourceSide] >= block.begin[sourceSide])
-		{
-			next = b;
-			break;
-		}
-	}
+	// land on the next remaining difference
+	int next = nextActive(m_current, +1);
 	if (next < 0)
-		next = nextNonTrivial(static_cast<int>(m_blocks.size()), -1);
+		next = nextActive(m_current, -1);
 	if (next >= 0)
 		gotoDiff(next);
-}
-
-/** Replace lines [firstLine..lastLine] (inclusive; last < first inserts at
-    firstLine) with newLines, as a single undoable edit. */
-void FileCompareView::spliceLines(int side, int firstLine, int lastLine,
-	const QStringList &newLines)
-{
-	QTextDocument *doc = m_panes[side]->document();
-	const int blockCount = doc->blockCount();
-	const bool removing = lastLine >= firstLine;
-
-	QTextCursor cursor(doc);
-	cursor.beginEditBlock();
-	m_syncing = true; // suppress per-keystroke stale marking; we recompare below
-
-	if (removing)
+	else
 	{
-		const QTextBlock firstBlock = doc->findBlockByNumber(firstLine);
-		cursor.setPosition(firstBlock.position());
-		if (lastLine + 1 < blockCount)
-		{
-			cursor.setPosition(doc->findBlockByNumber(lastLine + 1).position(),
-				QTextCursor::KeepAnchor);
-		}
-		else
-		{
-			cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
-			// also remove the newline preceding the removed tail block
-			if (firstLine > 0 && newLines.isEmpty())
-			{
-				const int prevEnd = doc->findBlockByNumber(firstLine - 1).position()
-					+ doc->findBlockByNumber(firstLine - 1).length() - 1;
-				cursor.setPosition(prevEnd);
-				cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
-			}
-		}
-		cursor.removeSelectedText();
-		if (!newLines.isEmpty())
-		{
-			const bool atEnd = lastLine + 1 >= blockCount;
-			cursor.insertText(newLines.join(QChar('\n')) + (atEnd ? QString() : QStringLiteral("\n")));
-		}
+		m_current = -1;
+		applyHighlights();
+		updateStatus();
 	}
-	else if (!newLines.isEmpty())
-	{
-		// pure insertion before firstLine (or append at the end)
-		if (firstLine < blockCount)
-		{
-			cursor.setPosition(doc->findBlockByNumber(firstLine).position());
-			cursor.insertText(newLines.join(QChar('\n')) + QStringLiteral("\n"));
-		}
-		else
-		{
-			cursor.movePosition(QTextCursor::End);
-			cursor.insertText(QStringLiteral("\n") + newLines.join(QChar('\n')));
-		}
-	}
-
-	m_syncing = false;
-	cursor.endEditBlock();
 }
 
 void FileCompareView::setReadOnlySides(const QList<bool> &readOnly)
@@ -696,6 +1020,7 @@ void FileCompareView::setSideModified(int side, bool modified)
 	m_sides[side].modified = modified;
 	if (m_actSave != nullptr)
 		m_actSave->setEnabled(isModified());
+	updateHeader(side);
 	updateStatus();
 	if (was != isModified())
 		emit modifiedChanged(isModified());
@@ -726,7 +1051,8 @@ bool FileCompareView::saveSide(int side, QString *error)
 	file.SetBom(s.bom);
 	file.WriteBom();
 
-	const QStringList lines = m_panes[side]->toPlainText().split(QChar('\n'));
+	// ghost alignment lines are visual only: never write them
+	const QStringList lines = collectRealLines(side);
 	const std::string eol = s.eol.toStdString();
 	for (int i = 0; i < lines.size(); ++i)
 	{
@@ -751,6 +1077,19 @@ void FileCompareView::syncScroll(int pane, int value)
 	{
 		if (i != pane)
 			m_panes[i]->verticalScrollBar()->setValue(value);
+	}
+	m_syncing = false;
+}
+
+void FileCompareView::syncHScroll(int pane, int value)
+{
+	if (m_syncing)
+		return;
+	m_syncing = true;
+	for (int i = 0; i < m_paneCount; ++i)
+	{
+		if (i != pane)
+			m_panes[i]->horizontalScrollBar()->setValue(value);
 	}
 	m_syncing = false;
 }

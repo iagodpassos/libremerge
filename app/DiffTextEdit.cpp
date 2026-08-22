@@ -58,6 +58,12 @@ void DiffTextEdit::setGutterLineColors(const QHash<int, QColor> &colors)
 	m_gutter->update();
 }
 
+void DiffTextEdit::setLineNumbers(const QList<int> &numbers)
+{
+	m_lineNumbers = numbers;
+	m_gutter->update();
+}
+
 int DiffTextEdit::gutterWidth() const
 {
 	int digits = 1;
@@ -107,9 +113,16 @@ void DiffTextEdit::paintGutter(QPaintEvent *event)
 			const auto colorIt = m_lineColors.constFind(blockNumber);
 			if (colorIt != m_lineColors.constEnd())
 				painter.fillRect(0, top, width, bottom - top, colorIt.value());
-			painter.setPen(palette().color(QPalette::PlaceholderText));
-			painter.drawText(0, top, width - 6, bottom - top,
-				Qt::AlignRight | Qt::AlignVCenter, QString::number(blockNumber + 1));
+			int number = blockNumber + 1;
+			if (!m_lineNumbers.isEmpty())
+				number = blockNumber < m_lineNumbers.size()
+					? m_lineNumbers.at(blockNumber) : -1;
+			if (number > 0)
+			{
+				painter.setPen(palette().color(QPalette::PlaceholderText));
+				painter.drawText(0, top, width - 6, bottom - top,
+					Qt::AlignRight | Qt::AlignVCenter, QString::number(number));
+			}
 		}
 		block = block.next();
 		top = bottom;
