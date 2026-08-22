@@ -1688,6 +1688,23 @@ bool FileCompareView::saveModified(QString *error)
 bool FileCompareView::saveSide(int side, QString *error)
 {
 	const Side &s = m_sides[side];
+
+	// like WinMerge (OPT_BACKUP_FILECMP, on by default): keep the
+	// original as <name>.bak next to it before overwriting
+	if (QSettings().value(QStringLiteral("Backup/FileCompare"), true).toBool()
+		&& QFile::exists(s.path))
+	{
+		const QString backupPath = s.path + QStringLiteral(".bak");
+		QFile::remove(backupPath);
+		if (!QFile::copy(s.path, backupPath))
+		{
+			if (error != nullptr)
+				*error = tr("could not create the backup file %1")
+					.arg(backupPath);
+			return false;
+		}
+	}
+
 	UniStdioFile file;
 	if (!file.OpenCreate(s.path.toStdString()))
 	{

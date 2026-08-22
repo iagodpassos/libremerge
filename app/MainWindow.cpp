@@ -10,6 +10,7 @@
 #include <QDragEnterEvent>
 #include <QFileOpenEvent>
 #include <QMimeData>
+#include <QSettings>
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -304,15 +305,22 @@ void MainWindow::showOptions()
 	algorithm->setCurrentIndex(mgr->GetInt(OPT_CMP_DIFF_ALGORITHM));
 	grid->addWidget(algorithm, 5, 1);
 
+	// like WinMerge's OPT_BACKUP_FILECMP, on by default
+	auto *backup = new QCheckBox(
+		tr("Back up the original file when saving (.bak)"), &dialog);
+	backup->setChecked(QSettings()
+		.value(QStringLiteral("Backup/FileCompare"), true).toBool());
+	grid->addWidget(backup, 6, 0, 1, 2);
+
 	auto *note = new QLabel(tr("Open comparisons pick the new options up on "
 		"Recompare (F5) or when reopened."), &dialog);
 	note->setWordWrap(true);
-	grid->addWidget(note, 6, 0, 1, 2);
+	grid->addWidget(note, 7, 0, 1, 2);
 
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
 	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-	grid->addWidget(buttons, 7, 0, 1, 2);
+	grid->addWidget(buttons, 8, 0, 1, 2);
 
 	if (dialog.exec() != QDialog::Accepted)
 		return;
@@ -324,6 +332,8 @@ void MainWindow::showOptions()
 	mgr->SaveOption(OPT_CMP_IGNORE_NUMBERS, ignoreNumbers->isChecked());
 	mgr->SaveOption(OPT_CMP_DIFF_ALGORITHM, algorithm->currentIndex());
 	mgr->FlushOptions();
+	QSettings().setValue(QStringLiteral("Backup/FileCompare"),
+		backup->isChecked());
 }
 
 void MainWindow::newComparison()

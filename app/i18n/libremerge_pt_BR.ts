@@ -240,6 +240,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         </translation>
     </message>
     <message>
+        <source>could not create the backup file %1</source>
+        <translation>não foi possível criar o arquivo de backup %1</translation>
+    </message>
+    <message>
         <source>cannot write %1</source>
         <translation>não foi possível gravar %1</translation>
     </message>
@@ -609,6 +613,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>None</source>
         <translation>Nenhum</translation>
+    </message>
+    <message>
+        <source>Back up the original file when saving (.bak)</source>
+        <translation>Fazer backup do arquivo original ao salvar (.bak)</translation>
     </message>
     <message>
         <source>Open comparisons pick the new options up on Recompare (F5) or when reopened.</source>

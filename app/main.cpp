@@ -64,7 +64,44 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestMergeAllOpt(QStringLiteral("selftest-merge-all"),
 		QStringLiteral("Copy all differences at once left-to-right and verify (for testing)"));
 	parser.addOption(selftestMergeAllOpt);
+	QCommandLineOption selftestSaveOpt(QStringLiteral("selftest-save"),
+		QStringLiteral("Merge left-to-right, save and verify the backup (for testing)"));
+	parser.addOption(selftestSaveOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestSaveOpt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 2)
+			return 2;
+		QFile rightBefore(files.at(1));
+		rightBefore.open(QIODevice::ReadOnly);
+		const QByteArray originalRight = rightBefore.readAll();
+		rightBefore.close();
+
+		FileCompareView view;
+		QString error;
+		if (!view.compare(files.at(0), files.at(1), &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		view.copyAllFrom(0);
+		if (!view.saveModified(&error))
+		{
+			fprintf(stderr, "save failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		QFile leftFile(files.at(0)), rightFile(files.at(1));
+		QFile backupFile(files.at(1) + QStringLiteral(".bak"));
+		leftFile.open(QIODevice::ReadOnly);
+		rightFile.open(QIODevice::ReadOnly);
+		const bool merged = leftFile.readAll() == rightFile.readAll();
+		bool backupOk = backupFile.open(QIODevice::ReadOnly)
+			&& backupFile.readAll() == originalRight;
+		printf("merged: %d, backup: %d\n", merged, backupOk);
+		return (merged && backupOk) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestMergeAllOpt))
 	{
