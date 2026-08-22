@@ -7,7 +7,9 @@
 #include <vector>
 
 class QAction;
+class QCheckBox;
 class QLabel;
+class QLineEdit;
 class QPlainTextEdit;
 class QToolButton;
 class DiffTextEdit;
@@ -57,6 +59,8 @@ public:
 	void swapSides();
 	void undoActive();
 	void redoActive();
+	void showFindBar();
+	void findNext(bool backward);
 	void recompare();
 	bool saveModified(QString *error);
 
@@ -119,6 +123,8 @@ private:
 	void gotoDiff(int blockIndex);
 	int nextActive(int from, int direction) const;
 	void applyBlockCopy(int blockIndex, int sourceSide, bool joinUndo);
+	void replaceOne();
+	void replaceAll();
 	void showHeaderMenu(int side);
 	void editCaption(int side);
 	void changeSideFile(int side, const QString &path);
@@ -155,4 +161,9 @@ private:
 	QAction *m_actDiffPane = nullptr;
 	QWidget *m_diffPaneWidget = nullptr;
 	QPlainTextEdit *m_diffPaneEdits[3] = {};
+	QWidget *m_findBar = nullptr;
+	QLineEdit *m_findEdit = nullptr;
+	QLineEdit *m_replaceEdit = nullptr;
+	QCheckBox *m_findCase = nullptr;
+	QLabel *m_findStatus = nullptr;
 };

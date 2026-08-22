@@ -87,6 +87,20 @@ MainWindow::MainWindow(QWidget *parent)
 			view->redoActive();
 	});
 	editMenu->addSeparator();
+	addMenuAction(editMenu, tr("&Find..."), QKeySequence::Find, [fileView]() {
+		if (auto *view = fileView())
+			view->showFindBar();
+	});
+	addMenuAction(editMenu, tr("Find &Next"), QKeySequence::FindNext, [fileView]() {
+		if (auto *view = fileView())
+			view->findNext(false);
+	});
+	addMenuAction(editMenu, tr("Find &Previous"), QKeySequence::FindPrevious,
+		[fileView]() {
+			if (auto *view = fileView())
+				view->findNext(true);
+		});
+	editMenu->addSeparator();
 	QAction *optionsAction = editMenu->addAction(tr("Comparison &Options..."));
 	optionsAction->setMenuRole(QAction::PreferencesRole); // macOS app menu
 	connect(optionsAction, &QAction::triggered, this, &MainWindow::showOptions);
