@@ -37,7 +37,8 @@ void TimeSizeCompare::CompareFiles(DIFFITEM& di) const
 	int64_t nTimeDiff02 = 0;
 	auto roundToSeconds = [](Poco::Timestamp tim) -> int64_t
 		{
-			constexpr auto unit = Poco::Timestamp::resolution();
+			// resolution() is constexpr only in newer Poco releases
+			const auto unit = Poco::Timestamp::resolution();
 			return (tim.epochMicroseconds() / unit) * unit;
 		};
 	if ((m_compMethod == CMP_DATE) || (m_compMethod == CMP_DATE_SIZE))

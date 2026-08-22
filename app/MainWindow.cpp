@@ -2,6 +2,7 @@
 #include "MainWindow.h"
 
 #include <QAction>
+#include <QApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFileDialog>
@@ -91,7 +92,7 @@ void MainWindow::openFileComparison(const QString &leftPath, const QString &righ
 			tr("Could not compare files:\n%1").arg(error));
 		return;
 	}
-	const QString title = QFileInfo(leftPath).fileName() + QStringLiteral(" \xE2\x86\x94 ")
+	const QString title = QFileInfo(leftPath).fileName() + QString::fromUtf8(" \xE2\x86\x94 ")
 		+ QFileInfo(rightPath).fileName();
 	const int index = m_tabs->addTab(view, title);
 	m_tabs->setTabToolTip(index, leftPath + QStringLiteral("\n") + rightPath);

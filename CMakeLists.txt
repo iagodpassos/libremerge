@@ -21,8 +21,20 @@ find_package(Poco REQUIRED COMPONENTS Foundation)
 find_package(Boost REQUIRED CONFIG)
 find_package(ICU REQUIRED COMPONENTS uc i18n)
 
+# Qt (Homebrew keg hint)
+if(APPLE AND EXISTS /opt/homebrew/opt/qt)
+  list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/qt)
+endif()
+
 enable_testing()
 add_subdirectory(engine)
+
+find_package(Qt6 COMPONENTS Widgets QUIET)
+if(Qt6_FOUND)
+  add_subdirectory(app)
+else()
+  message(STATUS "Qt6 not found - building the engine and tests only")
+endif()
 
 find_package(GTest CONFIG QUIET)
 if(NOT GTest_FOUND)
