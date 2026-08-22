@@ -11,6 +11,7 @@ std::array<TextDefinition, static_cast<size_t>(SRC_MAX_ENTRY)> m_SourceDefs =
 {
 	SRC_PLAIN, _T("Plain"), _T("txt;doc;diz"), false, SRCOPT_AUTOINDENT, /*4,*/ _T(""), _T(""), _T(""), (unsigned)-1,
 	SRC_ABAP, _T("ABAP"), _T("abap"), false, SRCOPT_AUTOINDENT | SRCOPT_BRACEANSI , /*2,*/ _T(""), _T(""), _T("'"), (unsigned)-1,
+	SRC_ABL, _T("ABL/Progress 4GL"), _T("p;i;w;cls"), false, SRCOPT_AUTOINDENT, /*4,*/ _T("/*"), _T("*/"), _T("//"), (unsigned)-1,
 	SRC_ADA, _T("Ada"), _T("ads;adb"), false, SRCOPT_AUTOINDENT | SRCOPT_BRACEANSI, /*3,*/ _T(""), _T(""), _T("'"), (unsigned)-1,
 	SRC_ASP, _T("ASP"), _T("asp;ascx"), false, SRCOPT_AUTOINDENT | SRCOPT_BRACEANSI, /*2,*/ _T(""), _T(""), _T("'"), (unsigned)-1,
 	SRC_AUTOIT, _T("AutoIt"), _T("au3"), false, SRCOPT_AUTOINDENT, /*4,*/ _T(""), _T(""), _T(";"), (unsigned)-1,

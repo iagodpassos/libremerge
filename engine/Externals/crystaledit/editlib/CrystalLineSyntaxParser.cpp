@@ -11,6 +11,7 @@ static const std::pair<LanguageId, ParseFunc> m_ParseXDef[] =
 {
 { LanguageId::SRC_PLAIN, CrystalLineParser::ParseLinePlain },
 { LanguageId::SRC_ABAP, CrystalLineParser::ParseLineAbap },
+{ LanguageId::SRC_ABL, CrystalLineParser::ParseLineAbl },
 { LanguageId::SRC_ADA, CrystalLineParser::ParseLineAda },
 { LanguageId::SRC_ASP, CrystalLineParser::ParseLineAsp },
 { LanguageId::SRC_AUTOIT, CrystalLineParser::ParseLineAutoIt },

@@ -27,6 +27,7 @@ enum LanguageId
 {
 	SRC_PLAIN = 0,
 	SRC_ABAP,
+	SRC_ABL,
 	SRC_ADA,
 	SRC_ASP,
 	SRC_AUTOIT,
