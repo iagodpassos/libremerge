@@ -8,6 +8,7 @@
 #include <QCheckBox>
 #include <QClipboard>
 #include <QDesktopServices>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontDatabase>
@@ -474,6 +475,28 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 
 bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 {
+	// refuse binary files up front: silently comparing them as text ends
+	// with a misleading "files are identical" (NUL bytes without a
+	// UTF-16/UTF-32 BOM mean binary, the same heuristic diff uses)
+	{
+		QFile probe(path);
+		if (probe.open(QIODevice::ReadOnly))
+		{
+			const QByteArray head = probe.read(8192);
+			const bool utf16or32Bom = head.startsWith("\xFF\xFE")
+				|| head.startsWith("\xFE\xFF")
+				|| head.startsWith(QByteArray("\x00\x00\xFE\xFF", 4));
+			if (!utf16or32Bom && head.contains('\0'))
+			{
+				if (error != nullptr)
+					*error = tr("%1 appears to be a binary file.\n"
+						"LibreMerge compares text files; binary comparison "
+						"is not supported yet.").arg(path);
+				return false;
+			}
+		}
+	}
+
 	UniMemFile file;
 	if (!file.OpenReadOnly(path.toStdString()))
 	{
@@ -574,6 +597,17 @@ bool FileCompareView::runDiff(QString *error)
 	{
 		if (error != nullptr)
 			*error = tr("the diff engine failed");
+		return false;
+	}
+	DIFFSTATUS status;
+	wrapper.GetDiffStatus(&status);
+	if (status.bBinaries)
+	{
+		// the text diff bailed out; an empty diff list here would show
+		// the misleading "files are identical"
+		if (error != nullptr)
+			*error = tr("the files could not be compared as text");
+		m_status->setText(tr("Binary content \xE2\x80\x94 comparison not supported"));
 		return false;
 	}
 
