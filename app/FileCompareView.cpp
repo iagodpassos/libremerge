@@ -23,6 +23,7 @@
 #include "PathContext.h"
 #include "UniFile.h"
 #include "unicoder.h"
+#include "stringdiffs.h"
 
 namespace
 {
@@ -31,6 +32,49 @@ const QColor kDiffColor(255, 243, 176);        // changed lines
 const QColor kCurrentDiffColor(255, 213, 100); // the selected difference
 const QColor kTrivialColor(230, 230, 230);     // whitespace-only/trivial
 const QColor kMissingColor(224, 236, 255);     // block exists only on other side
+const QColor kWordDiffColor(255, 199, 90);     // changed words within a line
+const QColor kWordDiffCurrentColor(255, 158, 40);
+
+// performance guards for intra-line highlighting
+constexpr int kMaxWordDiffLinesPerBlock = 400;
+constexpr int kMaxWordDiffLineLength = 2048;
+
+/** Map an inclusive UTF-8 byte range from the engine onto UTF-16 offsets
+    of the QString it was encoded from. */
+void byteRangeToU16(const QString &line, int beginByte, int endByte,
+	int *startU16, int *lengthU16)
+{
+	int bytePos = 0;
+	int start = -1, end = -1;
+	const int size = line.size();
+	for (int i = 0; i < size;)
+	{
+		const QChar ch = line.at(i);
+		int u16len = 1;
+		char32_t cp = ch.unicode();
+		if (ch.isHighSurrogate() && i + 1 < size && line.at(i + 1).isLowSurrogate())
+		{
+			cp = QChar::surrogateToUcs4(ch, line.at(i + 1));
+			u16len = 2;
+		}
+		const int u8len = cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+		if (start < 0 && beginByte < bytePos + u8len)
+			start = i;
+		if (endByte < bytePos + u8len)
+		{
+			end = i + u16len;
+			break;
+		}
+		bytePos += u8len;
+		i += u16len;
+	}
+	if (start < 0)
+		start = size;
+	if (end < 0)
+		end = size;
+	*startU16 = start;
+	*lengthU16 = qMax(0, end - start);
+}
 
 } // namespace
 
@@ -207,7 +251,67 @@ bool FileCompareView::runDiff(QString *error)
 		m_blocks.push_back(block);
 	}
 	m_diffStale = false;
+	computeWordSpans();
 	return true;
+}
+
+/** Intra-line (word-level) diff spans for every changed block, computed
+    once per diff run with the engine's stringdiffs. */
+void FileCompareView::computeWordSpans()
+{
+	m_wordSpans.clear();
+	const DIFFOPTIONS options = lm::currentDiffOptions();
+	QTextDocument *docs[2] = { m_panes[0]->document(), m_panes[1]->document() };
+
+	for (size_t b = 0; b < m_blocks.size(); ++b)
+	{
+		const Block &block = m_blocks[b];
+		if (block.trivial)
+			continue;
+		const int count0 = block.end[0] - block.begin[0] + 1;
+		const int count1 = block.end[1] - block.begin[1] + 1;
+		if (count0 <= 0 || count1 <= 0)
+			continue; // insertion/deletion: whole-line highlight is enough
+		const int pairs = qMin(count0, count1);
+		if (pairs > kMaxWordDiffLinesPerBlock)
+			continue;
+
+		for (int k = 0; k < pairs; ++k)
+		{
+			const int lineNo[2] = { block.begin[0] + k, block.begin[1] + k };
+			const QString lines[2] = {
+				docs[0]->findBlockByNumber(lineNo[0]).text(),
+				docs[1]->findBlockByNumber(lineNo[1]).text(),
+			};
+			if (lines[0] == lines[1]
+				|| lines[0].size() > kMaxWordDiffLineLength
+				|| lines[1].size() > kMaxWordDiffLineLength)
+				continue;
+
+			const std::vector<strdiff::wdiff> wdiffs = strdiff::ComputeWordDiffs(
+				lines[0].toStdString(), lines[1].toStdString(),
+				!options.bIgnoreCase, strdiff::EOL_STRICT,
+				options.nIgnoreWhitespace, options.bIgnoreNumbers,
+				0 /*breakType*/, false /*byte_level*/);
+
+			for (const strdiff::wdiff &wd : wdiffs)
+			{
+				for (int side = 0; side < 2; ++side)
+				{
+					if (wd.end[side] < wd.begin[side])
+						continue; // nothing on this side
+					WordSpan span;
+					span.side = side;
+					span.line = lineNo[side];
+					span.blockIndex = static_cast<int>(b);
+					byteRangeToU16(lines[side], wd.begin[side], wd.end[side],
+						&span.start, &span.length);
+					if (span.length > 0)
+						m_wordSpans.push_back(span);
+				}
+			}
+		}
+	}
 }
 
 void FileCompareView::applyHighlights()
@@ -241,6 +345,24 @@ void FileCompareView::applyHighlights()
 				selection.cursor = QTextCursor(textBlock);
 				selections.append(selection);
 			}
+		}
+		// word-level spans on top of the line backgrounds
+		for (const WordSpan &span : m_wordSpans)
+		{
+			if (span.side != side)
+				continue;
+			const QTextBlock textBlock = doc->findBlockByNumber(span.line);
+			if (!textBlock.isValid())
+				continue;
+			QTextEdit::ExtraSelection selection;
+			selection.format.setBackground(span.blockIndex == m_current
+				? kWordDiffCurrentColor : kWordDiffColor);
+			QTextCursor cursor(textBlock);
+			cursor.setPosition(textBlock.position() + span.start);
+			cursor.setPosition(textBlock.position() + span.start + span.length,
+				QTextCursor::KeepAnchor);
+			selection.cursor = cursor;
+			selections.append(selection);
 		}
 		m_panes[side]->setExtraSelections(selections);
 	}

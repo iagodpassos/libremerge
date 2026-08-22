@@ -12,6 +12,7 @@
 #include "OptionsDef.h"
 #include "options_global.h"
 #include "UnicodeString.h"
+#include "stringdiffs.h"
 
 namespace
 {
@@ -146,6 +147,7 @@ void installEngineOptions()
 {
 	static QSettingsOptionsMgr options;
 	SetOptionsMgr(&options);
+	strdiff::Init(); // word-diff break characters
 
 	// comparison option defaults (persisted values override these)
 	options.InitOption(OPT_CMP_IGNORE_WHITESPACE, 0);

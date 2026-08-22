@@ -44,6 +44,15 @@ private:
 		bool trivial;
 	};
 
+	struct WordSpan
+	{
+		int side;
+		int line;      // document line number
+		int start;     // UTF-16 offset within the line
+		int length;    // UTF-16 length
+		int blockIndex;
+	};
+
 	struct Side
 	{
 		QString path;
@@ -57,6 +66,7 @@ private:
 
 	bool loadSide(int side, const QString &path, QString *error);
 	bool runDiff(QString *error);
+	void computeWordSpans();
 	void applyHighlights();
 	void updateStatus();
 	void gotoDiff(int blockIndex);
@@ -70,6 +80,7 @@ private:
 	Side m_sides[2];
 	QLabel *m_status;
 	std::vector<Block> m_blocks;
+	std::vector<WordSpan> m_wordSpans;
 	int m_diffCount = 0;
 	int m_current = -1; // index into m_blocks; -1 = none
 	bool m_syncing = false;
