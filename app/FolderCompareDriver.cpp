@@ -82,7 +82,8 @@ int FolderCompareJob::totalItems() const
 }
 
 FolderCompareResult compareFolders(const QString &leftDir, const QString &rightDir,
-	bool recursive, const std::shared_ptr<FolderCompareJob> &jobIn)
+	bool recursive, const std::shared_ptr<FolderCompareJob> &jobIn,
+	const QString &filterMask)
 {
 	FolderCompareResult result;
 	std::shared_ptr<FolderCompareJob> job = jobIn;
@@ -106,7 +107,9 @@ FolderCompareResult compareFolders(const QString &leftDir, const QString &rightD
 	}
 
 	FileFilterHelper filter;
-	filter.SetMaskOrExpression(_T("*.*"));
+	const QString mask = filterMask.trimmed().isEmpty()
+		? QStringLiteral("*.*") : filterMask.trimmed();
+	filter.SetMaskOrExpression(mask.toStdString());
 	ctxt.m_piFilterGlobal = &filter;
 
 	ctxt.InitDiffItemList();

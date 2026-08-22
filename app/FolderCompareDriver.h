@@ -73,8 +73,11 @@ private:
 
 /** Run a synchronous 2-way folder comparison (full content compare)
     with the engine's DirScan machinery. Safe to call from a worker
-    thread; pass a job for progress/abort. */
+    thread; pass a job for progress/abort. filterMask accepts the
+    engine's syntax: masks ("*.cpp;*.h"), f:/d: regexes and filter
+    expressions. */
 FolderCompareResult compareFolders(const QString &leftDir, const QString &rightDir,
-	bool recursive, const std::shared_ptr<FolderCompareJob> &job = {});
+	bool recursive, const std::shared_ptr<FolderCompareJob> &job = {},
+	const QString &filterMask = QStringLiteral("*.*"));
 
 } // namespace lm

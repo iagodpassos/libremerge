@@ -10,6 +10,7 @@ qt_add_executable(LibreMerge
   LocationPane.cpp
   FolderCompareView.cpp
   FolderCompareDriver.cpp
+  FileOps.cpp
   EngineOptions.cpp
 )
 

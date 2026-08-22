@@ -5,6 +5,8 @@
 #include <QFileInfo>
 #include <QTimer>
 #include "FileCompareView.h"
+#include "FileOps.h"
+#include "FolderCompareDriver.h"
 #include "MainWindow.h"
 #include "EngineOptions.h"
 
@@ -35,7 +37,27 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestCountOpt(QStringLiteral("selftest-count"),
 		QStringLiteral("Print the number of differences and exit (for testing)"));
 	parser.addOption(selftestCountOpt);
+	QCommandLineOption selftestFileOpsOpt(QStringLiteral("selftest-fileops"),
+		QStringLiteral("Copy <left> recursively onto <right> and verify (for testing)"));
+	parser.addOption(selftestFileOpsOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestFileOpsOpt))
+	{
+		const QStringList dirs = parser.positionalArguments();
+		if (dirs.size() != 2)
+			return 2;
+		if (!lm::copyRecursively(dirs.at(0), dirs.at(1)))
+		{
+			fprintf(stderr, "copy failed\n");
+			return 1;
+		}
+		const lm::FolderCompareResult result =
+			lm::compareFolders(dirs.at(0), dirs.at(1), true);
+		printf("after copy: %d different, %d unique, %d identical\n",
+			result.different, result.unique, result.identical);
+		return (result.different == 0 && result.unique == 0) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestCountOpt))
 	{
