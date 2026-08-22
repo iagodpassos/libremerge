@@ -25,6 +25,12 @@ qt_add_executable(LibreMerge
   EngineOptions.cpp
 )
 
+qt_add_resources(LibreMerge "i18n"
+  PREFIX "/i18n"
+  BASE i18n
+  FILES i18n/libremerge_pt_BR.qm
+)
+
 set_target_properties(LibreMerge PROPERTIES
   MACOSX_BUNDLE TRUE
   MACOSX_BUNDLE_GUI_IDENTIFIER org.libremerge.LibreMerge

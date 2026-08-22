@@ -3,7 +3,10 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QFileInfo>
+#include <QLibraryInfo>
+#include <QLocale>
 #include <QTimer>
+#include <QTranslator>
 #include "FileCompareView.h"
 #include "FileOps.h"
 #include "FolderCompareDriver.h"
@@ -16,6 +19,21 @@ int main(int argc, char *argv[])
 	QApplication::setApplicationName(QStringLiteral("LibreMerge"));
 	QApplication::setApplicationVersion(QStringLiteral("0.3.0"));
 	QApplication::setOrganizationName(QStringLiteral("LibreMerge"));
+
+	// translations follow the system language (LIBREMERGE_LANGUAGE
+	// overrides it, e.g. pt_BR); Qt's own strings load too when the
+	// qtbase catalog is available
+	const QByteArray forcedLanguage = qgetenv("LIBREMERGE_LANGUAGE");
+	const QLocale locale = forcedLanguage.isEmpty()
+		? QLocale() : QLocale(QString::fromUtf8(forcedLanguage));
+	static QTranslator qtTranslator;
+	if (qtTranslator.load(locale, QStringLiteral("qtbase"), QStringLiteral("_"),
+			QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
+		app.installTranslator(&qtTranslator);
+	static QTranslator appTranslator;
+	if (appTranslator.load(locale, QStringLiteral("libremerge"),
+			QStringLiteral("_"), QStringLiteral(":/i18n")))
+		app.installTranslator(&appTranslator);
 
 	lm::installEngineOptions();
 
