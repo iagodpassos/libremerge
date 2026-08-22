@@ -2,7 +2,14 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent)
 
 qt_standard_project_setup()
 
+if(APPLE)
+  set(LM_APP_ICON ${CMAKE_CURRENT_SOURCE_DIR}/AppIcon.icns)
+  set_source_files_properties(${LM_APP_ICON} PROPERTIES
+    MACOSX_PACKAGE_LOCATION Resources)
+endif()
+
 qt_add_executable(LibreMerge
+  ${LM_APP_ICON}
   main.cpp
   MainWindow.cpp
   FileCompareView.cpp
@@ -19,6 +26,7 @@ set_target_properties(LibreMerge PROPERTIES
   MACOSX_BUNDLE_GUI_IDENTIFIER org.libremerge.LibreMerge
   MACOSX_BUNDLE_BUNDLE_VERSION 0.1.0
   MACOSX_BUNDLE_SHORT_VERSION_STRING 0.1.0
+  MACOSX_BUNDLE_ICON_FILE AppIcon.icns
 )
 
 target_link_libraries(LibreMerge PRIVATE

@@ -8,3 +8,5 @@ compile_commands.json
 *.dylib
 *.so
 CMakeUserPresets.json
+build-release/
+*.dmg
