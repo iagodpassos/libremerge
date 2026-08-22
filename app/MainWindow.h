@@ -12,6 +12,7 @@ public:
 	explicit MainWindow(QWidget *parent = nullptr);
 
 	void openFileComparison(const QString &leftPath, const QString &rightPath);
+	void openFolderComparison(const QString &leftDir, const QString &rightDir);
 
 private slots:
 	void newComparison();

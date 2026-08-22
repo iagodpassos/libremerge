@@ -2,6 +2,7 @@
 // LibreMerge: Qt application entry point.
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QFileInfo>
 #include <QTimer>
 #include "MainWindow.h"
 #include "EngineOptions.h"
@@ -31,7 +32,13 @@ int main(int argc, char *argv[])
 	MainWindow window;
 	const QStringList args = parser.positionalArguments();
 	if (args.size() == 2)
-		window.openFileComparison(args.at(0), args.at(1));
+	{
+		const QFileInfo leftInfo(args.at(0)), rightInfo(args.at(1));
+		if (leftInfo.isDir() && rightInfo.isDir())
+			window.openFolderComparison(args.at(0), args.at(1));
+		else
+			window.openFileComparison(args.at(0), args.at(1));
+	}
 
 	if (parser.isSet(screenshotOpt))
 	{

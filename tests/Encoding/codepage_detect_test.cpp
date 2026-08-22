@@ -79,12 +79,12 @@ namespace
 		EXPECT_EQ(false, enc.m_bom);
 		EXPECT_EQ(ucr::UTF8, enc.m_unicoding);
 
-		enc = codepage_detect::Guess(_T("../../../Docs/Manual/English/About_Doc.xml"), 1);
+		enc = codepage_detect::Guess(_T("../../Data/Docs/Manual/English/About_Doc.xml"), 1);
 		EXPECT_EQ(65001, enc.m_codepage);
 		EXPECT_EQ(false, enc.m_bom);
 		EXPECT_EQ(ucr::UTF8, enc.m_unicoding);
 
-		enc = codepage_detect::Guess(_T("../../../Docs/Developers/readme-developers.html"), 1);
+		enc = codepage_detect::Guess(_T("../../Data/Docs/Developers/readme-developers.html"), 1);
 		EXPECT_EQ(28591, enc.m_codepage);
 		EXPECT_EQ(false, enc.m_bom);
 		EXPECT_EQ(ucr::NONE, enc.m_unicoding);

@@ -16,6 +16,7 @@
 #include <QTabWidget>
 
 #include "FileCompareView.h"
+#include "FolderCompareView.h"
 
 namespace
 {
@@ -99,6 +100,29 @@ void MainWindow::openFileComparison(const QString &leftPath, const QString &righ
 	m_tabs->setCurrentIndex(index);
 }
 
+void MainWindow::openFolderComparison(const QString &leftDir, const QString &rightDir)
+{
+	QApplication::setOverrideCursor(Qt::WaitCursor);
+	auto *view = new FolderCompareView(this);
+	QString error;
+	const bool ok = view->compare(leftDir, rightDir, &error);
+	QApplication::restoreOverrideCursor();
+	if (!ok)
+	{
+		delete view;
+		QMessageBox::warning(this, tr("LibreMerge"),
+			tr("Could not compare folders:\n%1").arg(error));
+		return;
+	}
+	connect(view, &FolderCompareView::openFileComparisonRequested,
+		this, &MainWindow::openFileComparison);
+	const QString title = QFileInfo(leftDir).fileName() + QString::fromUtf8(" \xE2\x86\x94 ")
+		+ QFileInfo(rightDir).fileName();
+	const int index = m_tabs->addTab(view, title);
+	m_tabs->setTabToolTip(index, leftDir + QStringLiteral("\n") + rightDir);
+	m_tabs->setCurrentIndex(index);
+}
+
 void MainWindow::newComparison()
 {
 	QDialog dialog(this);
@@ -123,8 +147,7 @@ void MainWindow::newComparison()
 	const QFileInfo leftInfo(left), rightInfo(right);
 	if (leftInfo.isDir() && rightInfo.isDir())
 	{
-		QMessageBox::information(this, tr("LibreMerge"),
-			tr("Folder comparison is the next Phase 1 milestone \xE2\x80\x94 not wired up yet."));
+		openFolderComparison(left, right);
 		return;
 	}
 	if (leftInfo.isFile() && rightInfo.isFile())

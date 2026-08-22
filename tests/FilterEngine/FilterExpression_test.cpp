@@ -1494,7 +1494,7 @@ TEST_P(FilterExpressionTest, Content1)
 TEST_P(FilterExpressionTest, ContentEmpty)
 {
 	const String dir = paths::ConcatPath(env::GetProgPath(), "../../Data/Compare");
-	PathContext paths(paths::ConcatPath(dir, _T("dir1")), paths::ConcatPath(dir, _T("dir2")));
+	PathContext paths(paths::ConcatPath(dir, _T("Dir1")), paths::ConcatPath(dir, _T("Dir2")));
 	CDiffContext ctxt(paths, 0);
 	DIFFITEM di;
 	FilterExpression fe;
