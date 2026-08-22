@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "DiffTextEdit.h"
 
+#include <QKeyEvent>
 #include <QPainter>
 #include <QTextBlock>
 
@@ -39,6 +40,28 @@ DiffTextEdit::DiffTextEdit(QWidget *parent)
 	connect(this, &QPlainTextEdit::updateRequest,
 		this, &DiffTextEdit::updateGutter);
 	updateGutterWidth();
+}
+
+bool DiffTextEdit::event(QEvent *event)
+{
+	// QPlainTextEdit claims Alt+arrows for word/paragraph navigation
+	// (via ShortcutOverride), which starves the WinMerge-style merge
+	// shortcuts (Alt+Up/Down navigate, Alt+Left/Right copy) that live
+	// on the main window's menu. Let those reach the shortcut system.
+	if (event->type() == QEvent::ShortcutOverride)
+	{
+		const auto *keyEvent = static_cast<QKeyEvent *>(event);
+		const int key = keyEvent->key();
+		if ((keyEvent->modifiers() & Qt::AltModifier)
+			&& (key == Qt::Key_Left || key == Qt::Key_Right
+				|| key == Qt::Key_Up || key == Qt::Key_Down
+				|| key == Qt::Key_Home || key == Qt::Key_End))
+		{
+			event->ignore();
+			return false;
+		}
+	}
+	return QPlainTextEdit::event(event);
 }
 
 int DiffTextEdit::firstVisibleLine() const

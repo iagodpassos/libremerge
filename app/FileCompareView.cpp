@@ -179,35 +179,35 @@ FileCompareView::FileCompareView(QWidget *parent)
 		return action;
 	};
 	addToolAction(lm::Icon::FirstDiff, tr("First Difference"),
-		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x96"), [this]() { gotoFirstDiff(); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x96"), [this]() { gotoFirstDiff(); });
 	addToolAction(lm::Icon::PrevDiff, tr("Previous Difference"),
-		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x91"), [this]() { gotoPrevDiff(); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x91"), [this]() { gotoPrevDiff(); });
 	addToolAction(lm::Icon::NextDiff, tr("Next Difference"),
-		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x93"), [this]() { gotoNextDiff(); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x93"), [this]() { gotoNextDiff(); });
 	addToolAction(lm::Icon::LastDiff, tr("Last Difference"),
-		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x98"), [this]() { gotoLastDiff(); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x98"), [this]() { gotoLastDiff(); });
 	toolbar->addSeparator();
 	m_actCopyFromLeft = addToolAction(lm::Icon::CopyRight, tr("Copy to Right"),
-		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyCurrentDiff(0); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyCurrentDiff(0); });
 	m_actCopyFromRight = addToolAction(lm::Icon::CopyLeft, tr("Copy to Left"),
-		QStringLiteral("\xE2\x8C\xA5\xE2\x86\x90"),
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x90"),
 		[this]() { copyCurrentDiff(m_paneCount == 3 ? 2 : 1); });
 	addToolAction(lm::Icon::CopyAllRight, tr("Copy All to Right"),
 		QString(), [this]() { copyAllFrom(0); });
 	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"),
 		QString(), [this]() { copyAllFrom(m_paneCount == 3 ? 2 : 1); });
 	toolbar->addSeparator();
-	addToolAction(lm::Icon::Undo, tr("Undo"), QStringLiteral("\xE2\x8C\x98Z"),
+	addToolAction(lm::Icon::Undo, tr("Undo"), QString::fromUtf8("\xE2\x8C\x98Z"),
 		[this]() { undoActive(); });
 	addToolAction(lm::Icon::Redo, tr("Redo"),
-		QStringLiteral("\xE2\x87\xA7\xE2\x8C\x98Z"), [this]() { redoActive(); });
+		QString::fromUtf8("\xE2\x87\xA7\xE2\x8C\x98Z"), [this]() { redoActive(); });
 	toolbar->addSeparator();
 	addToolAction(lm::Icon::Swap, tr("Swap Panes"), QString(),
 		[this]() { swapSides(); });
 	addToolAction(lm::Icon::Refresh, tr("Recompare"), QStringLiteral("F5"),
 		[this]() { recompare(); });
 	m_actSave = addToolAction(lm::Icon::Save, tr("Save"),
-		QStringLiteral("\xE2\x8C\x98S"),
+		QString::fromUtf8("\xE2\x8C\x98S"),
 		[this]() { QString error; saveModified(&error); });
 	m_actSave->setEnabled(false);
 	toolbar->addSeparator();
@@ -221,7 +221,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 		m_diffPaneWidget->setVisible(on);
 		updateDiffPane();
 	});
-	addToolAction(lm::Icon::Find, tr("Find"), QStringLiteral("\xE2\x8C\x98""F"),
+	addToolAction(lm::Icon::Find, tr("Find"), QString::fromUtf8("\xE2\x8C\x98""F"),
 		[this]() { showFindBar(); });
 	addToolAction(lm::Icon::Options, tr("Comparison Options"), QString(),
 		[this]() { emit optionsRequested(); });
@@ -261,7 +261,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 	m_findStatus = new QLabel(m_findBar);
 	findLayout->addWidget(m_findStatus, 1);
 	auto *closeButton = new QToolButton(m_findBar);
-	closeButton->setText(QStringLiteral("\xE2\x9C\x95"));
+	closeButton->setText(QString::fromUtf8("\xE2\x9C\x95"));
 	closeButton->setAutoRaise(true);
 	connect(closeButton, &QToolButton::clicked, this, [this]() {
 		m_findBar->hide();
