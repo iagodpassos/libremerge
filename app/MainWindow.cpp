@@ -95,19 +95,26 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::openFileComparison(const QString &leftPath, const QString &rightPath)
 {
+	openFileComparison(QStringList{ leftPath, rightPath });
+}
+
+void MainWindow::openFileComparison(const QStringList &paths)
+{
 	auto *view = new FileCompareView(this);
 	QString error;
-	if (!view->compare(leftPath, rightPath, &error))
+	if (!view->compare(paths, &error))
 	{
 		delete view;
 		QMessageBox::warning(this, tr("LibreMerge"),
 			tr("Could not compare files:\n%1").arg(error));
 		return;
 	}
-	const QString title = QFileInfo(leftPath).fileName() + QString::fromUtf8(" \xE2\x86\x94 ")
-		+ QFileInfo(rightPath).fileName();
+	QStringList names;
+	for (const QString &path : paths)
+		names.append(QFileInfo(path).fileName());
+	const QString title = names.join(QString::fromUtf8(" \xE2\x86\x94 "));
 	const int index = m_tabs->addTab(view, title);
-	m_tabs->setTabToolTip(index, leftPath + QStringLiteral("\n") + rightPath);
+	m_tabs->setTabToolTip(index, paths.join(QStringLiteral("\n")));
 	m_tabs->setCurrentIndex(index);
 	connect(view, &FileCompareView::modifiedChanged, this, [this, view, title](bool modified) {
 		const int tabIndex = m_tabs->indexOf(view);
@@ -120,8 +127,8 @@ void MainWindow::openFileComparison(const QString &leftPath, const QString &righ
 void MainWindow::openFolderComparison(const QString &leftDir, const QString &rightDir)
 {
 	auto *view = new FolderCompareView(this);
-	connect(view, &FolderCompareView::openFileComparisonRequested,
-		this, &MainWindow::openFileComparison);
+	connect(view, &FolderCompareView::openFileComparisonRequested, this,
+		qOverload<const QString &, const QString &>(&MainWindow::openFileComparison));
 	const QString title = QFileInfo(leftDir).fileName() + QString::fromUtf8(" \xE2\x86\x94 ")
 		+ QFileInfo(rightDir).fileName();
 	const int index = m_tabs->addTab(view, title);
@@ -194,22 +201,35 @@ void MainWindow::newComparison()
 	dialog.setWindowTitle(tr("New Comparison"));
 	auto *grid = new QGridLayout(&dialog);
 	QLineEdit *leftEdit = addPathRow(grid, 0, tr("Left:"), &dialog);
-	QLineEdit *rightEdit = addPathRow(grid, 1, tr("Right:"), &dialog);
+	QLineEdit *middleEdit = addPathRow(grid, 1, tr("Middle (3-way, optional):"), &dialog);
+	QLineEdit *rightEdit = addPathRow(grid, 2, tr("Right:"), &dialog);
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 	buttons->button(QDialogButtonBox::Ok)->setText(tr("Compare"));
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
 	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-	grid->addWidget(buttons, 2, 0, 1, 4);
+	grid->addWidget(buttons, 3, 0, 1, 4);
 
 	if (dialog.exec() != QDialog::Accepted)
 		return;
 
 	const QString left = leftEdit->text().trimmed();
+	const QString middle = middleEdit->text().trimmed();
 	const QString right = rightEdit->text().trimmed();
 	if (left.isEmpty() || right.isEmpty())
 		return;
 
 	const QFileInfo leftInfo(left), rightInfo(right);
+	if (!middle.isEmpty())
+	{
+		if (leftInfo.isFile() && QFileInfo(middle).isFile() && rightInfo.isFile())
+		{
+			openFileComparison(QStringList{ left, middle, right });
+			return;
+		}
+		QMessageBox::warning(this, tr("LibreMerge"),
+			tr("3-way comparison needs three files."));
+		return;
+	}
 	if (leftInfo.isDir() && rightInfo.isDir())
 	{
 		openFolderComparison(left, right);

@@ -12,6 +12,13 @@ LocationPane::LocationPane(QWidget *parent)
 	setToolTip(tr("Location pane \xE2\x80\x94 click to jump"));
 }
 
+void LocationPane::setPaneCount(int count)
+{
+	m_paneCount = qBound(2, count, 3);
+	setFixedWidth(10 + 12 * m_paneCount);
+	update();
+}
+
 void LocationPane::setBands(std::vector<Band> bands, int totalLines)
 {
 	m_bands = std::move(bands);
@@ -34,7 +41,7 @@ void LocationPane::paintEvent(QPaintEvent *)
 	painter.setPen(palette().color(QPalette::Mid));
 	painter.drawRect(area);
 
-	const int columnWidth = (area.width() - 1) / 2;
+	const int columnWidth = (area.width() - 1) / m_paneCount;
 	const double scale = static_cast<double>(area.height()) / m_totalLines;
 	for (const Band &band : m_bands)
 	{

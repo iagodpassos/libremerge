@@ -24,6 +24,7 @@ public:
 
 	explicit LocationPane(QWidget *parent = nullptr);
 
+	void setPaneCount(int count);
 	void setBands(std::vector<Band> bands, int totalLines);
 	void setViewport(int firstVisibleLine, int visibleLines);
 
@@ -36,6 +37,7 @@ protected:
 
 private:
 	std::vector<Band> m_bands;
+	int m_paneCount = 2;
 	int m_totalLines = 1;
 	int m_viewFirst = 0;
 	int m_viewCount = 0;

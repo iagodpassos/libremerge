@@ -23,6 +23,7 @@ int main(int argc, char *argv[])
 	parser.addHelpOption();
 	parser.addVersionOption();
 	parser.addPositionalArgument(QStringLiteral("left"), QStringLiteral("Left file"), QStringLiteral("[left]"));
+	parser.addPositionalArgument(QStringLiteral("middle"), QStringLiteral("Middle file (3-way)"), QStringLiteral("[middle]"));
 	parser.addPositionalArgument(QStringLiteral("right"), QStringLiteral("Right file"), QStringLiteral("[right]"));
 	QCommandLineOption screenshotOpt(QStringLiteral("screenshot"),
 		QStringLiteral("Render the comparison to <file> and exit (for testing)"),
@@ -81,6 +82,10 @@ int main(int argc, char *argv[])
 			window.openFolderComparison(args.at(0), args.at(1));
 		else
 			window.openFileComparison(args.at(0), args.at(1));
+	}
+	else if (args.size() == 3)
+	{
+		window.openFileComparison(args);
 	}
 
 	if (parser.isSet(screenshotOpt))

@@ -7,9 +7,6 @@
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QPlainTextEdit>
-#include "DiffTextEdit.h"
-#include "LocationPane.h"
 #include <QScrollBar>
 #include <QStringList>
 #include <QTemporaryFile>
@@ -17,7 +14,9 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+#include "DiffTextEdit.h"
 #include "EngineOptions.h"
+#include "LocationPane.h"
 
 // engine
 #include "DiffWrapper.h"
@@ -103,10 +102,11 @@ FileCompareView::FileCompareView(QWidget *parent)
 	addToolAction(tr("\xE2\x96\xBC Next"), QKeySequence(Qt::ALT | Qt::Key_Down),
 		[this]() { gotoNextDiff(); });
 	toolbar->addSeparator();
-	addToolAction(tr("Copy \xE2\x86\x92 Right"), QKeySequence(Qt::ALT | Qt::Key_Right),
-		[this]() { copyCurrentDiff(0); });
-	addToolAction(tr("Copy \xE2\x86\x90 Left"), QKeySequence(Qt::ALT | Qt::Key_Left),
-		[this]() { copyCurrentDiff(1); });
+	m_actCopyFromLeft = addToolAction(tr("Copy \xE2\x86\x92 Right"),
+		QKeySequence(Qt::ALT | Qt::Key_Right), [this]() { copyCurrentDiff(0); });
+	m_actCopyFromRight = addToolAction(tr("Copy \xE2\x86\x90 Left"),
+		QKeySequence(Qt::ALT | Qt::Key_Left),
+		[this]() { copyCurrentDiff(m_paneCount == 3 ? 2 : 1); });
 	toolbar->addSeparator();
 	addToolAction(tr("Recompare"), QKeySequence(Qt::Key_F5),
 		[this]() { recompare(); });
@@ -122,7 +122,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 	m_locationPane = new LocationPane(this);
 	panes->addWidget(m_locationPane);
 	connect(m_locationPane, &LocationPane::jumpRequested, this, [this](int line) {
-		for (int side = 0; side < 2; ++side)
+		for (int side = 0; side < m_paneCount; ++side)
 		{
 			QTextCursor cursor(m_panes[side]->document()->findBlockByNumber(
 				qMin(line, m_panes[side]->document()->blockCount() - 1)));
@@ -134,22 +134,15 @@ FileCompareView::FileCompareView(QWidget *parent)
 	});
 
 	const QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < 3; ++i)
 	{
 		m_panes[i] = new DiffTextEdit(this);
 		m_panes[i]->setLineWrapMode(QPlainTextEdit::NoWrap);
 		m_panes[i]->setFont(mono);
+		m_panes[i]->setVisible(i < m_paneCount);
 		panes->addWidget(m_panes[i]);
 		connect(m_panes[i]->verticalScrollBar(), &QScrollBar::valueChanged,
 			this, [this, i](int value) { syncScroll(i, value); });
-		if (i == 0)
-		{
-			connect(m_panes[0]->verticalScrollBar(), &QScrollBar::valueChanged,
-				this, [this]() {
-					m_locationPane->setViewport(m_panes[0]->firstVisibleLine(),
-						m_panes[0]->visibleLineCount());
-				});
-		}
 		connect(m_panes[i]->document(), &QTextDocument::contentsChanged,
 			this, [this, i]() {
 				if (m_syncing)
@@ -158,6 +151,11 @@ FileCompareView::FileCompareView(QWidget *parent)
 				setSideModified(i, true);
 			});
 	}
+	connect(m_panes[0]->verticalScrollBar(), &QScrollBar::valueChanged,
+		this, [this]() {
+			m_locationPane->setViewport(m_panes[0]->firstVisibleLine(),
+				m_panes[0]->visibleLineCount());
+		});
 	layout->addLayout(panes, 1);
 
 	m_status = new QLabel(this);
@@ -165,10 +163,30 @@ FileCompareView::FileCompareView(QWidget *parent)
 	layout->addWidget(m_status);
 }
 
-bool FileCompareView::compare(const QString &leftPath, const QString &rightPath, QString *error)
+bool FileCompareView::compare(const QStringList &paths, QString *error)
 {
-	if (!loadSide(0, leftPath, error) || !loadSide(1, rightPath, error))
+	if (paths.size() != 2 && paths.size() != 3)
+	{
+		if (error != nullptr)
+			*error = tr("expected 2 or 3 files");
 		return false;
+	}
+	m_paneCount = paths.size();
+	m_locationPane->setPaneCount(m_paneCount);
+	for (int i = 0; i < 3; ++i)
+		m_panes[i]->setVisible(i < m_paneCount);
+	if (m_paneCount == 3)
+	{
+		// pane order on screen: left, middle, right; merges land in the middle
+		m_actCopyFromLeft->setText(tr("Left \xE2\x86\x92 Middle"));
+		m_actCopyFromRight->setText(tr("Right \xE2\x86\x92 Middle"));
+	}
+
+	for (int i = 0; i < m_paneCount; ++i)
+	{
+		if (!loadSide(i, paths.at(i), error))
+			return false;
+	}
 	if (!runDiff(error))
 		return false;
 	m_current = nextNonTrivial(-1, +1);
@@ -230,8 +248,10 @@ bool FileCompareView::runDiff(QString *error)
 {
 	// Diff the current pane contents through temp files (the engine's
 	// diff core operates on files, like upstream does for edited buffers).
-	QTemporaryFile temp[2];
-	for (int i = 0; i < 2; ++i)
+	QTemporaryFile temp[3];
+	PathContext paths;
+	paths.SetSize(m_paneCount);
+	for (int i = 0; i < m_paneCount; ++i)
 	{
 		if (!temp[i].open())
 		{
@@ -242,14 +262,14 @@ bool FileCompareView::runDiff(QString *error)
 		const QByteArray bytes = m_panes[i]->toPlainText().toUtf8();
 		temp[i].write(bytes);
 		temp[i].flush();
+		paths.SetPath(i, temp[i].fileName().toStdString(), false);
 	}
 
 	CDiffWrapper wrapper;
 	DIFFOPTIONS options = lm::currentDiffOptions();
 	DiffList diffList;
 	wrapper.SetCreateDiffList(&diffList);
-	wrapper.SetPaths({ temp[0].fileName().toStdString(),
-		temp[1].fileName().toStdString() }, false);
+	wrapper.SetPaths(paths, false);
 	wrapper.SetOptions(&options);
 	if (!wrapper.RunFileDiff())
 	{
@@ -265,7 +285,7 @@ bool FileCompareView::runDiff(QString *error)
 		DIFFRANGE dr;
 		diffList.GetDiff(i, dr);
 		Block block{};
-		for (int side = 0; side < 2; ++side)
+		for (int side = 0; side < m_paneCount; ++side)
 		{
 			block.begin[side] = dr.begin[side];
 			block.end[side] = dr.end[side];
@@ -286,42 +306,50 @@ void FileCompareView::computeWordSpans()
 {
 	m_wordSpans.clear();
 	const DIFFOPTIONS options = lm::currentDiffOptions();
-	QTextDocument *docs[2] = { m_panes[0]->document(), m_panes[1]->document() };
 
 	for (size_t b = 0; b < m_blocks.size(); ++b)
 	{
 		const Block &block = m_blocks[b];
 		if (block.trivial)
 			continue;
-		const int count0 = block.end[0] - block.begin[0] + 1;
-		const int count1 = block.end[1] - block.begin[1] + 1;
-		if (count0 <= 0 || count1 <= 0)
+		int pairs = INT_MAX;
+		for (int side = 0; side < m_paneCount; ++side)
+		{
+			const int count = block.end[side] - block.begin[side] + 1;
+			pairs = qMin(pairs, count);
+		}
+		if (pairs <= 0 || pairs > kMaxWordDiffLinesPerBlock)
 			continue; // insertion/deletion: whole-line highlight is enough
-		const int pairs = qMin(count0, count1);
-		if (pairs > kMaxWordDiffLinesPerBlock)
-			continue;
 
 		for (int k = 0; k < pairs; ++k)
 		{
-			const int lineNo[2] = { block.begin[0] + k, block.begin[1] + k };
-			const QString lines[2] = {
-				docs[0]->findBlockByNumber(lineNo[0]).text(),
-				docs[1]->findBlockByNumber(lineNo[1]).text(),
-			};
-			if (lines[0] == lines[1]
-				|| lines[0].size() > kMaxWordDiffLineLength
-				|| lines[1].size() > kMaxWordDiffLineLength)
+			int lineNo[3] = {};
+			QString lines[3];
+			String engineLines[3];
+			bool tooLong = false, allEqual = true;
+			for (int side = 0; side < m_paneCount; ++side)
+			{
+				lineNo[side] = block.begin[side] + k;
+				lines[side] = m_panes[side]->document()
+					->findBlockByNumber(lineNo[side]).text();
+				if (lines[side].size() > kMaxWordDiffLineLength)
+					tooLong = true;
+				if (side > 0 && lines[side] != lines[0])
+					allEqual = false;
+				engineLines[side] = lines[side].toStdString();
+			}
+			if (tooLong || allEqual)
 				continue;
 
 			const std::vector<strdiff::wdiff> wdiffs = strdiff::ComputeWordDiffs(
-				lines[0].toStdString(), lines[1].toStdString(),
+				m_paneCount, engineLines,
 				!options.bIgnoreCase, strdiff::EOL_STRICT,
 				options.nIgnoreWhitespace, options.bIgnoreNumbers,
 				0 /*breakType*/, false /*byte_level*/);
 
 			for (const strdiff::wdiff &wd : wdiffs)
 			{
-				for (int side = 0; side < 2; ++side)
+				for (int side = 0; side < m_paneCount; ++side)
 				{
 					if (wd.end[side] < wd.begin[side])
 						continue; // nothing on this side
@@ -341,7 +369,7 @@ void FileCompareView::computeWordSpans()
 
 void FileCompareView::applyHighlights()
 {
-	for (int side = 0; side < 2; ++side)
+	for (int side = 0; side < m_paneCount; ++side)
 	{
 		QList<QTextEdit::ExtraSelection> selections;
 		QTextDocument *doc = m_panes[side]->document();
@@ -371,6 +399,7 @@ void FileCompareView::applyHighlights()
 				selections.append(selection);
 			}
 		}
+
 		// mirror the line colors in the gutter
 		QHash<int, QColor> gutterColors;
 		for (const Block &block : m_blocks)
@@ -409,7 +438,7 @@ void FileCompareView::applyHighlights()
 	for (size_t b = 0; b < m_blocks.size(); ++b)
 	{
 		const Block &block = m_blocks[b];
-		for (int side = 0; side < 2; ++side)
+		for (int side = 0; side < m_paneCount; ++side)
 		{
 			LocationPane::Band band;
 			band.side = side;
@@ -422,8 +451,9 @@ void FileCompareView::applyHighlights()
 			bands.push_back(band);
 		}
 	}
-	const int totalLines = qMax(m_panes[0]->document()->blockCount(),
-		m_panes[1]->document()->blockCount());
+	int totalLines = 1;
+	for (int side = 0; side < m_paneCount; ++side)
+		totalLines = qMax(totalLines, m_panes[side]->document()->blockCount());
 	m_locationPane->setBands(std::move(bands), totalLines);
 	m_locationPane->setViewport(m_panes[0]->firstVisibleLine(),
 		m_panes[0]->visibleLineCount());
@@ -449,7 +479,10 @@ void FileCompareView::updateStatus()
 			? tr("Difference %1 of %2").arg(index).arg(m_diffCount)
 			: tr("%n difference(s)", nullptr, m_diffCount);
 	}
-	if (m_sides[0].modified || m_sides[1].modified)
+	bool modified = false;
+	for (int side = 0; side < m_paneCount; ++side)
+		modified = modified || m_sides[side].modified;
+	if (modified)
 		text += tr("  \xE2\x80\xA2 unsaved changes");
 	m_status->setText(text);
 }
@@ -467,7 +500,7 @@ void FileCompareView::gotoDiff(int blockIndex)
 	if (blockIndex < 0 || blockIndex >= static_cast<int>(m_blocks.size()))
 		return;
 	m_current = blockIndex;
-	for (int side = 0; side < 2; ++side)
+	for (int side = 0; side < m_paneCount; ++side)
 	{
 		const int line = m_blocks[blockIndex].begin[side];
 		QTextCursor cursor(m_panes[side]->document()->findBlockByNumber(qMax(0, line)));
@@ -516,10 +549,12 @@ void FileCompareView::copyCurrentDiff(int sourceSide)
 {
 	if (m_diffStale)
 		recompare();
+	if (sourceSide >= m_paneCount)
+		return;
 	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
 		return;
 	const Block block = m_blocks[m_current];
-	const int target = 1 - sourceSide;
+	const int target = mergeTarget(sourceSide);
 
 	// Collect the source block's lines
 	QStringList newLines;
@@ -612,7 +647,10 @@ void FileCompareView::spliceLines(int side, int firstLine, int lastLine,
 
 bool FileCompareView::isModified() const
 {
-	return m_sides[0].modified || m_sides[1].modified;
+	for (int side = 0; side < m_paneCount; ++side)
+		if (m_sides[side].modified)
+			return true;
+	return false;
 }
 
 void FileCompareView::setSideModified(int side, bool modified)
@@ -628,7 +666,7 @@ void FileCompareView::setSideModified(int side, bool modified)
 
 bool FileCompareView::saveModified(QString *error)
 {
-	for (int side = 0; side < 2; ++side)
+	for (int side = 0; side < m_paneCount; ++side)
 	{
 		if (m_sides[side].modified && !saveSide(side, error))
 			return false;
@@ -669,6 +707,10 @@ void FileCompareView::syncScroll(int pane, int value)
 	if (m_syncing)
 		return;
 	m_syncing = true;
-	m_panes[1 - pane]->verticalScrollBar()->setValue(value);
+	for (int i = 0; i < m_paneCount; ++i)
+	{
+		if (i != pane)
+			m_panes[i]->verticalScrollBar()->setValue(value);
+	}
 	m_syncing = false;
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QStringList>
 #include <QWidget>
 #include <vector>
 
@@ -10,10 +11,11 @@ class DiffTextEdit;
 class LocationPane;
 
 /**
- * Two-way file comparison and merge view: editable side-by-side panes
- * driven by the engine's CDiffWrapper. Supports difference navigation,
- * copying diff blocks between sides (undoable), free editing with
- * recompare, and saving with the original encoding/EOL preserved.
+ * File comparison and merge view for 2 or 3 files: editable side-by-side
+ * panes driven by the engine's CDiffWrapper. Supports difference
+ * navigation, copying diff blocks between sides (undoable; into the
+ * middle pane in 3-way mode), free editing with recompare, and saving
+ * with the original encoding/EOL preserved.
  */
 class FileCompareView : public QWidget
 {
@@ -21,13 +23,19 @@ class FileCompareView : public QWidget
 public:
 	explicit FileCompareView(QWidget *parent = nullptr);
 
-	/** Load both files and run the initial comparison. */
-	bool compare(const QString &leftPath, const QString &rightPath, QString *error);
+	/** Load 2 or 3 files and run the initial comparison. */
+	bool compare(const QStringList &paths, QString *error);
+	bool compare(const QString &leftPath, const QString &rightPath, QString *error)
+	{
+		return compare(QStringList{ leftPath, rightPath }, error);
+	}
 
 	bool isModified() const;
 	int diffCount() const { return m_diffCount; }
+	int paneCount() const { return m_paneCount; }
 
-	/** Copy the current difference into the other side. 0 = left→right, 1 = right→left source side. */
+	/** Copy the current difference from sourceSide into the merge target
+	    (the other side in 2-way mode, the middle pane in 3-way mode). */
 	void copyCurrentDiff(int sourceSide);
 	void gotoNextDiff();
 	void gotoPrevDiff();
@@ -40,8 +48,8 @@ signals:
 private:
 	struct Block
 	{
-		int begin[2];
-		int end[2]; // inclusive; end < begin means "no lines on this side"
+		int begin[3];
+		int end[3]; // inclusive; end < begin means "no lines on this side"
 		bool trivial;
 	};
 
@@ -65,6 +73,11 @@ private:
 		bool modified = false;
 	};
 
+	int mergeTarget(int sourceSide) const
+	{
+		return m_paneCount == 3 ? 1 : 1 - sourceSide;
+	}
+
 	bool loadSide(int side, const QString &path, QString *error);
 	bool runDiff(QString *error);
 	void computeWordSpans();
@@ -77,9 +90,10 @@ private:
 	void setSideModified(int side, bool modified);
 	void syncScroll(int pane, int value);
 
-	DiffTextEdit *m_panes[2];
+	int m_paneCount = 2;
+	DiffTextEdit *m_panes[3];
 	LocationPane *m_locationPane;
-	Side m_sides[2];
+	Side m_sides[3];
 	QLabel *m_status;
 	std::vector<Block> m_blocks;
 	std::vector<WordSpan> m_wordSpans;
@@ -88,4 +102,6 @@ private:
 	bool m_syncing = false;
 	bool m_diffStale = false;
 	QAction *m_actSave = nullptr;
+	QAction *m_actCopyFromLeft = nullptr;
+	QAction *m_actCopyFromRight = nullptr;
 };
