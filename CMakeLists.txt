@@ -41,7 +41,7 @@ find_package(GTest CONFIG QUIET)
 if(NOT GTest_FOUND)
   include(FetchContent)
   FetchContent_Declare(googletest
-    URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.zip)
+    URL https://github.com/google/googletest/archive/refs/tags/v1.18.0.zip)
   FetchContent_MakeAvailable(googletest)
   if(NOT TARGET GTest::gtest)
     add_library(GTest::gtest ALIAS gtest)

@@ -11,13 +11,29 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD="$ROOT/build-release"
 VERSION="0.7.0"
 DMG="$ROOT/LibreMerge-$VERSION.dmg"
-QT_BIN="$(brew --prefix qt)/bin"
 
-echo "==> Release build"
-cmake -S "$ROOT" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release > /dev/null
+# Universal (arm64 + x86_64, macOS 12+) toolchain: official Qt + ICU/Poco
+# built by packaging/build_deps.sh. Falls back to the Homebrew toolchain
+# (arm64-only, host-OS floor) when deps/ is absent.
+QT_DEPS="$ROOT/deps/qt/6.8.3/macos"
+if [ -d "$QT_DEPS" ] && [ -d "$ROOT/deps/icu" ] && [ -d "$ROOT/deps/poco" ]; then
+  echo "==> Release build (universal, macOS 12+)"
+  BUILD="$ROOT/build-universal"
+  QT_BIN="$QT_DEPS/bin"
+  cmake -S "$ROOT" -B "$BUILD" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+    -DCMAKE_PREFIX_PATH="$QT_DEPS;$ROOT/deps/icu;$ROOT/deps/poco" \
+    -DCMAKE_DISABLE_FIND_PACKAGE_GTest=ON > /dev/null
+else
+  echo "==> Release build (Homebrew toolchain, arm64-only)"
+  BUILD="$ROOT/build-release"
+  QT_BIN="$(brew --prefix qt)/bin"
+  cmake -S "$ROOT" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release > /dev/null
+fi
 cmake --build "$BUILD" --target LibreMerge
 
 APP="$BUILD/app/LibreMerge.app"

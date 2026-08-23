@@ -10,3 +10,5 @@ compile_commands.json
 CMakeUserPresets.json
 build-release/
 *.dmg
+build-universal/
+deps/
