@@ -73,7 +73,35 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestUndoOpt(QStringLiteral("selftest-undo"),
 		QStringLiteral("Copy one difference, undo, redo and verify (for testing)"));
 	parser.addOption(selftestUndoOpt);
+	QCommandLineOption selftestUndoScrollOpt(QStringLiteral("selftest-undo-scroll"),
+		QStringLiteral("Verify the viewport stays put across merge+undo (for testing)"));
+	parser.addOption(selftestUndoScrollOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestUndoScrollOpt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 2)
+			return 2;
+		FileCompareView view;
+		view.resize(900, 400);
+		QString error;
+		if (!view.compare(files.at(0), files.at(1), &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		view.gotoLastDiff();
+		QCoreApplication::processEvents();
+		const int scrollBefore = view.firstVisibleViewLine();
+		view.copyCurrentDiff(0);
+		QCoreApplication::processEvents();
+		view.undoActive();
+		QCoreApplication::processEvents();
+		const int scrollAfter = view.firstVisibleViewLine();
+		printf("before: %d, after: %d\n", scrollBefore, scrollAfter);
+		return qAbs(scrollAfter - scrollBefore) <= 2 ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestUndoOpt))
 	{

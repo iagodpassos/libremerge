@@ -364,11 +364,12 @@ FileCompareView::FileCompareView(QWidget *parent)
 				setSideModified(i, modified);
 			});
 		// undo is unified across the panes: remember which document each
-		// edit landed on, so Cmd+Z after a merge undoes the merge even
-		// though the focus stayed on the other pane
+		// edit landed on (and where), so Cmd+Z after a merge undoes the
+		// merge even though the focus stayed on the other pane
 		connect(m_panes[i]->document(), &QTextDocument::undoCommandAdded,
 			this, [this, i]() {
-				m_undoOrder.append(i);
+				m_undoOrder.append(
+					{ i, m_panes[i]->textCursor().blockNumber() });
 				m_redoOrder.clear();
 			});
 	}
@@ -1203,6 +1204,11 @@ void FileCompareView::updateHeaderStyles()
 		m_headerRows[i]->setStyleSheet(i == active ? activeStyle : inactiveStyle);
 }
 
+int FileCompareView::firstVisibleViewLine() const
+{
+	return m_panes[0]->firstVisibleLine();
+}
+
 QStringList FileCompareView::paths() const
 {
 	QStringList result;
@@ -1316,7 +1322,7 @@ int FileCompareView::nextActive(int from, int direction) const
 	return -1;
 }
 
-void FileCompareView::gotoDiff(int blockIndex)
+void FileCompareView::gotoDiff(int blockIndex, bool center)
 {
 	if (blockIndex < 0 || blockIndex >= static_cast<int>(m_blocks.size()))
 		return;
@@ -1327,7 +1333,8 @@ void FileCompareView::gotoDiff(int blockIndex)
 			qMax(0, m_blocks[blockIndex].viewBegin)));
 		m_syncing = true;
 		m_panes[side]->setTextCursor(cursor);
-		m_panes[side]->centerCursor();
+		if (center)
+			m_panes[side]->centerCursor();
 		m_syncing = false;
 	}
 	applyHighlights();
@@ -1389,11 +1396,14 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide, bool joinUn
 		return;
 	m_syncing = true;
 	QTextCursor cursor(tgtDoc);
+	// position before opening the edit block: undo restores the cursor
+	// to the macro's starting position, which must be the merge spot,
+	// not the top of the document
+	cursor.setPosition(firstBlock.position());
 	if (joinUndo)
 		cursor.joinPreviousEditBlock();
 	else
 		cursor.beginEditBlock();
-	cursor.setPosition(firstBlock.position());
 	cursor.setPosition(lastBlock.position() + lastBlock.length() - 1,
 		QTextCursor::KeepAnchor);
 	cursor.insertText(newLines.join(QChar('\n')));
@@ -1572,15 +1582,24 @@ void FileCompareView::undoActive()
 	int counts[3] = {};
 	for (int side = 0; side < m_paneCount; ++side)
 		counts[side] = m_panes[side]->document()->blockCount();
+	const int topLine = m_panes[0]->verticalScrollBar()->value();
 	while (!m_undoOrder.isEmpty())
 	{
-		const int side = m_undoOrder.takeLast();
-		if (side >= m_paneCount
-			|| !m_panes[side]->document()->isUndoAvailable())
+		const UndoRef ref = m_undoOrder.takeLast();
+		if (ref.side >= m_paneCount
+			|| !m_panes[ref.side]->document()->isUndoAvailable())
 			continue; // stale entry (e.g. a rebuild cleared that stack)
-		m_panes[side]->undo();
-		m_redoOrder.append(side);
+		m_panes[ref.side]->undo();
+		m_redoOrder.append(ref);
 		refreshAfterUndoRedo(counts);
+		// like WinMerge's OnEditUndo: the viewport stays where it was,
+		// and the difference at the undone spot is selected again so it
+		// can simply be merged once more
+		m_syncing = true;
+		for (int i = 0; i < m_paneCount; ++i)
+			m_panes[i]->verticalScrollBar()->setValue(topLine);
+		m_syncing = false;
+		selectDiffAtViewLine(ref.viewLine);
 		return;
 	}
 	m_panes[m_activePane]->undo();
@@ -1591,18 +1610,40 @@ void FileCompareView::redoActive()
 	int counts[3] = {};
 	for (int side = 0; side < m_paneCount; ++side)
 		counts[side] = m_panes[side]->document()->blockCount();
+	const int topLine = m_panes[0]->verticalScrollBar()->value();
 	while (!m_redoOrder.isEmpty())
 	{
-		const int side = m_redoOrder.takeLast();
-		if (side >= m_paneCount
-			|| !m_panes[side]->document()->isRedoAvailable())
+		const UndoRef ref = m_redoOrder.takeLast();
+		if (ref.side >= m_paneCount
+			|| !m_panes[ref.side]->document()->isRedoAvailable())
 			continue;
-		m_panes[side]->redo();
-		m_undoOrder.append(side);
+		m_panes[ref.side]->redo();
+		m_undoOrder.append(ref);
 		refreshAfterUndoRedo(counts);
+		m_syncing = true;
+		for (int i = 0; i < m_paneCount; ++i)
+			m_panes[i]->verticalScrollBar()->setValue(topLine);
+		m_syncing = false;
 		return;
 	}
 	m_panes[m_activePane]->redo();
+}
+
+/** Select (without scrolling) the difference covering the given view
+    line, mirroring upstream's OnCurdiff after a merge undo. */
+void FileCompareView::selectDiffAtViewLine(int viewLine)
+{
+	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+	{
+		const Block &block = m_blocks[b];
+		if (block.trivial || block.resolved)
+			continue;
+		if (viewLine >= block.viewBegin && viewLine <= block.viewEnd)
+		{
+			gotoDiff(b, false);
+			return;
+		}
+	}
 }
 
 void FileCompareView::showFindBar()

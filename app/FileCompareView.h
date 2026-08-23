@@ -41,6 +41,8 @@ public:
 	int diffCount() const { return m_diffCount; }
 	int paneCount() const { return m_paneCount; }
 	QStringList paths() const;
+	/** Top view line of the first pane (for tests). */
+	int firstVisibleViewLine() const;
 
 	/** Mark sides as read-only before compare(): the pane rejects edits
 	    and merge operations refuse to target it. */
@@ -127,7 +129,8 @@ private:
 	void applyZoom(qreal pointSize);
 	void updateHeader(int side);
 	void updateHeaderStyles();
-	void gotoDiff(int blockIndex);
+	void gotoDiff(int blockIndex, bool center = true);
+	void selectDiffAtViewLine(int viewLine);
 	int nextActive(int from, int direction) const;
 	void applyBlockCopy(int blockIndex, int sourceSide, bool joinUndo);
 	void refreshAfterUndoRedo(const int countsBefore[3]);
@@ -158,8 +161,13 @@ private:
 	QStringList m_realLines[3];      // side's real lines as of the last diff run
 	std::vector<int> m_realToView[3]; // real line -> view line, ditto
 	QList<int> m_lineNumbers[3];      // view line -> 1-based real number, -1 ghost
-	QList<int> m_undoOrder;           // panes in chronological edit order
-	QList<int> m_redoOrder;
+	struct UndoRef
+	{
+		int side;
+		int viewLine; // where the edit happened, to reselect after undo
+	};
+	QList<UndoRef> m_undoOrder;       // chronological edit order across panes
+	QList<UndoRef> m_redoOrder;
 	int m_diffCount = 0;
 	int m_current = -1; // index into m_blocks; -1 = none
 	int m_activePane = 0;
