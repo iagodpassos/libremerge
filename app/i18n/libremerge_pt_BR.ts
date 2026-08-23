@@ -477,6 +477,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Tamanho &amp;Original</translation>
     </message>
     <message>
+        <source>Next &amp;Pane</source>
+        <translation>Próximo &amp;Painel</translation>
+    </message>
+    <message>
         <source>&amp;Merge</source>
         <translation>&amp;Mesclar</translation>
     </message>
@@ -495,6 +499,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>&amp;Last Difference</source>
         <translation>Ú&amp;ltima Diferença</translation>
+    </message>
+    <message>
+        <source>C&amp;urrent Difference</source>
+        <translation>Diferença At&amp;ual</translation>
     </message>
     <message>
         <source>Copy to &amp;Right</source>

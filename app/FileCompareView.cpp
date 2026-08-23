@@ -1629,6 +1629,20 @@ void FileCompareView::redoActive()
 	m_panes[m_activePane]->redo();
 }
 
+void FileCompareView::selectDiffAtCursor()
+{
+	if (m_diffStale)
+		recompare();
+	selectDiffAtViewLine(m_panes[m_activePane]->textCursor().blockNumber());
+}
+
+void FileCompareView::focusNextPane()
+{
+	m_activePane = (m_activePane + 1) % m_paneCount;
+	m_panes[m_activePane]->setFocus();
+	updateHeaderStyles();
+}
+
 /** Select (without scrolling) the difference covering the given view
     line, mirroring upstream's OnCurdiff after a merge undo. */
 void FileCompareView::selectDiffAtViewLine(int viewLine)

@@ -156,6 +156,7 @@ void installEngineOptions()
 	options.InitOption(OPT_CMP_IGNORE_NUMBERS, false);
 	options.InitOption(OPT_CMP_IGNORE_EOL, false);
 	options.InitOption(OPT_CMP_DIFF_ALGORITHM, 0);
+	options.InitOption(OPT_CMP_INDENT_HEURISTIC, true); // upstream default
 }
 
 DIFFOPTIONS currentDiffOptions()
@@ -170,6 +171,7 @@ DIFFOPTIONS currentDiffOptions()
 	options.bIgnoreNumbers = mgr->GetBool(OPT_CMP_IGNORE_NUMBERS);
 	options.bIgnoreEol = mgr->GetBool(OPT_CMP_IGNORE_EOL);
 	options.nDiffAlgorithm = mgr->GetInt(OPT_CMP_DIFF_ALGORITHM);
+	options.bIndentHeuristic = mgr->GetBool(OPT_CMP_INDENT_HEURISTIC);
 	return options;
 }
 

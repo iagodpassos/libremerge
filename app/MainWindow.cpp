@@ -139,23 +139,37 @@ MainWindow::MainWindow(QWidget *parent)
 		QKeySequence(Qt::CTRL | Qt::Key_0), [fileView]() {
 			if (auto *view = fileView()) view->zoomReset();
 		});
+	viewMenu->addSeparator();
+	addMenuAction(viewMenu, tr("Next &Pane"), QKeySequence(Qt::Key_F6),
+		[fileView]() {
+			if (auto *view = fileView()) view->focusNextPane();
+		});
 
 	QMenu *mergeMenu = menuBar()->addMenu(tr("&Merge"));
 	addMenuAction(mergeMenu, tr("&First Difference"),
 		QKeySequence(Qt::ALT | Qt::Key_Home), [fileView]() {
 			if (auto *view = fileView()) view->gotoFirstDiff();
 		});
-	addMenuAction(mergeMenu, tr("&Previous Difference"),
+	QAction *prevDiffAction = addMenuAction(mergeMenu, tr("&Previous Difference"),
 		QKeySequence(Qt::ALT | Qt::Key_Up), [fileView]() {
 			if (auto *view = fileView()) view->gotoPrevDiff();
 		});
-	addMenuAction(mergeMenu, tr("&Next Difference"),
+	// F7/F8 are upstream aliases for previous/next
+	prevDiffAction->setShortcuts({ QKeySequence(Qt::ALT | Qt::Key_Up),
+		QKeySequence(Qt::Key_F7) });
+	QAction *nextDiffAction = addMenuAction(mergeMenu, tr("&Next Difference"),
 		QKeySequence(Qt::ALT | Qt::Key_Down), [fileView]() {
 			if (auto *view = fileView()) view->gotoNextDiff();
 		});
+	nextDiffAction->setShortcuts({ QKeySequence(Qt::ALT | Qt::Key_Down),
+		QKeySequence(Qt::Key_F8) });
 	addMenuAction(mergeMenu, tr("&Last Difference"),
 		QKeySequence(Qt::ALT | Qt::Key_End), [fileView]() {
 			if (auto *view = fileView()) view->gotoLastDiff();
+		});
+	addMenuAction(mergeMenu, tr("C&urrent Difference"),
+		QKeySequence(Qt::ALT | Qt::Key_Return), [fileView]() {
+			if (auto *view = fileView()) view->selectDiffAtCursor();
 		});
 	mergeMenu->addSeparator();
 	addMenuAction(mergeMenu, tr("Copy to &Right"),

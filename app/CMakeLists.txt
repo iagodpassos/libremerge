@@ -35,6 +35,16 @@ if(APPLE)
   enable_language(OBJCXX)
   target_sources(LibreMerge PRIVATE MacServices.mm)
   target_link_libraries(LibreMerge PRIVATE "-framework AppKit")
+  # localized titles for the Finder Services menu entry
+  target_sources(LibreMerge PRIVATE
+    ${CMAKE_SOURCE_DIR}/packaging/en.lproj/ServicesMenu.strings
+    ${CMAKE_SOURCE_DIR}/packaging/pt.lproj/ServicesMenu.strings)
+  set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/packaging/en.lproj/ServicesMenu.strings
+    PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/en.lproj")
+  set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/packaging/pt.lproj/ServicesMenu.strings
+    PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/pt.lproj")
 endif()
 
 set_target_properties(LibreMerge PROPERTIES

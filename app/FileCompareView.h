@@ -63,6 +63,11 @@ public:
 	void swapSides();
 	void undoActive();
 	void redoActive();
+	/** Select the difference under the active pane's cursor (Alt+Enter,
+	    upstream's ID_CURDIFF). */
+	void selectDiffAtCursor();
+	/** Move the focus to the next pane (F6, upstream's ID_NEXT_PANE). */
+	void focusNextPane();
 	void zoomIn();
 	void zoomOut();
 	void zoomReset();
