@@ -24,6 +24,8 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 
 ## Install (macOS)
 
+**Requirements**: Apple Silicon (arm64), macOS 26 or later. (Older macOS and Intel builds are planned — the blocker is rebuilding the bundled ICU/Poco for lower deployment targets.)
+
 Download `LibreMerge-<version>.dmg` from the [releases page](https://github.com/iagodpassos/libremerge/releases), open it and drag LibreMerge to Applications.
 
 LibreMerge is not yet notarized by Apple, so the first launch needs one extra step: right-click the app → **Open** (or allow it under **System Settings → Privacy & Security**). If macOS still refuses ("app is damaged"), clear the download quarantine once:
