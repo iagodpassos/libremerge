@@ -258,9 +258,15 @@ int main(int argc, char *argv[])
 	{
 		window.openFileComparison(args);
 	}
-	else
+	else if (!args.isEmpty())
 	{
 		window.openSelector(args);
+	}
+	else
+	{
+		// like WinMerge, start on a fresh (blank) comparison; the
+		// selector stays one Cmd+O away
+		window.openBlankComparison();
 	}
 
 	if (parser.isSet(gotoFirstOpt))
