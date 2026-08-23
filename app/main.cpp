@@ -64,6 +64,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption gotoFirstOpt(QStringLiteral("goto-first-diff"),
 		QStringLiteral("Select the first difference after opening (for testing)"));
 	parser.addOption(gotoFirstOpt);
+	QCommandLineOption newOpt(QStringLiteral("new"),
+		QStringLiteral("Open an empty text comparison"));
+	parser.addOption(newOpt);
 	QCommandLineOption selftestMergeAllOpt(QStringLiteral("selftest-merge-all"),
 		QStringLiteral("Copy all differences at once left-to-right and verify (for testing)"));
 	parser.addOption(selftestMergeAllOpt);
@@ -239,7 +242,11 @@ int main(int argc, char *argv[])
 	lm::installMacServices(&window);
 #endif
 	const QStringList args = parser.positionalArguments();
-	if (args.size() == 2)
+	if (parser.isSet(newOpt))
+	{
+		window.openBlankComparison();
+	}
+	else if (args.size() == 2)
 	{
 		const QFileInfo leftInfo(args.at(0)), rightInfo(args.at(1));
 		if (leftInfo.isDir() && rightInfo.isDir())

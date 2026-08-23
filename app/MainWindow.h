@@ -4,6 +4,7 @@
 #include <QMainWindow>
 
 class QTabWidget;
+class FileCompareView;
 
 class MainWindow : public QMainWindow
 {
@@ -14,6 +15,8 @@ public:
 	void openFileComparison(const QString &leftPath, const QString &rightPath);
 	void openFileComparison(const QStringList &paths,
 		const QList<bool> &readOnly = {});
+	/** Empty, editable comparison (WinMerge's File > New). */
+	void openBlankComparison();
 	void openFolderComparison(const QString &leftDir, const QString &rightDir);
 
 	/** Open (or focus) the "Select Files or Folders" page, optionally
@@ -38,5 +41,7 @@ private slots:
 	void closeTab(int index);
 
 private:
+	void attachFileView(FileCompareView *view);
+
 	QTabWidget *m_tabs;
 };

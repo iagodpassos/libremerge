@@ -520,6 +520,61 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 	return true;
 }
 
+void FileCompareView::startBlank()
+{
+	m_paneCount = 2;
+	m_locationPane->setPaneCount(m_paneCount);
+	for (int i = 0; i < 3; ++i)
+	{
+		const bool visible = i < m_paneCount;
+		m_headerRows[i]->setVisible(visible);
+		m_panes[i]->setVisible(visible);
+		m_posLabels[i]->setVisible(visible);
+		m_encLabels[i]->setVisible(visible);
+		m_diffPaneEdits[i]->setVisible(visible);
+	}
+
+	// like upstream's DoFileNew: empty untitled buffers, default encoding
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		Side &s = m_sides[side];
+		s = Side();
+		s.caption = side == 0 ? tr("Untitled Left") : tr("Untitled Right");
+		s.unicoding = ucr::UTF8;
+		s.codepage = 65001;
+		m_syncing = true;
+		m_panes[side]->setPlainText(QString());
+		m_panes[side]->document()->setModified(false);
+		m_syncing = false;
+		m_panes[side]->setReadOnly(false);
+		m_highlighters[side].reset();
+		updateHeader(side);
+		m_encLabels[side]->setText(QStringLiteral("%1  %2")
+			.arg(encodingName(s.unicoding, s.codepage, s.bom), eolName(s.eol)));
+		updatePaneStatus(side);
+	}
+
+	QString error;
+	runDiff(&error);
+	m_current = -1;
+	applyHighlights();
+	updateStatus();
+	updateHeaderStyles();
+}
+
+QString FileCompareView::tabTitle() const
+{
+	QStringList names;
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		const Side &s = m_sides[side];
+		names.append(s.path.isEmpty()
+			? (s.caption.isEmpty() ? tr("Untitled") : s.caption)
+			: QFileInfo(s.path).fileName());
+	}
+	return names.join(QString::fromUtf8(" \xE2\x86\x94 "));
+}
+
 bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 {
 	// refuse binary files up front: silently comparing them as text ends
@@ -1221,12 +1276,14 @@ void FileCompareView::showHeaderMenu(int side)
 {
 	const QString path = m_sides[side].path;
 	QMenu menu(this);
-	menu.addAction(tr("Copy Full Path"), this, [path]() {
+	QAction *copyPath = menu.addAction(tr("Copy Full Path"), this, [path]() {
 		QApplication::clipboard()->setText(path);
 	});
-	menu.addAction(tr("Copy Filename"), this, [path]() {
+	copyPath->setEnabled(!path.isEmpty());
+	QAction *copyName = menu.addAction(tr("Copy Filename"), this, [path]() {
 		QApplication::clipboard()->setText(QFileInfo(path).fileName());
 	});
+	copyName->setEnabled(!path.isEmpty());
 	menu.addSeparator();
 	QAction *caption = menu.addAction(tr("Edit Caption\xE2\x80\xA6"), this,
 		[this, side]() { editCaption(side); });
@@ -1239,16 +1296,17 @@ void FileCompareView::showHeaderMenu(int side)
 			changeSideFile(side, chosen);
 	});
 #ifdef Q_OS_MACOS
-	menu.addAction(tr("Reveal in Finder"), this, [path]() {
+	QAction *reveal = menu.addAction(tr("Reveal in Finder"), this, [path]() {
 		QProcess::startDetached(QStringLiteral("/usr/bin/open"),
 			{ QStringLiteral("-R"), path });
 	});
 #else
-	menu.addAction(tr("Show in File Manager"), this, [path]() {
+	QAction *reveal = menu.addAction(tr("Show in File Manager"), this, [path]() {
 		QDesktopServices::openUrl(
 			QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
 	});
 #endif
+	reveal->setEnabled(!path.isEmpty());
 	QMenu *recent = menu.addMenu(tr("Recent Files"));
 	const QStringList history =
 		QSettings().value(QStringLiteral("NewComparison/History")).toStringList();
@@ -1790,7 +1848,26 @@ bool FileCompareView::saveModified(QString *error)
 
 bool FileCompareView::saveSide(int side, QString *error)
 {
-	const Side &s = m_sides[side];
+	Side &s = m_sides[side];
+
+	// untitled panes (File > New) ask for a name on first save
+	if (s.path.isEmpty())
+	{
+		const QString chosen = QFileDialog::getSaveFileName(this,
+			tr("Save As"));
+		if (chosen.isEmpty())
+		{
+			if (error != nullptr)
+				*error = tr("save canceled");
+			return false;
+		}
+		s.path = chosen;
+		s.caption.clear();
+		m_highlighters[side] = std::make_unique<SyntaxHighlighter>(
+			m_panes[side]->document(), chosen);
+		updateHeader(side);
+		emit pathsChanged();
+	}
 
 	// like WinMerge (OPT_BACKUP_FILECMP, on by default): keep the
 	// original as <name>.bak next to it before overwriting

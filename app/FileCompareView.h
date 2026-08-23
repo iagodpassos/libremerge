@@ -32,6 +32,14 @@ public:
 
 	/** Load 2 or 3 files and run the initial comparison. */
 	bool compare(const QStringList &paths, QString *error);
+
+	/** Open an empty, editable 2-way comparison (WinMerge's File > New):
+	    paste or type text on both sides and recompare; saving asks for
+	    a file name. */
+	void startBlank();
+
+	/** Tab title: file names, or the untitled captions. */
+	QString tabTitle() const;
 	bool compare(const QString &leftPath, const QString &rightPath, QString *error)
 	{
 		return compare(QStringList{ leftPath, rightPath }, error);

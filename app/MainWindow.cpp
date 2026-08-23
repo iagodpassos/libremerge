@@ -64,7 +64,11 @@ MainWindow::MainWindow(QWidget *parent)
 	};
 
 	QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
-	addMenuAction(fileMenu, tr("&New Comparison..."), QKeySequence::New,
+	// like WinMerge: New opens an empty text comparison to paste into,
+	// Open brings up the file/folder selector
+	addMenuAction(fileMenu, tr("&New"), QKeySequence::New,
+		[this]() { openBlankComparison(); });
+	addMenuAction(fileMenu, tr("&Open..."), QKeySequence::Open,
 		[this]() { newComparison(); });
 	fileMenu->addSeparator();
 	addMenuAction(fileMenu, tr("&Save"), QKeySequence::Save, [fileView]() {
@@ -245,22 +249,29 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 			tr("Could not compare files:\n%1").arg(error));
 		return;
 	}
-	auto viewTitle = [](FileCompareView *v) {
-		QStringList names;
-		for (const QString &path : v->paths())
-			names.append(QFileInfo(path).fileName());
-		return names.join(QString::fromUtf8(" \xE2\x86\x94 "));
-	};
-	auto refreshTab = [this, viewTitle](FileCompareView *v) {
+	attachFileView(view);
+}
+
+void MainWindow::openBlankComparison()
+{
+	// WinMerge's File > New: paste or type text on both sides
+	auto *view = new FileCompareView(this);
+	view->startBlank();
+	attachFileView(view);
+}
+
+void MainWindow::attachFileView(FileCompareView *view)
+{
+	auto refreshTab = [this](FileCompareView *v) {
 		const int tabIndex = m_tabs->indexOf(v);
 		if (tabIndex < 0)
 			return;
 		m_tabs->setTabText(tabIndex, (v->isModified()
-			? QString::fromUtf8("\xE2\x80\xA2 ") : QString()) + viewTitle(v));
+			? QString::fromUtf8("\xE2\x80\xA2 ") : QString()) + v->tabTitle());
 		m_tabs->setTabToolTip(tabIndex, v->paths().join(QStringLiteral("\n")));
 	};
-	const int index = m_tabs->addTab(view, viewTitle(view));
-	m_tabs->setTabToolTip(index, paths.join(QStringLiteral("\n")));
+	const int index = m_tabs->addTab(view, view->tabTitle());
+	m_tabs->setTabToolTip(index, view->paths().join(QStringLiteral("\n")));
 	m_tabs->setCurrentIndex(index);
 	connect(view, &FileCompareView::modifiedChanged, this,
 		[view, refreshTab](bool) { refreshTab(view); });

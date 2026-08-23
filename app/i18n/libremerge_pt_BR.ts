@@ -112,6 +112,18 @@
         <translation>Direita → Meio</translation>
     </message>
     <message>
+        <source>Untitled Left</source>
+        <translation>Esquerda Sem Título</translation>
+    </message>
+    <message>
+        <source>Untitled Right</source>
+        <translation>Direita Sem Título</translation>
+    </message>
+    <message>
+        <source>Untitled</source>
+        <translation>Sem Título</translation>
+    </message>
+    <message>
         <source>%1 appears to be a binary file.
 LibreMerge compares text files; binary comparison is not supported yet.</source>
         <translation>%1 parece ser um arquivo binário.
@@ -238,6 +250,14 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
             <numerusform>%n substituição</numerusform>
             <numerusform>%n substituições</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>Save As</source>
+        <translation>Salvar Como</translation>
+    </message>
+    <message>
+        <source>save canceled</source>
+        <translation>salvamento cancelado</translation>
     </message>
     <message>
         <source>could not create the backup file %1</source>
@@ -402,7 +422,15 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     </message>
     <message>
         <source>&amp;New Comparison...</source>
-        <translation>&amp;Nova Comparação...</translation>
+        <translation type="vanished">&amp;Nova Comparação...</translation>
+    </message>
+    <message>
+        <source>&amp;New</source>
+        <translation>&amp;Novo</translation>
+    </message>
+    <message>
+        <source>&amp;Open...</source>
+        <translation>&amp;Abrir...</translation>
     </message>
     <message>
         <source>&amp;Save</source>
