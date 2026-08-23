@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 {
 	QApplication app(argc, argv);
 	QApplication::setApplicationName(QStringLiteral("LibreMerge"));
-	QApplication::setApplicationVersion(QStringLiteral("0.5.3"));
+	QApplication::setApplicationVersion(QStringLiteral("0.6.0"));
 	QApplication::setOrganizationName(QStringLiteral("LibreMerge"));
 
 	// translations follow the system language (LIBREMERGE_LANGUAGE
