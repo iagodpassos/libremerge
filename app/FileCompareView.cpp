@@ -355,6 +355,8 @@ FileCompareView::FileCompareView(QWidget *parent)
 		// like WinMerge's OnLButtonDblClk
 		m_panes[i]->setDoubleClickHook(
 			[this](int viewLine) { selectDiffAtViewLine(viewLine); });
+		m_panes[i]->setFileDropHook(
+			[this, i](const QString &path) { changeSideFile(i, path); });
 		m_panes[i]->setTabStopDistance(
 			4 * QFontMetricsF(mono).horizontalAdvance(QLatin1Char(' ')));
 		// QTextDocument's own modified tracking ignores syntax-highlight
@@ -1268,6 +1270,12 @@ int FileCompareView::firstVisibleViewLine() const
 	return m_panes[0]->firstVisibleLine();
 }
 
+void FileCompareView::selectAllAndCopyForTest(int side)
+{
+	m_panes[side]->selectAll();
+	m_panes[side]->copy();
+}
+
 QStringList FileCompareView::paths() const
 {
 	QStringList result;
@@ -1880,6 +1888,30 @@ bool FileCompareView::saveModified(QString *error)
 			return false;
 	}
 	return true;
+}
+
+QList<int> FileCompareView::modifiedSideIndexes() const
+{
+	QList<int> sides;
+	for (int side = 0; side < m_paneCount; ++side)
+		if (m_sides[side].modified)
+			sides.append(side);
+	return sides;
+}
+
+QString FileCompareView::sideLabel(int side) const
+{
+	const Side &s = m_sides[side];
+	if (!s.path.isEmpty())
+		return s.path;
+	return s.caption.isEmpty() ? tr("Untitled") : s.caption;
+}
+
+bool FileCompareView::saveSideAt(int side, QString *error)
+{
+	if (side < 0 || side >= m_paneCount)
+		return false;
+	return saveSide(side, error);
 }
 
 bool FileCompareView::saveSide(int side, QString *error)

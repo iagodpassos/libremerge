@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "MainWindow.h"
 
+#include <QAbstractButton>
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QVBoxLayout>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
@@ -479,19 +481,54 @@ void MainWindow::closeTab(int index)
 	QWidget *page = m_tabs->widget(index);
 	if (auto *view = qobject_cast<FileCompareView *>(page); view != nullptr && view->isModified())
 	{
-		const auto choice = QMessageBox::question(this, tr("LibreMerge"),
-			tr("This comparison has unsaved changes. Save before closing?"),
-			QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-		if (choice == QMessageBox::Cancel)
-			return;
-		if (choice == QMessageBox::Save)
+		// like WinMerge's closing dialog: list each modified side and
+		// let the user pick what gets saved
+		QDialog dialog(this);
+		dialog.setWindowTitle(tr("Save Changes"));
+		auto *layout = new QVBoxLayout(&dialog);
+		auto *label = new QLabel(
+			tr("This comparison has unsaved changes. Save the checked "
+			   "files before closing?"), &dialog);
+		label->setWordWrap(true);
+		layout->addWidget(label);
+		QList<QCheckBox *> boxes;
+		const QList<int> sides = view->modifiedSideIndexes();
+		for (const int side : sides)
 		{
-			QString error;
-			if (!view->saveModified(&error))
+			auto *box = new QCheckBox(view->sideLabel(side), &dialog);
+			box->setChecked(true);
+			layout->addWidget(box);
+			boxes.append(box);
+		}
+		auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save
+			| QDialogButtonBox::Discard | QDialogButtonBox::Cancel, &dialog);
+		connect(buttons, &QDialogButtonBox::clicked, &dialog,
+			[&dialog, buttons](QAbstractButton *button) {
+				switch (buttons->standardButton(button))
+				{
+				case QDialogButtonBox::Save: dialog.done(1); break;
+				case QDialogButtonBox::Discard: dialog.done(2); break;
+				default: dialog.reject(); break;
+				}
+			});
+		layout->addWidget(buttons);
+
+		const int choice = dialog.exec();
+		if (choice == 0)
+			return; // cancelled
+		if (choice == 1)
+		{
+			for (int k = 0; k < sides.size(); ++k)
 			{
-				QMessageBox::warning(this, tr("LibreMerge"),
-					tr("Could not save:\n%1").arg(error));
-				return;
+				if (!boxes.at(k)->isChecked())
+					continue;
+				QString error;
+				if (!view->saveSideAt(sides.at(k), &error))
+				{
+					QMessageBox::warning(this, tr("LibreMerge"),
+						tr("Could not save:\n%1").arg(error));
+					return;
+				}
 			}
 		}
 	}

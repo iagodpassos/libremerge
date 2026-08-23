@@ -47,6 +47,14 @@ public:
 		m_doubleClickHook = std::move(hook);
 	}
 
+	/** Called when a local file is dropped or pasted onto the pane; the
+	    compare view loads it into this side instead of inserting the
+	    URL as text, like WinMerge. */
+	void setFileDropHook(std::function<void(const QString &path)> hook)
+	{
+		m_fileDropHook = std::move(hook);
+	}
+
 	int gutterWidth() const;
 	void paintGutter(QPaintEvent *event);
 
@@ -57,6 +65,9 @@ protected:
 	bool event(QEvent *event) override;
 	void mouseDoubleClickEvent(QMouseEvent *event) override;
 	void resizeEvent(QResizeEvent *event) override;
+	QMimeData *createMimeDataFromSelection() const override;
+	bool canInsertFromMimeData(const QMimeData *source) const override;
+	void insertFromMimeData(const QMimeData *source) override;
 
 private slots:
 	void updateGutterWidth();
@@ -67,4 +78,5 @@ private:
 	QHash<int, QColor> m_lineColors;
 	QList<int> m_lineNumbers;
 	std::function<void(int)> m_doubleClickHook;
+	std::function<void(const QString &)> m_fileDropHook;
 };

@@ -2,9 +2,11 @@
 #include "DiffTextEdit.h"
 
 #include <QKeyEvent>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QTextBlock>
+#include <QUrl>
 
 namespace
 {
@@ -72,6 +74,57 @@ bool DiffTextEdit::event(QEvent *event)
 		}
 	}
 	return QPlainTextEdit::event(event);
+}
+
+/** Copy leaves the alignment ghost lines out, like WinMerge's
+    GetTextWithoutEmptys: they are visual filler, not file content. */
+QMimeData *DiffTextEdit::createMimeDataFromSelection() const
+{
+	const QTextCursor cursor = textCursor();
+	if (!cursor.hasSelection())
+		return QPlainTextEdit::createMimeDataFromSelection();
+
+	const int selStart = cursor.selectionStart();
+	const int selEnd = cursor.selectionEnd();
+	QStringList parts;
+	for (QTextBlock block = document()->findBlock(selStart);
+		block.isValid() && block.position() <= selEnd; block = block.next())
+	{
+		if (isGhostBlock(block))
+			continue;
+		const int from = qMax(selStart, block.position()) - block.position();
+		const int to = qMin(selEnd, block.position() + block.length() - 1)
+			- block.position();
+		parts.append(block.text().mid(from, to - from));
+	}
+	auto *mime = new QMimeData;
+	mime->setText(parts.join(QChar('\n')));
+	return mime;
+}
+
+bool DiffTextEdit::canInsertFromMimeData(const QMimeData *source) const
+{
+	if (source->hasUrls())
+		return true;
+	return QPlainTextEdit::canInsertFromMimeData(source);
+}
+
+void DiffTextEdit::insertFromMimeData(const QMimeData *source)
+{
+	// dropping a file loads it into this pane, like WinMerge, instead
+	// of inserting the file:// URL as text
+	if (source->hasUrls())
+	{
+		for (const QUrl &url : source->urls())
+		{
+			if (url.isLocalFile() && m_fileDropHook)
+			{
+				m_fileDropHook(url.toLocalFile());
+				return;
+			}
+		}
+	}
+	QPlainTextEdit::insertFromMimeData(source);
 }
 
 void DiffTextEdit::mouseDoubleClickEvent(QMouseEvent *event)

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // LibreMerge: Qt application entry point.
 #include <QApplication>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QCommandLineParser>
 #include <QFileInfo>
 #include <QLibraryInfo>
@@ -82,7 +84,39 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestNavOpt(QStringLiteral("selftest-nav"),
 		QStringLiteral("Verify next-diff after a copy continues from the cursor (for testing)"));
 	parser.addOption(selftestNavOpt);
+	QCommandLineOption selftestCopyOpt(QStringLiteral("selftest-copy"),
+		QStringLiteral("Verify select-all + copy excludes alignment filler (for testing)"));
+	parser.addOption(selftestCopyOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestCopyOpt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 2)
+			return 2;
+		FileCompareView view;
+		QString error;
+		if (!view.compare(files.at(0), files.at(1), &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		view.selectAllAndCopyForTest(0);
+		const QString copied = QGuiApplication::clipboard()->text();
+
+		QFile leftFile(files.at(0));
+		leftFile.open(QIODevice::ReadOnly);
+		QString expected = QString::fromUtf8(leftFile.readAll());
+		expected.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+		while (expected.endsWith(QChar('\n')))
+			expected.chop(1);
+
+		const bool ok = copied == expected;
+		printf("copied %lld chars, expected %lld, match: %d\n",
+			static_cast<long long>(copied.size()),
+			static_cast<long long>(expected.size()), ok);
+		return ok ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestNavOpt))
 	{

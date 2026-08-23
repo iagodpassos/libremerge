@@ -663,8 +663,16 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Selecionar Arquivos ou Pastas</translation>
     </message>
     <message>
+        <source>Save Changes</source>
+        <translation>Salvar Alterações</translation>
+    </message>
+    <message>
+        <source>This comparison has unsaved changes. Save the checked files before closing?</source>
+        <translation>Esta comparação tem alterações não salvas. Salvar os arquivos marcados antes de fechar?</translation>
+    </message>
+    <message>
         <source>This comparison has unsaved changes. Save before closing?</source>
-        <translation>Esta comparação tem alterações não salvas. Salvar antes de fechar?</translation>
+        <translation type="vanished">Esta comparação tem alterações não salvas. Salvar antes de fechar?</translation>
     </message>
     <message>
         <source>Could not save:

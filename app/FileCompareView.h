@@ -40,6 +40,13 @@ public:
 
 	/** Tab title: file names, or the untitled captions. */
 	QString tabTitle() const;
+
+	/** Sides with unsaved changes (for the closing dialog). */
+	QList<int> modifiedSideIndexes() const;
+	/** Display name of a side: its path, or the untitled caption. */
+	QString sideLabel(int side) const;
+	/** Save one side (untitled sides ask for a name). */
+	bool saveSideAt(int side, QString *error);
 	bool compare(const QString &leftPath, const QString &rightPath, QString *error)
 	{
 		return compare(QStringList{ leftPath, rightPath }, error);
@@ -51,6 +58,8 @@ public:
 	QStringList paths() const;
 	/** Top view line of the first pane (for tests). */
 	int firstVisibleViewLine() const;
+	/** Select everything in one pane and copy it (for tests). */
+	void selectAllAndCopyForTest(int side);
 
 	/** Mark sides as read-only before compare(): the pane rejects edits
 	    and merge operations refuse to target it. */
