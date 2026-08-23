@@ -351,6 +351,10 @@ FileCompareView::FileCompareView(QWidget *parent)
 			this, [this, i](int value) { syncHScroll(i, value); });
 		connect(m_panes[i], &QPlainTextEdit::cursorPositionChanged,
 			this, [this, i]() { updatePaneStatus(i); });
+		// double-clicking inside a difference selects it as current,
+		// like WinMerge's OnLButtonDblClk
+		m_panes[i]->setDoubleClickHook(
+			[this](int viewLine) { selectDiffAtViewLine(viewLine); });
 		m_panes[i]->setTabStopDistance(
 			4 * QFontMetricsF(mono).horizontalAdvance(QLatin1Char(' ')));
 		// QTextDocument's own modified tracking ignores syntax-highlight
@@ -1403,7 +1407,24 @@ void FileCompareView::gotoNextDiff()
 {
 	if (m_diffStale)
 		recompare();
-	const int next = nextActive(m_current, +1);
+	int next = -1;
+	if (m_current >= 0)
+		next = nextActive(m_current, +1);
+	else
+	{
+		// no selected diff: search from the cursor, like upstream's
+		// DiffList::NextSignificantDiffFromLine
+		const int line = m_panes[m_activePane]->textCursor().blockNumber();
+		for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+		{
+			if (!m_blocks[b].trivial && !m_blocks[b].resolved
+				&& m_blocks[b].viewBegin >= line)
+			{
+				next = b;
+				break;
+			}
+		}
+	}
 	if (next >= 0)
 		gotoDiff(next);
 }
@@ -1412,7 +1433,22 @@ void FileCompareView::gotoPrevDiff()
 {
 	if (m_diffStale)
 		recompare();
-	const int prev = nextActive(m_current < 0 ? static_cast<int>(m_blocks.size()) : m_current, -1);
+	int prev = -1;
+	if (m_current >= 0)
+		prev = nextActive(m_current, -1);
+	else
+	{
+		const int line = m_panes[m_activePane]->textCursor().blockNumber();
+		for (int b = static_cast<int>(m_blocks.size()) - 1; b >= 0; --b)
+		{
+			if (!m_blocks[b].trivial && !m_blocks[b].resolved
+				&& m_blocks[b].viewEnd <= line)
+			{
+				prev = b;
+				break;
+			}
+		}
+	}
 	if (prev >= 0)
 		gotoDiff(prev);
 }

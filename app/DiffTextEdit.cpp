@@ -2,6 +2,7 @@
 #include "DiffTextEdit.h"
 
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QTextBlock>
 
@@ -71,6 +72,15 @@ bool DiffTextEdit::event(QEvent *event)
 		}
 	}
 	return QPlainTextEdit::event(event);
+}
+
+void DiffTextEdit::mouseDoubleClickEvent(QMouseEvent *event)
+{
+	if (m_doubleClickHook)
+		m_doubleClickHook(
+			cursorForPosition(event->position().toPoint()).blockNumber());
+	// the default word selection still applies, like upstream
+	QPlainTextEdit::mouseDoubleClickEvent(event);
 }
 
 int DiffTextEdit::firstVisibleLine() const

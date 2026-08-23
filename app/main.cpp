@@ -79,7 +79,37 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestUndoScrollOpt(QStringLiteral("selftest-undo-scroll"),
 		QStringLiteral("Verify the viewport stays put across merge+undo (for testing)"));
 	parser.addOption(selftestUndoScrollOpt);
+	QCommandLineOption selftestNavOpt(QStringLiteral("selftest-nav"),
+		QStringLiteral("Verify next-diff after a copy continues from the cursor (for testing)"));
+	parser.addOption(selftestNavOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestNavOpt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 2)
+			return 2;
+		FileCompareView view;
+		view.resize(900, 400);
+		QString error;
+		if (!view.compare(files.at(0), files.at(1), &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		// stand on the middle difference, merge it (which deselects),
+		// then Next must continue downward from the cursor
+		view.gotoFirstDiff();
+		view.gotoNextDiff();
+		QCoreApplication::processEvents();
+		const int middle = view.firstVisibleViewLine();
+		view.copyCurrentDiff(0);
+		view.gotoNextDiff();
+		QCoreApplication::processEvents();
+		const int landed = view.firstVisibleViewLine();
+		printf("middle: %d, landed: %d\n", middle, landed);
+		return landed > middle ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestUndoScrollOpt))
 	{

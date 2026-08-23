@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
 #include <QHash>
 #include <QList>
 #include <QPlainTextEdit>
@@ -38,6 +39,14 @@ public:
 	    lines (no number drawn). Empty list falls back to 1:1 numbering. */
 	void setLineNumbers(const QList<int> &numbers);
 
+	/** Called with the view line on double-click, before the default
+	    word selection (the compare view selects the difference there,
+	    like WinMerge's OnLButtonDblClk). */
+	void setDoubleClickHook(std::function<void(int viewLine)> hook)
+	{
+		m_doubleClickHook = std::move(hook);
+	}
+
 	int gutterWidth() const;
 	void paintGutter(QPaintEvent *event);
 
@@ -46,6 +55,7 @@ public:
 
 protected:
 	bool event(QEvent *event) override;
+	void mouseDoubleClickEvent(QMouseEvent *event) override;
 	void resizeEvent(QResizeEvent *event) override;
 
 private slots:
@@ -56,4 +66,5 @@ private:
 	QWidget *m_gutter;
 	QHash<int, QColor> m_lineColors;
 	QList<int> m_lineNumbers;
+	std::function<void(int)> m_doubleClickHook;
 };
