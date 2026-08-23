@@ -565,6 +565,14 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Re&amp;comparar</translation>
     </message>
     <message>
+        <source>&amp;Tools</source>
+        <translation>Ferramen&amp;tas</translation>
+    </message>
+    <message>
+        <source>&amp;Line Filters...</source>
+        <translation>&amp;Filtros de Linha...</translation>
+    </message>
+    <message>
         <source>&amp;Help</source>
         <translation>A&amp;juda</translation>
     </message>
@@ -651,12 +659,32 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Nenhum</translation>
     </message>
     <message>
+        <source>Detect moved blocks</source>
+        <translation>Detectar blocos movidos</translation>
+    </message>
+    <message>
         <source>Back up the original file when saving (.bak)</source>
         <translation>Fazer backup do arquivo original ao salvar (.bak)</translation>
     </message>
     <message>
         <source>Open comparisons pick the new options up on Recompare (F5) or when reopened.</source>
         <translation>Comparações abertas aplicam as novas opções ao Recomparar (F5) ou ao serem reabertas.</translation>
+    </message>
+    <message>
+        <source>Line Filters</source>
+        <translation>Filtros de Linha</translation>
+    </message>
+    <message>
+        <source>Differences whose lines all match an enabled regular expression are shown as trivial and skipped by the navigation.</source>
+        <translation>Diferenças cujas linhas casam todas com uma expressão regular habilitada são exibidas como triviais e puladas pela navegação.</translation>
+    </message>
+    <message>
+        <source>Add</source>
+        <translation>Adicionar</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>Remover</translation>
     </message>
     <message>
         <source>Select Files or Folders</source>

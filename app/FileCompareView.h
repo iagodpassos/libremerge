@@ -2,6 +2,7 @@
 #pragma once
 
 #include <memory>
+#include <QSet>
 #include <QStringList>
 #include <QWidget>
 #include <vector>
@@ -181,6 +182,7 @@ private:
 	std::vector<Block> m_blocks;
 	std::vector<WordSpan> m_wordSpans;
 	QStringList m_realLines[3];      // side's real lines as of the last diff run
+	QSet<int> m_movedLines[3];       // real lines inside moved blocks
 	std::vector<int> m_realToView[3]; // real line -> view line, ditto
 	QList<int> m_lineNumbers[3];      // view line -> 1-based real number, -1 ghost
 	struct UndoRef

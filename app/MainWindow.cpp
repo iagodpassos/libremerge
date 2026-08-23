@@ -19,6 +19,7 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPushButton>
@@ -219,6 +220,10 @@ MainWindow::MainWindow(QWidget *parent)
 				folder->recompare();
 		});
 
+	QMenu *toolsMenu = menuBar()->addMenu(tr("&Tools"));
+	addMenuAction(toolsMenu, tr("&Line Filters..."), QKeySequence(),
+		[this]() { showLineFilters(); });
+
 	QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
 	QAction *aboutAction = helpMenu->addAction(tr("&About LibreMerge"));
 	connect(aboutAction, &QAction::triggered, this, [this]() {
@@ -332,22 +337,27 @@ void MainWindow::showOptions()
 	algorithm->setCurrentIndex(mgr->GetInt(OPT_CMP_DIFF_ALGORITHM));
 	grid->addWidget(algorithm, 5, 1);
 
+	// like WinMerge's OPT_CMP_MOVED_BLOCKS, off by default
+	auto *movedBlocks = new QCheckBox(tr("Detect moved blocks"), &dialog);
+	movedBlocks->setChecked(mgr->GetBool(OPT_CMP_MOVED_BLOCKS));
+	grid->addWidget(movedBlocks, 6, 0, 1, 2);
+
 	// like WinMerge's OPT_BACKUP_FILECMP, on by default
 	auto *backup = new QCheckBox(
 		tr("Back up the original file when saving (.bak)"), &dialog);
 	backup->setChecked(QSettings()
 		.value(QStringLiteral("Backup/FileCompare"), true).toBool());
-	grid->addWidget(backup, 6, 0, 1, 2);
+	grid->addWidget(backup, 7, 0, 1, 2);
 
 	auto *note = new QLabel(tr("Open comparisons pick the new options up on "
 		"Recompare (F5) or when reopened."), &dialog);
 	note->setWordWrap(true);
-	grid->addWidget(note, 7, 0, 1, 2);
+	grid->addWidget(note, 8, 0, 1, 2);
 
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
 	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-	grid->addWidget(buttons, 8, 0, 1, 2);
+	grid->addWidget(buttons, 9, 0, 1, 2);
 
 	if (dialog.exec() != QDialog::Accepted)
 		return;
@@ -358,9 +368,82 @@ void MainWindow::showOptions()
 	mgr->SaveOption(OPT_CMP_IGNORE_EOL, ignoreEol->isChecked());
 	mgr->SaveOption(OPT_CMP_IGNORE_NUMBERS, ignoreNumbers->isChecked());
 	mgr->SaveOption(OPT_CMP_DIFF_ALGORITHM, algorithm->currentIndex());
+	mgr->SaveOption(OPT_CMP_MOVED_BLOCKS, movedBlocks->isChecked());
 	mgr->FlushOptions();
 	QSettings().setValue(QStringLiteral("Backup/FileCompare"),
 		backup->isChecked());
+}
+
+/** WinMerge's line filters: regular expressions whose matching lines
+    are ignored (their diffs become trivial). */
+void MainWindow::showLineFilters()
+{
+	QDialog dialog(this);
+	dialog.setWindowTitle(tr("Line Filters"));
+	auto *layout = new QVBoxLayout(&dialog);
+	auto *note = new QLabel(tr("Differences whose lines all match an "
+		"enabled regular expression are shown as trivial and skipped "
+		"by the navigation."), &dialog);
+	note->setWordWrap(true);
+	layout->addWidget(note);
+
+	auto *list = new QListWidget(&dialog);
+	const QStringList entries = QSettings()
+		.value(QStringLiteral("LineFilters/List")).toStringList();
+	for (const QString &entry : entries)
+	{
+		const bool enabled = entry.startsWith(QStringLiteral("1\t"));
+		auto *item = new QListWidgetItem(entry.mid(2), list);
+		item->setFlags(item->flags() | Qt::ItemIsUserCheckable
+			| Qt::ItemIsEditable);
+		item->setCheckState(enabled ? Qt::Checked : Qt::Unchecked);
+	}
+	layout->addWidget(list, 1);
+
+	auto *rowButtons = new QHBoxLayout;
+	auto *addButton = new QPushButton(tr("Add"), &dialog);
+	connect(addButton, &QPushButton::clicked, &dialog, [list]() {
+		auto *item = new QListWidgetItem(QString(), list);
+		item->setFlags(item->flags() | Qt::ItemIsUserCheckable
+			| Qt::ItemIsEditable);
+		item->setCheckState(Qt::Checked);
+		list->setCurrentItem(item);
+		list->editItem(item);
+	});
+	rowButtons->addWidget(addButton);
+	auto *removeButton = new QPushButton(tr("Remove"), &dialog);
+	connect(removeButton, &QPushButton::clicked, &dialog, [list]() {
+		delete list->currentItem();
+	});
+	rowButtons->addWidget(removeButton);
+	rowButtons->addStretch(1);
+	layout->addLayout(rowButtons);
+
+	auto *hint = new QLabel(tr("Open comparisons pick the new options up on "
+		"Recompare (F5) or when reopened."), &dialog);
+	hint->setWordWrap(true);
+	layout->addWidget(hint);
+
+	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok
+		| QDialogButtonBox::Cancel, &dialog);
+	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+	layout->addWidget(buttons);
+	dialog.resize(480, 360);
+
+	if (dialog.exec() != QDialog::Accepted)
+		return;
+	QStringList saved;
+	for (int i = 0; i < list->count(); ++i)
+	{
+		const QListWidgetItem *item = list->item(i);
+		if (item->text().trimmed().isEmpty())
+			continue;
+		saved.append((item->checkState() == Qt::Checked
+			? QStringLiteral("1\t") : QStringLiteral("0\t"))
+			+ item->text().trimmed());
+	}
+	QSettings().setValue(QStringLiteral("LineFilters/List"), saved);
 }
 
 void MainWindow::newComparison()

@@ -68,6 +68,7 @@ const DiffColors &diffColors()
 		QColor(251, 242, 191), QColor(233, 233, 233),
 		QColor(241, 226, 173), QColor(255, 170, 130),
 		QColor(255, 160, 160), QColor(200, 129, 108),
+		QColor(228, 155, 82), QColor(248, 112, 78),
 	};
 	// same roles, tuned for light text on a #1e1e1e editor
 	static const DiffColors dark = {
@@ -76,6 +77,7 @@ const DiffColors &diffColors()
 		QColor(72, 68, 40), QColor(50, 50, 50),
 		QColor(130, 108, 36), QColor(160, 84, 48),
 		QColor(168, 88, 88), QColor(150, 78, 52),
+		QColor(140, 90, 45), QColor(150, 70, 45),
 	};
 	return Theme::instance()->dark() ? dark : light;
 }

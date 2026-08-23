@@ -41,6 +41,10 @@
 // engine
 #include "DiffWrapper.h"
 #include "DiffList.h"
+#include "FilterList.h"
+#include "MovedLines.h"
+#include "OptionsDef.h"
+#include "OptionsMgr.h"
 #include "PathContext.h"
 #include "UniFile.h"
 #include "unicoder.h"
@@ -701,6 +705,34 @@ bool FileCompareView::runDiff(QString *error)
 	wrapper.SetCreateDiffList(&diffList);
 	wrapper.SetPaths(paths, false);
 	wrapper.SetOptions(&options);
+
+	// line filters: diffs whose lines all match an enabled expression
+	// become trivial, like WinMerge's Tools > Filters
+	auto filterList = std::make_shared<FilterList>();
+	const QStringList filterEntries = QSettings()
+		.value(QStringLiteral("LineFilters/List")).toStringList();
+	for (const QString &entry : filterEntries)
+	{
+		if (entry.startsWith(QStringLiteral("1\t")))
+		{
+			try
+			{
+				filterList->AddRegExp(entry.mid(2).toStdString());
+			}
+			catch (...)
+			{
+				// invalid expression: skip it
+			}
+		}
+	}
+	if (filterList->HasRegExps())
+		wrapper.SetFilterList(filterList);
+
+	COptionsMgr *mgr = GetOptionsMgr();
+	const bool detectMoved = mgr != nullptr
+		&& mgr->GetBool(OPT_CMP_MOVED_BLOCKS) && m_paneCount == 2;
+	wrapper.SetDetectMovedBlocks(detectMoved);
+
 	if (!wrapper.RunFileDiff())
 	{
 		if (error != nullptr)
@@ -717,6 +749,25 @@ bool FileCompareView::runDiff(QString *error)
 			*error = tr("the files could not be compared as text");
 		m_status->setText(tr("Binary content \xE2\x80\x94 comparison not supported"));
 		return false;
+	}
+
+	// like upstream's FlagMovedLines: remember which real lines belong
+	// to moved blocks, per side
+	for (int side = 0; side < 3; ++side)
+		m_movedLines[side].clear();
+	if (detectMoved)
+	{
+		for (int side = 0; side < 2; ++side)
+		{
+			MovedLines *moved = wrapper.GetMovedLines(side);
+			if (moved == nullptr)
+				continue;
+			const MovedLines::SIDE other = side == 0
+				? MovedLines::SIDE::RIGHT : MovedLines::SIDE::LEFT;
+			for (int line = 0; line < m_realLines[side].size(); ++line)
+				if (moved->LineInBlock(line, other) != -1)
+					m_movedLines[side].insert(line);
+		}
 	}
 
 	m_blocks.clear();
@@ -994,6 +1045,9 @@ void FileCompareView::applyHighlights()
 						continue; // merged: real lines look like common text
 					color = C.trivialDeleted;
 				}
+				else if (!ghost && m_movedLines[side].contains(
+					block.begin[side] + (v - block.viewBegin)))
+					color = current ? C.selMoved : C.moved;
 				else if (current)
 					color = ghost ? C.selDiffDeleted : C.selDiff;
 				else

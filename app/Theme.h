@@ -45,6 +45,7 @@ struct DiffColors
 	QColor trivial, trivialDeleted;
 	QColor wordDiff, wordDiffDeleted;
 	QColor selWordDiff, selWordDiffDeleted;
+	QColor moved, selMoved;
 };
 
 const DiffColors &diffColors();

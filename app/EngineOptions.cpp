@@ -157,6 +157,7 @@ void installEngineOptions()
 	options.InitOption(OPT_CMP_IGNORE_EOL, false);
 	options.InitOption(OPT_CMP_DIFF_ALGORITHM, 0);
 	options.InitOption(OPT_CMP_INDENT_HEURISTIC, true); // upstream default
+	options.InitOption(OPT_CMP_MOVED_BLOCKS, false);    // upstream default
 }
 
 DIFFOPTIONS currentDiffOptions()
