@@ -819,4 +819,94 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Pasta: %1</translation>
     </message>
 </context>
+<context>
+    <name>TableCompareView</name>
+    <message>
+        <source>Previous Difference</source>
+        <translation>Diferença Anterior</translation>
+    </message>
+    <message>
+        <source>Next Difference</source>
+        <translation>Próxima Diferença</translation>
+    </message>
+    <message>
+        <source>Copy to Right</source>
+        <translation>Copiar para a Direita</translation>
+    </message>
+    <message>
+        <source>Copy to Left</source>
+        <translation>Copiar para a Esquerda</translation>
+    </message>
+    <message>
+        <source>Copy All to Right</source>
+        <translation>Copiar Tudo para a Direita</translation>
+    </message>
+    <message>
+        <source>Copy All to Left</source>
+        <translation>Copiar Tudo para a Esquerda</translation>
+    </message>
+    <message>
+        <source>Recompare</source>
+        <translation>Recomparar</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>Salvar</translation>
+    </message>
+    <message>
+        <source>First row is the header</source>
+        <translation>Primeira linha é o cabeçalho</translation>
+    </message>
+    <message>
+        <source>Open as Text</source>
+        <translation>Abrir como Texto</translation>
+    </message>
+    <message>
+        <source>cannot open %1</source>
+        <translation>não foi possível abrir %1</translation>
+    </message>
+    <message>
+        <source>cannot create temporary file</source>
+        <translation>não foi possível criar o arquivo temporário</translation>
+    </message>
+    <message>
+        <source>the diff engine failed</source>
+        <translation>o motor de comparação falhou</translation>
+    </message>
+    <message>
+        <source>Files are identical</source>
+        <translation>Os arquivos são idênticos</translation>
+    </message>
+    <message>
+        <source>Difference %1 of %2</source>
+        <translation>Diferença %1 de %2</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n difference(s) found</source>
+        <translation>
+            <numerusform>%n diferença encontrada</numerusform>
+            <numerusform>%n diferenças encontradas</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>  •  delimiter: %1</source>
+        <translation>  •  delimitador: %1</translation>
+    </message>
+    <message>
+        <source>tab</source>
+        <translation>tabulação</translation>
+    </message>
+    <message>
+        <source>  • unsaved changes</source>
+        <translation>  • alterações não salvas</translation>
+    </message>
+    <message>
+        <source>could not create the backup file %1</source>
+        <translation>não foi possível criar o arquivo de backup %1</translation>
+    </message>
+    <message>
+        <source>cannot write %1</source>
+        <translation>não foi possível gravar %1</translation>
+    </message>
+</context>
 </TS>

@@ -10,6 +10,7 @@
 #include <QTimer>
 #include <QTranslator>
 #include "FileCompareView.h"
+#include "TableCompareView.h"
 #include "FileOps.h"
 #include "FolderCompareDriver.h"
 #include "MainWindow.h"
@@ -87,7 +88,39 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestCopyOpt(QStringLiteral("selftest-copy"),
 		QStringLiteral("Verify select-all + copy excludes alignment filler (for testing)"));
 	parser.addOption(selftestCopyOpt);
+	QCommandLineOption selftestTableOpt(QStringLiteral("selftest-table"),
+		QStringLiteral("Table-compare two CSVs, merge all and verify (for testing)"));
+	parser.addOption(selftestTableOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestTableOpt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 2)
+			return 2;
+		TableCompareView view;
+		QString error;
+		if (!view.compare(files.at(0), files.at(1), &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		const int initial = view.diffCount();
+		view.copyAllFrom(0);
+		const int merged = view.diffCount();
+		if (!view.saveModified(&error))
+		{
+			fprintf(stderr, "save failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		QFile leftFile(files.at(0)), rightFile(files.at(1));
+		leftFile.open(QIODevice::ReadOnly);
+		rightFile.open(QIODevice::ReadOnly);
+		const bool equal = leftFile.readAll() == rightFile.readAll();
+		printf("initial: %d, merged: %d, files equal: %d\n",
+			initial, merged, equal);
+		return (initial > 0 && merged == 0 && equal) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestCopyOpt))
 	{

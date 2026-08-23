@@ -26,6 +26,7 @@
 #include <QTabWidget>
 
 #include "FileCompareView.h"
+#include "TableCompareView.h"
 #include "Theme.h"
 #include "FolderCompareView.h"
 #include "NewComparisonView.h"
@@ -244,8 +245,23 @@ void MainWindow::openFileComparison(const QString &leftPath, const QString &righ
 	openFileComparison(QStringList{ leftPath, rightPath });
 }
 
-void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> &readOnly)
+void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> &readOnly,
+	bool forceText)
 {
+	// CSV/TSV pairs open as side-by-side grids, like WinMerge's table
+	// compare; "Open as Text" in the table view forces the text path
+	if (!forceText && paths.size() == 2)
+	{
+		const QStringList tableExts = { QStringLiteral("csv"),
+			QStringLiteral("tsv") };
+		if (tableExts.contains(QFileInfo(paths.at(0)).suffix().toLower())
+			&& tableExts.contains(QFileInfo(paths.at(1)).suffix().toLower()))
+		{
+			openTableComparison(paths.at(0), paths.at(1));
+			return;
+		}
+	}
+
 	auto *view = new FileCompareView(this);
 	view->setReadOnlySides(readOnly);
 	QString error;
@@ -257,6 +273,42 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 		return;
 	}
 	attachFileView(view);
+}
+
+void MainWindow::openTableComparison(const QString &leftPath,
+	const QString &rightPath)
+{
+	auto *view = new TableCompareView(this);
+	QString error;
+	if (!view->compare(leftPath, rightPath, &error))
+	{
+		delete view;
+		QMessageBox::warning(this, tr("LibreMerge"),
+			tr("Could not compare files:\n%1").arg(error));
+		return;
+	}
+	auto refreshTab = [this](TableCompareView *v) {
+		const int tabIndex = m_tabs->indexOf(v);
+		if (tabIndex < 0)
+			return;
+		m_tabs->setTabText(tabIndex, (v->isModified()
+			? QString::fromUtf8("\xE2\x80\xA2 ") : QString()) + v->tabTitle());
+	};
+	const int index = m_tabs->addTab(view, view->tabTitle());
+	m_tabs->setTabToolTip(index, view->paths().join(QStringLiteral("\n")));
+	m_tabs->setCurrentIndex(index);
+	connect(view, &TableCompareView::modifiedChanged, this,
+		[view, refreshTab](bool) { refreshTab(view); });
+	connect(view, &TableCompareView::openAsTextRequested, this,
+		[this, view](const QString &left, const QString &right) {
+			const int tabIndex = m_tabs->indexOf(view);
+			openFileComparison({ left, right }, {}, true);
+			if (tabIndex >= 0 && !view->isModified())
+			{
+				m_tabs->removeTab(tabIndex);
+				view->deleteLater();
+			}
+		});
 }
 
 void MainWindow::openBlankComparison()
