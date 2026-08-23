@@ -12,7 +12,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="$ROOT/build-release"
-VERSION="0.5.0"
+VERSION="0.5.1"
 DMG="$ROOT/LibreMerge-$VERSION.dmg"
 QT_BIN="$(brew --prefix qt)/bin"
 
