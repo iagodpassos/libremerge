@@ -130,6 +130,7 @@ private:
 	void gotoDiff(int blockIndex);
 	int nextActive(int from, int direction) const;
 	void applyBlockCopy(int blockIndex, int sourceSide, bool joinUndo);
+	void refreshAfterUndoRedo(const int countsBefore[3]);
 	void replaceOne();
 	void replaceAll();
 	void showHeaderMenu(int side);
@@ -157,6 +158,8 @@ private:
 	QStringList m_realLines[3];      // side's real lines as of the last diff run
 	std::vector<int> m_realToView[3]; // real line -> view line, ditto
 	QList<int> m_lineNumbers[3];      // view line -> 1-based real number, -1 ghost
+	QList<int> m_undoOrder;           // panes in chronological edit order
+	QList<int> m_redoOrder;
 	int m_diffCount = 0;
 	int m_current = -1; // index into m_blocks; -1 = none
 	int m_activePane = 0;

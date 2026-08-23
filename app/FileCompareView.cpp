@@ -363,6 +363,14 @@ FileCompareView::FileCompareView(QWidget *parent)
 					m_diffStale = true;
 				setSideModified(i, modified);
 			});
+		// undo is unified across the panes: remember which document each
+		// edit landed on, so Cmd+Z after a merge undoes the merge even
+		// though the focus stayed on the other pane
+		connect(m_panes[i]->document(), &QTextDocument::undoCommandAdded,
+			this, [this, i]() {
+				m_undoOrder.append(i);
+				m_redoOrder.clear();
+			});
 	}
 	connect(m_panes[0]->verticalScrollBar(), &QScrollBar::valueChanged,
 		this, [this]() {
@@ -1547,13 +1555,53 @@ void FileCompareView::swapSides()
 	emit pathsChanged();
 }
 
+/** After an undo/redo that kept every pane's line count (merge splices
+    always do), the alignment still holds: recompare in place to refresh
+    the highlights without touching the undo stacks. Line-count changes
+    fall back to the stale-marker flow (F5), which may rebuild. */
+void FileCompareView::refreshAfterUndoRedo(const int countsBefore[3])
+{
+	for (int side = 0; side < m_paneCount; ++side)
+		if (m_panes[side]->document()->blockCount() != countsBefore[side])
+			return; // stale marker already set by the modified listener
+	recompare();
+}
+
 void FileCompareView::undoActive()
 {
+	int counts[3] = {};
+	for (int side = 0; side < m_paneCount; ++side)
+		counts[side] = m_panes[side]->document()->blockCount();
+	while (!m_undoOrder.isEmpty())
+	{
+		const int side = m_undoOrder.takeLast();
+		if (side >= m_paneCount
+			|| !m_panes[side]->document()->isUndoAvailable())
+			continue; // stale entry (e.g. a rebuild cleared that stack)
+		m_panes[side]->undo();
+		m_redoOrder.append(side);
+		refreshAfterUndoRedo(counts);
+		return;
+	}
 	m_panes[m_activePane]->undo();
 }
 
 void FileCompareView::redoActive()
 {
+	int counts[3] = {};
+	for (int side = 0; side < m_paneCount; ++side)
+		counts[side] = m_panes[side]->document()->blockCount();
+	while (!m_redoOrder.isEmpty())
+	{
+		const int side = m_redoOrder.takeLast();
+		if (side >= m_paneCount
+			|| !m_panes[side]->document()->isRedoAvailable())
+			continue;
+		m_panes[side]->redo();
+		m_undoOrder.append(side);
+		refreshAfterUndoRedo(counts);
+		return;
+	}
 	m_panes[m_activePane]->redo();
 }
 

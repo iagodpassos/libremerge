@@ -70,7 +70,36 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestSaveOpt(QStringLiteral("selftest-save"),
 		QStringLiteral("Merge left-to-right, save and verify the backup (for testing)"));
 	parser.addOption(selftestSaveOpt);
+	QCommandLineOption selftestUndoOpt(QStringLiteral("selftest-undo"),
+		QStringLiteral("Copy one difference, undo, redo and verify (for testing)"));
+	parser.addOption(selftestUndoOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestUndoOpt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 2)
+			return 2;
+		FileCompareView view;
+		QString error;
+		if (!view.compare(files.at(0), files.at(1), &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		const int initial = view.diffCount();
+		view.copyCurrentDiff(0);
+		const int afterCopy = view.diffCount();
+		view.undoActive();
+		const int afterUndo = view.diffCount();
+		view.redoActive();
+		const int afterRedo = view.diffCount();
+		printf("initial: %d, copy: %d, undo: %d, redo: %d\n",
+			initial, afterCopy, afterUndo, afterRedo);
+		const bool ok = initial > 0 && afterCopy == initial - 1
+			&& afterUndo == initial && afterRedo == initial - 1;
+		return ok ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestSaveOpt))
 	{

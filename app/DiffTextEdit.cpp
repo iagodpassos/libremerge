@@ -60,6 +60,15 @@ bool DiffTextEdit::event(QEvent *event)
 			event->ignore();
 			return false;
 		}
+		// undo/redo go through the menu too: the compare view keeps a
+		// unified undo order across the panes, so Cmd+Z must not stop
+		// at this pane's own stack
+		if (keyEvent->matches(QKeySequence::Undo)
+			|| keyEvent->matches(QKeySequence::Redo))
+		{
+			event->ignore();
+			return false;
+		}
 	}
 	return QPlainTextEdit::event(event);
 }
