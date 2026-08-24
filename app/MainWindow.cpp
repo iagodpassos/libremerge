@@ -93,14 +93,20 @@ MainWindow::MainWindow(QWidget *parent)
 		[]() { QApplication::quit(); });
 
 	QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
-	addMenuAction(editMenu, tr("&Undo"), QKeySequence::Undo, [fileView]() {
-		if (auto *view = fileView())
-			view->undoActive();
-	});
-	addMenuAction(editMenu, tr("&Redo"), QKeySequence::Redo, [fileView]() {
-		if (auto *view = fileView())
-			view->redoActive();
-	});
+	addMenuAction(editMenu, tr("&Undo"), QKeySequence::Undo,
+		[fileView, tableView]() {
+			if (auto *view = fileView())
+				view->undoActive();
+			else if (auto *table = tableView())
+				table->undo();
+		});
+	addMenuAction(editMenu, tr("&Redo"), QKeySequence::Redo,
+		[fileView, tableView]() {
+			if (auto *view = fileView())
+				view->redoActive();
+			else if (auto *table = tableView())
+				table->redo();
+		});
 	editMenu->addSeparator();
 	addMenuAction(editMenu, tr("&Find..."), QKeySequence::Find, [fileView]() {
 		if (auto *view = fileView())

@@ -421,10 +421,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>&amp;Arquivo</translation>
     </message>
     <message>
-        <source>&amp;New Comparison...</source>
-        <translation type="vanished">&amp;Nova Comparação...</translation>
-    </message>
-    <message>
         <source>&amp;New</source>
         <translation>&amp;Novo</translation>
     </message>
@@ -699,10 +695,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Esta comparação tem alterações não salvas. Salvar os arquivos marcados antes de fechar?</translation>
     </message>
     <message>
-        <source>This comparison has unsaved changes. Save before closing?</source>
-        <translation type="vanished">Esta comparação tem alterações não salvas. Salvar antes de fechar?</translation>
-    </message>
-    <message>
         <source>Could not save:
 %1</source>
         <translation>Não foi possível salvar:
@@ -854,12 +846,12 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Copiar Tudo para a Esquerda</translation>
     </message>
     <message>
-        <source>Undo (not available in table compare yet)</source>
-        <translation>Desfazer (ainda não disponível na comparação em tabela)</translation>
+        <source>Undo</source>
+        <translation>Desfazer</translation>
     </message>
     <message>
-        <source>Redo (not available in table compare yet)</source>
-        <translation>Refazer (ainda não disponível na comparação em tabela)</translation>
+        <source>Redo</source>
+        <translation>Refazer</translation>
     </message>
     <message>
         <source>Swap Panes</source>

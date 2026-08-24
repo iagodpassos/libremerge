@@ -11,7 +11,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="0.7.1"
+VERSION="0.7.2"
 DMG="$ROOT/LibreMerge-$VERSION.dmg"
 
 # Universal (arm64 + x86_64, macOS 12+) toolchain: official Qt + ICU/Poco

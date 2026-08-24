@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	QApplication app(argc, argv);
 	QGuiApplication::setDesktopFileName(QStringLiteral("libremerge"));
 	QApplication::setApplicationName(QStringLiteral("LibreMerge"));
-	QApplication::setApplicationVersion(QStringLiteral("0.7.1"));
+	QApplication::setApplicationVersion(QStringLiteral("0.7.2"));
 	QApplication::setOrganizationName(QStringLiteral("LibreMerge"));
 
 	// translations follow the system language (LIBREMERGE_LANGUAGE
@@ -109,6 +109,10 @@ int main(int argc, char *argv[])
 		const int initial = view.diffCount();
 		view.copyAllFrom(0);
 		const int merged = view.diffCount();
+		view.undo();
+		const int undone = view.diffCount();
+		view.redo();
+		const int redone = view.diffCount();
 		if (!view.saveModified(&error))
 		{
 			fprintf(stderr, "save failed: %s\n", qPrintable(error));
@@ -118,9 +122,10 @@ int main(int argc, char *argv[])
 		leftFile.open(QIODevice::ReadOnly);
 		rightFile.open(QIODevice::ReadOnly);
 		const bool equal = leftFile.readAll() == rightFile.readAll();
-		printf("initial: %d, merged: %d, files equal: %d\n",
-			initial, merged, equal);
-		return (initial > 0 && merged == 0 && equal) ? 0 : 1;
+		printf("initial: %d, merged: %d, undone: %d, redone: %d, "
+			"files equal: %d\n", initial, merged, undone, redone, equal);
+		return (initial > 0 && merged == 0 && undone == initial
+			&& redone == 0 && equal) ? 0 : 1;
 	}
 
 	if (parser.isSet(selftestCopyOpt))

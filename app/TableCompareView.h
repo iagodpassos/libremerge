@@ -41,6 +41,8 @@ public:
 	void selectDiffAtCursor();
 	void copyCurrentDiff(int sourceSide);
 	void copyAllFrom(int sourceSide);
+	void undo();
+	void redo();
 	void swapSides();
 	void focusNextPane();
 	void recompare();
@@ -73,6 +75,18 @@ private:
 		std::vector<QStringList> cells;       // parsed per row
 	};
 
+	// one side's content before a block copy; undo/redo swap the live
+	// state with these snapshots (QStringList shares the row strings, so
+	// each entry is cheap)
+	struct UndoEntry
+	{
+		int side;
+		QStringList lines;
+		bool modified;
+		int saveSerial;   // invalid once the side is saved again
+		int viewBegin;    // where the change was, to reselect
+	};
+
 	bool loadSide(int side, const QString &path, QString *error);
 	bool runDiff(QString *error);
 	void rebuildModel();
@@ -81,6 +95,11 @@ private:
 	void gotoDiff(int blockIndex);
 	void selectDiffAtModelRow(int modelRow);
 	int nextActive(int from, int direction) const;
+	UndoEntry captureEntry(int side, int viewBegin) const;
+	void applyEntry(const UndoEntry &entry);
+	void pushUndo(const UndoEntry &entry);
+	void clearHistory();
+	void updateUndoActions();
 	void applyTheme();
 	void setSideModified(int side, bool modified);
 
@@ -97,6 +116,11 @@ private:
 	QLabel *m_status;
 	QAction *m_actSave = nullptr;
 	QAction *m_actHeader = nullptr;
+	QAction *m_actUndo = nullptr;
+	QAction *m_actRedo = nullptr;
+	QList<UndoEntry> m_undoStack;
+	QList<UndoEntry> m_redoStack;
+	int m_saveSerial[2] = { 0, 0 };
 	int m_diffCount = 0;
 	int m_current = -1;
 	bool m_syncing = false;

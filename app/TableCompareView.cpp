@@ -242,15 +242,12 @@ TableCompareView::TableCompareView(QWidget *parent)
 	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"), QString(),
 		[this]() { copyAllFrom(1); });
 	toolbar->addSeparator();
-	// block copies in the table rebuild the whole model, so there is no
-	// undo history yet; the buttons stay for visual parity with the text
-	// compare until that lands
-	QAction *undoAction = addToolAction(lm::Icon::Undo,
-		tr("Undo (not available in table compare yet)"), QString(), []() {});
-	undoAction->setEnabled(false);
-	QAction *redoAction = addToolAction(lm::Icon::Redo,
-		tr("Redo (not available in table compare yet)"), QString(), []() {});
-	redoAction->setEnabled(false);
+	m_actUndo = addToolAction(lm::Icon::Undo, tr("Undo"),
+		QString::fromUtf8("\xE2\x8C\x98Z"), [this]() { undo(); });
+	m_actUndo->setEnabled(false);
+	m_actRedo = addToolAction(lm::Icon::Redo, tr("Redo"),
+		QString::fromUtf8("\xE2\x87\xA7\xE2\x8C\x98Z"), [this]() { redo(); });
+	m_actRedo->setEnabled(false);
 	toolbar->addSeparator();
 	addToolAction(lm::Icon::Swap, tr("Swap Panes"), QString(),
 		[this]() { swapSides(); });
@@ -346,6 +343,7 @@ bool TableCompareView::compare(const QString &leftPath,
 {
 	if (!loadSide(0, leftPath, error) || !loadSide(1, rightPath, error))
 		return false;
+	clearHistory();
 
 	// sniff the delimiter over both files' first rows
 	QStringList sample;
@@ -648,8 +646,87 @@ void TableCompareView::selectDiffAtCursor()
 		selectDiffAtModelRow(index.row());
 }
 
+TableCompareView::UndoEntry TableCompareView::captureEntry(int side,
+	int viewBegin) const
+{
+	return { side, m_sides[side].rawLines, m_sides[side].modified,
+		m_saveSerial[side], viewBegin };
+}
+
+/** Swap the given side's live content with the snapshot (WinMerge's
+ *  OnEditUndo re-selects the restored difference "so we may just merge
+ *  it again"). */
+void TableCompareView::applyEntry(const UndoEntry &entry)
+{
+	Side &side = m_sides[entry.side];
+	side.rawLines = entry.lines;
+	side.cells.clear();
+	for (const QString &line : side.rawLines)
+		side.cells.push_back(splitRow(line, m_delimiter));
+	// once the side has been saved again the snapshot no longer matches
+	// the file on disk, so the side stays marked as modified
+	setSideModified(entry.side,
+		entry.saveSerial == m_saveSerial[entry.side] ? entry.modified : true);
+
+	QString error;
+	runDiff(&error);
+	rebuildModel();
+	m_current = -1;
+	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+		if (!m_blocks[b].trivial && m_blocks[b].viewEnd >= entry.viewBegin)
+		{
+			gotoDiff(b);
+			return;
+		}
+	updateStatus();
+}
+
+void TableCompareView::pushUndo(const UndoEntry &entry)
+{
+	m_undoStack.append(entry);
+	while (m_undoStack.size() > 200)
+		m_undoStack.removeFirst();
+	m_redoStack.clear();
+	updateUndoActions();
+}
+
+void TableCompareView::undo()
+{
+	if (m_undoStack.isEmpty())
+		return;
+	const UndoEntry entry = m_undoStack.takeLast();
+	m_redoStack.append(captureEntry(entry.side, entry.viewBegin));
+	applyEntry(entry);
+	updateUndoActions();
+}
+
+void TableCompareView::redo()
+{
+	if (m_redoStack.isEmpty())
+		return;
+	const UndoEntry entry = m_redoStack.takeLast();
+	m_undoStack.append(captureEntry(entry.side, entry.viewBegin));
+	applyEntry(entry);
+	updateUndoActions();
+}
+
+void TableCompareView::clearHistory()
+{
+	m_undoStack.clear();
+	m_redoStack.clear();
+	updateUndoActions();
+}
+
+void TableCompareView::updateUndoActions()
+{
+	m_actUndo->setEnabled(!m_undoStack.isEmpty());
+	m_actRedo->setEnabled(!m_redoStack.isEmpty());
+}
+
 void TableCompareView::swapSides()
 {
+	// snapshots refer to sides by index, which a swap would scramble
+	clearHistory();
 	std::swap(m_sides[0], m_sides[1]);
 	QString error;
 	runDiff(&error);
@@ -673,6 +750,7 @@ void TableCompareView::copyCurrentDiff(int sourceSide)
 		return;
 	const Block block = m_blocks[m_current];
 	const int target = 1 - sourceSide;
+	pushUndo(captureEntry(target, block.viewBegin));
 
 	QStringList newLines;
 	for (int row = block.begin[sourceSide];
@@ -710,6 +788,7 @@ void TableCompareView::copyCurrentDiff(int sourceSide)
 void TableCompareView::copyAllFrom(int sourceSide)
 {
 	const int target = 1 - sourceSide;
+	pushUndo(captureEntry(target, 0));
 	m_sides[target].rawLines = m_sides[sourceSide].rawLines;
 	m_sides[target].cells = m_sides[sourceSide].cells;
 	setSideModified(target, true);
@@ -798,6 +877,7 @@ bool TableCompareView::saveModified(QString *error)
 		}
 		file.Close();
 		setSideModified(side, false);
+		++m_saveSerial[side]; // older snapshots no longer match the disk
 	}
 	return true;
 }
