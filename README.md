@@ -4,6 +4,8 @@
 
 LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winmerge.org/) — GNU diffutils + git xdiff, folder scanning, file filters, moved-block detection, Unicode handling — and rebuilds the user interface natively with Qt 6, since the original UI is written in MFC and cannot leave Windows. If you know WinMerge, you already know LibreMerge: the layout, the colors and the workflow are intentionally the same.
 
+📦 [Releases](https://github.com/iagodpassos/libremerge/releases) · ☕ [Buy me a coffee](https://buymeacoffee.com/iagodpassos)
+
 ![File comparison](docs/screenshots/file-compare-light.png)
 
 ## Features
@@ -64,6 +66,14 @@ Linux binaries are not distributed yet — the application builds and the engine
 - 3-way comparison is available for files, not folders yet
 - Archive (zip/7z) and image comparison from WinMerge are not ported yet
 - Table comparison copies whole differences (no per-cell editing or undo yet)
+
+## Support
+
+If LibreMerge saves you time, you can [buy me a coffee](https://buymeacoffee.com/iagodpassos). ☕
+
+## AI-assisted development
+
+This port was built with the assistance of **Claude Fable 5**, an AI model by [Anthropic](https://www.anthropic.com): the engine portability layer, the Qt interface and the release tooling came out of AI-assisted pair-programming sessions. Everything that ships is validated against WinMerge's own engine test suite (369 tests) and an application selftest suite, on macOS and Linux CI.
 
 ## Relationship to WinMerge, license
 
