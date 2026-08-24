@@ -67,15 +67,15 @@ ctest --test-dir build        # engine test suite (369 tests)
 
 ## Install (Linux)
 
-**Debian 12/13** (arm64): download the `libremerge_<version>_arm64_debianNN.deb` matching your release from the [releases page](https://github.com/iagodpassos/libremerge/releases) and install it — apt resolves the Qt/Poco/ICU dependencies from the official repositories:
+**Debian 12/13** (amd64 and arm64): download the `libremerge_<version>_<arch>_debianNN.deb` matching your Debian release and architecture from the [releases page](https://github.com/iagodpassos/libremerge/releases) and install it — apt resolves the Qt/Poco/ICU dependencies from the official repositories:
 
 ```sh
-sudo apt install ./libremerge_<version>_arm64_debian12.deb
+sudo apt install ./libremerge_<version>_amd64_debian12.deb
 ```
 
 **Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` in this repository builds and installs cleanly with `makepkg -si`.
 
-Other architectures (amd64) and formats (AppImage/Flatpak) are planned — open an issue if you need one and it moves up the list.
+Other formats (Ubuntu-specific builds, AppImage/Flatpak) are planned — open an issue if you need one and it moves up the list.
 
 ## Known limitations
 
