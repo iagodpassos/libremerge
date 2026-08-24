@@ -57,7 +57,17 @@ ctest --test-dir build        # engine test suite (369 tests)
 ./build/app/LibreMerge        # (on macOS: build/app/LibreMerge.app)
 ```
 
-Linux binaries are not distributed yet — the application builds and the engine test suite passes on Ubuntu (see CI), and packaging (AppImage/Flatpak) is planned.
+## Install (Linux)
+
+**Debian 12/13** (arm64): download the `libremerge_<version>_arm64_debianNN.deb` matching your release from the [releases page](https://github.com/iagodpassos/libremerge/releases) and install it — apt resolves the Qt/Poco/ICU dependencies from the official repositories:
+
+```sh
+sudo apt install ./libremerge_<version>_arm64_debian12.deb
+```
+
+**Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` in this repository builds and installs cleanly with `makepkg -si`.
+
+Other architectures (amd64) and formats (AppImage/Flatpak) are planned — open an issue if you need one and it moves up the list.
 
 ## Known limitations
 
