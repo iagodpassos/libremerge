@@ -35,6 +35,10 @@ if(UNIX AND NOT APPLE)
   set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Iago Passos <iago.dpassos@gmail.com>")
   set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
   set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+  # Qt platform plugins (wayland, xcb) are dlopen'd at runtime, which
+  # dpkg-shlibdeps cannot see - without qt6-wayland the app aborts on a
+  # GNOME Wayland session
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-qpa-plugins, qt6-wayland")
   set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/iagodpassos/libremerge")
   set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
     "Diff and merge tool for files, folders and CSV tables")
