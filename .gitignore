@@ -13,3 +13,4 @@ build-release/
 build-universal/
 deps/
 *.deb
+*.AppImage
