@@ -34,14 +34,20 @@ public:
 	QString tabTitle() const;
 	bool saveModified(QString *error);
 
+	void gotoFirstDiff();
 	void gotoNextDiff();
 	void gotoPrevDiff();
+	void gotoLastDiff();
+	void selectDiffAtCursor();
 	void copyCurrentDiff(int sourceSide);
 	void copyAllFrom(int sourceSide);
+	void swapSides();
+	void focusNextPane();
 	void recompare();
 
 signals:
 	void modifiedChanged(bool modified);
+	void pathsChanged();
 	void openAsTextRequested(const QString &leftPath, const QString &rightPath);
 
 private:
@@ -73,6 +79,7 @@ private:
 	void computeCellDiffs();
 	void updateStatus();
 	void gotoDiff(int blockIndex);
+	void selectDiffAtModelRow(int modelRow);
 	int nextActive(int from, int direction) const;
 	void applyTheme();
 	void setSideModified(int side, bool modified);

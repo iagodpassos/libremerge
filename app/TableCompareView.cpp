@@ -213,42 +213,63 @@ TableCompareView::TableCompareView(QWidget *parent)
 	auto *toolbar = new QToolBar(this);
 	toolbar->setIconSize(QSize(16, 16));
 	toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+	// same toolbar as the text compare (WinMerge's table view is the same
+	// editor, so the toolbar is identical there); shortcuts live on the
+	// main window's menu and are only mentioned in tooltips
 	auto addToolAction = [this, toolbar](lm::Icon icon, const QString &text,
-		auto slot) -> QAction * {
+		const QString &shortcutHint, auto slot) -> QAction * {
 		QAction *action = toolbar->addAction(lm::icon(icon), text);
-		action->setToolTip(text);
+		action->setToolTip(shortcutHint.isEmpty() ? text
+			: QStringLiteral("%1 (%2)").arg(text, shortcutHint));
 		connect(action, &QAction::triggered, this, slot);
 		return action;
 	};
+	addToolAction(lm::Icon::FirstDiff, tr("First Difference"),
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x96"), [this]() { gotoFirstDiff(); });
 	addToolAction(lm::Icon::PrevDiff, tr("Previous Difference"),
-		[this]() { gotoPrevDiff(); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x91"), [this]() { gotoPrevDiff(); });
 	addToolAction(lm::Icon::NextDiff, tr("Next Difference"),
-		[this]() { gotoNextDiff(); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x93"), [this]() { gotoNextDiff(); });
+	addToolAction(lm::Icon::LastDiff, tr("Last Difference"),
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x98"), [this]() { gotoLastDiff(); });
 	toolbar->addSeparator();
 	addToolAction(lm::Icon::CopyRight, tr("Copy to Right"),
-		[this]() { copyCurrentDiff(0); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyCurrentDiff(0); });
 	addToolAction(lm::Icon::CopyLeft, tr("Copy to Left"),
-		[this]() { copyCurrentDiff(1); });
-	addToolAction(lm::Icon::CopyAllRight, tr("Copy All to Right"),
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x90"), [this]() { copyCurrentDiff(1); });
+	addToolAction(lm::Icon::CopyAllRight, tr("Copy All to Right"), QString(),
 		[this]() { copyAllFrom(0); });
-	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"),
+	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"), QString(),
 		[this]() { copyAllFrom(1); });
 	toolbar->addSeparator();
-	addToolAction(lm::Icon::Refresh, tr("Recompare"),
+	// block copies in the table rebuild the whole model, so there is no
+	// undo history yet; the buttons stay for visual parity with the text
+	// compare until that lands
+	QAction *undoAction = addToolAction(lm::Icon::Undo,
+		tr("Undo (not available in table compare yet)"), QString(), []() {});
+	undoAction->setEnabled(false);
+	QAction *redoAction = addToolAction(lm::Icon::Redo,
+		tr("Redo (not available in table compare yet)"), QString(), []() {});
+	redoAction->setEnabled(false);
+	toolbar->addSeparator();
+	addToolAction(lm::Icon::Swap, tr("Swap Panes"), QString(),
+		[this]() { swapSides(); });
+	addToolAction(lm::Icon::Refresh, tr("Recompare"), QStringLiteral("F5"),
 		[this]() { recompare(); });
 	m_actSave = addToolAction(lm::Icon::Save, tr("Save"),
+		QString::fromUtf8("\xE2\x8C\x98S"),
 		[this]() { QString error; saveModified(&error); });
 	m_actSave->setEnabled(false);
 	toolbar->addSeparator();
 	m_actHeader = addToolAction(lm::Icon::DiffPane,
-		tr("First row is the header"), [this]() {});
+		tr("First row is the header"), QString(), [this]() {});
 	m_actHeader->setCheckable(true);
 	m_actHeader->setChecked(true);
 	connect(m_actHeader, &QAction::toggled, this, [this](bool on) {
 		m_firstRowIsHeader = on;
 		rebuildModel();
 	});
-	addToolAction(lm::Icon::Find, tr("Open as Text"), [this]() {
+	addToolAction(lm::Icon::Find, tr("Open as Text"), QString(), [this]() {
 		emit openAsTextRequested(m_sides[0].path, m_sides[1].path);
 	});
 	layout->addWidget(toolbar);
@@ -284,23 +305,9 @@ TableCompareView::TableCompareView(QWidget *parent)
 				m_syncing = false;
 			});
 		connect(m_tables[i], &QTableView::doubleClicked,
-			this, [this, i](const QModelIndex &index) {
+			this, [this](const QModelIndex &index) {
 				// select the difference under the double-clicked row
-				const int viewRow = m_firstRowIsHeader
-					? index.row() + 1 : index.row();
-				for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
-				{
-					if (!m_blocks[b].trivial
-						&& viewRow >= m_blocks[b].viewBegin
-						&& viewRow <= m_blocks[b].viewEnd)
-					{
-						m_current = b;
-						m_models[0]->refresh(m_models[0]->columnCount());
-						m_models[1]->refresh(m_models[1]->columnCount());
-						updateStatus();
-						break;
-					}
-				}
+				selectDiffAtModelRow(index.row());
 			});
 	}
 	layout->addLayout(tables, 1);
@@ -603,6 +610,59 @@ void TableCompareView::gotoPrevDiff()
 		m_current < 0 ? static_cast<int>(m_blocks.size()) : m_current, -1);
 	if (prev >= 0)
 		gotoDiff(prev);
+}
+
+void TableCompareView::gotoFirstDiff()
+{
+	const int first = nextActive(-1, +1);
+	if (first >= 0)
+		gotoDiff(first);
+}
+
+void TableCompareView::gotoLastDiff()
+{
+	const int last = nextActive(static_cast<int>(m_blocks.size()), -1);
+	if (last >= 0)
+		gotoDiff(last);
+}
+
+/** Make the difference under the given model row current (the table
+ *  version of WinMerge's LineToDiff + SelectDiff). */
+void TableCompareView::selectDiffAtModelRow(int modelRow)
+{
+	const int viewRow = modelRow + (m_firstRowIsHeader ? 1 : 0);
+	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+		if (!m_blocks[b].trivial && viewRow >= m_blocks[b].viewBegin
+			&& viewRow <= m_blocks[b].viewEnd)
+		{
+			gotoDiff(b);
+			return;
+		}
+}
+
+void TableCompareView::selectDiffAtCursor()
+{
+	const int side = m_tables[1]->hasFocus() ? 1 : 0;
+	const QModelIndex index = m_tables[side]->currentIndex();
+	if (index.isValid())
+		selectDiffAtModelRow(index.row());
+}
+
+void TableCompareView::swapSides()
+{
+	std::swap(m_sides[0], m_sides[1]);
+	QString error;
+	runDiff(&error);
+	rebuildModel();
+	m_current = -1;
+	updateStatus();
+	emit pathsChanged();
+}
+
+void TableCompareView::focusNextPane()
+{
+	const int side = m_tables[0]->hasFocus() ? 1 : 0;
+	m_tables[side]->setFocus();
 }
 
 void TableCompareView::copyCurrentDiff(int sourceSide)

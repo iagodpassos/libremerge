@@ -58,6 +58,9 @@ MainWindow::MainWindow(QWidget *parent)
 	auto fileView = [this]() {
 		return qobject_cast<FileCompareView *>(m_tabs->currentWidget());
 	};
+	auto tableView = [this]() {
+		return qobject_cast<TableCompareView *>(m_tabs->currentWidget());
+	};
 	auto addMenuAction = [this](QMenu *menu, const QString &text,
 		const QKeySequence &shortcut, auto slot) -> QAction * {
 		QAction *action = menu->addAction(text);
@@ -75,13 +78,14 @@ MainWindow::MainWindow(QWidget *parent)
 	addMenuAction(fileMenu, tr("&Open..."), QKeySequence::Open,
 		[this]() { newComparison(); });
 	fileMenu->addSeparator();
-	addMenuAction(fileMenu, tr("&Save"), QKeySequence::Save, [fileView]() {
-		if (auto *view = fileView())
-		{
+	addMenuAction(fileMenu, tr("&Save"), QKeySequence::Save,
+		[fileView, tableView]() {
 			QString error;
-			view->saveModified(&error);
-		}
-	});
+			if (auto *view = fileView())
+				view->saveModified(&error);
+			else if (auto *table = tableView())
+				table->saveModified(&error);
+		});
 	addMenuAction(fileMenu, tr("&Close Tab"), QKeySequence::Close,
 		[this]() { closeTab(m_tabs->currentIndex()); });
 	fileMenu->addSeparator();
@@ -149,73 +153,95 @@ MainWindow::MainWindow(QWidget *parent)
 		});
 	viewMenu->addSeparator();
 	addMenuAction(viewMenu, tr("Next &Pane"), QKeySequence(Qt::Key_F6),
-		[fileView]() {
+		[fileView, tableView]() {
 			if (auto *view = fileView()) view->focusNextPane();
+			else if (auto *table = tableView()) table->focusNextPane();
 		});
 
 	QMenu *mergeMenu = menuBar()->addMenu(tr("&Merge"));
 	addMenuAction(mergeMenu, tr("&First Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Home), [fileView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Home), [fileView, tableView]() {
 			if (auto *view = fileView()) view->gotoFirstDiff();
+			else if (auto *table = tableView()) table->gotoFirstDiff();
 		});
 	QAction *prevDiffAction = addMenuAction(mergeMenu, tr("&Previous Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Up), [fileView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Up), [fileView, tableView]() {
 			if (auto *view = fileView()) view->gotoPrevDiff();
+			else if (auto *table = tableView()) table->gotoPrevDiff();
 		});
 	// F7/F8 are upstream aliases for previous/next
 	prevDiffAction->setShortcuts({ QKeySequence(Qt::ALT | Qt::Key_Up),
 		QKeySequence(Qt::Key_F7) });
 	QAction *nextDiffAction = addMenuAction(mergeMenu, tr("&Next Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Down), [fileView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Down), [fileView, tableView]() {
 			if (auto *view = fileView()) view->gotoNextDiff();
+			else if (auto *table = tableView()) table->gotoNextDiff();
 		});
 	nextDiffAction->setShortcuts({ QKeySequence(Qt::ALT | Qt::Key_Down),
 		QKeySequence(Qt::Key_F8) });
 	addMenuAction(mergeMenu, tr("&Last Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_End), [fileView]() {
+		QKeySequence(Qt::ALT | Qt::Key_End), [fileView, tableView]() {
 			if (auto *view = fileView()) view->gotoLastDiff();
+			else if (auto *table = tableView()) table->gotoLastDiff();
 		});
 	addMenuAction(mergeMenu, tr("C&urrent Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Return), [fileView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Return), [fileView, tableView]() {
 			if (auto *view = fileView()) view->selectDiffAtCursor();
+			else if (auto *table = tableView()) table->selectDiffAtCursor();
 		});
 	mergeMenu->addSeparator();
 	addMenuAction(mergeMenu, tr("Copy to &Right"),
-		QKeySequence(Qt::ALT | Qt::Key_Right), [fileView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Right), [fileView, tableView]() {
 			if (auto *view = fileView()) view->copyCurrentDiff(0);
+			else if (auto *table = tableView()) table->copyCurrentDiff(0);
 		});
 	addMenuAction(mergeMenu, tr("Copy to &Left"),
-		QKeySequence(Qt::ALT | Qt::Key_Left), [fileView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Left), [fileView, tableView]() {
 			if (auto *view = fileView())
 				view->copyCurrentDiff(view->paneCount() == 3 ? 2 : 1);
+			else if (auto *table = tableView())
+				table->copyCurrentDiff(1);
 		});
 	// WinMerge's Ctrl+Alt variants copy and jump to the next difference
+	// (the table copy always lands on the difference below the merge)
 	addMenuAction(mergeMenu, tr("Copy to Right and Ad&vance"),
-		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right), [fileView]() {
+		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right),
+		[fileView, tableView]() {
 			if (auto *view = fileView()) view->copyCurrentDiff(0, true);
+			else if (auto *table = tableView()) table->copyCurrentDiff(0);
 		});
 	addMenuAction(mergeMenu, tr("Copy to Left and Advanc&e"),
-		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left), [fileView]() {
+		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left),
+		[fileView, tableView]() {
 			if (auto *view = fileView())
 				view->copyCurrentDiff(view->paneCount() == 3 ? 2 : 1, true);
+			else if (auto *table = tableView())
+				table->copyCurrentDiff(1);
 		});
 	addMenuAction(mergeMenu, tr("Copy All to Righ&t"), QKeySequence(),
-		[fileView]() {
+		[fileView, tableView]() {
 			if (auto *view = fileView()) view->copyAllFrom(0);
+			else if (auto *table = tableView()) table->copyAllFrom(0);
 		});
 	addMenuAction(mergeMenu, tr("Copy All to Le&ft"), QKeySequence(),
-		[fileView]() {
+		[fileView, tableView]() {
 			if (auto *view = fileView())
 				view->copyAllFrom(view->paneCount() == 3 ? 2 : 1);
+			else if (auto *table = tableView())
+				table->copyAllFrom(1);
 		});
 	mergeMenu->addSeparator();
-	addMenuAction(mergeMenu, tr("S&wap Panes"), QKeySequence(), [fileView]() {
-		if (auto *view = fileView()) view->swapSides();
-	});
+	addMenuAction(mergeMenu, tr("S&wap Panes"), QKeySequence(),
+		[fileView, tableView]() {
+			if (auto *view = fileView()) view->swapSides();
+			else if (auto *table = tableView()) table->swapSides();
+		});
 	addMenuAction(mergeMenu, tr("Re&compare"), QKeySequence(Qt::Key_F5),
-		[this, fileView]() {
+		[this, fileView, tableView]() {
 			if (auto *view = fileView())
 				view->recompare();
+			else if (auto *table = tableView())
+				table->recompare();
 			else if (auto *folder = qobject_cast<FolderCompareView *>(
 					m_tabs->currentWidget()))
 				folder->recompare();
@@ -299,6 +325,14 @@ void MainWindow::openTableComparison(const QString &leftPath,
 	m_tabs->setCurrentIndex(index);
 	connect(view, &TableCompareView::modifiedChanged, this,
 		[view, refreshTab](bool) { refreshTab(view); });
+	connect(view, &TableCompareView::pathsChanged, this,
+		[this, view, refreshTab]() {
+			refreshTab(view);
+			const int tabIndex = m_tabs->indexOf(view);
+			if (tabIndex >= 0)
+				m_tabs->setTabToolTip(tabIndex,
+					view->paths().join(QStringLiteral("\n")));
+		});
 	connect(view, &TableCompareView::openAsTextRequested, this,
 		[this, view](const QString &left, const QString &right) {
 			const int tabIndex = m_tabs->indexOf(view);

@@ -12,6 +12,8 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - **Free editing with live remerge**: type directly in the panes, copy differences (or all of them) in either direction, undo/redo, recompare with F5; files are saved with their original encoding, BOM and line endings preserved
 - **Folder comparison** with a hierarchical tree or flat list, background scanning with progress and cancel, file masks / regex / expression filters, copy between sides and delete to Trash
 - **Diff pane** showing the current difference per file, **location pane** minimap, per-pane headers and status bars (line/column, encoding, EOL)
+- **CSV/TSV table comparison** as side-by-side grids: cell-level difference highlighting, delimiter auto-detection (`,` `;` tab `|`), quoted fields, first-row headers
+- **Line filters** (regular expressions that mark matching differences as trivial) and **moved block detection**
 - **Find and replace** in the compare panes (⌘F, wrap-around, match case)
 - **Syntax highlighting** for 47 languages, via WinMerge's own parsers
 - **Light and dark themes** (or follow the system), **English and Brazilian Portuguese** interface following the system language
@@ -24,7 +26,7 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 
 ## Install (macOS)
 
-**Requirements**: Apple Silicon (arm64), macOS 26 or later. (Older macOS and Intel builds are planned — the blocker is rebuilding the bundled ICU/Poco for lower deployment targets.)
+**Requirements**: macOS 12 or later, Intel or Apple Silicon (universal binary).
 
 Download `LibreMerge-<version>.dmg` from the [releases page](https://github.com/iagodpassos/libremerge/releases), open it and drag LibreMerge to Applications.
 
@@ -60,7 +62,8 @@ Linux binaries are not distributed yet — the application builds and the engine
 - Binary files are detected and refused — binary/hex comparison is planned, not implemented
 - Recompare (F5) may rebuild the alignment and clear the undo history of that moment
 - 3-way comparison is available for files, not folders yet
-- Archive (zip/7z), CSV table and image comparison from WinMerge are not ported yet
+- Archive (zip/7z) and image comparison from WinMerge are not ported yet
+- Table comparison copies whole differences (no per-cell editing or undo yet)
 
 ## Relationship to WinMerge, license
 
@@ -72,6 +75,6 @@ LibreMerge as a whole is distributed under the **GNU GPL v3.0 or later** ([LICEN
 
 ## Roadmap
 
-CSV/table compare, binary/hex compare, archive support, 3-way folders, moved-block display, line filters, HTML reports, notarized builds, Linux packages, and — if it proves itself — offering the portable engine fixes back to WinMerge upstream ([WinMerge/winmerge#141](https://github.com/WinMerge/winmerge/issues/141) tracks the idea of a cross-platform UI).
+Binary/hex compare, archive support, 3-way folders, HTML reports, notarized builds, Linux packages (AUR first), and — if it proves itself — offering the portable engine fixes back to WinMerge upstream ([WinMerge/winmerge#141](https://github.com/WinMerge/winmerge/issues/141) tracks the idea of a cross-platform UI).
 
 Issues and pull requests are welcome.

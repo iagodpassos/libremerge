@@ -822,12 +822,20 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
 <context>
     <name>TableCompareView</name>
     <message>
+        <source>First Difference</source>
+        <translation>Primeira Diferença</translation>
+    </message>
+    <message>
         <source>Previous Difference</source>
         <translation>Diferença Anterior</translation>
     </message>
     <message>
         <source>Next Difference</source>
         <translation>Próxima Diferença</translation>
+    </message>
+    <message>
+        <source>Last Difference</source>
+        <translation>Última Diferença</translation>
     </message>
     <message>
         <source>Copy to Right</source>
@@ -844,6 +852,18 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>Copy All to Left</source>
         <translation>Copiar Tudo para a Esquerda</translation>
+    </message>
+    <message>
+        <source>Undo (not available in table compare yet)</source>
+        <translation>Desfazer (ainda não disponível na comparação em tabela)</translation>
+    </message>
+    <message>
+        <source>Redo (not available in table compare yet)</source>
+        <translation>Refazer (ainda não disponível na comparação em tabela)</translation>
+    </message>
+    <message>
+        <source>Swap Panes</source>
+        <translation>Trocar Painéis</translation>
     </message>
     <message>
         <source>Recompare</source>
