@@ -12,3 +12,4 @@ build-release/
 *.dmg
 build-universal/
 deps/
+*.deb
