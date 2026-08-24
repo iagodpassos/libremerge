@@ -26,6 +26,25 @@ if(APPLE AND EXISTS /opt/homebrew/opt/qt)
   list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/qt)
 endif()
 
+if(UNIX AND NOT APPLE)
+  # `cpack -G DEB` in the build dir produces the .deb; runtime
+  # dependencies are computed by dpkg-shlibdeps (needs dpkg-dev)
+  set(CPACK_PACKAGE_NAME "libremerge")
+  set(CPACK_PACKAGE_VERSION "0.7.2")
+  set(CPACK_PACKAGE_CONTACT "Iago Passos <iago.dpassos@gmail.com>")
+  set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Iago Passos <iago.dpassos@gmail.com>")
+  set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+  set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+  set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/iagodpassos/libremerge")
+  set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Diff and merge tool for files, folders and CSV tables")
+  set(CPACK_PACKAGE_DESCRIPTION
+    "A free, open-source differencing and merging tool: side-by-side file\ncomparison and merging, folder comparison, CSV/TSV table comparison,\nsyntax highlighting and 3-way merge, reusing the WinMerge engine with\na native Qt 6 interface.")
+  set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+  set(CPACK_STRIP_FILES ON)
+  include(CPack)
+endif()
+
 enable_testing()
 add_subdirectory(engine)
 
