@@ -67,16 +67,16 @@ ctest --test-dir build        # engine test suite (369 tests)
 
 ## Install (Linux)
 
-**AppImage** (any distro, x86_64): download `LibreMerge-<version>-x86_64.AppImage` from the [releases page](https://github.com/iagodpassos/libremerge/releases), make it executable and run — Qt, ICU and Poco are bundled, nothing to install. Needs glibc 2.36+ (Debian 12+, Ubuntu 24.04+, Mint 22+, Fedora 37+, Arch):
+**AppImage** (recommended — any distro, x86_64 or arm64): download the `LibreMerge-<version>-<arch>.AppImage` for your architecture from the [releases page](https://github.com/iagodpassos/libremerge/releases), make it executable and run — Qt, ICU and Poco are bundled, nothing to install. Needs glibc 2.36+ (Debian 12+, Ubuntu 24.04+, Mint 22+, Fedora 37+, Arch):
 
 ```sh
 chmod +x LibreMerge-<version>-x86_64.AppImage && ./LibreMerge-<version>-x86_64.AppImage
 ```
 
-**Debian 12/13** (amd64 and arm64): download the `libremerge_<version>_<arch>_debianNN.deb` matching your Debian release and architecture from the [releases page](https://github.com/iagodpassos/libremerge/releases) and install it — apt resolves the Qt/Poco/ICU dependencies from the official repositories:
+**Debian 13** (amd64): a native `.deb` for apt integration — dependencies resolve from the official repositories:
 
 ```sh
-sudo apt install ./libremerge_<version>_amd64_debian12.deb
+sudo apt install ./libremerge_<version>_amd64_debian13.deb
 ```
 
 **Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` in this repository builds and installs cleanly with `makepkg -si`.
