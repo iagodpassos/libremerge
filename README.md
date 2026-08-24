@@ -30,7 +30,15 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 
 **Requirements**: macOS 12 or later, Intel or Apple Silicon (universal binary).
 
-Download `LibreMerge-<version>.dmg` from the [releases page](https://github.com/iagodpassos/libremerge/releases), open it and drag LibreMerge to Applications.
+**Homebrew**:
+
+```sh
+brew install --cask iagodpassos/tap/libremerge
+```
+
+(Recent Homebrew asks you to trust third-party taps first: `brew trust iagodpassos/tap`.)
+
+**Manual**: download `LibreMerge-<version>.dmg` from the [releases page](https://github.com/iagodpassos/libremerge/releases), open it and drag LibreMerge to Applications.
 
 LibreMerge is not yet notarized by Apple, so the first launch needs one extra step: right-click the app → **Open** (or allow it under **System Settings → Privacy & Security**). If macOS still refuses ("app is damaged"), clear the download quarantine once:
 
