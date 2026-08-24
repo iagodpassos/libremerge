@@ -40,6 +40,7 @@ endif()
 find_package(GTest CONFIG QUIET)
 if(NOT GTest_FOUND)
   include(FetchContent)
+  set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
   FetchContent_Declare(googletest
     URL https://github.com/google/googletest/archive/refs/tags/v1.18.0.zip)
   FetchContent_MakeAvailable(googletest)

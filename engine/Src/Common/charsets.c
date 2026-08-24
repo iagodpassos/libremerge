@@ -998,7 +998,7 @@ static struct _charsetInfo const *FindByName(const char *name)
 	{
 		struct _charsetInfo const key = {0, name, 0, no};
 		struct _charsetInfo const *pkey = &key;
-		struct _charsetInfo const **pinfo = (struct _charsetInfo **)bsearch(&pkey, index1, numCharsetInfo, sizeof *index1, CompareByName);
+		struct _charsetInfo const **pinfo = (struct _charsetInfo const **)bsearch(&pkey, index1, numCharsetInfo, sizeof *index1, CompareByName);
 		if (pinfo != NULL)
 		{
 			info = *pinfo;
@@ -1021,7 +1021,7 @@ static struct _charsetInfo const *FindByCodePage(unsigned codepage)
 	{
 		struct _charsetInfo const key = {0, 0, codepage, no};
 		struct _charsetInfo const *pkey = &key;
-		struct _charsetInfo const **pinfo = (struct _charsetInfo **)bsearch(&pkey, index3, numIndex, sizeof(void *), CompareByCodePage);
+		struct _charsetInfo const **pinfo = (struct _charsetInfo const **)bsearch(&pkey, index3, numIndex, sizeof(void *), CompareByCodePage);
 		if (pinfo != NULL) do
 		{
 			info = *pinfo;
@@ -1034,9 +1034,9 @@ void charsets_init(void)
 {
 	size_t i;
 	size_t numIndex = charsetInfo[numCharsetInfo - 1].id + 1;
-	index1 = (struct _charsetInfo **)calloc(numCharsetInfo, sizeof(void *));
-	index2 = (struct _charsetInfo **)calloc(numIndex, sizeof(void *));
-	index3 = (struct _charsetInfo **)calloc(numIndex, sizeof(void *));
+	index1 = (struct _charsetInfo const **)calloc(numCharsetInfo, sizeof(void *));
+	index2 = (struct _charsetInfo const **)calloc(numIndex, sizeof(void *));
+	index3 = (struct _charsetInfo const **)calloc(numIndex, sizeof(void *));
 	if (!index1 || !index2 || !index3)
 		return;
 	for (i = numCharsetInfo ; i-- ; )

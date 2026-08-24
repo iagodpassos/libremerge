@@ -12,13 +12,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: brew install ninja poco boost icu4c googletest re2c lemon
+        run: brew install ninja qt poco boost icu4c googletest re2c lemon
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
       - name: Build
         run: cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: App selftests (offscreen)
+        run: ./packaging/run_selftests.sh build/app/LibreMerge.app/Contents/MacOS/LibreMerge
 
   linux:
     name: Ubuntu
@@ -29,10 +31,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build libpoco-dev libboost-dev \
-            libicu-dev re2c lemon
+            libicu-dev re2c lemon qt6-base-dev libgl1-mesa-dev
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
       - name: Build
         run: cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: App selftests (offscreen)
+        run: ./packaging/run_selftests.sh build/app/libremerge

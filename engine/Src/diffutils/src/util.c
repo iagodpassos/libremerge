@@ -19,6 +19,9 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
 #ifdef _WIN32
 #include <windows.h>
+#else
+#include <sys/wait.h>	/* waitpid()/wait() in finish_output; implicit
+			   declarations are errors from GCC 14 on */
 #endif
 #include "diff.h"
 

@@ -68,3 +68,16 @@ if(NOT WIN32)
   target_compile_options(LibreMerge PRIVATE
     -include ${CMAKE_SOURCE_DIR}/engine/ports/posix_compat.h)
 endif()
+
+if(UNIX AND NOT APPLE)
+  include(GNUInstallDirs)
+  set_target_properties(LibreMerge PROPERTIES OUTPUT_NAME libremerge)
+  install(TARGETS LibreMerge RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/libremerge.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+  foreach(_size 16 32 64 128 256 512)
+    install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/icons/libremerge-${_size}.png
+      DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${_size}x${_size}/apps
+      RENAME libremerge.png)
+  endforeach()
+endif()

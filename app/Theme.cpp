@@ -4,6 +4,7 @@
 #include "Theme.h"
 
 #include <QApplication>
+#include <QPalette>
 #include <QSettings>
 #include <QStyleHints>
 
@@ -28,11 +29,13 @@ Theme::Theme()
 	m_mode = value == QStringLiteral("light") ? ThemeMode::Light
 		: value == QStringLiteral("dark") ? ThemeMode::Dark
 		: ThemeMode::System;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
 	connect(qApp->styleHints(), &QStyleHints::colorSchemeChanged,
 		this, [this]() {
 			if (m_mode == ThemeMode::System)
 				emit changed();
 		});
+#endif
 }
 
 void Theme::setMode(ThemeMode mode)
@@ -56,7 +59,15 @@ bool Theme::dark() const
 	case ThemeMode::System:
 		break;
 	}
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
 	return qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark;
+#else
+	// Qt < 6.5 has no color-scheme API: a dark platform palette is the
+	// only signal (window darker than its text means a dark theme)
+	const QPalette pal = qApp->palette();
+	return pal.color(QPalette::Window).lightness()
+		< pal.color(QPalette::WindowText).lightness();
+#endif
 }
 
 const DiffColors &diffColors()

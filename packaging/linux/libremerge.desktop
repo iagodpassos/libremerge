@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=LibreMerge
+GenericName=Diff and Merge Tool
+GenericName[pt_BR]=Ferramenta de Comparação e Mesclagem
+Comment=Compare and merge files and folders
+Comment[pt_BR]=Compare e mescle arquivos e pastas
+Exec=libremerge %F
+Icon=libremerge
+Terminal=false
+Categories=Development;Utility;TextTools;
+MimeType=text/plain;text/csv;tab-separated-values;
+Keywords=diff;merge;compare;winmerge;
+Keywords[pt_BR]=diff;merge;comparar;mesclar;winmerge;
+StartupWMClass=libremerge
