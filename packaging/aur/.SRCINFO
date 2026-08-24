@@ -18,6 +18,6 @@ pkgbase = libremerge
 	depends = icu
 	depends = hicolor-icon-theme
 	source = libremerge-0.7.2.tar.gz::https://github.com/iagodpassos/libremerge/archive/refs/tags/v0.7.2.tar.gz
-	sha256sums = 41782219ead6a33bf2e31b715506328f0882bd0eb38028fdb5b37f882cee0683
+	sha256sums = 8437ae5d751ab7181169af7b23a9176cfdc3caf4a44608a6a402650e0c513832
 
 pkgname = libremerge
