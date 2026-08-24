@@ -9,6 +9,10 @@
 #include <QPainterPath>
 #include <QPalette>
 #include <QPixmap>
+#include <QToolBar>
+#include <QAction>
+
+#include "Theme.h"
 
 namespace lm
 {
@@ -25,8 +29,11 @@ const QColor kRed(0xe0, 0x5d, 0x58);
 
 QColor baseColor()
 {
-	// follows the window chrome (light glyphs on a dark toolbar)
-	return qApp->palette().color(QPalette::WindowText);
+	// follows the application theme, not the platform palette: the
+	// toolbars are restyled by applyToolbarTheme(), so the platform's
+	// idea of light/dark may disagree with where the glyphs land
+	return lm::Theme::instance()->dark()
+		? QColor(0xd0, 0xd0, 0xd0) : QColor(0x38, 0x38, 0x38);
 }
 
 QPen linePen(const QColor &color, qreal width = kStroke)
@@ -277,6 +284,32 @@ QIcon icon(Icon id)
 		});
 	}
 	return QIcon();
+}
+
+void applyToolbarTheme(QWidget *root)
+{
+	const bool dark = Theme::instance()->dark();
+	// child labels/edits must be styled here too: a stylesheet on the
+	// toolbar makes its children ignore assigned palettes
+	const QString style = dark
+		? QStringLiteral("QToolBar { background: #2c2c2c; border: none;"
+			" border-bottom: 1px solid #3a3a3a; }"
+			" QToolBar QLabel { color: #d0d0d0; background: transparent; }"
+			" QToolBar QLineEdit { background: #1e1e1e; color: #d4d4d4;"
+			" border: 1px solid #4a4a4a; border-radius: 4px; padding: 2px 6px; }")
+		: QStringLiteral("QToolBar { background: #ececec; border: none;"
+			" border-bottom: 1px solid #c8c8c8; }"
+			" QToolBar QLabel { color: #303030; background: transparent; }"
+			" QToolBar QLineEdit { background: white; color: black;"
+			" border: 1px solid #b6b6b6; border-radius: 4px; padding: 2px 6px; }");
+	for (QToolBar *bar : root->findChildren<QToolBar *>())
+	{
+		bar->setStyleSheet(style);
+		for (QAction *action : bar->actions())
+			if (action->data().isValid())
+				action->setIcon(
+					icon(static_cast<Icon>(action->data().toInt())));
+	}
 }
 
 } // namespace lm

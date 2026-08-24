@@ -81,7 +81,7 @@ sudo apt install ./libremerge_<version>_amd64_debian12.deb
 
 **Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` in this repository builds and installs cleanly with `makepkg -si`.
 
-Other formats (Ubuntu-specific builds, AppImage/Flatpak) are planned — open an issue if you need one and it moves up the list.
+Other formats (Ubuntu-specific builds, Flatpak) are planned — open an issue if you need one and it moves up the list.
 
 ## Known limitations
 

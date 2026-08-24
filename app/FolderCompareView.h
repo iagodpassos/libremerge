@@ -42,6 +42,7 @@ signals:
 	void openFileComparisonRequested(const QString &leftPath, const QString &rightPath);
 
 private slots:
+	void applyTheme();
 	void itemActivated(QTreeWidgetItem *item, int column);
 	void updateProgress();
 	void compareFinished();

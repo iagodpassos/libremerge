@@ -177,6 +177,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 	auto addToolAction = [this, toolbar](lm::Icon icon, const QString &text,
 		const QString &shortcutHint, auto slot) -> QAction * {
 		QAction *action = toolbar->addAction(lm::icon(icon), text);
+		action->setData(static_cast<int>(icon)); // re-rendered on theme change
 		action->setToolTip(shortcutHint.isEmpty() ? text
 			: QStringLiteral("%1 (%2)").arg(text, shortcutHint));
 		connect(action, &QAction::triggered, this, slot);
@@ -1293,6 +1294,8 @@ void FileCompareView::applyTheme()
 	locPal.setColor(QPalette::Mid,
 		dark ? QColor(0x50, 0x50, 0x50) : QColor(0xc0, 0xc0, 0xc0));
 	m_locationPane->setPalette(locPal);
+	m_status->setStyleSheet(statusStyle);
+	lm::applyToolbarTheme(this);
 	updateHeaderStyles();
 	applyHighlights();
 }

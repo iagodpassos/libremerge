@@ -219,6 +219,7 @@ TableCompareView::TableCompareView(QWidget *parent)
 	auto addToolAction = [this, toolbar](lm::Icon icon, const QString &text,
 		const QString &shortcutHint, auto slot) -> QAction * {
 		QAction *action = toolbar->addAction(lm::icon(icon), text);
+		action->setData(static_cast<int>(icon)); // re-rendered on theme change
 		action->setToolTip(shortcutHint.isEmpty() ? text
 			: QStringLiteral("%1 (%2)").arg(text, shortcutHint));
 		connect(action, &QAction::triggered, this, slot);
@@ -334,6 +335,10 @@ void TableCompareView::applyTheme()
 	}
 	for (int i = 0; i < 2; ++i)
 		m_tables[i]->setPalette(pal);
+	m_status->setStyleSheet(dark
+		? QStringLiteral("QLabel { background: #2c2c2c; color: #b8b8b8; }")
+		: QStringLiteral("QLabel { background: #ececec; color: #303030; }"));
+	lm::applyToolbarTheme(this);
 	m_models[0]->refresh(m_models[0]->columnCount());
 	m_models[1]->refresh(m_models[1]->columnCount());
 }

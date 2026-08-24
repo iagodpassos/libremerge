@@ -4,12 +4,14 @@
 #include "FolderCompareView.h"
 #include "FileOps.h"
 #include "Icons.h"
+#include "Theme.h"
 
 #include <QAction>
 #include <QDir>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QStyleFactory>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
@@ -68,6 +70,19 @@ QString categoryText(lm::FolderCompareItem::Category category)
 
 QColor categoryColor(lm::FolderCompareItem::Category category)
 {
+	if (lm::Theme::instance()->dark())
+	{
+		// same hues as the light pastels, tuned for light text
+		// (matching the dark set in lm::diffColors())
+		switch (category)
+		{
+		case lm::FolderCompareItem::Different: return QColor(105, 92, 38);
+		case lm::FolderCompareItem::LeftOnly: return QColor(42, 62, 96);
+		case lm::FolderCompareItem::RightOnly: return QColor(38, 82, 58);
+		case lm::FolderCompareItem::Error: return QColor(110, 48, 48);
+		default: return {};
+		}
+	}
 	switch (category)
 	{
 	case lm::FolderCompareItem::Different: return QColor(255, 243, 176);
@@ -94,12 +109,15 @@ void setRowCategory(QTreeWidgetItem *row, lm::FolderCompareItem::Category catego
 	row->setText(ColResult, isDir
 		? QObject::tr("Folder: %1").arg(categoryText(category)) : categoryText(category));
 	const QColor color = categoryColor(category);
+	// explicit text color so the row stays readable whatever the
+	// platform palette is: black on the light pastels, near-white on
+	// the dark category colors
+	const QColor text = lm::Theme::instance()->dark()
+		? QColor(0xd4, 0xd4, 0xd4) : QColor(Qt::black);
 	for (int col = 0; col < ColCount; ++col)
 	{
 		row->setBackground(col, color.isValid() ? QBrush(color) : QBrush());
-		// category backgrounds are light pastels; keep the text readable
-		// when the system theme is dark
-		row->setForeground(col, color.isValid() ? QBrush(Qt::black) : QBrush());
+		row->setForeground(col, color.isValid() ? QBrush(text) : QBrush());
 	}
 }
 
@@ -137,6 +155,12 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
 	toolbar->addWidget(new QLabel(tr(" Filter: "), this));
 	m_filterEdit = new QLineEdit(this);
+	// the macOS style paints this field natively (white, own focus ring)
+	// no matter what stylesheet it carries; Fusion honors our theming
+	static QStyle *fusion = QStyleFactory::create(QStringLiteral("Fusion"));
+	if (fusion != nullptr)
+		m_filterEdit->setStyle(fusion);
+	m_filterEdit->setAttribute(Qt::WA_MacShowFocusRect, false);
 	m_filterEdit->setPlaceholderText(tr("*.* \xE2\x80\x94 masks (*.cpp;*.h), f:/d: regexes or expressions"));
 	m_filterEdit->setMaximumWidth(340);
 	m_filterEdit->setText(QSettings().value(kFilterSettingsKey, QStringLiteral("*.*")).toString());
@@ -172,6 +196,14 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	m_actDeleteBoth = toolbar->addAction(lm::icon(lm::Icon::DeleteBoth), tr("Delete Both"));
 	m_actDeleteBoth->setToolTip(tr("Delete Both"));
 	connect(m_actDeleteBoth, &QAction::triggered, this, [this]() { deleteSelected(true, true); });
+	// tag with the lm::Icon so applyToolbarTheme() can re-render them
+	applyAction->setData(static_cast<int>(lm::Icon::Refresh));
+	m_actTreeMode->setData(static_cast<int>(lm::Icon::TreeView));
+	m_actCopyRight->setData(static_cast<int>(lm::Icon::CopyRight));
+	m_actCopyLeft->setData(static_cast<int>(lm::Icon::CopyLeft));
+	m_actDeleteLeft->setData(static_cast<int>(lm::Icon::DeleteLeft));
+	m_actDeleteRight->setData(static_cast<int>(lm::Icon::DeleteRight));
+	m_actDeleteBoth->setData(static_cast<int>(lm::Icon::DeleteBoth));
 	layout->addWidget(toolbar);
 
 	m_tree = new QTreeWidget(this);
@@ -224,6 +256,63 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 		this, &FolderCompareView::compareFinished);
 
 	updateActions();
+	// last: every widget this touches must already exist
+	applyTheme();
+	connect(lm::Theme::instance(), &lm::Theme::changed,
+		this, &FolderCompareView::applyTheme);
+}
+
+/** Follow the application theme like the file compare does: the tree,
+ *  filter field and status bar get explicit palettes (the platform
+ *  palette may disagree with the chosen theme), and the rows are
+ *  rebuilt so the category colors switch set. */
+void FolderCompareView::applyTheme()
+{
+	const bool dark = lm::Theme::instance()->dark();
+	QPalette pal;
+	if (dark)
+	{
+		pal.setColor(QPalette::Base, QColor(0x1e, 0x1e, 0x1e));
+		pal.setColor(QPalette::AlternateBase, QColor(0x24, 0x24, 0x24));
+		pal.setColor(QPalette::Text, QColor(0xd4, 0xd4, 0xd4));
+		pal.setColor(QPalette::Window, QColor(0x2a, 0x2a, 0x2a));
+		pal.setColor(QPalette::WindowText, QColor(0xd4, 0xd4, 0xd4));
+		pal.setColor(QPalette::PlaceholderText, QColor(0x70, 0x70, 0x70));
+		pal.setColor(QPalette::Highlight, QColor(0x26, 0x4f, 0x78));
+		pal.setColor(QPalette::HighlightedText, QColor(0xe6, 0xe6, 0xe6));
+		pal.setColor(QPalette::Button, QColor(0x2a, 0x2a, 0x2a));
+		pal.setColor(QPalette::ButtonText, QColor(0xd4, 0xd4, 0xd4));
+	}
+	else
+	{
+		pal.setColor(QPalette::Base, Qt::white);
+		pal.setColor(QPalette::AlternateBase, QColor(0xf6, 0xf6, 0xf6));
+		pal.setColor(QPalette::Text, Qt::black);
+		pal.setColor(QPalette::Window, QColor(0xf0, 0xf0, 0xf0));
+		pal.setColor(QPalette::WindowText, QColor(0x10, 0x10, 0x10));
+		pal.setColor(QPalette::PlaceholderText, QColor(0x88, 0x88, 0x88));
+		pal.setColor(QPalette::Highlight, QColor(0xb5, 0xd5, 0xff));
+		pal.setColor(QPalette::HighlightedText, Qt::black);
+		pal.setColor(QPalette::Button, QColor(0xf0, 0xf0, 0xf0));
+		pal.setColor(QPalette::ButtonText, QColor(0x10, 0x10, 0x10));
+	}
+	setPalette(pal);
+	setAutoFillBackground(true); // gaps between widgets follow the theme
+	m_tree->setPalette(pal);
+	// direct stylesheet: the toolbar-level selector loses to the native
+	// macOS focus frame
+	m_filterEdit->setStyleSheet(dark
+		? QStringLiteral("QLineEdit { background: #1e1e1e; color: #d4d4d4;"
+			" border: 1px solid #4a4a4a; border-radius: 4px; padding: 2px 6px; }")
+		: QStringLiteral("QLineEdit { background: white; color: black;"
+			" border: 1px solid #b6b6b6; border-radius: 4px; padding: 2px 6px; }"));
+	m_status->setStyleSheet(dark
+		? QStringLiteral("QLabel { background: #2c2c2c; color: #b8b8b8; }")
+		: QStringLiteral("QLabel { background: #ececec; color: #303030; }"));
+	// header row of the tree follows the view palette on all platforms
+	m_tree->header()->setPalette(pal);
+	lm::applyToolbarTheme(this);
+	rebuildRows();
 }
 
 FolderCompareView::~FolderCompareView()
@@ -300,6 +389,9 @@ void FolderCompareView::populate(const lm::FolderCompareResult &result)
 
 	m_result = result;
 	rebuildRows();
+	// results are in: move focus to the list (also keeps macOS from
+	// painting its native focus treatment over the themed filter field)
+	m_tree->setFocus();
 
 	QString text = tr("%1 item(s): %2 different, %3 unique, %4 identical")
 		.arg(result.items.size()).arg(result.different).arg(result.unique)

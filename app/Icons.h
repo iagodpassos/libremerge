@@ -35,4 +35,8 @@ enum class Icon
 
 QIcon icon(Icon id);
 
+/** Restyle every toolbar under root for the current theme and re-render
+    the icons of actions tagged with their lm::Icon in QAction::data(). */
+void applyToolbarTheme(QWidget *root);
+
 } // namespace lm
