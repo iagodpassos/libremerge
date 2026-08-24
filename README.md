@@ -22,9 +22,9 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - Drag & drop files or folders onto the window or the Dock icon; a WinMerge-style "Select Files or Folders" screen with history, read-only flags and swap
 - Comparison options carried over from WinMerge: ignore whitespace/case/blank lines/EOL/numbers, diff algorithm selection (Myers, minimal, patience, histogram)
 
-| Dark theme | Folder comparison |
-| --- | --- |
-| ![Dark theme](docs/screenshots/file-compare-dark.png) | ![Folder comparison](docs/screenshots/folder-compare-light.png) |
+| Dark theme | Folder comparison | On Linux (Debian/GNOME) |
+| --- | --- | --- |
+| ![Dark theme](docs/screenshots/file-compare-dark.png) | ![Folder comparison](docs/screenshots/folder-compare-light.png) | ![LibreMerge on Debian](docs/screenshots/linux-debian.png) |
 
 ## Install (macOS)
 
