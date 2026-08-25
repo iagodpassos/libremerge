@@ -423,6 +423,7 @@ QWidget *ImageCompareView::buildToolPanel()
 		m_buffer->SetOverlayAlpha(v / 100.0);
 		saveSettings();
 		refreshPanes();
+		syncPanel(); // keeps the "(nn)" value label live while dragging
 	});
 	panelLayout->addWidget(overlayGroup);
 
