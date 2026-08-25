@@ -328,6 +328,61 @@ TEST_F(ImgMergeBufferTest, DiffMapImageMarksDiffBlocks)
 	EXPECT_EQ(0, bottomLine[31 * 4 + 3]);
 }
 
+TEST_F(ImgMergeBufferTest, ThreeWayClassifiesSidesAndAutoMerges)
+{
+	// middle is the base; left adds a box at the top, right adds one at
+	// the bottom, and both change the same center block differently
+	QImage middle = solidImage(64, 64, Qt::white);
+	QImage left = middle;
+	{
+		QPainter p(&left);
+		p.fillRect(0, 0, 8, 8, Qt::red);        // left-only change
+		p.fillRect(24, 24, 8, 8, Qt::blue);     // conflicting change
+	}
+	QImage right = middle;
+	{
+		QPainter p(&right);
+		p.fillRect(48, 48, 8, 8, Qt::green);    // right-only change
+		p.fillRect(24, 24, 8, 8, Qt::yellow);   // conflicting change
+	}
+	auto l = writeImage("l.png", left);
+	auto m = writeImage("m.png", middle);
+	auto r = writeImage("r.png", right);
+
+	CImgMergeBuffer buf;
+	const wchar_t *files[3] = { l.c_str(), m.c_str(), r.c_str() };
+	ASSERT_TRUE(buf.OpenImages(3, files));
+	buf.CompareImages();
+
+	ASSERT_EQ(3, buf.GetDiffCount());
+	EXPECT_EQ(1, buf.GetConflictCount());
+	int ops[4] = { 0, 0, 0, 0 }; // 1stonly, 2ndonly, 3rdonly, conflict
+	for (int i = 0; i < buf.GetDiffCount(); ++i)
+	{
+		switch (buf.GetDiffInfo(i)->op)
+		{
+		case OP_1STONLY: ++ops[0]; break;
+		case OP_2NDONLY: ++ops[1]; break;
+		case OP_3RDONLY: ++ops[2]; break;
+		case OP_DIFF: ++ops[3]; break;
+		}
+	}
+	EXPECT_EQ(1, ops[0]);
+	EXPECT_EQ(0, ops[1]);
+	EXPECT_EQ(1, ops[2]);
+	EXPECT_EQ(1, ops[3]);
+
+	// auto merge into the middle resolves the one-sided changes and
+	// leaves the conflict alone
+	EXPECT_EQ(2, buf.CopyDiff3Way(1));
+	EXPECT_TRUE(buf.IsModified(1));
+	EXPECT_EQ(1, buf.GetConflictCount());
+
+	ASSERT_TRUE(buf.Undo());
+	EXPECT_FALSE(buf.IsModified(1));
+	EXPECT_EQ(3, buf.GetDiffCount());
+}
+
 } // namespace
 
 int main(int argc, char **argv)

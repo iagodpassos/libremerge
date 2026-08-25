@@ -17,8 +17,9 @@ public:
 		const QList<bool> &readOnly = {}, bool forceText = false);
 	/** CSV/TSV side-by-side grid comparison. */
 	void openTableComparison(const QString &leftPath, const QString &rightPath);
-	/** Image comparison (WinMerge's image compare). */
-	void openImageComparison(const QString &leftPath, const QString &rightPath);
+	/** Image comparison, 2- or 3-way (WinMerge's image compare). */
+	void openImageComparison(const QStringList &paths,
+		const QList<bool> &readOnly = {});
 	/** Empty, editable comparison (WinMerge's File > New). */
 	void openBlankComparison();
 	void openFolderComparison(const QString &leftDir, const QString &rightDir);

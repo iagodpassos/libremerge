@@ -33,11 +33,17 @@ public:
 	explicit ImageCompareView(QWidget *parent = nullptr);
 	~ImageCompareView() override;
 
+	/** Load 2 or 3 images and run the initial comparison. */
+	bool compare(const QStringList &paths, QString *error);
 	bool compare(const QString &leftPath, const QString &rightPath,
-		QString *error);
+		QString *error)
+	{
+		return compare(QStringList{ leftPath, rightPath }, error);
+	}
 
 	bool isModified() const;
 	int diffCount() const;
+	int paneCount() const { return m_paneCount; }
 	QStringList paths() const;
 	QString tabTitle() const;
 	bool saveModified(QString *error);
@@ -48,7 +54,9 @@ public:
 	void gotoPrevDiff();
 	void gotoLastDiff();
 	void selectDiffAtCursor();
-	void copyCurrentDiff(int sourceSide); // 0 = left→right, 1 = right→left
+	/** Copy the current difference from sourceSide into the merge target
+	    (the other side in 2-way mode, the middle pane in 3-way mode). */
+	void copyCurrentDiff(int sourceSide);
 	void copyAllFrom(int sourceSide);
 	void undo();
 	void redo();
@@ -125,15 +133,21 @@ private:
 	void setActivePane(int pane);
 	bool savePane(int pane, QString *error);
 
+	int mergeTarget(int sourceSide) const
+	{
+		return m_paneCount == 3 ? 1 : 1 - sourceSide;
+	}
+
 	std::unique_ptr<CImgMergeBuffer> m_buffer;
-	QString m_paths[2];
+	QString m_paths[3];
 	int m_paneCount = 2;
 	int m_activePane = 0;
 	double m_zoom = 1.0;
 
-	ImagePane *m_panes[2] = {};
-	QLabel *m_headers[2] = {};
-	QLabel *m_paneStatus[2] = {};
+	ImagePane *m_panes[3] = {};
+	QWidget *m_columns[3] = {};
+	QLabel *m_headers[3] = {};
+	QLabel *m_paneStatus[3] = {};
 	QSplitter *m_splitter = nullptr;
 	QLabel *m_status = nullptr;
 	DiffMapWidget *m_diffMap = nullptr;

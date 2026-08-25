@@ -192,21 +192,33 @@ ImageCompareView::ImageCompareView(QWidget *parent)
 	m_splitter = new QSplitter(Qt::Horizontal, this);
 	m_splitter->setHandleWidth(4); // WinIMerge's pane gutter
 	m_splitter->setChildrenCollapsible(false);
-	for (int i = 0; i < 2; ++i)
+	// three columns are built; the third stays hidden until a 3-way opens
+	for (int i = 0; i < 3; ++i)
 	{
 		auto *column = new QWidget(this);
+		m_columns[i] = column;
 		auto *columnLayout = new QVBoxLayout(column);
 		columnLayout->setContentsMargins(0, 0, 0, 0);
 		columnLayout->setSpacing(0);
 		m_headers[i] = new QLabel(column);
 		m_headers[i]->setContentsMargins(6, 3, 6, 3);
+		// header and status text must never drive the column width: the
+		// cursor readout grows on hover, and a label-driven minimum width
+		// makes the splitter relayout under the mouse in a feedback loop
+		// (WinMerge's status bars clip; these do too)
+		m_headers[i]->setSizePolicy(QSizePolicy::Ignored,
+			QSizePolicy::Preferred);
 		columnLayout->addWidget(m_headers[i]);
 		m_panes[i] = new ImagePane(column);
 		columnLayout->addWidget(m_panes[i], 1);
 		m_paneStatus[i] = new QLabel(column);
 		m_paneStatus[i]->setContentsMargins(6, 2, 6, 2);
+		m_paneStatus[i]->setSizePolicy(QSizePolicy::Ignored,
+			QSizePolicy::Preferred);
 		columnLayout->addWidget(m_paneStatus[i]);
 		m_splitter->addWidget(column);
+		if (i == 2)
+			column->setVisible(false);
 
 		connect(m_panes[i], &ImagePane::mousePressed,
 			this, &ImageCompareView::paneMousePressed);
@@ -480,7 +492,7 @@ void ImageCompareView::loadSettings()
 	m_draggingMode = settings.value(QStringLiteral("DraggingMode"), DragMove).toInt();
 	m_zoom = settings.value(QStringLiteral("Zoom"), 1000).toInt() / 1000.0;
 	settings.endGroup();
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < 3; ++i)
 		m_panes[i]->setZoom(m_zoom);
 	updateAnimationTimer();
 }
@@ -529,34 +541,44 @@ void ImageCompareView::applyTheme()
 		? QStringLiteral("QLabel { background: #2c2c2c; color: #b8b8b8; }")
 		: QStringLiteral("QLabel { background: #ececec; color: #303030; }");
 	m_status->setStyleSheet(labelStyle);
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < 3; ++i)
 	{
 		m_paneStatus[i]->setStyleSheet(labelStyle);
 		updatePaneHeader(i);
 	}
 	lm::applyToolbarTheme(this);
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < 3; ++i)
 		m_panes[i]->viewport()->update();
 	if (m_diffMap != nullptr)
 		m_diffMap->update();
 }
 
-bool ImageCompareView::compare(const QString &leftPath,
-	const QString &rightPath, QString *error)
+bool ImageCompareView::compare(const QStringList &paths, QString *error)
 {
-	m_paths[0] = leftPath;
-	m_paths[1] = rightPath;
-	const std::wstring l = leftPath.toStdWString();
-	const std::wstring r = rightPath.toStdWString();
-	const wchar_t *files[3] = { l.c_str(), r.c_str(), nullptr };
-	if (!m_buffer->OpenImages(2, files))
+	if (paths.size() < 2 || paths.size() > 3)
+	{
+		if (error != nullptr)
+			*error = tr("Could not open the files as images.");
+		return false;
+	}
+	m_paneCount = static_cast<int>(paths.size());
+	std::wstring names[3];
+	const wchar_t *files[3] = { nullptr, nullptr, nullptr };
+	for (int i = 0; i < m_paneCount; ++i)
+	{
+		m_paths[i] = paths.at(i);
+		names[i] = paths.at(i).toStdWString();
+		files[i] = names[i].c_str();
+	}
+	if (!m_buffer->OpenImages(m_paneCount, files))
 	{
 		if (error != nullptr)
 			*error = tr("Could not open the files as images.");
 		return false;
 	}
 	m_buffer->CompareImages();
-	for (int i = 0; i < 2; ++i)
+	m_columns[2]->setVisible(m_paneCount == 3);
+	for (int i = 0; i < m_paneCount; ++i)
 	{
 		m_panes[i]->setBuffer(m_buffer.get(), i);
 		m_panes[i]->setZoom(m_zoom);
@@ -584,18 +606,23 @@ int ImageCompareView::diffCount() const
 
 QStringList ImageCompareView::paths() const
 {
-	return { m_paths[0], m_paths[1] };
+	QStringList result;
+	for (int i = 0; i < m_paneCount; ++i)
+		result.append(m_paths[i]);
+	return result;
 }
 
 QString ImageCompareView::tabTitle() const
 {
-	return QFileInfo(m_paths[0]).fileName() + QString::fromUtf8(" \xE2\x86\x94 ")
-		+ QFileInfo(m_paths[1]).fileName();
+	QStringList names;
+	for (int i = 0; i < m_paneCount; ++i)
+		names.append(QFileInfo(m_paths[i]).fileName());
+	return names.join(QString::fromUtf8(" \xE2\x86\x94 "));
 }
 
 void ImageCompareView::setReadOnlySides(const QList<bool> &readOnly)
 {
-	for (int i = 0; i < qMin(2, static_cast<int>(readOnly.size())); ++i)
+	for (int i = 0; i < qMin(3, static_cast<int>(readOnly.size())); ++i)
 		m_buffer->SetReadOnly(i, readOnly.at(i));
 }
 
@@ -689,7 +716,7 @@ void ImageCompareView::copyCurrentDiff(int sourceSide)
 	const int diffIndex = m_buffer->GetCurrentDiffIndex();
 	if (diffIndex < 0)
 		return;
-	m_buffer->CopyDiff(diffIndex, sourceSide, 1 - sourceSide);
+	m_buffer->CopyDiff(diffIndex, sourceSide, mergeTarget(sourceSide));
 	afterBufferChange();
 }
 
@@ -697,7 +724,7 @@ void ImageCompareView::copyAllFrom(int sourceSide)
 {
 	if (m_buffer->GetDiffCount() == 0)
 		return;
-	m_buffer->CopyDiffAll(sourceSide, 1 - sourceSide);
+	m_buffer->CopyDiffAll(sourceSide, mergeTarget(sourceSide));
 	afterBufferChange();
 }
 
@@ -1410,7 +1437,14 @@ void ImageCompareView::updatePaneHeader(int pane)
 		return;
 	QString text = QFileInfo(m_paths[pane]).fileName();
 	if (text.isEmpty())
-		text = pane == 0 ? tr("Untitled Left") : tr("Untitled Right");
+	{
+		if (pane == 0)
+			text = tr("Untitled Left");
+		else if (pane == 1 && m_paneCount == 3)
+			text = tr("Untitled Middle");
+		else
+			text = tr("Untitled Right");
+	}
 	if (m_buffer->IsModified(pane))
 		text.prepend(QStringLiteral("* "));
 	m_headers[pane]->setText(text);
@@ -1453,8 +1487,14 @@ void ImageCompareView::updatePaneStatus(int pane)
 				.arg(rx).arg(ry)
 				.arg(Image::valueR(color)).arg(Image::valueG(color))
 				.arg(Image::valueB(color)).arg(Image::valueA(color));
-			text += tr("Dist: %1  ").arg(
-				m_buffer->GetColorDistance(0, 1, pt.x(), pt.y()), 0, 'g', 4);
+			// the middle pane of a 3-way shows both neighbor distances
+			if (m_paneCount == 3 && pane == 1)
+				text += tr("Dist: %1, %2  ")
+					.arg(m_buffer->GetColorDistance(0, 1, pt.x(), pt.y()), 0, 'g', 4)
+					.arg(m_buffer->GetColorDistance(1, 2, pt.x(), pt.y()), 0, 'g', 4);
+			else
+				text += tr("Dist: %1  ").arg(
+					m_buffer->GetColorDistance(0, 1, pt.x(), pt.y()), 0, 'g', 4);
 		}
 	}
 	if (m_panes[pane]->selectionVisible()

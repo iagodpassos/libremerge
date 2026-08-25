@@ -229,7 +229,7 @@ MainWindow::MainWindow(QWidget *parent)
 			else if (auto *table = tableView())
 				table->copyCurrentDiff(1);
 			else if (auto *image = imageView())
-				image->copyCurrentDiff(1);
+				image->copyCurrentDiff(image->paneCount() == 3 ? 2 : 1);
 		});
 	// WinMerge's Ctrl+Alt variants copy and jump to the next difference
 	// (the table copy always lands on the difference below the merge)
@@ -260,7 +260,7 @@ MainWindow::MainWindow(QWidget *parent)
 			else if (auto *table = tableView())
 				table->copyAllFrom(1);
 			else if (auto *image = imageView())
-				image->copyAllFrom(1);
+				image->copyAllFrom(image->paneCount() == 3 ? 2 : 1);
 		});
 	mergeMenu->addSeparator();
 	addMenuAction(mergeMenu, tr("S&wap Panes"), QKeySequence(),
@@ -438,13 +438,19 @@ void MainWindow::openFileComparison(const QString &leftPath, const QString &righ
 void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> &readOnly,
 	bool forceText)
 {
-	// image pairs open as an image comparison (WinMerge's image file
-	// patterns decide, checked before the table patterns like upstream)
-	if (!forceText && paths.size() == 2
-		&& lm::isImageFile(paths.at(0)) && lm::isImageFile(paths.at(1)))
+	// image pairs/triples open as an image comparison (WinMerge's image
+	// file patterns decide, checked before the table patterns like
+	// upstream; 3-way image compare is supported)
+	if (!forceText && (paths.size() == 2 || paths.size() == 3))
 	{
-		openImageComparison(paths.at(0), paths.at(1));
-		return;
+		bool allImages = true;
+		for (const QString &path : paths)
+			allImages = allImages && lm::isImageFile(path);
+		if (allImages)
+		{
+			openImageComparison(paths, readOnly);
+			return;
+		}
 	}
 
 	// CSV/TSV pairs open as side-by-side grids, like WinMerge's table
@@ -518,18 +524,19 @@ void MainWindow::openTableComparison(const QString &leftPath,
 		});
 }
 
-void MainWindow::openImageComparison(const QString &leftPath,
-	const QString &rightPath)
+void MainWindow::openImageComparison(const QStringList &paths,
+	const QList<bool> &readOnly)
 {
 	auto *view = new ImageCompareView(this);
 	QString error;
-	if (!view->compare(leftPath, rightPath, &error))
+	if (!view->compare(paths, &error))
 	{
 		delete view;
 		QMessageBox::warning(this, tr("LibreMerge"),
 			tr("Could not compare files:\n%1").arg(error));
 		return;
 	}
+	view->setReadOnlySides(readOnly);
 	auto refreshTab = [this](ImageCompareView *v) {
 		const int tabIndex = m_tabs->indexOf(v);
 		if (tabIndex < 0)
