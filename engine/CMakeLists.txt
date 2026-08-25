@@ -177,3 +177,17 @@ target_link_libraries(libremerge-engine PUBLIC
   Boost::boost
   ICU::uc ICU::i18n
 )
+
+# Image-compare core: the vendored WinIMerge algorithm headers
+# (Externals/winimerge) over a Qt-backed image wrapper (ports/imgmerge).
+# Header-only; consumers need Qt6 Gui only, so the target exists whenever
+# Qt6 is present even in engine-only builds.
+find_package(Qt6 COMPONENTS Gui QUIET)
+if(Qt6Gui_FOUND)
+  add_library(libremerge-imgmerge INTERFACE)
+  target_include_directories(libremerge-imgmerge INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/ports/imgmerge
+    ${CMAKE_CURRENT_SOURCE_DIR}/Externals/winimerge/src/WinIMergeLib
+  )
+  target_link_libraries(libremerge-imgmerge INTERFACE Qt6::Gui)
+endif()

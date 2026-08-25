@@ -15,6 +15,8 @@ qt_add_executable(LibreMerge
   NewComparisonView.cpp
   FileCompareView.cpp
   TableCompareView.cpp
+  ImageCompareView.cpp
+  ImagePane.cpp
   DiffTextEdit.cpp
   Icons.cpp
   LocationPane.cpp
@@ -62,6 +64,7 @@ target_link_libraries(LibreMerge PRIVATE
   Qt6::Widgets
   Qt6::Concurrent
   libremerge-engine
+  libremerge-imgmerge
 )
 
 if(NOT WIN32)

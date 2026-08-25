@@ -11,6 +11,7 @@
 #include <QTranslator>
 #include "FileCompareView.h"
 #include "TableCompareView.h"
+#include "ImageCompareView.h"
 #include "FileOps.h"
 #include "FolderCompareDriver.h"
 #include "MainWindow.h"
@@ -18,6 +19,57 @@
 #ifdef Q_OS_MACOS
 #include "MacServices.h"
 #endif
+
+// engine (folder-compare image hook)
+#include "DiffItem.h"
+#include "IAbortable.h"
+#include "image_compare_hook.h"
+#include "ImgMergeBuffer.hpp"
+
+namespace
+{
+
+/** Pixel comparison for the folder compare, mirroring upstream's
+    ImageCompare::compare_files over the ported WinIMerge core. */
+int compareImageFiles(const String &file1, const String &file2,
+	double colorDistanceThreshold, const IAbortable *piAbortable)
+{
+	CImgMergeBuffer buffer;
+	buffer.SetColorDistanceThreshold(colorDistanceThreshold);
+	const std::wstring f1 = QString::fromStdString(file1).toStdWString();
+	const std::wstring f2 = QString::fromStdString(file2).toStdWString();
+	const wchar_t *files[3] = { f1.c_str(), f2.c_str(), nullptr };
+	if (!buffer.OpenImages(2, files))
+		return DIFFCODE::CMPERR;
+	bool aborted = false;
+	bool different = false;
+	if (buffer.GetPageCount(0) == buffer.GetPageCount(1))
+	{
+		for (int page = 0; page < buffer.GetPageCount(0); ++page)
+		{
+			if (piAbortable != nullptr && piAbortable->ShouldAbort())
+			{
+				aborted = true;
+				break;
+			}
+			buffer.SetCurrentPageAll(page);
+			buffer.CompareImages();
+			if (buffer.GetDiffCount() > 0)
+			{
+				different = true;
+				break;
+			}
+		}
+	}
+	else
+		different = true;
+	buffer.CloseImages();
+	if (aborted)
+		return DIFFCODE::CMPABORT;
+	return different ? DIFFCODE::DIFF : DIFFCODE::SAME;
+}
+
+} // namespace
 
 int main(int argc, char *argv[])
 {
@@ -43,6 +95,7 @@ int main(int argc, char *argv[])
 		app.installTranslator(&appTranslator);
 
 	lm::installEngineOptions();
+	lm::SetImageCompareHook(&compareImageFiles);
 
 	QCommandLineParser parser;
 	parser.setApplicationDescription(
@@ -92,7 +145,35 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestTableOpt(QStringLiteral("selftest-table"),
 		QStringLiteral("Table-compare two CSVs, merge all and verify (for testing)"));
 	parser.addOption(selftestTableOpt);
+	QCommandLineOption selftestImageOpt(QStringLiteral("selftest-image"),
+		QStringLiteral("Image-compare two files, merge all in memory and verify (for testing)"));
+	parser.addOption(selftestImageOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestImageOpt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 2)
+			return 2;
+		ImageCompareView view;
+		QString error;
+		if (!view.compare(files.at(0), files.at(1), &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		const int initial = view.diffCount();
+		view.copyAllFrom(0);
+		const int merged = view.diffCount();
+		view.undo();
+		const int undone = view.diffCount();
+		view.redo();
+		const int redone = view.diffCount();
+		printf("initial: %d, merged: %d, undone: %d, redone: %d\n",
+			initial, merged, undone, redone);
+		return (initial > 0 && merged == 0 && undone == initial
+			&& redone == 0) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestTableOpt))
 	{

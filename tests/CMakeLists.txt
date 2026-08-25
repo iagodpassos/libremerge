@@ -57,6 +57,18 @@ if(NOT WIN32)
     -include ${CMAKE_SOURCE_DIR}/engine/ports/posix_compat.h)
 endif()
 
+# Image-compare core tests (needs Qt6 Gui; own binary with a
+# QGuiApplication offscreen main)
+include(GoogleTest)
+if(TARGET libremerge-imgmerge)
+  add_executable(libremerge-imgmerge-tests ImgMerge/ImgMergeBuffer_test.cpp)
+  target_link_libraries(libremerge-imgmerge-tests PRIVATE
+    libremerge-imgmerge
+    GTest::gtest
+  )
+  gtest_discover_tests(libremerge-imgmerge-tests DISCOVERY_TIMEOUT 60)
+endif()
+
 # Tests use upstream-relative data paths (../TestData, ../../Data,
 # ../../Src, ...). tests/run plus the Src/Externals symlinks at the repo
 # root reproduce that layout.

@@ -8,8 +8,10 @@
 
 #include "FolderCompareDriver.h"
 #include "EngineOptions.h"
+#include "ImageFormats.h"
 
 #include <climits>
+#include <QSettings>
 #include <Poco/Semaphore.h>
 
 #include "CompareStats.h"
@@ -111,6 +113,22 @@ FolderCompareResult compareFolders(const QString &leftDir, const QString &rightD
 		? QStringLiteral("*.*") : filterMask.trimmed();
 	filter.SetMaskOrExpression(mask.toStdString());
 	ctxt.m_piFilterGlobal = &filter;
+
+	// image compare in folder compare (WinMerge option, off by default):
+	// matching pairs compare by pixels through the registered hook, with
+	// the same color-distance threshold as the image window
+	FileFilterHelper imgFilter;
+	if (QSettings().value(QStringLiteral("ImageCompare/EnableInFolderCompare"),
+			false).toBool())
+	{
+		ctxt.m_bEnableImageCompare = true;
+		ctxt.m_dColorDistanceThreshold = QSettings().value(
+			QStringLiteral("ImageCompare/ColorDistanceThreshold"), 0).toInt()
+			/ 1000.0;
+		imgFilter.SetMaskOrExpression(
+			lm::imageFilePatterns().toStdString());
+		ctxt.m_pImgfileFilter = &imgFilter;
+	}
 
 	ctxt.InitDiffItemList();
 

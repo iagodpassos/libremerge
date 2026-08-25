@@ -18,11 +18,21 @@ LibreMerge vendors the comparison engine of **WinMerge**.
 | `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect` |
 | `engine/Src/Common/` | `Src/Common/` | Portable utilities: `unicoder`, `UnicodeString`, `UniFile`, `paths`, `OptionsMgr`/`IniOptionsMgr`, `charsets`, `TempFile` support |
 | `tests/` | `Testing/GoogleTest/` | Upstream unit tests for the engine + `TestData/` |
+| `engine/Externals/winimerge/src/WinIMergeLib/` | [WinMerge/winimerge](https://github.com/WinMerge/winimerge) `src/WinIMergeLib/` @ `57ef929c` (the commit WinMerge pins) | Image-compare core: `ImgDiffBuffer.hpp` (block diff, overlay, blink, wipe), `ImgMergeBuffer.hpp` (copy diff, undo, save), `Diff.hpp` (embedded xdiff for insertion/deletion alignment) — GPL-2.0-or-later |
+
+The WinIMerge image wrapper (`image.hpp`, FreeImagePlus-based) and
+`ImgConverter.hpp` (WIC/Direct2D/GDI+, Windows-only) are **not** vendored;
+`engine/ports/imgmerge/` reimplements the same API over `QImage` (FreeImage
+is unmaintained as a system package — Homebrew deprecates it in 2027 over
+open CVEs). The vendored algorithm headers therefore run on identical BGRA
+scanlines and produce the same diffs; format support follows Qt's decoders
+instead of FreeImage's (writing GIF and multi-page files back is not
+supported, unlike WinMerge).
 
 ## Deliberately excluded (and why)
 
 - **All MFC GUI code** (`*Dlg`, `*Bar`, `*Menu`, `*View`, `*Frm`, `*Doc`, `Src/Common` widgets): MFC is Windows-only and non-redistributable. The UI is rebuilt in Qt.
-- `Src/CompareEngines/ImageCompare.*`: thin wrapper around the WinIMerge Win32 DLL.
+- `Src/CompareEngines/ImageCompare.cpp`: thin wrapper around the WinIMerge Win32 DLL. LibreMerge keeps the engine Qt-free with a hook (`ports/image_compare_stub.cpp`) that the Qt app fills in with the ported image core at startup.
 - **frhed** (hex editor): GPL-2.0-**only**, incompatible with GPLv3 distribution.
 - **7-Zip `Rar*` codecs**: unRAR license restriction is GPL-incompatible (archive support will use libarchive, without RAR).
 - **winwebdiff**: depends on WebView2 (proprietary, Windows-only).
@@ -48,6 +58,15 @@ Windows-only code paths): `diffutils/src/util.c`, `unicoder.cpp`,
 branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
 (SyntaxColors include, ToWindowsPath call), `DiffContext.cpp`
 (CVersionInfo), `FileFlags.cpp`, `Exceptions.h` came pre-guarded.
+
+**winimerge (`engine/Externals/winimerge`):**
+- `ImgDiffBuffer.hpp` (`DataForDiff`): `LM_IMAGE_SCANLINES_TOPDOWN` branch —
+  the Qt image backend stores scanlines top-down and contiguous, so
+  `reverse()` is a no-op and `data()` starts at row 0 (FreeImage stores
+  bottom-up, which is what the original flip-then-walk trick compensated)
+- `Diff.hpp` (`xdl_prepare_ctx`): the `const Data& data` declaration moved
+  above the first `goto` — Clang/GCC reject a jump that bypasses the
+  initialization of a reference; MSVC accepted it
 
 **POSIX additions inside vendored files:**
 - `DirTravel.cpp`: POSIX `LoadFiles` (readdir + fnmatch + stat)

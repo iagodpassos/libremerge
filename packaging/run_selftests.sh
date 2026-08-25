@@ -21,6 +21,13 @@ make_fixtures() {
     > "$TMP/left.csv"
   printf 'id,name,price\n1,apple,11\n2,banana,20\n3,cereja,30\n5,elder,50\n' \
     > "$TMP/right.csv"
+  # 64x48 white PNG vs the same with a red and a green box (2 differences)
+  base64 -d > "$TMP/left.png" <<'PNG'
+iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAAdElEQVR4nO3QQREAAAiAMPuX1hh7yBJwzD43OkBrgA7QGqADtAboAK0BOkBrgA7QGqADtAboAK0BOkBrgA7QGqADtAboAK0BOkBrgA7QGqADtAboAK0BOkBrgA7QGqADtAboAK0BOkBrgA7QGqADtAboAO0AM+HSwnsOK34AAAAASUVORK5CYII=
+PNG
+  base64 -d > "$TMP/right.png" <<'PNG'
+iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAAiElEQVR4nO3QQQrDMBAEwX16fm6fc7INMkWibtBNLEPNsXmjB+gC0AN0AegBugD0AF0AeoDuPsDMs/cjBXD/ZwABBBBAAAEEEEAAmwL8aQHoAboA9ABdAHqALgA94Kr5zNdbfn/5xcUFEMDmAG8XgB6gC0AP0AWgB+gC0AN0AegBugD0AN32ACcCDIwDSDcRXgAAAABJRU5ErkJggg==
+PNG
 }
 
 fails=0
@@ -39,6 +46,7 @@ for t in selftest-merge selftest-save selftest-undo selftest-undo-scroll \
   run_one "$t" "$TMP/left.txt" "$TMP/right.txt"
 done
 run_one selftest-table "$TMP/left.csv" "$TMP/right.csv"
+run_one selftest-image "$TMP/left.png" "$TMP/right.png"
 
 echo "== $fails failure(s)"
 exit "$((fails > 0 ? 1 : 0))"

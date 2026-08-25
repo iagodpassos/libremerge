@@ -27,6 +27,8 @@
 
 #include "FileCompareView.h"
 #include "TableCompareView.h"
+#include "ImageCompareView.h"
+#include "ImageFormats.h"
 #include "Theme.h"
 #include "FolderCompareView.h"
 #include "NewComparisonView.h"
@@ -61,6 +63,9 @@ MainWindow::MainWindow(QWidget *parent)
 	auto tableView = [this]() {
 		return qobject_cast<TableCompareView *>(m_tabs->currentWidget());
 	};
+	auto imageView = [this]() {
+		return qobject_cast<ImageCompareView *>(m_tabs->currentWidget());
+	};
 	auto addMenuAction = [this](QMenu *menu, const QString &text,
 		const QKeySequence &shortcut, auto slot) -> QAction * {
 		QAction *action = menu->addAction(text);
@@ -79,12 +84,14 @@ MainWindow::MainWindow(QWidget *parent)
 		[this]() { newComparison(); });
 	fileMenu->addSeparator();
 	addMenuAction(fileMenu, tr("&Save"), QKeySequence::Save,
-		[fileView, tableView]() {
+		[fileView, tableView, imageView]() {
 			QString error;
 			if (auto *view = fileView())
 				view->saveModified(&error);
 			else if (auto *table = tableView())
 				table->saveModified(&error);
+			else if (auto *image = imageView())
+				image->saveModified(&error);
 		});
 	addMenuAction(fileMenu, tr("&Close Tab"), QKeySequence::Close,
 		[this]() { closeTab(m_tabs->currentIndex()); });
@@ -94,18 +101,22 @@ MainWindow::MainWindow(QWidget *parent)
 
 	QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
 	addMenuAction(editMenu, tr("&Undo"), QKeySequence::Undo,
-		[fileView, tableView]() {
+		[fileView, tableView, imageView]() {
 			if (auto *view = fileView())
 				view->undoActive();
 			else if (auto *table = tableView())
 				table->undo();
+			else if (auto *image = imageView())
+				image->undo();
 		});
 	addMenuAction(editMenu, tr("&Redo"), QKeySequence::Redo,
-		[fileView, tableView]() {
+		[fileView, tableView, imageView]() {
 			if (auto *view = fileView())
 				view->redoActive();
 			else if (auto *table = tableView())
 				table->redo();
+			else if (auto *image = imageView())
+				image->redo();
 		});
 	editMenu->addSeparator();
 	addMenuAction(editMenu, tr("&Find..."), QKeySequence::Find, [fileView]() {
@@ -143,70 +154,82 @@ MainWindow::MainWindow(QWidget *parent)
 	addThemeAction(tr("&Dark"), lm::ThemeMode::Dark);
 	viewMenu->addSeparator();
 	QAction *zoomInAction = addMenuAction(viewMenu, tr("Zoom &In"),
-		QKeySequence::ZoomIn, [fileView]() {
+		QKeySequence::ZoomIn, [fileView, imageView]() {
 			if (auto *view = fileView()) view->zoomIn();
+			else if (auto *image = imageView()) image->zoomIn();
 		});
 	// pt-BR and US keyboards type "+" as Shift+= — accept Cmd+= too
 	zoomInAction->setShortcuts({ QKeySequence::ZoomIn,
 		QKeySequence(Qt::CTRL | Qt::Key_Equal) });
 	addMenuAction(viewMenu, tr("Zoom &Out"), QKeySequence::ZoomOut,
-		[fileView]() {
+		[fileView, imageView]() {
 			if (auto *view = fileView()) view->zoomOut();
+			else if (auto *image = imageView()) image->zoomOut();
 		});
 	addMenuAction(viewMenu, tr("&Actual Size"),
-		QKeySequence(Qt::CTRL | Qt::Key_0), [fileView]() {
+		QKeySequence(Qt::CTRL | Qt::Key_0), [fileView, imageView]() {
 			if (auto *view = fileView()) view->zoomReset();
+			else if (auto *image = imageView()) image->zoomReset();
 		});
 	viewMenu->addSeparator();
 	addMenuAction(viewMenu, tr("Next &Pane"), QKeySequence(Qt::Key_F6),
-		[fileView, tableView]() {
+		[fileView, tableView, imageView]() {
 			if (auto *view = fileView()) view->focusNextPane();
 			else if (auto *table = tableView()) table->focusNextPane();
+			else if (auto *image = imageView()) image->focusNextPane();
 		});
 
 	QMenu *mergeMenu = menuBar()->addMenu(tr("&Merge"));
 	addMenuAction(mergeMenu, tr("&First Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Home), [fileView, tableView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Home), [fileView, tableView, imageView]() {
 			if (auto *view = fileView()) view->gotoFirstDiff();
 			else if (auto *table = tableView()) table->gotoFirstDiff();
+			else if (auto *image = imageView()) image->gotoFirstDiff();
 		});
 	QAction *prevDiffAction = addMenuAction(mergeMenu, tr("&Previous Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Up), [fileView, tableView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Up), [fileView, tableView, imageView]() {
 			if (auto *view = fileView()) view->gotoPrevDiff();
 			else if (auto *table = tableView()) table->gotoPrevDiff();
+			else if (auto *image = imageView()) image->gotoPrevDiff();
 		});
 	// F7/F8 are upstream aliases for previous/next
 	prevDiffAction->setShortcuts({ QKeySequence(Qt::ALT | Qt::Key_Up),
 		QKeySequence(Qt::Key_F7) });
 	QAction *nextDiffAction = addMenuAction(mergeMenu, tr("&Next Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Down), [fileView, tableView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Down), [fileView, tableView, imageView]() {
 			if (auto *view = fileView()) view->gotoNextDiff();
 			else if (auto *table = tableView()) table->gotoNextDiff();
+			else if (auto *image = imageView()) image->gotoNextDiff();
 		});
 	nextDiffAction->setShortcuts({ QKeySequence(Qt::ALT | Qt::Key_Down),
 		QKeySequence(Qt::Key_F8) });
 	addMenuAction(mergeMenu, tr("&Last Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_End), [fileView, tableView]() {
+		QKeySequence(Qt::ALT | Qt::Key_End), [fileView, tableView, imageView]() {
 			if (auto *view = fileView()) view->gotoLastDiff();
 			else if (auto *table = tableView()) table->gotoLastDiff();
+			else if (auto *image = imageView()) image->gotoLastDiff();
 		});
 	addMenuAction(mergeMenu, tr("C&urrent Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Return), [fileView, tableView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Return), [fileView, tableView, imageView]() {
 			if (auto *view = fileView()) view->selectDiffAtCursor();
 			else if (auto *table = tableView()) table->selectDiffAtCursor();
+			else if (auto *image = imageView()) image->selectDiffAtCursor();
 		});
 	mergeMenu->addSeparator();
 	addMenuAction(mergeMenu, tr("Copy to &Right"),
-		QKeySequence(Qt::ALT | Qt::Key_Right), [fileView, tableView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Right), [fileView, tableView, imageView]() {
 			if (auto *view = fileView()) view->copyCurrentDiff(0);
 			else if (auto *table = tableView()) table->copyCurrentDiff(0);
+			else if (auto *image = imageView()) image->copyCurrentDiff(0);
 		});
 	addMenuAction(mergeMenu, tr("Copy to &Left"),
-		QKeySequence(Qt::ALT | Qt::Key_Left), [fileView, tableView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Left), [fileView, tableView, imageView]() {
 			if (auto *view = fileView())
 				view->copyCurrentDiff(view->paneCount() == 3 ? 2 : 1);
 			else if (auto *table = tableView())
 				table->copyCurrentDiff(1);
+			else if (auto *image = imageView())
+				image->copyCurrentDiff(1);
 		});
 	// WinMerge's Ctrl+Alt variants copy and jump to the next difference
 	// (the table copy always lands on the difference below the merge)
@@ -225,16 +248,19 @@ MainWindow::MainWindow(QWidget *parent)
 				table->copyCurrentDiff(1);
 		});
 	addMenuAction(mergeMenu, tr("Copy All to Righ&t"), QKeySequence(),
-		[fileView, tableView]() {
+		[fileView, tableView, imageView]() {
 			if (auto *view = fileView()) view->copyAllFrom(0);
 			else if (auto *table = tableView()) table->copyAllFrom(0);
+			else if (auto *image = imageView()) image->copyAllFrom(0);
 		});
 	addMenuAction(mergeMenu, tr("Copy All to Le&ft"), QKeySequence(),
-		[fileView, tableView]() {
+		[fileView, tableView, imageView]() {
 			if (auto *view = fileView())
 				view->copyAllFrom(view->paneCount() == 3 ? 2 : 1);
 			else if (auto *table = tableView())
 				table->copyAllFrom(1);
+			else if (auto *image = imageView())
+				image->copyAllFrom(1);
 		});
 	mergeMenu->addSeparator();
 	addMenuAction(mergeMenu, tr("S&wap Panes"), QKeySequence(),
@@ -243,15 +269,147 @@ MainWindow::MainWindow(QWidget *parent)
 			else if (auto *table = tableView()) table->swapSides();
 		});
 	addMenuAction(mergeMenu, tr("Re&compare"), QKeySequence(Qt::Key_F5),
-		[this, fileView, tableView]() {
+		[this, fileView, tableView, imageView]() {
 			if (auto *view = fileView())
 				view->recompare();
 			else if (auto *table = tableView())
 				table->recompare();
+			else if (auto *image = imageView())
+				image->recompare();
 			else if (auto *folder = qobject_cast<FolderCompareView *>(
 					m_tabs->currentWidget()))
 				folder->recompare();
 		});
+
+	// WinMerge's Image menu; active while an image comparison is current
+	QMenu *imageMenu = menuBar()->addMenu(tr("&Image"));
+	QAction *actViewDiffs = imageMenu->addAction(tr("View &Differences"));
+	actViewDiffs->setCheckable(true);
+	connect(actViewDiffs, &QAction::triggered, this, [imageView](bool on) {
+		if (auto *image = imageView()) image->setShowDifferences(on);
+	});
+	QMenu *blockSizeMenu = imageMenu->addMenu(tr("Diff &Block Size"));
+	auto *blockSizeGroup = new QActionGroup(this);
+	for (const int size : { 1, 2, 4, 8, 16, 32 })
+	{
+		QAction *action = blockSizeMenu->addAction(QString::number(size));
+		action->setCheckable(true);
+		action->setData(size);
+		blockSizeGroup->addAction(action);
+		connect(action, &QAction::triggered, this, [imageView, size]() {
+			if (auto *image = imageView()) image->setBlockSize(size);
+		});
+	}
+	QMenu *thresholdMenu = imageMenu->addMenu(tr("&Ignore Color Difference"));
+	auto *thresholdGroup = new QActionGroup(this);
+	for (const int threshold : { 0, 2, 4, 8, 16, 32, 64 })
+	{
+		QAction *action = thresholdMenu->addAction(QString::number(threshold));
+		action->setCheckable(true);
+		action->setData(threshold);
+		thresholdGroup->addAction(action);
+		connect(action, &QAction::triggered, this, [imageView, threshold]() {
+			if (auto *image = imageView())
+				image->setColorDistanceThreshold(threshold);
+		});
+	}
+	QMenu *insDelMenu = imageMenu->addMenu(tr("Ins&ertion/Deletion Detection"));
+	auto *insDelGroup = new QActionGroup(this);
+	const QStringList insDelNames = { tr("None"), tr("Vertical"),
+		tr("Horizontal") };
+	for (int mode = 0; mode < insDelNames.size(); ++mode)
+	{
+		QAction *action = insDelMenu->addAction(insDelNames.at(mode));
+		action->setCheckable(true);
+		action->setData(mode);
+		insDelGroup->addAction(action);
+		connect(action, &QAction::triggered, this, [imageView, mode]() {
+			if (auto *image = imageView())
+				image->setInsertionDeletionMode(mode);
+		});
+	}
+	QMenu *overlayMenu = imageMenu->addMenu(tr("&Overlay"));
+	auto *overlayGroup = new QActionGroup(this);
+	const QStringList overlayNames = { tr("None"), tr("XOR"),
+		tr("Alpha Blend"), tr("Alpha Blend Animation") };
+	for (int mode = 0; mode < overlayNames.size(); ++mode)
+	{
+		QAction *action = overlayMenu->addAction(overlayNames.at(mode));
+		action->setCheckable(true);
+		action->setData(mode);
+		overlayGroup->addAction(action);
+		connect(action, &QAction::triggered, this, [imageView, mode]() {
+			if (auto *image = imageView()) image->setOverlayMode(mode);
+		});
+	}
+	QMenu *draggingMenu = imageMenu->addMenu(tr("Dragging &Mode"));
+	auto *draggingGroup = new QActionGroup(this);
+	const struct { int mode; QString name; } draggingModes[] = {
+		{ 0, tr("None") }, { 1, tr("Move") }, { 2, tr("Adjust Offset") },
+		{ 3, tr("Vertical Wipe") }, { 4, tr("Horizontal Wipe") },
+		{ 5, tr("Rectangle Select") },
+	};
+	for (const auto &m : draggingModes)
+	{
+		QAction *action = draggingMenu->addAction(m.name);
+		action->setCheckable(true);
+		action->setData(m.mode);
+		draggingGroup->addAction(action);
+		connect(action, &QAction::triggered, this, [imageView, mode = m.mode]() {
+			if (auto *image = imageView()) image->setDraggingMode(mode);
+		});
+	}
+	imageMenu->addSeparator();
+	QAction *actPrevPage = imageMenu->addAction(tr("&Previous Page"));
+	connect(actPrevPage, &QAction::triggered, this, [imageView]() {
+		if (auto *image = imageView()) image->prevPage();
+	});
+	QAction *actNextPage = imageMenu->addAction(tr("&Next Page"));
+	connect(actNextPage, &QAction::triggered, this, [imageView]() {
+		if (auto *image = imageView()) image->nextPage();
+	});
+	QMenu *activePaneMenu = imageMenu->addMenu(tr("&Active Pane"));
+	activePaneMenu->addAction(tr("Rotate &Right 90\xC2\xB0"), this, [imageView]() {
+		if (auto *image = imageView()) image->rotateActivePane(1);
+	});
+	activePaneMenu->addAction(tr("Rotate &Left 90\xC2\xB0"), this, [imageView]() {
+		if (auto *image = imageView()) image->rotateActivePane(-1);
+	});
+	activePaneMenu->addAction(tr("Flip V&ertically"), this, [imageView]() {
+		if (auto *image = imageView()) image->flipActivePaneVertical();
+	});
+	activePaneMenu->addAction(tr("Flip H&orizontally"), this, [imageView]() {
+		if (auto *image = imageView()) image->flipActivePaneHorizontal();
+	});
+	activePaneMenu->addAction(tr("&Previous Page"), this, [imageView]() {
+		if (auto *image = imageView()) image->prevPageActivePane();
+	});
+	activePaneMenu->addAction(tr("&Next Page"), this, [imageView]() {
+		if (auto *image = imageView()) image->nextPageActivePane();
+	});
+	connect(imageMenu, &QMenu::aboutToShow, this, [=]() {
+		ImageCompareView *image = imageView();
+		const bool enabled = image != nullptr;
+		for (QAction *action : imageMenu->actions())
+			action->setEnabled(enabled);
+		if (image == nullptr)
+			return;
+		actViewDiffs->setChecked(image->showDifferences());
+		for (QAction *action : blockSizeGroup->actions())
+			action->setChecked(action->data().toInt() == image->blockSize());
+		for (QAction *action : thresholdGroup->actions())
+			action->setChecked(action->data().toInt()
+				== static_cast<int>(image->colorDistanceThreshold()));
+		for (QAction *action : insDelGroup->actions())
+			action->setChecked(action->data().toInt()
+				== image->insertionDeletionMode());
+		for (QAction *action : overlayGroup->actions())
+			action->setChecked(action->data().toInt() == image->overlayMode());
+		for (QAction *action : draggingGroup->actions())
+			action->setChecked(action->data().toInt() == image->draggingMode());
+		actPrevPage->setEnabled(image->maxPageCount() > 1);
+		actNextPage->setEnabled(image->maxPageCount() > 1);
+	});
 
 	QMenu *toolsMenu = menuBar()->addMenu(tr("&Tools"));
 	addMenuAction(toolsMenu, tr("&Line Filters..."), QKeySequence(),
@@ -280,6 +438,15 @@ void MainWindow::openFileComparison(const QString &leftPath, const QString &righ
 void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> &readOnly,
 	bool forceText)
 {
+	// image pairs open as an image comparison (WinMerge's image file
+	// patterns decide, checked before the table patterns like upstream)
+	if (!forceText && paths.size() == 2
+		&& lm::isImageFile(paths.at(0)) && lm::isImageFile(paths.at(1)))
+	{
+		openImageComparison(paths.at(0), paths.at(1));
+		return;
+	}
+
 	// CSV/TSV pairs open as side-by-side grids, like WinMerge's table
 	// compare; "Open as Text" in the table view forces the text path
 	if (!forceText && paths.size() == 2)
@@ -348,6 +515,40 @@ void MainWindow::openTableComparison(const QString &leftPath,
 				m_tabs->removeTab(tabIndex);
 				view->deleteLater();
 			}
+		});
+}
+
+void MainWindow::openImageComparison(const QString &leftPath,
+	const QString &rightPath)
+{
+	auto *view = new ImageCompareView(this);
+	QString error;
+	if (!view->compare(leftPath, rightPath, &error))
+	{
+		delete view;
+		QMessageBox::warning(this, tr("LibreMerge"),
+			tr("Could not compare files:\n%1").arg(error));
+		return;
+	}
+	auto refreshTab = [this](ImageCompareView *v) {
+		const int tabIndex = m_tabs->indexOf(v);
+		if (tabIndex < 0)
+			return;
+		m_tabs->setTabText(tabIndex, (v->isModified()
+			? QString::fromUtf8("\xE2\x80\xA2 ") : QString()) + v->tabTitle());
+	};
+	const int index = m_tabs->addTab(view, view->tabTitle());
+	m_tabs->setTabToolTip(index, view->paths().join(QStringLiteral("\n")));
+	m_tabs->setCurrentIndex(index);
+	connect(view, &ImageCompareView::modifiedChanged, this,
+		[view, refreshTab](bool) { refreshTab(view); });
+	connect(view, &ImageCompareView::pathsChanged, this,
+		[this, view, refreshTab]() {
+			refreshTab(view);
+			const int tabIndex = m_tabs->indexOf(view);
+			if (tabIndex >= 0)
+				m_tabs->setTabToolTip(tabIndex,
+					view->paths().join(QStringLiteral("\n")));
 		});
 }
 
@@ -654,6 +855,25 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 void MainWindow::closeTab(int index)
 {
 	QWidget *page = m_tabs->widget(index);
+	if (auto *image = qobject_cast<ImageCompareView *>(page);
+		image != nullptr && image->isModified())
+	{
+		const auto choice = QMessageBox::question(this, tr("Save Changes"),
+			tr("This comparison has unsaved changes. Save before closing?"),
+			QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+		if (choice == QMessageBox::Cancel)
+			return;
+		if (choice == QMessageBox::Save)
+		{
+			QString error;
+			if (!image->saveModified(&error))
+			{
+				QMessageBox::warning(this, tr("LibreMerge"),
+					tr("Could not save:\n%1").arg(error));
+				return;
+			}
+		}
+	}
 	if (auto *view = qobject_cast<FileCompareView *>(page); view != nullptr && view->isModified())
 	{
 		// like WinMerge's closing dialog: list each modified side and
