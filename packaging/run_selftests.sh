@@ -21,6 +21,10 @@ make_fixtures() {
     > "$TMP/left.csv"
   printf 'id,name,price\n1,apple,11\n2,banana,20\n3,cereja,30\n5,elder,50\n' \
     > "$TMP/right.csv"
+  # 3-way: one line, three versions (pane-relative merge flow)
+  printf 'alpha\nversion = "A"\ncommon\n' > "$TMP/w3a.txt"
+  printf 'alpha\nversion = "B"\ncommon\n' > "$TMP/w3b.txt"
+  printf 'alpha\nversion = "C"\ncommon\n' > "$TMP/w3c.txt"
   # 64x48 white PNG vs the same with a red and a green box (2 differences)
   base64 -d > "$TMP/left.png" <<'PNG'
 iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAAdElEQVR4nO3QQREAAAiAMPuX1hh7yBJwzD43OkBrgA7QGqADtAboAK0BOkBrgA7QGqADtAboAK0BOkBrgA7QGqADtAboAK0BOkBrgA7QGqADtAboAK0BOkBrgA7QGqADtAboAK0BOkBrgA7QGqADtAboAO0AM+HSwnsOK34AAAAASUVORK5CYII=
@@ -31,9 +35,9 @@ PNG
 }
 
 fails=0
-run_one() { # $1 = selftest name, $2/$3 = files
+run_one() { # $1 = selftest name, $2/$3[/$4] = files
   make_fixtures
-  if "$BIN" "--$1" "$2" "$3" > /dev/null 2>&1; then
+  if "$BIN" "--$1" "${@:2}" > /dev/null 2>&1; then
     echo "ok: $1"
   else
     echo "FAIL: $1 (exit $?)"
@@ -47,6 +51,7 @@ for t in selftest-merge selftest-save selftest-undo selftest-undo-scroll \
 done
 run_one selftest-table "$TMP/left.csv" "$TMP/right.csv"
 run_one selftest-image "$TMP/left.png" "$TMP/right.png"
+run_one selftest-merge3 "$TMP/w3a.txt" "$TMP/w3b.txt" "$TMP/w3c.txt"
 
 echo "== $fails failure(s)"
 exit "$((fails > 0 ? 1 : 0))"

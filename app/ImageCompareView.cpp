@@ -323,13 +323,13 @@ void ImageCompareView::buildToolbar(QVBoxLayout *layout)
 		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x98"), [this]() { gotoLastDiff(); });
 	toolbar->addSeparator();
 	addToolAction(lm::Icon::CopyRight, tr("Copy to Right"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyCurrentDiff(0); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyToRight(); });
 	addToolAction(lm::Icon::CopyLeft, tr("Copy to Left"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x90"), [this]() { copyCurrentDiff(1); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x90"), [this]() { copyToLeft(); });
 	addToolAction(lm::Icon::CopyAllRight, tr("Copy All to Right"), QString(),
-		[this]() { copyAllFrom(0); });
+		[this]() { copyAllToRight(); });
 	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"), QString(),
-		[this]() { copyAllFrom(1); });
+		[this]() { copyAllToLeft(); });
 	toolbar->addSeparator();
 	m_actUndo = addToolAction(lm::Icon::Undo, tr("Undo"),
 		QString::fromUtf8("\xE2\x8C\x98Z"), [this]() { undo(); });
@@ -711,20 +711,46 @@ void ImageCompareView::selectDiffAtCursor()
 	afterDiffNavigation();
 }
 
-void ImageCompareView::copyCurrentDiff(int sourceSide)
+void ImageCompareView::copyToRight()
+{
+	// WinMerge's ID_L2R: relative to the active pane, so the middle pane
+	// of a 3-way pushes into the right pane
+	const int target = qMin(m_activePane + 1, m_paneCount - 1);
+	copyCurrentDiff(target - 1, target);
+}
+
+void ImageCompareView::copyToLeft()
+{
+	const int target = qMax(m_activePane - 1, 0);
+	copyCurrentDiff(target + 1, target);
+}
+
+void ImageCompareView::copyAllToRight()
+{
+	const int target = qMin(m_activePane + 1, m_paneCount - 1);
+	copyAllFrom(target - 1, target);
+}
+
+void ImageCompareView::copyAllToLeft()
+{
+	const int target = qMax(m_activePane - 1, 0);
+	copyAllFrom(target + 1, target);
+}
+
+void ImageCompareView::copyCurrentDiff(int sourceSide, int targetSide)
 {
 	const int diffIndex = m_buffer->GetCurrentDiffIndex();
-	if (diffIndex < 0)
+	if (diffIndex < 0 || sourceSide == targetSide)
 		return;
-	m_buffer->CopyDiff(diffIndex, sourceSide, mergeTarget(sourceSide));
+	m_buffer->CopyDiff(diffIndex, sourceSide, targetSide);
 	afterBufferChange();
 }
 
-void ImageCompareView::copyAllFrom(int sourceSide)
+void ImageCompareView::copyAllFrom(int sourceSide, int targetSide)
 {
-	if (m_buffer->GetDiffCount() == 0)
+	if (m_buffer->GetDiffCount() == 0 || sourceSide == targetSide)
 		return;
-	m_buffer->CopyDiffAll(sourceSide, mergeTarget(sourceSide));
+	m_buffer->CopyDiffAll(sourceSide, targetSide);
 	afterBufferChange();
 }
 

@@ -148,7 +148,40 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestImageOpt(QStringLiteral("selftest-image"),
 		QStringLiteral("Image-compare two files, merge all in memory and verify (for testing)"));
 	parser.addOption(selftestImageOpt);
+	QCommandLineOption selftestMerge3Opt(QStringLiteral("selftest-merge3"),
+		QStringLiteral("3-way: merge left into middle, then middle into right, and verify (for testing)"));
+	parser.addOption(selftestMerge3Opt);
 	parser.process(app);
+
+	if (parser.isSet(selftestMerge3Opt))
+	{
+		const QStringList files = parser.positionalArguments();
+		if (files.size() != 3)
+			return 2;
+		FileCompareView view;
+		QString error;
+		if (!view.compare(files, &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		const int initial = view.diffCount();
+		// the user's workflow: with the left pane active, Alt+Right pushes
+		// left->middle; recompare, focus the middle pane, Alt+Right again
+		// pushes middle->right (WinMerge's pane-relative MenuIDtoXY)
+		view.copyAllToRight();          // active pane 0: left -> middle
+		view.recompare();
+		const int afterFirst = view.diffCount();
+		view.focusNextPane();           // active pane 1 (middle)
+		view.copyAllToRight();          // middle -> right
+		view.recompare();
+		const int afterSecond = view.diffCount();
+		printf("initial: %d, after left->middle: %d, after middle->right: %d\n",
+			initial, afterFirst, afterSecond);
+		// after the first merge the block still differs against the right
+		// pane; only the second merge zeroes the comparison
+		return (initial > 0 && afterFirst > 0 && afterSecond == 0) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestImageOpt))
 	{

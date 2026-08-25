@@ -66,13 +66,29 @@ public:
 	    and merge operations refuse to target it. */
 	void setReadOnlySides(const QList<bool> &readOnly);
 
-	/** Copy the current difference from sourceSide into the merge target
-	    (the other side in 2-way mode, the middle pane in 3-way mode).
-	    Like WinMerge, plain copy stays on the merged spot; pass
-	    advance=true for the "copy and advance" variant. */
-	void copyCurrentDiff(int sourceSide, bool advance = false);
-	/** Copy every remaining difference from sourceSide at once. */
-	void copyAllFrom(int sourceSide);
+	/** Copy the current difference between explicit panes. Like WinMerge,
+	    plain copy stays on the merged spot; pass advance=true for the
+	    "copy and advance" variant. */
+	void copyCurrentDiff(int sourceSide, int targetSide, bool advance);
+	/** Compatibility shim: target is the other side (2-way) or the
+	    middle pane (3-way). */
+	void copyCurrentDiff(int sourceSide, bool advance = false)
+	{
+		copyCurrentDiff(sourceSide, mergeTargetFor(sourceSide), advance);
+	}
+	/** Copy every remaining difference between explicit panes. */
+	void copyAllFrom(int sourceSide, int targetSide);
+	void copyAllFrom(int sourceSide)
+	{
+		copyAllFrom(sourceSide, mergeTargetFor(sourceSide));
+	}
+	/** WinMerge's pane-relative merge commands (MenuIDtoXY): the copy
+	    happens between the active pane's neighborhood, so in 3-way the
+	    middle pane can push into either side. */
+	void copyToRight(bool advance = false);
+	void copyToLeft(bool advance = false);
+	void copyAllToRight();
+	void copyAllToLeft();
 	void gotoNextDiff();
 	void gotoPrevDiff();
 	void gotoFirstDiff();
@@ -133,7 +149,7 @@ private:
 		bool modified = false;
 	};
 
-	int mergeTarget(int sourceSide) const
+	int mergeTargetFor(int sourceSide) const
 	{
 		return m_paneCount == 3 ? 1 : 1 - sourceSide;
 	}
@@ -155,7 +171,8 @@ private:
 	void gotoDiff(int blockIndex, bool center = true);
 	void selectDiffAtViewLine(int viewLine);
 	int nextActive(int from, int direction) const;
-	void applyBlockCopy(int blockIndex, int sourceSide, bool joinUndo);
+	void applyBlockCopy(int blockIndex, int sourceSide, int targetSide,
+		bool joinUndo);
 	void refreshAfterUndoRedo(const int countsBefore[3]);
 	void replaceOne();
 	void replaceAll();

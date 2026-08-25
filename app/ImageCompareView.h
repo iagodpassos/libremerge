@@ -54,10 +54,20 @@ public:
 	void gotoPrevDiff();
 	void gotoLastDiff();
 	void selectDiffAtCursor();
-	/** Copy the current difference from sourceSide into the merge target
-	    (the other side in 2-way mode, the middle pane in 3-way mode). */
-	void copyCurrentDiff(int sourceSide);
-	void copyAllFrom(int sourceSide);
+	/** Copy the current difference between explicit panes. */
+	void copyCurrentDiff(int sourceSide, int targetSide);
+	void copyAllFrom(int sourceSide, int targetSide);
+	/** Compatibility shim: target is the other side (2-way) or the
+	    middle pane (3-way). */
+	void copyAllFrom(int sourceSide)
+	{
+		copyAllFrom(sourceSide, mergeTarget(sourceSide));
+	}
+	/** WinMerge's pane-relative merge commands (MenuIDtoXY). */
+	void copyToRight();
+	void copyToLeft();
+	void copyAllToRight();
+	void copyAllToLeft();
 	void undo();
 	void redo();
 	void focusNextPane();

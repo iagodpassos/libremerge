@@ -216,51 +216,51 @@ MainWindow::MainWindow(QWidget *parent)
 			else if (auto *image = imageView()) image->selectDiffAtCursor();
 		});
 	mergeMenu->addSeparator();
+	// the file/image copy commands are pane-relative like WinMerge's
+	// MenuIDtoXY: from the active pane toward its neighbor, so in 3-way
+	// the middle pane can push into either side
 	addMenuAction(mergeMenu, tr("Copy to &Right"),
 		QKeySequence(Qt::ALT | Qt::Key_Right), [fileView, tableView, imageView]() {
-			if (auto *view = fileView()) view->copyCurrentDiff(0);
+			if (auto *view = fileView()) view->copyToRight();
 			else if (auto *table = tableView()) table->copyCurrentDiff(0);
-			else if (auto *image = imageView()) image->copyCurrentDiff(0);
+			else if (auto *image = imageView()) image->copyToRight();
 		});
 	addMenuAction(mergeMenu, tr("Copy to &Left"),
 		QKeySequence(Qt::ALT | Qt::Key_Left), [fileView, tableView, imageView]() {
-			if (auto *view = fileView())
-				view->copyCurrentDiff(view->paneCount() == 3 ? 2 : 1);
+			if (auto *view = fileView()) view->copyToLeft();
 			else if (auto *table = tableView())
 				table->copyCurrentDiff(1);
 			else if (auto *image = imageView())
-				image->copyCurrentDiff(image->paneCount() == 3 ? 2 : 1);
+				image->copyToLeft();
 		});
 	// WinMerge's Ctrl+Alt variants copy and jump to the next difference
 	// (the table copy always lands on the difference below the merge)
 	addMenuAction(mergeMenu, tr("Copy to Right and Ad&vance"),
 		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right),
 		[fileView, tableView]() {
-			if (auto *view = fileView()) view->copyCurrentDiff(0, true);
+			if (auto *view = fileView()) view->copyToRight(true);
 			else if (auto *table = tableView()) table->copyCurrentDiff(0);
 		});
 	addMenuAction(mergeMenu, tr("Copy to Left and Advanc&e"),
 		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left),
 		[fileView, tableView]() {
-			if (auto *view = fileView())
-				view->copyCurrentDiff(view->paneCount() == 3 ? 2 : 1, true);
+			if (auto *view = fileView()) view->copyToLeft(true);
 			else if (auto *table = tableView())
 				table->copyCurrentDiff(1);
 		});
 	addMenuAction(mergeMenu, tr("Copy All to Righ&t"), QKeySequence(),
 		[fileView, tableView, imageView]() {
-			if (auto *view = fileView()) view->copyAllFrom(0);
+			if (auto *view = fileView()) view->copyAllToRight();
 			else if (auto *table = tableView()) table->copyAllFrom(0);
-			else if (auto *image = imageView()) image->copyAllFrom(0);
+			else if (auto *image = imageView()) image->copyAllToRight();
 		});
 	addMenuAction(mergeMenu, tr("Copy All to Le&ft"), QKeySequence(),
 		[fileView, tableView, imageView]() {
-			if (auto *view = fileView())
-				view->copyAllFrom(view->paneCount() == 3 ? 2 : 1);
+			if (auto *view = fileView()) view->copyAllToLeft();
 			else if (auto *table = tableView())
 				table->copyAllFrom(1);
 			else if (auto *image = imageView())
-				image->copyAllFrom(image->paneCount() == 3 ? 2 : 1);
+				image->copyAllToLeft();
 		});
 	mergeMenu->addSeparator();
 	addMenuAction(mergeMenu, tr("S&wap Panes"), QKeySequence(),

@@ -193,14 +193,14 @@ FileCompareView::FileCompareView(QWidget *parent)
 		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x98"), [this]() { gotoLastDiff(); });
 	toolbar->addSeparator();
 	m_actCopyFromLeft = addToolAction(lm::Icon::CopyRight, tr("Copy to Right"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyCurrentDiff(0); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyToRight(); });
 	m_actCopyFromRight = addToolAction(lm::Icon::CopyLeft, tr("Copy to Left"),
 		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x90"),
-		[this]() { copyCurrentDiff(m_paneCount == 3 ? 2 : 1); });
+		[this]() { copyToLeft(); });
 	addToolAction(lm::Icon::CopyAllRight, tr("Copy All to Right"),
-		QString(), [this]() { copyAllFrom(0); });
+		QString(), [this]() { copyAllToRight(); });
 	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"),
-		QString(), [this]() { copyAllFrom(m_paneCount == 3 ? 2 : 1); });
+		QString(), [this]() { copyAllToLeft(); });
 	toolbar->addSeparator();
 	addToolAction(lm::Icon::Undo, tr("Undo"), QString::fromUtf8("\xE2\x8C\x98Z"),
 		[this]() { undoActive(); });
@@ -506,12 +506,8 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 		m_encLabels[i]->setVisible(visible);
 		m_diffPaneEdits[i]->setVisible(visible);
 	}
-	if (m_paneCount == 3)
-	{
-		// pane order on screen: left, middle, right; merges land in the middle
-		m_actCopyFromLeft->setText(tr("Left \xE2\x86\x92 Middle"));
-		m_actCopyFromRight->setText(tr("Right \xE2\x86\x92 Middle"));
-	}
+	// in 3-way the copy commands are relative to the active pane
+	// (WinMerge's MenuIDtoXY), so the captions stay "Copy to Right/Left"
 
 	for (int i = 0; i < m_paneCount; ++i)
 	{
@@ -1531,10 +1527,11 @@ void FileCompareView::recompare()
 /** Merge one block from sourceSide into the target pane, updating the
     model in place (a full recompare would rebuild the documents and
     clear the undo history). The caller refreshes maps/highlights. */
-void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide, bool joinUndo)
+void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide,
+	int targetSide, bool joinUndo)
 {
 	Block &block = m_blocks[blockIndex];
-	const int target = mergeTarget(sourceSide);
+	const int target = targetSide;
 
 	// the panes are ghost-aligned: the block occupies the same view range
 	// everywhere, so the merge is an equal-length line replacement
@@ -1592,11 +1589,38 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide, bool joinUn
 			s.line += delta;
 }
 
-void FileCompareView::copyCurrentDiff(int sourceSide, bool advance)
+void FileCompareView::copyToRight(bool advance)
+{
+	// WinMerge's ID_L2R: relative to the active pane, so the middle pane
+	// of a 3-way pushes into the right pane
+	const int target = qMin(m_activePane + 1, m_paneCount - 1);
+	copyCurrentDiff(target - 1, target, advance);
+}
+
+void FileCompareView::copyToLeft(bool advance)
+{
+	const int target = qMax(m_activePane - 1, 0);
+	copyCurrentDiff(target + 1, target, advance);
+}
+
+void FileCompareView::copyAllToRight()
+{
+	const int target = qMin(m_activePane + 1, m_paneCount - 1);
+	copyAllFrom(target - 1, target);
+}
+
+void FileCompareView::copyAllToLeft()
+{
+	const int target = qMax(m_activePane - 1, 0);
+	copyAllFrom(target + 1, target);
+}
+
+void FileCompareView::copyCurrentDiff(int sourceSide, int targetSide, bool advance)
 {
 	if (m_diffStale)
 		recompare();
-	if (sourceSide >= m_paneCount)
+	if (sourceSide >= m_paneCount || targetSide >= m_paneCount
+		|| sourceSide == targetSide)
 		return;
 	if (m_current < 0)
 		m_current = nextActive(-1, +1);
@@ -1604,7 +1628,7 @@ void FileCompareView::copyCurrentDiff(int sourceSide, bool advance)
 		return;
 	if (m_blocks[m_current].trivial || m_blocks[m_current].resolved)
 		return;
-	const int target = mergeTarget(sourceSide);
+	const int target = targetSide;
 	if (m_readOnly[target])
 	{
 		m_status->setText(tr("The merge target is read-only."));
@@ -1612,7 +1636,7 @@ void FileCompareView::copyCurrentDiff(int sourceSide, bool advance)
 	}
 
 	const int mergedViewBegin = m_blocks[m_current].viewBegin;
-	applyBlockCopy(m_current, sourceSide, false);
+	applyBlockCopy(m_current, sourceSide, target, false);
 	refreshSideMaps(target);
 	setSideModified(target, true);
 
@@ -1642,13 +1666,14 @@ void FileCompareView::copyCurrentDiff(int sourceSide, bool advance)
 	updateStatus();
 }
 
-void FileCompareView::copyAllFrom(int sourceSide)
+void FileCompareView::copyAllFrom(int sourceSide, int targetSide)
 {
 	if (m_diffStale)
 		recompare();
-	if (sourceSide >= m_paneCount)
+	if (sourceSide >= m_paneCount || targetSide >= m_paneCount
+		|| sourceSide == targetSide)
 		return;
-	const int target = mergeTarget(sourceSide);
+	const int target = targetSide;
 	if (m_readOnly[target])
 	{
 		m_status->setText(tr("The merge target is read-only."));
@@ -1661,7 +1686,7 @@ void FileCompareView::copyAllFrom(int sourceSide)
 		if (m_blocks[b].trivial || m_blocks[b].resolved)
 			continue;
 		// one undoable step for the whole merge
-		applyBlockCopy(b, sourceSide, !first);
+		applyBlockCopy(b, sourceSide, target, !first);
 		first = false;
 	}
 	if (first)
