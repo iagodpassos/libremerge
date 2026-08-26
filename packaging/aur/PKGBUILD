@@ -1,16 +1,16 @@
 # Maintainer: Iago Passos <iago.dpassos@gmail.com>
 pkgname=libremerge
-pkgver=0.7.3
+pkgver=0.8.0
 pkgrel=1
 pkgdesc="Diff and merge tool for files, folders and CSV tables - a Qt port of the WinMerge engine"
 arch=('x86_64' 'aarch64')
 url="https://github.com/iagodpassos/libremerge"
 license=('GPL-3.0-or-later')
-depends=('qt6-base' 'qt6-wayland' 'poco' 'icu' 'hicolor-icon-theme')
+depends=('qt6-base' 'qt6-wayland' 'qt6-imageformats' 'poco' 'icu' 'hicolor-icon-theme')
 makedepends=('cmake' 'ninja' 'boost' 're2c' 'lemon')
 checkdepends=('gtest')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('3ad4693fe271544b7e6d5e915028f7791eb0fae56bd45cf7d4e91b5dad0eee4e')
+sha256sums=('4d676a874a3fdffd518303fd662362786c870b0b46f1de41a92d79e3d47bfc14')
 
 build() {
   cd "$pkgname-$pkgver"
