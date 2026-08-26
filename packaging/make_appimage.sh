@@ -14,7 +14,7 @@ set -euo pipefail
 SRC="${1:?usage: make_appimage.sh <source-dir> <work-dir>}"
 WORK="${2:?usage: make_appimage.sh <source-dir> <work-dir>}"
 ARCH="$(uname -m)"
-export VERSION="0.8.0"
+export VERSION="0.8.1"
 
 mkdir -p "$WORK"
 cd "$WORK"
@@ -24,6 +24,20 @@ cmake -S "$SRC" -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
 cmake --build build --target LibreMerge
 rm -rf AppDir
 DESTDIR="$PWD/AppDir" cmake --install build
+
+# linuxdeploy's qt plugin does not know the client buffer integration
+# category, so the wayland platform came up bufferless on GNOME
+# ("Failed to load client buffer integration: wayland-egl"). Pre-place
+# the plugins in the AppDir; linuxdeploy then bundles their deps and
+# patches their rpaths like any other ELF it finds. vulkan-server is
+# skipped to keep the Vulkan loader out of the dependency set.
+QT_PLUGIN_DIR="$(/usr/bin/qmake6 -query QT_INSTALL_PLUGINS)"
+mkdir -p AppDir/usr/plugins/wayland-graphics-integration-client
+for plugin in libqt-plugin-wayland-egl.so libshm-emulation-server.so \
+              libdrm-egl-server.so libdmabuf-server.so; do
+  cp "$QT_PLUGIN_DIR/wayland-graphics-integration-client/$plugin" \
+     AppDir/usr/plugins/wayland-graphics-integration-client/
+done
 
 for tool in linuxdeploy linuxdeploy-plugin-qt; do
   if [ ! -x "$tool-$ARCH.AppImage" ]; then
@@ -43,6 +57,11 @@ export QMAKE=/usr/bin/qmake6
 # wayland+xcb for real sessions, offscreen so the selftest suite can run
 # headless against the AppImage itself (CI, containers)
 export EXTRA_PLATFORM_PLUGINS="libqwayland-generic.so;libqwayland-egl.so;libqoffscreen.so"
+# the wayland platform plugin dlopens its own helpers: client buffer
+# integrations (wayland-egl), the xdg-shell integration and the window
+# decorations - without them the window comes up bufferless and
+# borderless on a pure Wayland session (GNOME)
+export EXTRA_QT_PLUGINS="wayland-decoration-client;wayland-graphics-integration-client;wayland-shell-integration"
 ./linuxdeploy-"$ARCH".AppImage --appdir AppDir --plugin qt --output appimage
 
 ls -la LibreMerge*.AppImage
