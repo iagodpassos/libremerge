@@ -15,6 +15,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QToolButton>
+#include <QUrl>
 #include <QVBoxLayout>
 
 namespace
@@ -75,6 +76,11 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 		m_slots[i].path->setCurrentText(QString());
 		m_slots[i].path->lineEdit()->setPlaceholderText(
 			tr("Type a path, pick a recent one, drop a file here or browse\xE2\x80\xA6"));
+		// the editable combo's line edit must not swallow drops: it would
+		// paste the raw "file://" URI (evpix's report on Linux, #2); with
+		// drops off the event reaches our dropEvent, which resolves the
+		// local path and targets the slot under the cursor
+		m_slots[i].path->lineEdit()->setAcceptDrops(false);
 		layout->addWidget(m_slots[i].path);
 
 		auto *row = new QGridLayout;
@@ -222,9 +228,17 @@ void NewComparisonView::compare()
 	QList<bool> readOnly;
 	for (int i = 0; i < 3; ++i)
 	{
-		const QString path = m_slots[i].path->currentText().trimmed();
+		QString path = m_slots[i].path->currentText().trimmed();
 		if (path.isEmpty())
 			continue;
+		// pasted or typed "file://" URIs still resolve (percent-encoding
+		// included) instead of failing as nonexistent paths
+		if (path.startsWith(QStringLiteral("file://")))
+		{
+			const QString local = QUrl(path).toLocalFile();
+			if (!local.isEmpty())
+				path = local;
+		}
 		paths.append(path);
 		readOnly.append(m_slots[i].readOnly->isChecked());
 	}
