@@ -37,8 +37,10 @@ if(UNIX AND NOT APPLE)
   set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
   # Qt platform plugins (wayland, xcb) are dlopen'd at runtime, which
   # dpkg-shlibdeps cannot see - without qt6-wayland the app aborts on a
-  # GNOME Wayland session
-  set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-qpa-plugins, qt6-wayland")
+  # GNOME Wayland session. Image-format plugins (TIFF, WebP, ...) are
+  # dlopen'd too and feed the image comparison.
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS
+    "qt6-qpa-plugins, qt6-wayland, qt6-image-formats-plugins")
   set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/iagodpassos/libremerge")
   set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
     "Diff and merge tool for files, folders and CSV tables")
