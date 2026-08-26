@@ -15,6 +15,7 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - **Folder comparison** with a hierarchical tree or flat list, background scanning with progress and cancel, file masks / regex / expression filters, copy between sides and delete to Trash
 - **Diff pane** showing the current difference per file, **location pane** minimap, per-pane headers and status bars (line/column, encoding, EOL)
 - **CSV/TSV table comparison** as side-by-side grids: cell-level difference highlighting, delimiter auto-detection (`,` `;` tab `|`), quoted fields, first-row headers
+- **Image comparison** (2-way and 3-way) with WinMerge's own image-diff engine: block-level pixel differences with adjustable block size and color-distance threshold, insertion/deletion detection for shifted rows/columns, XOR and alpha-blend overlays, blink mode, wipe and rectangle-select dragging, multi-page navigation (animated GIF, multi-page TIFF), rotation/flips, copy between sides with undo, and a clickable difference minimap
 - **Line filters** (regular expressions that mark matching differences as trivial) and **moved block detection**
 - **Find and replace** in the compare panes (⌘F, wrap-around, match case)
 - **Syntax highlighting** for 47 languages, via WinMerge's own parsers
@@ -22,9 +23,13 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - Drag & drop files or folders onto the window or the Dock icon; a WinMerge-style "Select Files or Folders" screen with history, read-only flags and swap
 - Comparison options carried over from WinMerge: ignore whitespace/case/blank lines/EOL/numbers, diff algorithm selection (Myers, minimal, patience, histogram)
 
-| Dark theme | Folder comparison | On Linux (Debian/GNOME) |
-| --- | --- | --- |
-| ![Dark theme](docs/screenshots/file-compare-dark.png) | ![Folder comparison](docs/screenshots/folder-compare-light.png) | ![LibreMerge on Debian](docs/screenshots/linux-debian.png) |
+| Dark theme | Folder comparison |
+| --- | --- |
+| ![Dark theme](docs/screenshots/file-compare-dark.png) | ![Folder comparison](docs/screenshots/folder-compare-light.png) |
+
+| Image comparison | On Linux (Debian/GNOME) |
+| --- | --- |
+| ![Image comparison](docs/screenshots/image-compare.png) | ![LibreMerge on Debian](docs/screenshots/linux-debian.png) |
 
 ## Install (macOS)
 
@@ -87,8 +92,9 @@ Other formats (Ubuntu-specific builds, Flatpak) are planned — open an issue if
 
 - Binary files are detected and refused — binary/hex comparison is planned, not implemented
 - Recompare (F5) may rebuild the alignment and clear the undo history of that moment
-- 3-way comparison is available for files, not folders yet
-- Archive (zip/7z) and image comparison from WinMerge are not ported yet
+- 3-way comparison is available for files and images, not folders yet
+- Archive (zip/7z) comparison from WinMerge is not ported yet
+- Image comparison: animated GIF and multi-page TIFF open and compare, but cannot be saved back (no Qt encoder — Save As offers PNG); SVG/PDF comparison is not supported yet
 - Table comparison copies whole differences (no per-cell editing or undo yet)
 
 ## Support

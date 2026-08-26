@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
 	QApplication app(argc, argv);
 	QGuiApplication::setDesktopFileName(QStringLiteral("libremerge"));
 	QApplication::setApplicationName(QStringLiteral("LibreMerge"));
-	QApplication::setApplicationVersion(QStringLiteral("0.7.3"));
+	QApplication::setApplicationVersion(QStringLiteral("0.8.0"));
 	QApplication::setOrganizationName(QStringLiteral("LibreMerge"));
 
 	// translations follow the system language (LIBREMERGE_LANGUAGE
