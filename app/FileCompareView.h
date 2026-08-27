@@ -93,6 +93,9 @@ public:
 	void gotoPrevDiff();
 	void gotoFirstDiff();
 	void gotoLastDiff();
+	/** Scroll horizontally to the first word-level difference of the
+	    current block (the "scroll to first inline difference" option). */
+	void scrollToFirstInlineDiff();
 	/** Swap the outer panes (and reload both sides). */
 	void swapSides();
 	void undoActive();

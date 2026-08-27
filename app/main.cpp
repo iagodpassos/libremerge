@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QLibraryInfo>
 #include <QLocale>
+#include <QSettings>
 #include <QTimer>
 #include <QTranslator>
 #include "FileCompareView.h"
@@ -16,6 +17,7 @@
 #include "FolderCompareDriver.h"
 #include "MainWindow.h"
 #include "EngineOptions.h"
+#include "OptionsDialog.h"
 #ifdef Q_OS_MACOS
 #include "MacServices.h"
 #endif
@@ -79,12 +81,17 @@ int main(int argc, char *argv[])
 	QApplication::setApplicationVersion(QStringLiteral("0.8.1"));
 	QApplication::setOrganizationName(QStringLiteral("LibreMerge"));
 
-	// translations follow the system language (LIBREMERGE_LANGUAGE
-	// overrides it, e.g. pt_BR); Qt's own strings load too when the
-	// qtbase catalog is available
+	// translations follow the system language unless overridden by the
+	// Options dialog (Appearance/Language) or, for testing, by the
+	// LIBREMERGE_LANGUAGE environment variable; Qt's own strings load
+	// too when the qtbase catalog is available
 	const QByteArray forcedLanguage = qgetenv("LIBREMERGE_LANGUAGE");
-	const QLocale locale = forcedLanguage.isEmpty()
-		? QLocale() : QLocale(QString::fromUtf8(forcedLanguage));
+	const QString configuredLanguage = QSettings()
+		.value(QStringLiteral("Appearance/Language")).toString();
+	const QLocale locale = !forcedLanguage.isEmpty()
+		? QLocale(QString::fromUtf8(forcedLanguage))
+		: (!configuredLanguage.isEmpty()
+			? QLocale(configuredLanguage) : QLocale());
 	static QTranslator qtTranslator;
 	if (qtTranslator.load(locale, QStringLiteral("qtbase"), QStringLiteral("_"),
 			QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
@@ -478,6 +485,11 @@ int main(int argc, char *argv[])
 	else if (!args.isEmpty())
 	{
 		window.openSelector(args);
+	}
+	else if (OptionsDialog::showSelectorAtStartup())
+	{
+		// WinMerge's "show Select Files or Folders at startup" option
+		window.openSelector();
 	}
 	else
 	{

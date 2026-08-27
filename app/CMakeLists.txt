@@ -17,6 +17,7 @@ qt_add_executable(LibreMerge
   TableCompareView.cpp
   ImageCompareView.cpp
   ImagePane.cpp
+  OptionsDialog.cpp
   DiffTextEdit.cpp
   Icons.cpp
   LocationPane.cpp

@@ -1707,6 +1707,36 @@ void FileCompareView::gotoFirstDiff()
 		gotoDiff(firstBlock);
 }
 
+void FileCompareView::scrollToFirstInlineDiff()
+{
+	// WinMerge's "scroll to first inline difference": place the cursor on
+	// the first word-level difference of the current block, so long lines
+	// scroll horizontally to where the change actually is
+	if (m_current < 0)
+		return;
+	for (const WordSpan &span : m_wordSpans)
+	{
+		if (span.blockIndex != m_current)
+			continue;
+		if (span.line < 0
+			|| span.line >= static_cast<int>(m_realToView[span.side].size()))
+			continue;
+		const int viewLine = m_realToView[span.side][span.line];
+		const QTextBlock block =
+			m_panes[span.side]->document()->findBlockByNumber(viewLine);
+		if (!block.isValid())
+			continue;
+		QTextCursor cursor(block);
+		cursor.setPosition(block.position()
+			+ qMin(span.start, static_cast<int>(block.length()) - 1));
+		m_syncing = true;
+		m_panes[span.side]->setTextCursor(cursor);
+		m_panes[span.side]->ensureCursorVisible();
+		m_syncing = false;
+		break;
+	}
+}
+
 void FileCompareView::gotoLastDiff()
 {
 	if (m_diffStale)
