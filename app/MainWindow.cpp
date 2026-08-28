@@ -24,6 +24,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTabWidget>
+#include <QTimer>
 
 #include "FileCompareView.h"
 #include "TableCompareView.h"
@@ -531,7 +532,7 @@ void MainWindow::openTableComparison(const QString &leftPath,
 		});
 
 	if (OptionsDialog::scrollToFirstDiff())
-		view->gotoFirstDiff();
+		QTimer::singleShot(0, view, [view]() { view->gotoFirstDiff(); });
 }
 
 void MainWindow::openImageComparison(const QStringList &paths,
@@ -569,7 +570,7 @@ void MainWindow::openImageComparison(const QStringList &paths,
 		});
 
 	if (OptionsDialog::scrollToFirstDiff())
-		view->gotoFirstDiff();
+		QTimer::singleShot(0, view, [view]() { view->gotoFirstDiff(); });
 }
 
 void MainWindow::openBlankComparison()
@@ -600,12 +601,16 @@ void MainWindow::attachFileView(FileCompareView *view)
 	connect(view, &FileCompareView::optionsRequested,
 		this, &MainWindow::showOptions);
 
-	// WinMerge's "automatically scroll to first difference" (issue #3)
+	// WinMerge's "automatically scroll to first difference" (issue #3);
+	// deferred one event-loop cycle so the fresh documents are laid out
+	// (centerCursor/ensureCursorVisible are unreliable before that)
 	if (OptionsDialog::scrollToFirstDiff())
 	{
-		view->gotoFirstDiff();
-		if (OptionsDialog::scrollToFirstInlineDiff())
-			view->scrollToFirstInlineDiff();
+		QTimer::singleShot(0, view, [view]() {
+			view->gotoFirstDiff();
+			if (OptionsDialog::scrollToFirstInlineDiff())
+				view->scrollToFirstInlineDiff();
+		});
 	}
 }
 

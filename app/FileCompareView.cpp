@@ -27,6 +27,7 @@
 #include <QTemporaryFile>
 #include <QTextBlock>
 #include <QTextLayout>
+#include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
 #include <QUrl>
@@ -366,6 +367,20 @@ FileCompareView::FileCompareView(QWidget *parent)
 			[this, i](const QString &path) { changeSideFile(i, path); });
 		m_panes[i]->setTabStopDistance(
 			4 * QFontMetricsF(mono).horizontalAdvance(QLatin1Char(' ')));
+		// debug spy: LM_DEBUG_EDITS=1 prints every real document edit
+		if (qEnvironmentVariableIsSet("LM_DEBUG_EDITS"))
+			connect(m_panes[i]->document(), &QTextDocument::contentsChange,
+				this, [this, i](int position, int removed, int added) {
+					QTextCursor probe(m_panes[i]->document());
+					probe.setPosition(qMax(0, position));
+					probe.setPosition(qMin(position + added,
+						m_panes[i]->document()->characterCount() - 1),
+						QTextCursor::KeepAnchor);
+					fprintf(stderr,
+						"[edit] pane=%d pos=%d removed=%d added=%d text=%s\n",
+						i, position, removed, added,
+						qPrintable(probe.selectedText()));
+				});
 		// QTextDocument's own modified tracking ignores syntax-highlight
 		// format changes, unlike contentsChange
 		connect(m_panes[i]->document(), &QTextDocument::modificationChanged,
@@ -1439,12 +1454,15 @@ void FileCompareView::changeSideFile(int side, const QString &path)
 
 	// changing a pane's file re-applies "scroll to first difference",
 	// like WinMerge (CMergeDoc::ChangeFile ends in MoveOnLoad) - this
-	// covers dropping files onto the panes of a File > New comparison
+	// covers dropping files onto the panes of a File > New comparison.
+	// Deferred one cycle so the reloaded documents are laid out.
 	if (OptionsDialog::scrollToFirstDiff())
 	{
-		gotoFirstDiff();
-		if (OptionsDialog::scrollToFirstInlineDiff())
-			scrollToFirstInlineDiff();
+		QTimer::singleShot(0, this, [this]() {
+			gotoFirstDiff();
+			if (OptionsDialog::scrollToFirstInlineDiff())
+				scrollToFirstInlineDiff();
+		});
 	}
 
 	emit pathsChanged();
@@ -1746,10 +1764,46 @@ void FileCompareView::scrollToFirstInlineDiff()
 		QTextCursor cursor(block);
 		cursor.setPosition(block.position()
 			+ qMin(span.start, static_cast<int>(block.length()) - 1));
-		m_syncing = true;
 		m_panes[span.side]->setTextCursor(cursor);
-		m_panes[span.side]->ensureCursorVisible();
-		m_syncing = false;
+		// explicit horizontal scroll: WinMerge's EnsureVisible leaves the
+		// inline difference ~5 characters from the left edge. The target
+		// x comes from font metrics (needs no layout), but QPlainTextEdit
+		// lays out lazily and its horizontal range only exists after the
+		// first paint - so when the range is not there yet, the value is
+		// applied on the scrollbar's own rangeChanged. No m_syncing
+		// guard: the sibling panes follow, like WinMerge's
+		// UpdateSiblingScrollPos on the horizontal axis.
+		{
+			const QFontMetricsF metrics(m_panes[span.side]->font());
+			const int x = qRound(metrics.horizontalAdvance(
+				block.text().left(span.start)));
+			const int margin =
+				qRound(5 * metrics.horizontalAdvance(QLatin1Char(' ')));
+			DiffTextEdit *paneEdit = m_panes[span.side];
+			QScrollBar *hbar = paneEdit->horizontalScrollBar();
+			auto apply = [paneEdit, hbar, x, margin]() {
+				if (x > paneEdit->viewport()->width() - margin)
+					hbar->setValue(qMax(0, x - margin));
+			};
+			if (hbar->maximum() > 0)
+				apply();
+			else
+			{
+				// the horizontal range appears after the first paint
+				auto conn = std::make_shared<QMetaObject::Connection>();
+				*conn = connect(hbar, &QAbstractSlider::rangeChanged,
+					paneEdit, [apply, conn](int, int max) {
+						if (max <= 0)
+							return;
+						QObject::disconnect(*conn);
+						apply();
+					});
+			}
+			// starting the app straight into a comparison relayouts the
+			// panes when the window first shows, resetting the scroll:
+			// re-assert once after the startup settles (idempotent)
+			QTimer::singleShot(300, paneEdit, apply);
+		}
 		break;
 	}
 }
