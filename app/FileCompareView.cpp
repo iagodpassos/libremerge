@@ -1747,66 +1747,95 @@ void FileCompareView::scrollToFirstInlineDiff()
 {
 	// WinMerge's "scroll to first inline difference": place the cursor on
 	// the first word-level difference of the current block, so long lines
-	// scroll horizontally to where the change actually is
+	// scroll horizontally to where the change actually is. Like upstream
+	// (worddiffs[0].begin[m_nThisPane]), the active pane's own span is
+	// preferred, so the pane the user is looking at lands exactly on it.
 	if (m_current < 0)
 		return;
+	const WordSpan *chosen = nullptr;
 	for (const WordSpan &span : m_wordSpans)
 	{
 		if (span.blockIndex != m_current)
 			continue;
-		if (span.line < 0
-			|| span.line >= static_cast<int>(m_realToView[span.side].size()))
-			continue;
-		const int viewLine = m_realToView[span.side][span.line];
-		const QTextBlock block =
-			m_panes[span.side]->document()->findBlockByNumber(viewLine);
-		if (!block.isValid())
-			continue;
-		QTextCursor cursor(block);
-		cursor.setPosition(block.position()
-			+ qMin(span.start, static_cast<int>(block.length()) - 1));
-		m_panes[span.side]->setTextCursor(cursor);
-		// explicit horizontal scroll: WinMerge's EnsureVisible leaves the
-		// inline difference ~5 characters from the left edge. The target
-		// x comes from font metrics (needs no layout), but QPlainTextEdit
-		// lays out lazily and its horizontal range only exists after the
-		// first paint - so when the range is not there yet, the value is
-		// applied on the scrollbar's own rangeChanged. No m_syncing
-		// guard: the sibling panes follow, like WinMerge's
-		// UpdateSiblingScrollPos on the horizontal axis.
+		if (chosen == nullptr)
+			chosen = &span;
+		if (span.side == m_activePane)
 		{
-			const QFontMetricsF metrics(m_panes[span.side]->font());
-			const int x = qRound(metrics.horizontalAdvance(
-				block.text().left(span.start)));
-			const int margin =
-				qRound(5 * metrics.horizontalAdvance(QLatin1Char(' ')));
-			DiffTextEdit *paneEdit = m_panes[span.side];
-			QScrollBar *hbar = paneEdit->horizontalScrollBar();
-			auto apply = [paneEdit, hbar, x, margin]() {
-				if (x > paneEdit->viewport()->width() - margin)
-					hbar->setValue(qMax(0, x - margin));
-			};
-			if (hbar->maximum() > 0)
-				apply();
-			else
-			{
-				// the horizontal range appears after the first paint
-				auto conn = std::make_shared<QMetaObject::Connection>();
-				*conn = connect(hbar, &QAbstractSlider::rangeChanged,
-					paneEdit, [apply, conn](int, int max) {
-						if (max <= 0)
-							return;
-						QObject::disconnect(*conn);
-						apply();
-					});
-			}
-			// starting the app straight into a comparison relayouts the
-			// panes when the window first shows, resetting the scroll:
-			// re-assert once after the startup settles (idempotent)
-			QTimer::singleShot(300, paneEdit, apply);
+			chosen = &span;
+			break;
 		}
-		break;
 	}
+	if (chosen == nullptr)
+		return;
+	if (qEnvironmentVariableIsSet("LM_DEBUG_EDITS"))
+	{
+		for (const WordSpan &s : m_wordSpans)
+			if (s.blockIndex == m_current)
+				fprintf(stderr, "[span] side=%d line=%d start=%d len=%d one=%d%s\n",
+					s.side, s.line, s.start, s.length, s.oneSided,
+					&s == chosen ? "  <-- escolhido" : "");
+	}
+	const WordSpan &span = *chosen;
+	if (span.line < 0
+		|| span.line >= static_cast<int>(m_realToView[span.side].size()))
+		return;
+	const int viewLine = m_realToView[span.side][span.line];
+	DiffTextEdit *paneEdit = m_panes[span.side];
+	const QTextBlock block =
+		paneEdit->document()->findBlockByNumber(viewLine);
+	if (!block.isValid())
+		return;
+	const int position = block.position()
+		+ qMin(span.start, static_cast<int>(block.length()) - 1);
+	QTextCursor cursor(block);
+	cursor.setPosition(position);
+	paneEdit->setTextCursor(cursor);
+
+	// explicit horizontal scroll: WinMerge's EnsureVisible leaves the
+	// inline difference ~5 characters from the left edge. The target x
+	// comes from the block's real layout (cursorToX handles tab stops
+	// and formats; raw font metrics overshot on lines with tabs, hiding
+	// the change off-screen to the left), forcing the lazy layout first.
+	// QPlainTextEdit's horizontal range only exists after the first
+	// paint - when it is not there yet, the value is applied on the
+	// scrollbar's own rangeChanged. No m_syncing guard: the sibling
+	// panes follow, like WinMerge's UpdateSiblingScrollPos.
+	paneEdit->document()->documentLayout()->blockBoundingRect(block);
+	const QFontMetricsF metrics(paneEdit->font());
+	int x = -1;
+	if (block.layout() != nullptr)
+	{
+		const QTextLine line =
+			block.layout()->lineForTextPosition(position - block.position());
+		if (line.isValid())
+			x = qRound(line.cursorToX(position - block.position()));
+	}
+	if (x < 0) // layout unavailable: metrics approximation
+		x = qRound(metrics.horizontalAdvance(block.text().left(span.start)));
+	const int margin = qRound(5 * metrics.horizontalAdvance(QLatin1Char(' ')));
+	QScrollBar *hbar = paneEdit->horizontalScrollBar();
+	auto apply = [paneEdit, hbar, x, margin]() {
+		if (x > paneEdit->viewport()->width() - margin)
+			hbar->setValue(qMax(0, x - margin));
+	};
+	if (hbar->maximum() > 0)
+		apply();
+	else
+	{
+		// the horizontal range appears after the first paint
+		auto conn = std::make_shared<QMetaObject::Connection>();
+		*conn = connect(hbar, &QAbstractSlider::rangeChanged,
+			paneEdit, [apply, conn](int, int max) {
+				if (max <= 0)
+					return;
+				QObject::disconnect(*conn);
+				apply();
+			});
+	}
+	// starting the app straight into a comparison relayouts the panes
+	// when the window first shows, resetting the scroll: re-assert once
+	// after the startup settles (idempotent)
+	QTimer::singleShot(300, paneEdit, apply);
 }
 
 void FileCompareView::gotoLastDiff()
