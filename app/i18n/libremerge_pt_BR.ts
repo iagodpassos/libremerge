@@ -3,202 +3,202 @@
 <context>
     <name>FileCompareView</name>
     <message>
-        <location filename="../FileCompareView.cpp" line="186" />
+        <location filename="../FileCompareView.cpp" line="190" />
         <source>First Difference</source>
         <translation>Primeira Diferença</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="188" />
+        <location filename="../FileCompareView.cpp" line="192" />
         <source>Previous Difference</source>
         <translation>Diferença Anterior</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="190" />
+        <location filename="../FileCompareView.cpp" line="194" />
         <source>Next Difference</source>
         <translation>Próxima Diferença</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="192" />
+        <location filename="../FileCompareView.cpp" line="196" />
         <source>Last Difference</source>
         <translation>Última Diferença</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="195" />
+        <location filename="../FileCompareView.cpp" line="199" />
         <source>Copy to Right</source>
         <translation>Copiar para a Direita</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="197" />
+        <location filename="../FileCompareView.cpp" line="201" />
         <source>Copy to Left</source>
         <translation>Copiar para a Esquerda</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="200" />
+        <location filename="../FileCompareView.cpp" line="204" />
         <source>Copy All to Right</source>
         <translation>Copiar Tudo para a Direita</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="202" />
+        <location filename="../FileCompareView.cpp" line="206" />
         <source>Copy All to Left</source>
         <translation>Copiar Tudo para a Esquerda</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="205" />
+        <location filename="../FileCompareView.cpp" line="209" />
         <source>Undo</source>
         <translation>Desfazer</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="207" />
+        <location filename="../FileCompareView.cpp" line="211" />
         <source>Redo</source>
         <translation>Refazer</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="210" />
+        <location filename="../FileCompareView.cpp" line="214" />
         <source>Swap Panes</source>
         <translation>Trocar Painéis</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="212" />
+        <location filename="../FileCompareView.cpp" line="216" />
         <source>Recompare</source>
         <translation>Recomparar</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="214" />
+        <location filename="../FileCompareView.cpp" line="218" />
         <source>Save</source>
         <translation>Salvar</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="219" />
+        <location filename="../FileCompareView.cpp" line="223" />
         <source>Diff Pane</source>
         <translation>Painel de Diferenciação</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="229" />
-        <location filename="../FileCompareView.cpp" line="241" />
+        <location filename="../FileCompareView.cpp" line="233" />
+        <location filename="../FileCompareView.cpp" line="245" />
         <source>Find</source>
         <translation>Localizar</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="231" />
+        <location filename="../FileCompareView.cpp" line="235" />
         <source>Comparison Options</source>
         <translation>Opções de Comparação</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="246" />
+        <location filename="../FileCompareView.cpp" line="250" />
         <source>Previous</source>
         <translation>Anterior</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="249" />
+        <location filename="../FileCompareView.cpp" line="253" />
         <source>Next</source>
         <translation>Próxima</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="253" />
+        <location filename="../FileCompareView.cpp" line="257" />
         <source>Match case</source>
         <translation>Diferenciar maiúsculas</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="257" />
+        <location filename="../FileCompareView.cpp" line="261" />
         <source>Replace with</source>
         <translation>Substituir por</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="260" />
+        <location filename="../FileCompareView.cpp" line="264" />
         <source>Replace</source>
         <translation>Substituir</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="263" />
+        <location filename="../FileCompareView.cpp" line="267" />
         <source>Replace All</source>
         <translation>Substituir Tudo</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="326" />
+        <location filename="../FileCompareView.cpp" line="330" />
         <source>Pane options</source>
         <translation>Opções do painel</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="435" />
-        <location filename="../FileCompareView.cpp" line="1395" />
+        <location filename="../FileCompareView.cpp" line="453" />
+        <location filename="../FileCompareView.cpp" line="1413" />
         <source>Edit Caption</source>
         <translation>Editar Legenda</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="495" />
+        <location filename="../FileCompareView.cpp" line="513" />
         <source>expected 2 or 3 files</source>
         <translation>eram esperados 2 ou 3 arquivos</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="549" />
+        <location filename="../FileCompareView.cpp" line="567" />
         <source>Untitled Left</source>
         <translation>Esquerda Sem Título</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="549" />
+        <location filename="../FileCompareView.cpp" line="567" />
         <source>Untitled Right</source>
         <translation>Direita Sem Título</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="579" />
-        <location filename="../FileCompareView.cpp" line="2019" />
+        <location filename="../FileCompareView.cpp" line="597" />
+        <location filename="../FileCompareView.cpp" line="2091" />
         <source>Untitled</source>
         <translation>Sem Título</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="601" />
+        <location filename="../FileCompareView.cpp" line="619" />
         <source>%1 appears to be a binary file.
 LibreMerge compares text files; binary comparison is not supported yet.</source>
         <translation>%1 parece ser um arquivo binário.
 O LibreMerge compara arquivos de texto; comparação binária ainda não é suportada.</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="613" />
+        <location filename="../FileCompareView.cpp" line="631" />
         <source>cannot open %1</source>
         <translation>não foi possível abrir %1</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="690" />
+        <location filename="../FileCompareView.cpp" line="708" />
         <source>cannot create temporary file</source>
         <translation>não foi possível criar o arquivo temporário</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="736" />
+        <location filename="../FileCompareView.cpp" line="754" />
         <source>the diff engine failed</source>
         <translation>o motor de comparação falhou</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="746" />
+        <location filename="../FileCompareView.cpp" line="764" />
         <source>the files could not be compared as text</source>
         <translation>os arquivos não puderam ser comparados como texto</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="747" />
+        <location filename="../FileCompareView.cpp" line="765" />
         <source>Binary content — comparison not supported</source>
         <translation>Conteúdo binário — comparação não suportada</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1149" />
+        <location filename="../FileCompareView.cpp" line="1167" />
         <source>… (%1 more lines)</source>
         <translation>… (mais %1 linhas)</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1196" />
+        <location filename="../FileCompareView.cpp" line="1214" />
         <source>Edited — press F5 to recompare</source>
         <translation>Editado — pressione F5 para recomparar</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1198" />
+        <location filename="../FileCompareView.cpp" line="1216" />
         <source>Files are identical</source>
         <translation>Os arquivos são idênticos</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1209" />
+        <location filename="../FileCompareView.cpp" line="1227" />
         <source>Difference %1 of %2</source>
         <translation>Diferença %1 de %2</translation>
     </message>
     <message numerus="yes">
-        <location filename="../FileCompareView.cpp" line="1210" />
+        <location filename="../FileCompareView.cpp" line="1228" />
         <source>%n difference(s) found</source>
         <translation>
             <numerusform>%n diferença encontrada</numerusform>
@@ -206,102 +206,102 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         </translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1216" />
+        <location filename="../FileCompareView.cpp" line="1234" />
         <source>  • unsaved changes</source>
         <translation>  • alterações não salvas</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1236" />
+        <location filename="../FileCompareView.cpp" line="1254" />
         <source>Lin: %1  Col: %2/%3  Car: %2/%3</source>
         <translation>Lin: %1  Col: %2/%3  Car: %2/%3</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1344" />
+        <location filename="../FileCompareView.cpp" line="1362" />
         <source>Copy Full Path</source>
         <translation>Copiar o Caminho Completo</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1348" />
+        <location filename="../FileCompareView.cpp" line="1366" />
         <source>Copy Filename</source>
         <translation>Copiar o Nome do Arquivo</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1353" />
+        <location filename="../FileCompareView.cpp" line="1371" />
         <source>Edit Caption…</source>
         <translation>Editar Legenda…</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1357" />
+        <location filename="../FileCompareView.cpp" line="1375" />
         <source>Open File…</source>
         <translation>Abrir Arquivo…</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1359" />
+        <location filename="../FileCompareView.cpp" line="1377" />
         <source>Open File</source>
         <translation>Abrir Arquivo</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1364" />
+        <location filename="../FileCompareView.cpp" line="1382" />
         <source>Reveal in Finder</source>
         <translation>Revelar no Finder</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1369" />
+        <location filename="../FileCompareView.cpp" line="1387" />
         <source>Show in File Manager</source>
         <translation>Mostrar no Gerenciador de Arquivos</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1375" />
+        <location filename="../FileCompareView.cpp" line="1393" />
         <source>Recent Files</source>
         <translation>Arquivos Recentes</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1396" />
+        <location filename="../FileCompareView.cpp" line="1414" />
         <source>Caption for this pane (leave empty to show the file path):</source>
         <translation>Legenda deste painel (vazio mostra o caminho do arquivo):</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1411" />
-        <location filename="../FileCompareView.cpp" line="1418" />
-        <location filename="../FileCompareView.cpp" line="1753" />
-        <location filename="../FileCompareView.cpp" line="1770" />
+        <location filename="../FileCompareView.cpp" line="1429" />
+        <location filename="../FileCompareView.cpp" line="1436" />
+        <location filename="../FileCompareView.cpp" line="1825" />
+        <location filename="../FileCompareView.cpp" line="1842" />
         <source>LibreMerge</source>
         <translation>LibreMerge</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1412" />
+        <location filename="../FileCompareView.cpp" line="1430" />
         <source>Discard unsaved changes in this pane?</source>
         <translation>Descartar as alterações não salvas deste painel?</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1634" />
-        <location filename="../FileCompareView.cpp" line="1679" />
+        <location filename="../FileCompareView.cpp" line="1670" />
+        <location filename="../FileCompareView.cpp" line="1715" />
         <source>The merge target is read-only.</source>
         <translation>O destino da mesclagem é somente leitura.</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1754" />
+        <location filename="../FileCompareView.cpp" line="1826" />
         <source>Swapping reloads both files. Discard unsaved changes?</source>
         <translation>Trocar os painéis recarrega os dois arquivos. Descartar as alterações não salvas?</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1915" />
+        <location filename="../FileCompareView.cpp" line="1987" />
         <source>Search wrapped</source>
         <translation>A busca recomeçou do início</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1915" />
+        <location filename="../FileCompareView.cpp" line="1987" />
         <source>Not found</source>
         <translation>Não encontrado</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="1922" />
-        <location filename="../FileCompareView.cpp" line="1942" />
+        <location filename="../FileCompareView.cpp" line="1994" />
+        <location filename="../FileCompareView.cpp" line="2014" />
         <source>This pane is read-only.</source>
         <translation>Este painel é somente leitura.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../FileCompareView.cpp" line="1966" />
+        <location filename="../FileCompareView.cpp" line="2038" />
         <source>%n replacement(s)</source>
         <translation>
             <numerusform>%n substituição</numerusform>
@@ -309,22 +309,22 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         </translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="2037" />
+        <location filename="../FileCompareView.cpp" line="2109" />
         <source>Save As</source>
         <translation>Salvar Como</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="2041" />
+        <location filename="../FileCompareView.cpp" line="2113" />
         <source>save canceled</source>
         <translation>salvamento cancelado</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="2062" />
+        <location filename="../FileCompareView.cpp" line="2134" />
         <source>could not create the backup file %1</source>
         <translation>não foi possível criar o arquivo de backup %1</translation>
     </message>
     <message>
-        <location filename="../FileCompareView.cpp" line="2072" />
+        <location filename="../FileCompareView.cpp" line="2144" />
         <source>cannot write %1</source>
         <translation>não foi possível gravar %1</translation>
     </message>
@@ -332,151 +332,151 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
 <context>
     <name>FolderCompareView</name>
     <message>
-        <location filename="../FolderCompareView.cpp" line="156" />
+        <location filename="../FolderCompareView.cpp" line="157" />
         <source> Filter: </source>
         <translation> Filtro: </translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="164" />
+        <location filename="../FolderCompareView.cpp" line="165" />
         <source>*.* — masks (*.cpp;*.h), f:/d: regexes or expressions</source>
         <translation>*.* — máscaras (*.cpp;*.h), regex f:/d: ou expressões</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="169" />
+        <location filename="../FolderCompareView.cpp" line="170" />
         <source>Recompare</source>
         <translation>Recomparar</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="170" />
+        <location filename="../FolderCompareView.cpp" line="171" />
         <source>Recompare (F5)</source>
         <translation>Recomparar (F5)</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="174" />
-        <location filename="../FolderCompareView.cpp" line="176" />
+        <location filename="../FolderCompareView.cpp" line="175" />
+        <location filename="../FolderCompareView.cpp" line="177" />
         <source>Tree View</source>
         <translation>Modo Árvore</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="183" />
         <location filename="../FolderCompareView.cpp" line="184" />
+        <location filename="../FolderCompareView.cpp" line="185" />
         <source>Copy to Right</source>
         <translation>Copiar para a Direita</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="186" />
         <location filename="../FolderCompareView.cpp" line="187" />
+        <location filename="../FolderCompareView.cpp" line="188" />
         <source>Copy to Left</source>
         <translation>Copiar para a Esquerda</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="190" />
         <location filename="../FolderCompareView.cpp" line="191" />
+        <location filename="../FolderCompareView.cpp" line="192" />
         <source>Delete Left</source>
         <translation>Excluir à Esquerda</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="193" />
         <location filename="../FolderCompareView.cpp" line="194" />
+        <location filename="../FolderCompareView.cpp" line="195" />
         <source>Delete Right</source>
         <translation>Excluir à Direita</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="196" />
         <location filename="../FolderCompareView.cpp" line="197" />
+        <location filename="../FolderCompareView.cpp" line="198" />
         <source>Delete Both</source>
         <translation>Excluir Ambos</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="211" />
+        <location filename="../FolderCompareView.cpp" line="212" />
         <source>Name</source>
         <translation>Nome</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="211" />
+        <location filename="../FolderCompareView.cpp" line="212" />
         <source>Folder</source>
         <translation>Pasta</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="211" />
+        <location filename="../FolderCompareView.cpp" line="212" />
         <source>Comparison result</source>
         <translation>Resultado da comparação</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="212" />
+        <location filename="../FolderCompareView.cpp" line="213" />
         <source>Left size</source>
         <translation>Tamanho esquerdo</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="212" />
+        <location filename="../FolderCompareView.cpp" line="213" />
         <source>Right size</source>
         <translation>Tamanho direito</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="212" />
+        <location filename="../FolderCompareView.cpp" line="213" />
         <source>Left date</source>
         <translation>Data esquerda</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="212" />
+        <location filename="../FolderCompareView.cpp" line="213" />
         <source>Right date</source>
         <translation>Data direita</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="241" />
+        <location filename="../FolderCompareView.cpp" line="242" />
         <source>Cancel</source>
         <translation>Cancelar</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="247" />
+        <location filename="../FolderCompareView.cpp" line="248" />
         <source>Cancelling…</source>
         <translation>Cancelando…</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="338" />
+        <location filename="../FolderCompareView.cpp" line="339" />
         <source>Scanning…</source>
         <translation>Verificando…</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="369" />
+        <location filename="../FolderCompareView.cpp" line="370" />
         <source>Comparing… %1 of %2 items</source>
         <translation>Comparando… %1 de %2 itens</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="386" />
+        <location filename="../FolderCompareView.cpp" line="387" />
         <source>Comparison failed: %1</source>
         <translation>A comparação falhou: %1</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="396" />
+        <location filename="../FolderCompareView.cpp" line="397" />
         <source>%1 item(s): %2 different, %3 unique, %4 identical</source>
         <translation>%1 item(ns): %2 diferentes, %3 únicos, %4 idênticos</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="400" />
+        <location filename="../FolderCompareView.cpp" line="401" />
         <source>Cancelled — partial results. </source>
         <translation>Cancelado — resultados parciais. </translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="559" />
+        <location filename="../FolderCompareView.cpp" line="560" />
         <source>left → right</source>
         <translation>esquerda → direita</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="559" />
+        <location filename="../FolderCompareView.cpp" line="560" />
         <source>right → left</source>
         <translation>direita → esquerda</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="560" />
-        <location filename="../FolderCompareView.cpp" line="576" />
-        <location filename="../FolderCompareView.cpp" line="593" />
-        <location filename="../FolderCompareView.cpp" line="618" />
+        <location filename="../FolderCompareView.cpp" line="561" />
+        <location filename="../FolderCompareView.cpp" line="577" />
+        <location filename="../FolderCompareView.cpp" line="594" />
+        <location filename="../FolderCompareView.cpp" line="619" />
         <source>LibreMerge</source>
         <translation>LibreMerge</translation>
     </message>
     <message numerus="yes">
-        <location filename="../FolderCompareView.cpp" line="561" />
+        <location filename="../FolderCompareView.cpp" line="562" />
         <source>Copy %n item(s) (%1)? Overwritten files go to the Trash.</source>
         <translation>
             <numerusform>Copiar %n item (%1)? Arquivos sobrescritos vão para a Lixeira.</numerusform>
@@ -484,7 +484,7 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../FolderCompareView.cpp" line="577" />
+        <location filename="../FolderCompareView.cpp" line="578" />
         <source>%n item(s) could not be copied.</source>
         <translation>
             <numerusform>%n item não pôde ser copiado.</numerusform>
@@ -492,7 +492,7 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../FolderCompareView.cpp" line="594" />
+        <location filename="../FolderCompareView.cpp" line="595" />
         <source>Move %n item(s) to the Trash?</source>
         <translation>
             <numerusform>Mover %n item para a Lixeira?</numerusform>
@@ -500,7 +500,7 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../FolderCompareView.cpp" line="619" />
+        <location filename="../FolderCompareView.cpp" line="620" />
         <source>%n item(s) could not be moved to the Trash.</source>
         <translation>
             <numerusform>%n item não pôde ser movido para a Lixeira.</numerusform>
@@ -819,422 +819,437 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../MainWindow.cpp" line="79" />
+        <location filename="../MainWindow.cpp" line="81" />
         <source>&amp;File</source>
         <translation>&amp;Arquivo</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="82" />
+        <location filename="../MainWindow.cpp" line="84" />
         <source>&amp;New</source>
         <translation>&amp;Novo</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="84" />
+        <location filename="../MainWindow.cpp" line="86" />
         <source>&amp;Open...</source>
         <translation>&amp;Abrir...</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="87" />
+        <location filename="../MainWindow.cpp" line="90" />
+        <source>Recent Files or Folders</source>
+        <translation>Arquivos ou Pastas Recentes</translation>
+    </message>
+    <message>
+        <location filename="../MainWindow.cpp" line="112" />
+        <source>(empty)</source>
+        <translation>(vazio)</translation>
+    </message>
+    <message>
+        <location filename="../MainWindow.cpp" line="118" />
+        <source>Clear Menu</source>
+        <translation>Limpar Menu</translation>
+    </message>
+    <message>
+        <location filename="../MainWindow.cpp" line="124" />
         <source>&amp;Save</source>
         <translation>&amp;Salvar</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="97" />
+        <location filename="../MainWindow.cpp" line="134" />
         <source>&amp;Close Tab</source>
         <translation>&amp;Fechar Aba</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="100" />
+        <location filename="../MainWindow.cpp" line="137" />
         <source>&amp;Quit</source>
         <translation>Sai&amp;r</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="103" />
+        <location filename="../MainWindow.cpp" line="140" />
         <source>&amp;Edit</source>
         <translation>&amp;Editar</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="104" />
+        <location filename="../MainWindow.cpp" line="141" />
         <source>&amp;Undo</source>
         <translation>&amp;Desfazer</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="113" />
+        <location filename="../MainWindow.cpp" line="150" />
         <source>&amp;Redo</source>
         <translation>&amp;Refazer</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="123" />
+        <location filename="../MainWindow.cpp" line="160" />
         <source>&amp;Find...</source>
         <translation>&amp;Localizar...</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="127" />
+        <location filename="../MainWindow.cpp" line="164" />
         <source>Find &amp;Next</source>
         <translation>Localizar &amp;Próxima</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="131" />
+        <location filename="../MainWindow.cpp" line="168" />
         <source>Find &amp;Previous</source>
         <translation>Localizar &amp;Anterior</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="147" />
+        <location filename="../MainWindow.cpp" line="184" />
         <source>&amp;View</source>
         <translation>&amp;Ver</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="148" />
+        <location filename="../MainWindow.cpp" line="185" />
         <source>&amp;Theme</source>
         <translation>&amp;Tema</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="159" />
+        <location filename="../MainWindow.cpp" line="196" />
         <source>&amp;System</source>
         <translation>&amp;Sistema</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="160" />
+        <location filename="../MainWindow.cpp" line="197" />
         <source>&amp;Light</source>
         <translation>&amp;Claro</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="161" />
+        <location filename="../MainWindow.cpp" line="198" />
         <source>&amp;Dark</source>
         <translation>&amp;Escuro</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="163" />
+        <location filename="../MainWindow.cpp" line="200" />
         <source>Zoom &amp;In</source>
         <translation>&amp;Aumentar Zoom</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="171" />
+        <location filename="../MainWindow.cpp" line="208" />
         <source>Zoom &amp;Out</source>
         <translation>&amp;Reduzir Zoom</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="176" />
+        <location filename="../MainWindow.cpp" line="213" />
         <source>&amp;Actual Size</source>
         <translation>Tamanho &amp;Original</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="182" />
+        <location filename="../MainWindow.cpp" line="219" />
         <source>Next &amp;Pane</source>
         <translation>Próximo &amp;Painel</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="189" />
+        <location filename="../MainWindow.cpp" line="226" />
         <source>&amp;Merge</source>
         <translation>&amp;Mesclar</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="190" />
+        <location filename="../MainWindow.cpp" line="227" />
         <source>&amp;First Difference</source>
         <translation>&amp;Primeira Diferença</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="196" />
+        <location filename="../MainWindow.cpp" line="233" />
         <source>&amp;Previous Difference</source>
         <translation>Diferença &amp;Anterior</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="205" />
+        <location filename="../MainWindow.cpp" line="242" />
         <source>&amp;Next Difference</source>
         <translation>Pró&amp;xima Diferença</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="213" />
+        <location filename="../MainWindow.cpp" line="250" />
         <source>&amp;Last Difference</source>
         <translation>Ú&amp;ltima Diferença</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="219" />
+        <location filename="../MainWindow.cpp" line="256" />
         <source>C&amp;urrent Difference</source>
         <translation>Diferença At&amp;ual</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="229" />
+        <location filename="../MainWindow.cpp" line="266" />
         <source>Copy to &amp;Right</source>
         <translation>Copiar para a &amp;Direita</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="235" />
+        <location filename="../MainWindow.cpp" line="272" />
         <source>Copy to &amp;Left</source>
         <translation>Copiar para a &amp;Esquerda</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="245" />
+        <location filename="../MainWindow.cpp" line="282" />
         <source>Copy to Right and Ad&amp;vance</source>
         <translation>Copiar para a Direita e A&amp;vançar</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="251" />
+        <location filename="../MainWindow.cpp" line="288" />
         <source>Copy to Left and Advanc&amp;e</source>
         <translation>Copiar para a Esquerda e Avança&amp;r</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="258" />
+        <location filename="../MainWindow.cpp" line="295" />
         <source>Copy All to Righ&amp;t</source>
         <translation>Copiar &amp;Tudo para a Direita</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="264" />
+        <location filename="../MainWindow.cpp" line="301" />
         <source>Copy All to Le&amp;ft</source>
         <translation>Copiar T&amp;udo para a Esquerda</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="273" />
+        <location filename="../MainWindow.cpp" line="310" />
         <source>S&amp;wap Panes</source>
         <translation>Tr&amp;ocar Painéis</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="278" />
+        <location filename="../MainWindow.cpp" line="315" />
         <source>Re&amp;compare</source>
         <translation>Re&amp;comparar</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="292" />
+        <location filename="../MainWindow.cpp" line="329" />
         <source>&amp;Image</source>
         <translation>&amp;Imagem</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="293" />
+        <location filename="../MainWindow.cpp" line="330" />
         <source>View &amp;Differences</source>
         <translation>Ver &amp;Diferenças</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="298" />
+        <location filename="../MainWindow.cpp" line="335" />
         <source>Diff &amp;Block Size</source>
         <translation>Tamanho do &amp;Bloco de Diferença</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="310" />
+        <location filename="../MainWindow.cpp" line="347" />
         <source>&amp;Ignore Color Difference</source>
         <translation>&amp;Ignorar Diferença de Cor</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="323" />
+        <location filename="../MainWindow.cpp" line="360" />
         <source>Ins&amp;ertion/Deletion Detection</source>
         <translation>Detecção de Ins&amp;erção/Exclusão</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="325" />
+        <location filename="../MainWindow.cpp" line="362" />
         <source>Vertical</source>
         <translation>Vertical</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="326" />
+        <location filename="../MainWindow.cpp" line="363" />
         <source>Horizontal</source>
         <translation>Horizontal</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="338" />
+        <location filename="../MainWindow.cpp" line="375" />
         <source>&amp;Overlay</source>
         <translation>S&amp;obreposição</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="340" />
+        <location filename="../MainWindow.cpp" line="377" />
         <source>XOR</source>
         <translation>XOR</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="341" />
+        <location filename="../MainWindow.cpp" line="378" />
         <source>Alpha Blend</source>
         <translation>Mesclagem Alfa</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="341" />
+        <location filename="../MainWindow.cpp" line="378" />
         <source>Alpha Blend Animation</source>
         <translation>Animação de Mesclagem Alfa</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="352" />
+        <location filename="../MainWindow.cpp" line="389" />
         <source>Dragging &amp;Mode</source>
         <translation>&amp;Modo de Arraste</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="355" />
+        <location filename="../MainWindow.cpp" line="392" />
         <source>Move</source>
         <translation>Mover</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="355" />
+        <location filename="../MainWindow.cpp" line="392" />
         <source>Adjust Offset</source>
         <translation>Ajustar Deslocamento</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="356" />
+        <location filename="../MainWindow.cpp" line="393" />
         <source>Vertical Wipe</source>
         <translation>Cortina Vertical</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="356" />
+        <location filename="../MainWindow.cpp" line="393" />
         <source>Horizontal Wipe</source>
         <translation>Cortina Horizontal</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="357" />
+        <location filename="../MainWindow.cpp" line="394" />
         <source>Rectangle Select</source>
         <translation>Seleção Retangular</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="370" />
-        <location filename="../MainWindow.cpp" line="391" />
+        <location filename="../MainWindow.cpp" line="407" />
+        <location filename="../MainWindow.cpp" line="428" />
         <source>&amp;Previous Page</source>
         <translation>Página &amp;Anterior</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="374" />
-        <location filename="../MainWindow.cpp" line="394" />
+        <location filename="../MainWindow.cpp" line="411" />
+        <location filename="../MainWindow.cpp" line="431" />
         <source>&amp;Next Page</source>
         <translation>&amp;Próxima Página</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="378" />
+        <location filename="../MainWindow.cpp" line="415" />
         <source>&amp;Active Pane</source>
         <translation>Painel &amp;Ativo</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="379" />
+        <location filename="../MainWindow.cpp" line="416" />
         <source>Rotate &amp;Right 90°</source>
         <translation>Girar 90° à &amp;Direita</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="382" />
+        <location filename="../MainWindow.cpp" line="419" />
         <source>Rotate &amp;Left 90°</source>
         <translation>Girar 90° à &amp;Esquerda</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="385" />
+        <location filename="../MainWindow.cpp" line="422" />
         <source>Flip V&amp;ertically</source>
         <translation>Inverter V&amp;erticalmente</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="388" />
+        <location filename="../MainWindow.cpp" line="425" />
         <source>Flip H&amp;orizontally</source>
         <translation>Inverter H&amp;orizontalmente</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="421" />
+        <location filename="../MainWindow.cpp" line="458" />
         <source>&amp;Tools</source>
         <translation>Ferramen&amp;tas</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="422" />
+        <location filename="../MainWindow.cpp" line="459" />
         <source>&amp;Line Filters...</source>
         <translation>&amp;Filtros de Linha...</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="425" />
+        <location filename="../MainWindow.cpp" line="462" />
         <source>&amp;Help</source>
         <translation>A&amp;juda</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="426" />
+        <location filename="../MainWindow.cpp" line="463" />
         <source>&amp;About LibreMerge</source>
         <translation>&amp;Sobre o LibreMerge</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="428" />
+        <location filename="../MainWindow.cpp" line="465" />
         <source>About LibreMerge</source>
         <translation>Sobre o LibreMerge</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="429" />
+        <location filename="../MainWindow.cpp" line="466" />
         <source>&lt;b&gt;LibreMerge %1&lt;/b&gt;&lt;br/&gt;A free differencing and merging tool for macOS and Linux.&lt;br/&gt;&lt;br/&gt;Based on the comparison engine of &lt;a href="https://winmerge.org"&gt;WinMerge&lt;/a&gt;, © Dean P. Grimm / Thingamahoochie Software and the WinMerge contributors (GPL-2.0-or-later).&lt;br/&gt;LibreMerge is licensed under the GNU GPL v3.0 or later.&lt;br/&gt;&lt;br/&gt;Not affiliated with or endorsed by the WinMerge project.</source>
         <translation>&lt;b&gt;LibreMerge %1&lt;/b&gt;&lt;br/&gt;Uma ferramenta livre de comparação e mesclagem para macOS e Linux.&lt;br/&gt;&lt;br/&gt;Baseado no motor de comparação do &lt;a href="https://winmerge.org"&gt;WinMerge&lt;/a&gt;, © Dean P. Grimm / Thingamahoochie Software e os contribuidores do WinMerge (GPL-2.0-or-later).&lt;br/&gt;O LibreMerge é licenciado sob a GNU GPL v3.0 ou posterior.&lt;br/&gt;&lt;br/&gt;Não afiliado ao projeto WinMerge nem endossado por ele.</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="483" />
-        <location filename="../MainWindow.cpp" line="498" />
-        <location filename="../MainWindow.cpp" line="545" />
-        <location filename="../MainWindow.cpp" line="810" />
-        <location filename="../MainWindow.cpp" line="849" />
-        <location filename="../MainWindow.cpp" line="901" />
+        <location filename="../MainWindow.cpp" line="520" />
+        <location filename="../MainWindow.cpp" line="535" />
+        <location filename="../MainWindow.cpp" line="583" />
+        <location filename="../MainWindow.cpp" line="886" />
+        <location filename="../MainWindow.cpp" line="925" />
+        <location filename="../MainWindow.cpp" line="978" />
         <source>LibreMerge</source>
         <translation>LibreMerge</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="484" />
-        <location filename="../MainWindow.cpp" line="499" />
-        <location filename="../MainWindow.cpp" line="546" />
+        <location filename="../MainWindow.cpp" line="521" />
+        <location filename="../MainWindow.cpp" line="536" />
+        <location filename="../MainWindow.cpp" line="584" />
         <source>Could not compare files:
 %1</source>
         <translation>Não foi possível comparar os arquivos:
 %1</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="325" />
-        <location filename="../MainWindow.cpp" line="340" />
-        <location filename="../MainWindow.cpp" line="355" />
+        <location filename="../MainWindow.cpp" line="362" />
+        <location filename="../MainWindow.cpp" line="377" />
+        <location filename="../MainWindow.cpp" line="392" />
         <source>None</source>
         <translation>Nenhum</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="677" />
+        <location filename="../MainWindow.cpp" line="723" />
         <source>Open comparisons pick the new options up on Recompare (F5) or when reopened.</source>
         <translation>Comparações abertas aplicam as novas opções ao Recomparar (F5) ou ao serem reabertas.</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="637" />
+        <location filename="../MainWindow.cpp" line="683" />
         <source>Line Filters</source>
         <translation>Filtros de Linha</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="139" />
+        <location filename="../MainWindow.cpp" line="176" />
         <source>Settings...</source>
         <translation>Ajustes...</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="142" />
+        <location filename="../MainWindow.cpp" line="179" />
         <source>&amp;Options...</source>
         <translation>&amp;Opções...</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="639" />
+        <location filename="../MainWindow.cpp" line="685" />
         <source>Differences whose lines all match an enabled regular expression are shown as trivial and skipped by the navigation.</source>
         <translation>Diferenças cujas linhas casam todas com uma expressão regular habilitada são exibidas como triviais e puladas pela navegação.</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="659" />
+        <location filename="../MainWindow.cpp" line="705" />
         <source>Add</source>
         <translation>Adicionar</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="669" />
+        <location filename="../MainWindow.cpp" line="715" />
         <source>Remove</source>
         <translation>Remover</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="740" />
+        <location filename="../MainWindow.cpp" line="816" />
         <source>Select Files or Folders</source>
         <translation>Selecionar Arquivos ou Pastas</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="811" />
+        <location filename="../MainWindow.cpp" line="887" />
         <source>Close all %1 comparison tabs?</source>
         <translation>Fechar todas as %1 abas de comparação?</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="839" />
-        <location filename="../MainWindow.cpp" line="860" />
+        <location filename="../MainWindow.cpp" line="915" />
+        <location filename="../MainWindow.cpp" line="937" />
         <source>Save Changes</source>
         <translation>Salvar Alterações</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="840" />
+        <location filename="../MainWindow.cpp" line="916" />
         <source>This comparison has unsaved changes. Save before closing?</source>
         <translation>Esta comparação tem alterações não salvas. Salvar antes de fechar?</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="863" />
+        <location filename="../MainWindow.cpp" line="940" />
         <source>This comparison has unsaved changes. Save the checked files before closing?</source>
         <translation>Esta comparação tem alterações não salvas. Salvar os arquivos marcados antes de fechar?</translation>
     </message>
     <message>
-        <location filename="../MainWindow.cpp" line="850" />
-        <location filename="../MainWindow.cpp" line="902" />
+        <location filename="../MainWindow.cpp" line="926" />
+        <location filename="../MainWindow.cpp" line="979" />
         <source>Could not save:
 %1</source>
         <translation>Não foi possível salvar:
@@ -1343,133 +1358,133 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Opções</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="61" />
+        <location filename="../OptionsDialog.cpp" line="66" />
         <source>General</source>
         <translation>Geral</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="61" />
-        <location filename="../OptionsDialog.cpp" line="138" />
+        <location filename="../OptionsDialog.cpp" line="66" />
+        <location filename="../OptionsDialog.cpp" line="143" />
         <source>Compare</source>
         <translation>Comparar</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="75" />
+        <location filename="../OptionsDialog.cpp" line="80" />
         <source>Defaults</source>
         <translation>Padrões</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="96" />
+        <location filename="../OptionsDialog.cpp" line="101" />
         <source>Automatically scroll to first difference</source>
         <translation>Rolar automaticamente para a primeira diferença</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="99" />
+        <location filename="../OptionsDialog.cpp" line="104" />
         <source>Automatically scroll to first inline difference</source>
         <translation>Rolar automaticamente para a primeira diferença em linha</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="102" />
+        <location filename="../OptionsDialog.cpp" line="107" />
         <source>Show "Select Files or Folders" screen at startup</source>
         <translation>Mostrar a tela "Selecionar Arquivos ou Pastas" ao iniciar</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="105" />
+        <location filename="../OptionsDialog.cpp" line="110" />
         <source>Ask before closing a window with multiple tabs</source>
         <translation>Perguntar antes de fechar uma janela com várias abas</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="108" />
+        <location filename="../OptionsDialog.cpp" line="113" />
         <source>Back up the original file when saving (.bak)</source>
         <translation>Fazer backup do arquivo original ao salvar (.bak)</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="113" />
+        <location filename="../OptionsDialog.cpp" line="118" />
         <source>Language:</source>
         <translation>Idioma:</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="115" />
+        <location filename="../OptionsDialog.cpp" line="120" />
         <source>System default</source>
         <translation>Padrão do sistema</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="122" />
+        <location filename="../OptionsDialog.cpp" line="127" />
         <source>Language changes take effect after restarting LibreMerge.</source>
         <translation>A mudança de idioma entra em vigor após reiniciar o LibreMerge.</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="136" />
+        <location filename="../OptionsDialog.cpp" line="141" />
         <source>Whitespace:</source>
         <translation>Espaços em branco:</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="138" />
+        <location filename="../OptionsDialog.cpp" line="143" />
         <source>Ignore changes</source>
         <translation>Ignorar alterações</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="139" />
+        <location filename="../OptionsDialog.cpp" line="144" />
         <source>Ignore all</source>
         <translation>Ignorar todos</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="143" />
+        <location filename="../OptionsDialog.cpp" line="148" />
         <source>Ignore case</source>
         <translation>Ignorar maiúsculas/minúsculas</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="145" />
+        <location filename="../OptionsDialog.cpp" line="150" />
         <source>Ignore blank lines</source>
         <translation>Ignorar linhas em branco</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="148" />
+        <location filename="../OptionsDialog.cpp" line="153" />
         <source>Ignore carriage return differences</source>
         <translation>Ignorar diferenças de quebra de linha (CR)</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="150" />
+        <location filename="../OptionsDialog.cpp" line="155" />
         <source>Ignore numbers</source>
         <translation>Ignorar números</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="154" />
+        <location filename="../OptionsDialog.cpp" line="159" />
         <source>Diff algorithm:</source>
         <translation>Algoritmo de comparação:</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="156" />
+        <location filename="../OptionsDialog.cpp" line="161" />
         <source>Default</source>
         <translation>Padrão</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="156" />
+        <location filename="../OptionsDialog.cpp" line="161" />
         <source>Minimal</source>
         <translation>Mínimo</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="156" />
+        <location filename="../OptionsDialog.cpp" line="161" />
         <source>Patience</source>
         <translation>Patience</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="157" />
+        <location filename="../OptionsDialog.cpp" line="162" />
         <source>Histogram</source>
         <translation>Histograma</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="157" />
+        <location filename="../OptionsDialog.cpp" line="162" />
         <source>None</source>
         <translation>Nenhum</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="161" />
+        <location filename="../OptionsDialog.cpp" line="166" />
         <source>Detect moved blocks</source>
         <translation>Detectar blocos movidos</translation>
     </message>
     <message>
-        <location filename="../OptionsDialog.cpp" line="164" />
+        <location filename="../OptionsDialog.cpp" line="169" />
         <source>Open comparisons pick the new options up on Recompare (F5) or when reopened.</source>
         <translation>Comparações abertas aplicam as novas opções ao Recomparar (F5) ou ao serem reabertas.</translation>
     </message>
@@ -1482,37 +1497,37 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>não foi possível criar as opções de comparação</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="61" />
+        <location filename="../FolderCompareView.cpp" line="62" />
         <source>Identical</source>
         <translation>Idêntico</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="62" />
+        <location filename="../FolderCompareView.cpp" line="63" />
         <source>Different</source>
         <translation>Diferente</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="63" />
+        <location filename="../FolderCompareView.cpp" line="64" />
         <source>Left only</source>
         <translation>Somente à esquerda</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="64" />
+        <location filename="../FolderCompareView.cpp" line="65" />
         <source>Right only</source>
         <translation>Somente à direita</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="65" />
+        <location filename="../FolderCompareView.cpp" line="66" />
         <source>Skipped</source>
         <translation>Ignorado</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="66" />
+        <location filename="../FolderCompareView.cpp" line="67" />
         <source>Error</source>
         <translation>Erro</translation>
     </message>
     <message>
-        <location filename="../FolderCompareView.cpp" line="110" />
+        <location filename="../FolderCompareView.cpp" line="111" />
         <source>Folder: %1</source>
         <translation>Pasta: %1</translation>
     </message>

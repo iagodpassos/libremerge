@@ -49,6 +49,10 @@ private slots:
 
 private:
 	void attachFileView(FileCompareView *view);
+	/** Record a successful comparison in File > Recent Files or Folders. */
+	void rememberComparison(const QStringList &paths);
+	/** Reopen a recent comparison (folders or files). */
+	void reopenComparison(const QStringList &paths);
 
 	QTabWidget *m_tabs;
 };

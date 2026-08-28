@@ -85,6 +85,41 @@ MainWindow::MainWindow(QWidget *parent)
 		[this]() { openBlankComparison(); });
 	addMenuAction(fileMenu, tr("&Open..."), QKeySequence::Open,
 		[this]() { newComparison(); });
+	// WinMerge's File > Recent Files or Folders: each entry is a whole
+	// comparison, rebuilt from settings every time the menu opens
+	QMenu *recentMenu = fileMenu->addMenu(tr("Recent Files or Folders"));
+	connect(recentMenu, &QMenu::aboutToShow, this, [this, recentMenu]() {
+		recentMenu->clear();
+		const QStringList entries = QSettings()
+			.value(QStringLiteral("RecentComparisons/List")).toStringList();
+		for (const QString &entry : entries)
+		{
+			const QStringList paths = entry.split(QChar('\n'));
+			QStringList names;
+			for (const QString &path : paths)
+			{
+				const QString name = QFileInfo(path).fileName();
+				names.append(name.isEmpty() ? path : name);
+			}
+			QAction *action = recentMenu->addAction(
+				names.join(QString::fromUtf8(" \xE2\x86\x94 ")));
+			action->setToolTip(paths.join(QStringLiteral("\n")));
+			connect(action, &QAction::triggered, this,
+				[this, paths]() { reopenComparison(paths); });
+		}
+		if (entries.isEmpty())
+		{
+			QAction *empty = recentMenu->addAction(tr("(empty)"));
+			empty->setEnabled(false);
+		}
+		else
+		{
+			recentMenu->addSeparator();
+			recentMenu->addAction(tr("Clear Menu"), this, []() {
+				QSettings().remove(QStringLiteral("RecentComparisons/List"));
+			});
+		}
+	});
 	fileMenu->addSeparator();
 	addMenuAction(fileMenu, tr("&Save"), QKeySequence::Save,
 		[fileView, tableView, imageView]() {
@@ -508,6 +543,7 @@ void MainWindow::openTableComparison(const QString &leftPath,
 		m_tabs->setTabText(tabIndex, (v->isModified()
 			? QString::fromUtf8("\xE2\x80\xA2 ") : QString()) + v->tabTitle());
 	};
+	rememberComparison(view->paths());
 	const int index = m_tabs->addTab(view, view->tabTitle());
 	m_tabs->setTabToolTip(index, view->paths().join(QStringLiteral("\n")));
 	m_tabs->setCurrentIndex(index);
@@ -556,6 +592,7 @@ void MainWindow::openImageComparison(const QStringList &paths,
 		m_tabs->setTabText(tabIndex, (v->isModified()
 			? QString::fromUtf8("\xE2\x80\xA2 ") : QString()) + v->tabTitle());
 	};
+	rememberComparison(view->paths());
 	const int index = m_tabs->addTab(view, view->tabTitle());
 	m_tabs->setTabToolTip(index, view->paths().join(QStringLiteral("\n")));
 	m_tabs->setCurrentIndex(index);
@@ -592,6 +629,7 @@ void MainWindow::attachFileView(FileCompareView *view)
 			? QString::fromUtf8("\xE2\x80\xA2 ") : QString()) + v->tabTitle());
 		m_tabs->setTabToolTip(tabIndex, v->paths().join(QStringLiteral("\n")));
 	};
+	rememberComparison(view->paths());
 	const int index = m_tabs->addTab(view, view->tabTitle());
 	m_tabs->setTabToolTip(index, view->paths().join(QStringLiteral("\n")));
 	m_tabs->setCurrentIndex(index);
@@ -625,6 +663,7 @@ void MainWindow::openFolderComparison(const QString &leftDir, const QString &rig
 	const int index = m_tabs->addTab(view, title);
 	m_tabs->setTabToolTip(index, leftDir + QStringLiteral("\n") + rightDir);
 	m_tabs->setCurrentIndex(index);
+	rememberComparison({ leftDir, rightDir });
 	view->start(leftDir, rightDir);
 }
 
@@ -711,6 +750,36 @@ void MainWindow::showLineFilters()
 void MainWindow::newComparison()
 {
 	openSelector();
+}
+
+void MainWindow::rememberComparison(const QStringList &paths)
+{
+	if (paths.size() < 2)
+		return;
+	for (const QString &path : paths)
+		if (path.isEmpty())
+			return; // untitled panes are not reopenable
+	QSettings settings;
+	const QString key = QStringLiteral("RecentComparisons/List");
+	QStringList entries = settings.value(key).toStringList();
+	const QString entry = paths.join(QChar('\n'));
+	entries.removeAll(entry);
+	entries.prepend(entry);
+	while (entries.size() > 9)
+		entries.removeLast();
+	settings.setValue(key, entries);
+}
+
+void MainWindow::reopenComparison(const QStringList &paths)
+{
+	int dirs = 0;
+	for (const QString &path : paths)
+		if (QFileInfo(path).isDir())
+			++dirs;
+	if (paths.size() == 2 && dirs == 2)
+		openFolderComparison(paths.at(0), paths.at(1));
+	else
+		openFileComparison(paths);
 }
 
 void MainWindow::openSelector(const QStringList &paths)
