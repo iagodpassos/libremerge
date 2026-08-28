@@ -62,6 +62,19 @@ export EXTRA_PLATFORM_PLUGINS="libqwayland-generic.so;libqwayland-egl.so;libqoff
 # decorations - without them the window comes up bufferless and
 # borderless on a pure Wayland session (GNOME)
 export EXTRA_QT_PLUGINS="wayland-decoration-client;wayland-graphics-integration-client;wayland-shell-integration"
-./linuxdeploy-"$ARCH".AppImage --appdir AppDir --plugin qt --output appimage
+# deploy first (generates an AppRun that sources apprun-hooks/*.sh at
+# runtime), then add our hook, then pack
+./linuxdeploy-"$ARCH".AppImage --appdir AppDir --plugin qt
+
+# the bundled Qt (Debian 12's 6.4) cannot position windows on a native
+# Wayland session, so dialogs land in a screen corner instead of being
+# centered on the application window; prefer XWayland until the bundle
+# moves to a newer Qt. QT_QPA_PLATFORM set by the user still wins.
+mkdir -p AppDir/apprun-hooks
+cat > AppDir/apprun-hooks/00-libremerge-platform.sh <<'EOF'
+export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
+EOF
+
+./linuxdeploy-"$ARCH".AppImage --appdir AppDir --output appimage
 
 ls -la LibreMerge*.AppImage
