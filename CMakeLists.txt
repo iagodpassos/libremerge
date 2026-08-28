@@ -30,7 +30,7 @@ if(UNIX AND NOT APPLE)
   # `cpack -G DEB` in the build dir produces the .deb; runtime
   # dependencies are computed by dpkg-shlibdeps (needs dpkg-dev)
   set(CPACK_PACKAGE_NAME "libremerge")
-  set(CPACK_PACKAGE_VERSION "0.8.1")
+  set(CPACK_PACKAGE_VERSION "0.9.0")
   set(CPACK_PACKAGE_CONTACT "Iago Passos <iago.dpassos@gmail.com>")
   set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Iago Passos <iago.dpassos@gmail.com>")
   set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
