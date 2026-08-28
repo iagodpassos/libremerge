@@ -92,6 +92,7 @@ MainWindow::MainWindow(QWidget *parent)
 		recentMenu->clear();
 		const QStringList entries = QSettings()
 			.value(QStringLiteral("RecentComparisons/List")).toStringList();
+		int number = 1;
 		for (const QString &entry : entries)
 		{
 			const QStringList paths = entry.split(QChar('\n'));
@@ -101,8 +102,12 @@ MainWindow::MainWindow(QWidget *parent)
 				const QString name = QFileInfo(path).fileName();
 				names.append(name.isEmpty() ? path : name);
 			}
+			// numbered mnemonics and the 128-character cap, like
+			// WinMerge's "&1 title" MRU entries
 			QAction *action = recentMenu->addAction(
-				names.join(QString::fromUtf8(" \xE2\x86\x94 ")));
+				QStringLiteral("&%1 %2").arg(number++).arg(
+					names.join(QString::fromUtf8(" \xE2\x86\x94 "))
+						.left(128)));
 			action->setToolTip(paths.join(QStringLiteral("\n")));
 			connect(action, &QAction::triggered, this,
 				[this, paths]() { reopenComparison(paths); });
