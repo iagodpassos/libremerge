@@ -14,7 +14,7 @@ set -euo pipefail
 SRC="${1:?usage: make_appimage.sh <source-dir> <work-dir>}"
 WORK="${2:?usage: make_appimage.sh <source-dir> <work-dir>}"
 ARCH="$(uname -m)"
-export VERSION="0.9.0"
+export VERSION="0.9.1"
 
 mkdir -p "$WORK"
 cd "$WORK"
