@@ -43,6 +43,18 @@
 namespace
 {
 
+/** Display name of a file or folder path; folders dragged in carry a
+    trailing slash, which makes QFileInfo::fileName() return nothing. */
+QString displayName(const QString &path)
+{
+	QString trimmed = path;
+	while (trimmed.length() > 1 && (trimmed.endsWith(QLatin1Char('/'))
+		|| trimmed.endsWith(QLatin1Char('\\'))))
+		trimmed.chop(1);
+	const QString name = QFileInfo(trimmed).fileName();
+	return name.isEmpty() ? trimmed : name;
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
@@ -98,10 +110,7 @@ MainWindow::MainWindow(QWidget *parent)
 			const QStringList paths = entry.split(QChar('\n'));
 			QStringList names;
 			for (const QString &path : paths)
-			{
-				const QString name = QFileInfo(path).fileName();
-				names.append(name.isEmpty() ? path : name);
-			}
+				names.append(displayName(path));
 			// numbered mnemonics and the 128-character cap, like
 			// WinMerge's "&1 title" MRU entries
 			QAction *action = recentMenu->addAction(
@@ -663,8 +672,8 @@ void MainWindow::openFolderComparison(const QString &leftDir, const QString &rig
 	auto *view = new FolderCompareView(this);
 	connect(view, &FolderCompareView::openFileComparisonRequested, this,
 		qOverload<const QString &, const QString &>(&MainWindow::openFileComparison));
-	const QString title = QFileInfo(leftDir).fileName() + QString::fromUtf8(" \xE2\x86\x94 ")
-		+ QFileInfo(rightDir).fileName();
+	const QString title = displayName(leftDir)
+		+ QString::fromUtf8(" \xE2\x86\x94 ") + displayName(rightDir);
 	const int index = m_tabs->addTab(view, title);
 	m_tabs->setTabToolTip(index, leftDir + QStringLiteral("\n") + rightDir);
 	m_tabs->setCurrentIndex(index);
