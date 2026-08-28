@@ -6,6 +6,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QTextBlock>
+#include <QTimer>
 #include <QUrl>
 
 namespace
@@ -112,14 +113,20 @@ bool DiffTextEdit::canInsertFromMimeData(const QMimeData *source) const
 void DiffTextEdit::insertFromMimeData(const QMimeData *source)
 {
 	// dropping a file loads it into this pane, like WinMerge, instead
-	// of inserting the file:// URL as text
+	// of inserting the file:// URL as text. The hook is deferred to the
+	// next event-loop cycle: it replaces this widget's document, and
+	// doing that while QWidgetTextControl is still processing the drop
+	// crashed inside centerCursor (the fresh document had no layout yet)
 	if (source->hasUrls())
 	{
 		for (const QUrl &url : source->urls())
 		{
 			if (url.isLocalFile() && m_fileDropHook)
 			{
-				m_fileDropHook(url.toLocalFile());
+				QTimer::singleShot(0, this,
+					[hook = m_fileDropHook, path = url.toLocalFile()]() {
+						hook(path);
+					});
 				return;
 			}
 		}

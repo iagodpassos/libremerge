@@ -26,6 +26,7 @@
 #include <QStringList>
 #include <QTemporaryFile>
 #include <QTextBlock>
+#include <QTextLayout>
 #include <QToolBar>
 #include <QToolButton>
 #include <QUrl>
@@ -1464,11 +1465,15 @@ void FileCompareView::gotoDiff(int blockIndex, bool center)
 	m_current = blockIndex;
 	for (int side = 0; side < m_paneCount; ++side)
 	{
-		QTextCursor cursor(m_panes[side]->document()->findBlockByNumber(
-			qMax(0, m_blocks[blockIndex].viewBegin)));
+		const QTextBlock cursorBlock = m_panes[side]->document()
+			->findBlockByNumber(qMax(0, m_blocks[blockIndex].viewBegin));
+		QTextCursor cursor(cursorBlock);
 		m_syncing = true;
 		m_panes[side]->setTextCursor(cursor);
-		if (center)
+		// centerCursor dereferences the block's QTextLine; a freshly
+		// replaced document may not be laid out yet (crashed on macOS)
+		if (center && cursorBlock.layout() != nullptr
+			&& cursorBlock.layout()->lineCount() > 0)
 			m_panes[side]->centerCursor();
 		m_syncing = false;
 	}
