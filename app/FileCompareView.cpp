@@ -36,6 +36,7 @@
 #include "Icons.h"
 #include "LocationPane.h"
 #include "SyntaxHighlighter.h"
+#include "OptionsDialog.h"
 #include "Theme.h"
 
 // engine
@@ -1434,6 +1435,17 @@ void FileCompareView::changeSideFile(int side, const QString &path)
 	settings.setValue(historyKey, history);
 
 	recompare();
+
+	// changing a pane's file re-applies "scroll to first difference",
+	// like WinMerge (CMergeDoc::ChangeFile ends in MoveOnLoad) - this
+	// covers dropping files onto the panes of a File > New comparison
+	if (OptionsDialog::scrollToFirstDiff())
+	{
+		gotoFirstDiff();
+		if (OptionsDialog::scrollToFirstInlineDiff())
+			scrollToFirstInlineDiff();
+	}
+
 	emit pathsChanged();
 }
 
