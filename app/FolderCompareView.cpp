@@ -17,6 +17,7 @@
 #include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
+#include "Dialogs.h"
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSettings>
@@ -557,7 +558,7 @@ void FolderCompareView::copySelected(int sourceSide)
 
 	const QString direction = sourceSide == 0
 		? tr("left \xE2\x86\x92 right") : tr("right \xE2\x86\x92 left");
-	if (QMessageBox::question(this, tr("LibreMerge"),
+	if (lm::question(this, tr("LibreMerge"),
 		tr("Copy %n item(s) (%1)? Overwritten files go to the Trash.", nullptr,
 			rows.size()).arg(direction)) != QMessageBox::Yes)
 		return;
@@ -573,7 +574,7 @@ void FolderCompareView::copySelected(int sourceSide)
 			++failures;
 	}
 	if (failures > 0)
-		QMessageBox::warning(this, tr("LibreMerge"),
+		lm::warning(this, tr("LibreMerge"),
 			tr("%n item(s) could not be copied.", nullptr, failures));
 	updateActions();
 }
@@ -590,7 +591,7 @@ void FolderCompareView::deleteSelected(bool leftSide, bool rightSide)
 	if (rows.isEmpty())
 		return;
 
-	if (QMessageBox::question(this, tr("LibreMerge"),
+	if (lm::question(this, tr("LibreMerge"),
 		tr("Move %n item(s) to the Trash?", nullptr, rows.size())) != QMessageBox::Yes)
 		return;
 
@@ -615,7 +616,7 @@ void FolderCompareView::deleteSelected(bool leftSide, bool rightSide)
 		updateRowFromDisk(row);
 	}
 	if (failures > 0)
-		QMessageBox::warning(this, tr("LibreMerge"),
+		lm::warning(this, tr("LibreMerge"),
 			tr("%n item(s) could not be moved to the Trash.", nullptr, failures));
 	updateActions();
 }

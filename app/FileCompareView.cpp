@@ -19,6 +19,7 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
+#include "Dialogs.h"
 #include <QProcess>
 #include <QScrollBar>
 #include <QSettings>
@@ -1425,14 +1426,14 @@ void FileCompareView::changeSideFile(int side, const QString &path)
 	if (path.isEmpty() || path == m_sides[side].path)
 		return;
 	if (m_sides[side].modified
-		&& QMessageBox::question(this, tr("LibreMerge"),
+		&& lm::question(this, tr("LibreMerge"),
 			tr("Discard unsaved changes in this pane?")) != QMessageBox::Yes)
 		return;
 
 	QString error;
 	if (!loadSide(side, path, &error))
 	{
-		QMessageBox::warning(this, tr("LibreMerge"), error);
+		lm::warning(this, tr("LibreMerge"), error);
 		return;
 	}
 	m_sides[side].caption.clear();
@@ -1821,7 +1822,7 @@ void FileCompareView::swapSides()
 {
 	if (m_paneCount < 2)
 		return;
-	if (isModified() && QMessageBox::question(this, tr("LibreMerge"),
+	if (isModified() && lm::question(this, tr("LibreMerge"),
 		tr("Swapping reloads both files. Discard unsaved changes?"))
 			!= QMessageBox::Yes)
 		return;
@@ -1838,7 +1839,7 @@ void FileCompareView::swapSides()
 	QString error;
 	if (!compare(newPaths, &error))
 	{
-		QMessageBox::warning(this, tr("LibreMerge"), error);
+		lm::warning(this, tr("LibreMerge"), error);
 		return;
 	}
 	for (int i = 0; i < m_paneCount; ++i)

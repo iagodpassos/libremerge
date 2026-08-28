@@ -54,6 +54,11 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	: QDialog(parent)
 {
 	setWindowTitle(tr("Options"));
+#ifndef Q_OS_MACOS
+	// window-modal so Wayland/GNOME centers it over the application
+	// window; not on macOS, where a Preferences sheet would be unusual
+	setWindowModality(Qt::WindowModal);
+#endif
 	auto *layout = new QVBoxLayout(this);
 
 	auto *body = new QHBoxLayout;

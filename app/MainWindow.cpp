@@ -22,6 +22,7 @@
 #include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
+#include "Dialogs.h"
 #include <QPushButton>
 #include <QTabWidget>
 #include <QTimer>
@@ -481,7 +482,7 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 	if (!view->compare(paths, &error))
 	{
 		delete view;
-		QMessageBox::warning(this, tr("LibreMerge"),
+		lm::warning(this, tr("LibreMerge"),
 			tr("Could not compare files:\n%1").arg(error));
 		return;
 	}
@@ -496,7 +497,7 @@ void MainWindow::openTableComparison(const QString &leftPath,
 	if (!view->compare(leftPath, rightPath, &error))
 	{
 		delete view;
-		QMessageBox::warning(this, tr("LibreMerge"),
+		lm::warning(this, tr("LibreMerge"),
 			tr("Could not compare files:\n%1").arg(error));
 		return;
 	}
@@ -543,7 +544,7 @@ void MainWindow::openImageComparison(const QStringList &paths,
 	if (!view->compare(paths, &error))
 	{
 		delete view;
-		QMessageBox::warning(this, tr("LibreMerge"),
+		lm::warning(this, tr("LibreMerge"),
 			tr("Could not compare files:\n%1").arg(error));
 		return;
 	}
@@ -639,6 +640,7 @@ void MainWindow::showOptions()
 void MainWindow::showLineFilters()
 {
 	QDialog dialog(this);
+	dialog.setWindowModality(Qt::WindowModal);
 	dialog.setWindowTitle(tr("Line Filters"));
 	auto *layout = new QVBoxLayout(&dialog);
 	auto *note = new QLabel(tr("Differences whose lines all match an "
@@ -812,7 +814,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 	// WinMerge's "ask when closing multiple windows", off by default
 	if (OptionsDialog::askBeforeClosingMultipleTabs() && m_tabs->count() > 1)
 	{
-		const auto choice = QMessageBox::question(this, tr("LibreMerge"),
+		const auto choice = lm::question(this, tr("LibreMerge"),
 			tr("Close all %1 comparison tabs?").arg(m_tabs->count()));
 		if (choice != QMessageBox::Yes)
 		{
@@ -841,7 +843,7 @@ void MainWindow::closeTab(int index)
 	if (auto *image = qobject_cast<ImageCompareView *>(page);
 		image != nullptr && image->isModified())
 	{
-		const auto choice = QMessageBox::question(this, tr("Save Changes"),
+		const auto choice = lm::question(this, tr("Save Changes"),
 			tr("This comparison has unsaved changes. Save before closing?"),
 			QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 		if (choice == QMessageBox::Cancel)
@@ -851,7 +853,7 @@ void MainWindow::closeTab(int index)
 			QString error;
 			if (!image->saveModified(&error))
 			{
-				QMessageBox::warning(this, tr("LibreMerge"),
+				lm::warning(this, tr("LibreMerge"),
 					tr("Could not save:\n%1").arg(error));
 				return;
 			}
@@ -862,6 +864,7 @@ void MainWindow::closeTab(int index)
 		// like WinMerge's closing dialog: list each modified side and
 		// let the user pick what gets saved
 		QDialog dialog(this);
+		dialog.setWindowModality(Qt::WindowModal);
 		dialog.setWindowTitle(tr("Save Changes"));
 		auto *layout = new QVBoxLayout(&dialog);
 		auto *label = new QLabel(
@@ -903,7 +906,7 @@ void MainWindow::closeTab(int index)
 				QString error;
 				if (!view->saveSideAt(sides.at(k), &error))
 				{
-					QMessageBox::warning(this, tr("LibreMerge"),
+					lm::warning(this, tr("LibreMerge"),
 						tr("Could not save:\n%1").arg(error));
 					return;
 				}
