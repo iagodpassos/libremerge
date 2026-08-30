@@ -88,6 +88,29 @@ sudo apt install ./libremerge_<version>_amd64_debian13.deb
 
 Other formats (Ubuntu-specific builds, Flatpak) are planned — open an issue if you need one and it moves up the list.
 
+## Use with git
+
+LibreMerge works as git's merge and diff tool. Conflicts open in the familiar three-pane layout, with the merged result in the middle pane.
+
+**macOS**:
+
+```sh
+git config --global merge.tool libremerge
+git config --global mergetool.libremerge.cmd \
+  '/Applications/LibreMerge.app/Contents/MacOS/LibreMerge "$LOCAL" "$MERGED" "$REMOTE"'
+
+git config --global diff.tool libremerge
+git config --global difftool.libremerge.cmd \
+  '/Applications/LibreMerge.app/Contents/MacOS/LibreMerge "$LOCAL" "$REMOTE"'
+```
+
+**Linux**: the same commands, with `libremerge` (or the path to the AppImage) in place of the full bundle path.
+
+To use it, run `git mergetool` after a conflict: resolve it in the middle pane, save, and close the window. Two notes on the extra files you may see afterwards:
+
+- LibreMerge writes a `.bak` copy next to the file it saves, which is WinMerge's default behavior. Turn it off under Options > General if you prefer.
+- `git mergetool` itself keeps a `.orig` file unless you set `git config --global mergetool.keepBackup false`.
+
 ## Known limitations
 
 - Binary files are detected and refused — binary/hex comparison is planned, not implemented
