@@ -61,6 +61,14 @@ public:
 	int firstVisibleViewLine() const;
 	/** Select everything in one pane and copy it (for tests). */
 	void selectAllAndCopyForTest(int side);
+	/** Type text at the start of a view line, as an undoable user edit
+	    (for tests). */
+	void typeAtForTest(int side, int viewLine, const QString &text);
+	/** The side's real content lines, ghosts excluded (for tests). */
+	QStringList realLinesForTest(int side) const
+	{
+		return collectRealLines(side);
+	}
 
 	/** Mark sides as read-only before compare(): the pane rejects edits
 	    and merge operations refuse to target it. */
@@ -176,6 +184,13 @@ private:
 	int nextActive(int from, int direction) const;
 	void applyBlockCopy(int blockIndex, int sourceSide, int targetSide,
 		bool joinUndo);
+	bool applyAlignmentEdits(int side, const QStringList &oldLines,
+		const QList<bool> &oldGhosts, const QList<bool> &rawFlags,
+		const QStringList &newLines, const QList<bool> &newGhosts);
+	void applyGhostFlags(int side, const QList<bool> &flags);
+	void tagLastCommand(int side, bool alignment,
+		const QList<bool> &flagsBefore, const QList<bool> &flagsAfter);
+	void resetUndoHistory();
 	void refreshAfterUndoRedo(const int countsBefore[3]);
 	void replaceOne();
 	void replaceAll();
@@ -207,8 +222,17 @@ private:
 	QList<int> m_lineNumbers[3];      // view line -> 1-based real number, -1 ghost
 	struct UndoRef
 	{
-		int side;
-		int viewLine; // where the edit happened, to reselect after undo
+		int side = 0;
+		int viewLine = 0; // where the edit happened, to reselect after undo
+		// alignment commands are the ghost-line edits of a recompare:
+		// they replay silently around the user's own edits, like
+		// WinMerge's rescan (whose ghost operations bypass undo)
+		bool alignment = false;
+		// ghost flags of the whole pane before/after a programmatic
+		// command (alignment or merge); undo/redo restores them, since
+		// Qt does not bring block user data back. Empty for user edits.
+		QList<bool> flagsBefore;
+		QList<bool> flagsAfter;
 	};
 	QList<UndoRef> m_undoOrder;       // chronological edit order across panes
 	QList<UndoRef> m_redoOrder;
@@ -217,6 +241,7 @@ private:
 	int m_activePane = 0;
 	bool m_syncing = false;
 	bool m_diffStale = false;
+	bool m_recordingAlignment = false;
 	QAction *m_actSave = nullptr;
 	QAction *m_actCopyFromLeft = nullptr;
 	QAction *m_actCopyFromRight = nullptr;

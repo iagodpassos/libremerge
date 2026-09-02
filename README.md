@@ -114,7 +114,6 @@ To use it, run `git mergetool` after a conflict: resolve it in the middle pane, 
 ## Known limitations
 
 - Binary files are detected and refused — binary/hex comparison is planned, not implemented
-- Recompare (F5) may rebuild the alignment and clear the undo history of that moment
 - 3-way comparison is available for files and images, not folders yet
 - Archive (zip/7z) comparison from WinMerge is not ported yet
 - Image comparison: animated GIF and multi-page TIFF open and compare, but cannot be saved back (no Qt encoder — Save As offers PNG); SVG/PDF comparison is not supported yet

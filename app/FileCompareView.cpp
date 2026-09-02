@@ -397,8 +397,11 @@ FileCompareView::FileCompareView(QWidget *parent)
 		// merge even though the focus stayed on the other pane
 		connect(m_panes[i]->document(), &QTextDocument::undoCommandAdded,
 			this, [this, i]() {
-				m_undoOrder.append(
-					{ i, m_panes[i]->textCursor().blockNumber() });
+				UndoRef ref;
+				ref.side = i;
+				ref.viewLine = m_panes[i]->textCursor().blockNumber();
+				ref.alignment = m_recordingAlignment;
+				m_undoOrder.append(ref);
 				m_redoOrder.clear();
 			});
 	}
@@ -542,6 +545,8 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 	applyHighlights();
 	updateStatus();
 	updateHeaderStyles();
+	// the initial ghost alignment is part of opening, not undoable
+	resetUndoHistory();
 	return true;
 }
 
@@ -585,6 +590,7 @@ void FileCompareView::startBlank()
 	applyHighlights();
 	updateStatus();
 	updateHeaderStyles();
+	resetUndoHistory();
 }
 
 QString FileCompareView::tabTitle() const
@@ -883,8 +889,12 @@ void FileCompareView::rebuildAlignment()
 		const QStringList oldLines = collectRealLines(side, &oldFlags);
 		Q_UNUSED(oldLines);
 		QStringList currentViewLines;
+		QList<bool> rawFlags; // user-data presence, for the undo snapshot
 		for (QTextBlock b = doc->begin(); b.isValid(); b = b.next())
+		{
 			currentViewLines.append(b.text());
+			rawFlags.append(b.userData() != nullptr);
+		}
 
 		const bool changed = currentViewLines != newLines[side]
 			|| oldFlags != newFlags[side];
@@ -894,7 +904,17 @@ void FileCompareView::rebuildAlignment()
 			const int vScroll = m_panes[side]->verticalScrollBar()->value();
 			const int hScroll = m_panes[side]->horizontalScrollBar()->value();
 			m_syncing = true;
-			m_panes[side]->setPlainText(newLines[side].join(QChar('\n')));
+			if (!applyAlignmentEdits(side, currentViewLines, oldFlags,
+				rawFlags, newLines[side], newFlags[side]))
+			{
+				// the real lines diverged from the plan: rebuild the
+				// document (this drops the pane's undo history)
+				m_panes[side]->setPlainText(newLines[side].join(QChar('\n')));
+				m_undoOrder.removeIf(
+					[side](const UndoRef &r) { return r.side == side; });
+				m_redoOrder.removeIf(
+					[side](const UndoRef &r) { return r.side == side; });
+			}
 			int idx = 0;
 			for (QTextBlock b = doc->begin(); b.isValid(); b = b.next(), ++idx)
 				b.setUserData(idx < newFlags[side].size() && newFlags[side].at(idx)
@@ -937,6 +957,172 @@ void FileCompareView::refreshSideMaps(int side)
 	}
 	m_panes[side]->setLineNumbers(m_lineNumbers[side]);
 	m_realLines[side] = collectRealLines(side);
+}
+
+/** Reshape one pane to a new ghost alignment with minimal cursor edits
+    instead of rebuilding the document, so the undo history survives a
+    recompare (the real lines are the same sequence by construction;
+    only the ghost filler moves). The edits form one undoable command
+    tagged as alignment: undo/redo replays it silently around the user's
+    own edits, the QTextDocument equivalent of WinMerge's rescan, whose
+    ghost operations bypass the undo buffer entirely. Returns false when
+    the real lines diverge (the caller falls back to a full rebuild). */
+bool FileCompareView::applyAlignmentEdits(int side,
+	const QStringList &oldLines, const QList<bool> &oldGhosts,
+	const QList<bool> &rawFlags, const QStringList &newLines,
+	const QList<bool> &newGhosts)
+{
+	struct Op
+	{
+		int oldIndex; // first old view line of the run
+		int count;
+		bool insert;  // insert `count` ghosts before oldIndex, or
+		              // delete the ghost run starting at oldIndex
+	};
+	std::vector<Op> ops;
+	const int oldN = oldLines.size();
+	const int newN = newLines.size();
+	int i = 0, j = 0;
+	while (i < oldN || j < newN)
+	{
+		const bool oldGhost = i < oldN && oldGhosts.at(i);
+		const bool newGhost = j < newN && newGhosts.at(j);
+		if (oldGhost && newGhost)
+		{
+			++i;
+			++j;
+		}
+		else if (oldGhost)
+		{
+			if (!ops.empty() && !ops.back().insert
+				&& ops.back().oldIndex + ops.back().count == i)
+				++ops.back().count;
+			else
+				ops.push_back({ i, 1, false });
+			++i;
+		}
+		else if (newGhost)
+		{
+			if (!ops.empty() && ops.back().insert
+				&& ops.back().oldIndex == i)
+				++ops.back().count;
+			else
+				ops.push_back({ i, 1, true });
+			++j;
+		}
+		else if (i < oldN && j < newN && oldLines.at(i) == newLines.at(j))
+		{
+			++i;
+			++j;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	if (ops.empty())
+		return true;
+
+	QTextDocument *doc = m_panes[side]->document();
+	const int refsBefore = m_undoOrder.size();
+	m_recordingAlignment = true;
+	QTextCursor cursor(doc);
+	cursor.beginEditBlock();
+	// backward, so earlier view indices stay valid while editing
+	for (auto it = ops.rbegin(); it != ops.rend(); ++it)
+	{
+		if (it->insert)
+		{
+			if (it->oldIndex >= doc->blockCount())
+				cursor.movePosition(QTextCursor::End);
+			else
+				cursor.setPosition(
+					doc->findBlockByNumber(it->oldIndex).position());
+			cursor.insertText(QString(QChar('\n')).repeated(it->count));
+		}
+		else
+		{
+			const QTextBlock first = doc->findBlockByNumber(it->oldIndex);
+			const QTextBlock last =
+				doc->findBlockByNumber(it->oldIndex + it->count - 1);
+			int from = first.position() - 1;
+			int to = last.position() + last.length() - 1;
+			if (from < 0)
+			{
+				// deleting from the top: take the separator after the
+				// run instead of the one before it
+				from = 0;
+				to = qMin(to + 1, doc->characterCount() - 1);
+			}
+			cursor.setPosition(from);
+			cursor.setPosition(to, QTextCursor::KeepAnchor);
+			cursor.removeSelectedText();
+		}
+	}
+	cursor.endEditBlock();
+	m_recordingAlignment = false;
+	if (m_undoOrder.size() > refsBefore)
+		tagLastCommand(side, true, rawFlags, newGhosts);
+	else
+		// the edits merged into an existing command (defensive: Qt
+		// does not merge across edit blocks today); keep that command
+		// user-visible, it now carries the realignment too
+		tagLastCommand(side, false, QList<bool>(), newGhosts);
+	return true;
+}
+
+/** Reapply ghost markers to a whole pane. Undo/redo restores the text
+    but not the block user data, so programmatic commands carry these
+    snapshots. */
+void FileCompareView::applyGhostFlags(int side, const QList<bool> &flags)
+{
+	int idx = 0;
+	for (QTextBlock b = m_panes[side]->document()->begin(); b.isValid();
+		b = b.next(), ++idx)
+		b.setUserData(idx < flags.size() && flags.at(idx)
+			? new GhostBlockData : nullptr);
+}
+
+/** Attach the flag snapshots (and the alignment marker) to the newest
+    undo command recorded for a side. A joined edit block extends an
+    existing command, so the entry may predate the current splice; only
+    the first snapshot of the before-state is kept. */
+void FileCompareView::tagLastCommand(int side, bool alignment,
+	const QList<bool> &flagsBefore, const QList<bool> &flagsAfter)
+{
+	for (int k = m_undoOrder.size() - 1; k >= 0; --k)
+	{
+		if (m_undoOrder[k].side != side)
+			continue;
+		m_undoOrder[k].alignment = alignment;
+		if (m_undoOrder[k].flagsBefore.isEmpty())
+			m_undoOrder[k].flagsBefore = flagsBefore;
+		m_undoOrder[k].flagsAfter = flagsAfter;
+		return;
+	}
+}
+
+/** Drop all undo state, documents and cross-pane order alike: the panes
+    were rebuilt wholesale and nothing on the stacks matches them. */
+void FileCompareView::resetUndoHistory()
+{
+	m_syncing = true;
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		QTextDocument *doc = m_panes[side]->document();
+		doc->clearUndoRedoStacks();
+		// re-anchor the clean state: clearing rewinds the revision but
+		// leaves the old clean marker behind, and the next edit-block
+		// close (e.g. the highlighter's deferred pass) would otherwise
+		// flag the pristine document as modified. setModified(false)
+		// alone is a no-op on an already-clean document, hence the
+		// round trip.
+		doc->setModified(true);
+		doc->setModified(false);
+	}
+	m_syncing = false;
+	m_undoOrder.clear();
+	m_redoOrder.clear();
 }
 
 /** Intra-line (word-level) diff spans, computed like upstream's
@@ -1347,6 +1533,16 @@ void FileCompareView::selectAllAndCopyForTest(int side)
 	m_panes[side]->copy();
 }
 
+void FileCompareView::typeAtForTest(int side, int viewLine, const QString &text)
+{
+	const QTextBlock block =
+		m_panes[side]->document()->findBlockByNumber(viewLine);
+	if (!block.isValid())
+		return;
+	QTextCursor cursor(block);
+	cursor.insertText(text);
+}
+
 QStringList FileCompareView::paths() const
 {
 	QStringList result;
@@ -1441,6 +1637,10 @@ void FileCompareView::changeSideFile(int side, const QString &path)
 	m_highlighters[side] = std::make_unique<SyntaxHighlighter>(
 		m_panes[side]->document(), path);
 	setSideModified(side, false);
+	// the reload dropped this pane's undo stack (the other panes keep
+	// theirs; the recompare below realigns them undoably)
+	m_undoOrder.removeIf([side](const UndoRef &r) { return r.side == side; });
+	m_redoOrder.removeIf([side](const UndoRef &r) { return r.side == side; });
 
 	QSettings settings;
 	const QString historyKey = QStringLiteral("NewComparison/History");
@@ -1586,6 +1786,22 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide,
 	const QTextBlock lastBlock = tgtDoc->findBlockByNumber(block.viewEnd);
 	if (!firstBlock.isValid() || !lastBlock.isValid())
 		return;
+	// snapshot of the target's ghost markers for undo/redo: Qt restores
+	// the text but not the block user data. A joined step already has a
+	// before-state on its command; reuse its after-state as the base.
+	QList<bool> flagsBase;
+	if (joinUndo)
+	{
+		for (int k = m_undoOrder.size() - 1; k >= 0; --k)
+			if (m_undoOrder[k].side == target)
+			{
+				flagsBase = m_undoOrder[k].flagsAfter;
+				break;
+			}
+	}
+	if (flagsBase.isEmpty())
+		for (QTextBlock b = tgtDoc->begin(); b.isValid(); b = b.next())
+			flagsBase.append(b.userData() != nullptr);
 	m_syncing = true;
 	QTextCursor cursor(tgtDoc);
 	// position before opening the edit block: undo restores the cursor
@@ -1604,6 +1820,11 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide,
 		tgtDoc->findBlockByNumber(v).setUserData(
 			ghost.at(v - block.viewBegin) ? new GhostBlockData : nullptr);
 	m_syncing = false;
+	QList<bool> flagsAfter = flagsBase;
+	for (int v = block.viewBegin; v <= block.viewEnd && v < flagsAfter.size(); ++v)
+		flagsAfter[v] = ghost.at(v - block.viewBegin);
+	tagLastCommand(target, false,
+		joinUndo ? QList<bool>() : flagsBase, flagsAfter);
 
 	const int srcLen = qMax(0, block.end[sourceSide] - block.begin[sourceSide] + 1);
 	const int tgtLen = qMax(0, block.end[target] - block.begin[target] + 1);
@@ -1898,14 +2119,42 @@ void FileCompareView::undoActive()
 	for (int side = 0; side < m_paneCount; ++side)
 		counts[side] = m_panes[side]->document()->blockCount();
 	const int topLine = m_panes[0]->verticalScrollBar()->value();
-	while (!m_undoOrder.isEmpty())
+	bool undidReal = false;
+	bool undidAny = false;
+	UndoRef realRef;
+	while (!m_undoOrder.isEmpty() && !undidReal)
 	{
 		const UndoRef ref = m_undoOrder.takeLast();
 		if (ref.side >= m_paneCount
 			|| !m_panes[ref.side]->document()->isUndoAvailable())
 			continue; // stale entry (e.g. a rebuild cleared that stack)
-		m_panes[ref.side]->undo();
+		if (ref.alignment)
+		{
+			// a recompare's ghost edits: replay them silently and keep
+			// going, the user asked to undo their own edit (WinMerge's
+			// rescan ghosts live outside the undo history)
+			m_syncing = true;
+			m_panes[ref.side]->undo();
+			if (!ref.flagsBefore.isEmpty())
+				applyGhostFlags(ref.side, ref.flagsBefore);
+			if (!m_sides[ref.side].modified)
+				m_panes[ref.side]->document()->setModified(false);
+			m_syncing = false;
+		}
+		else
+		{
+			m_panes[ref.side]->undo();
+			if (!ref.flagsBefore.isEmpty())
+				applyGhostFlags(ref.side, ref.flagsBefore);
+			undidReal = true;
+			realRef = ref;
+		}
+		refreshSideMaps(ref.side);
 		m_redoOrder.append(ref);
+		undidAny = true;
+	}
+	if (undidAny)
+	{
 		refreshAfterUndoRedo(counts);
 		// like WinMerge's OnEditUndo: the viewport stays where it was,
 		// and the difference at the undone spot is selected again so it
@@ -1914,7 +2163,13 @@ void FileCompareView::undoActive()
 		for (int i = 0; i < m_paneCount; ++i)
 			m_panes[i]->verticalScrollBar()->setValue(topLine);
 		m_syncing = false;
-		selectDiffAtViewLine(ref.viewLine);
+		if (undidReal)
+			selectDiffAtViewLine(realRef.viewLine);
+		else
+		{
+			m_diffStale = true;
+			updateStatus();
+		}
 		return;
 	}
 	m_panes[m_activePane]->undo();
@@ -1926,14 +2181,45 @@ void FileCompareView::redoActive()
 	for (int side = 0; side < m_paneCount; ++side)
 		counts[side] = m_panes[side]->document()->blockCount();
 	const int topLine = m_panes[0]->verticalScrollBar()->value();
+	bool redidReal = false;
+	bool redidAny = false;
 	while (!m_redoOrder.isEmpty())
 	{
-		const UndoRef ref = m_redoOrder.takeLast();
+		const UndoRef ref = m_redoOrder.last();
 		if (ref.side >= m_paneCount
 			|| !m_panes[ref.side]->document()->isRedoAvailable())
+		{
+			m_redoOrder.removeLast();
 			continue;
-		m_panes[ref.side]->redo();
+		}
+		// one user edit per redo; the alignment edits that followed it
+		// (a recompare between the edit and now) replay silently after
+		if (redidReal && !ref.alignment)
+			break;
+		m_redoOrder.removeLast();
+		if (ref.alignment)
+		{
+			m_syncing = true;
+			m_panes[ref.side]->redo();
+			if (!ref.flagsAfter.isEmpty())
+				applyGhostFlags(ref.side, ref.flagsAfter);
+			if (!m_sides[ref.side].modified)
+				m_panes[ref.side]->document()->setModified(false);
+			m_syncing = false;
+		}
+		else
+		{
+			m_panes[ref.side]->redo();
+			if (!ref.flagsAfter.isEmpty())
+				applyGhostFlags(ref.side, ref.flagsAfter);
+			redidReal = true;
+		}
+		refreshSideMaps(ref.side);
 		m_undoOrder.append(ref);
+		redidAny = true;
+	}
+	if (redidAny)
+	{
 		refreshAfterUndoRedo(counts);
 		m_syncing = true;
 		for (int i = 0; i < m_paneCount; ++i)

@@ -8,6 +8,7 @@
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QSettings>
+#include <QTemporaryDir>
 #include <QTimer>
 #include <QTranslator>
 #include "FileCompareView.h"
@@ -158,7 +159,105 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestMerge3Opt(QStringLiteral("selftest-merge3"),
 		QStringLiteral("3-way: merge left into middle, then middle into right, and verify (for testing)"));
 	parser.addOption(selftestMerge3Opt);
+	QCommandLineOption selftestUndoRescanOpt(QStringLiteral("selftest-undo-rescan"),
+		QStringLiteral("Edit, recompare (realigning the edited pane), undo and redo (for testing)"));
+	parser.addOption(selftestUndoRescanOpt);
+	QCommandLineOption selftestUndoGhostsOpt(QStringLiteral("selftest-undo-ghosts"),
+		QStringLiteral("Merge over ghost filler, undo and verify no phantom lines (for testing)"));
+	parser.addOption(selftestUndoGhostsOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestUndoRescanOpt))
+	{
+		// the README's old limitation: a recompare that rebuilds the
+		// alignment of the edited pane must not clear its undo history
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString leftPath = dir.filePath(QStringLiteral("left.txt"));
+		const QString rightPath = dir.filePath(QStringLiteral("right.txt"));
+		{
+			QFile f(leftPath);
+			f.open(QIODevice::WriteOnly);
+			f.write("a\np\nq\nb\n");
+		}
+		{
+			QFile f(rightPath);
+			f.open(QIODevice::WriteOnly);
+			f.write("a\nb\n");
+		}
+		FileCompareView view;
+		QString error;
+		if (!view.compare({ leftPath, rightPath }, &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		const QStringList original{ QStringLiteral("a"), QStringLiteral("b") };
+		const QStringList edited{ QStringLiteral("a"), QStringLiteral("p"),
+			QString(), QStringLiteral("b") };
+		bool ok = view.diffCount() == 1
+			&& view.realLinesForTest(1) == original;
+		// type over the first ghost: the pane gains a real line, so the
+		// recompare must delete the leftover ghost from this very pane
+		view.typeAtForTest(1, 1, QStringLiteral("p\n"));
+		view.recompare();
+		ok = ok && view.realLinesForTest(1) == edited;
+		view.undoActive();
+		const bool undone = view.realLinesForTest(1) == original;
+		view.recompare();
+		ok = ok && undone && view.diffCount() == 1;
+		view.redoActive();
+		const bool redone = view.realLinesForTest(1) == edited;
+		view.undoActive();
+		const bool undoneAgain = view.realLinesForTest(1) == original;
+		printf("undone: %d, redone: %d, again: %d, ok: %d\n",
+			undone, redone, undoneAgain, ok);
+		return (ok && redone && undoneAgain) ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestUndoGhostsOpt))
+	{
+		// undoing a merge restores the target's ghost filler as ghosts,
+		// not as phantom real empty lines that would reach the file
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString leftPath = dir.filePath(QStringLiteral("left.txt"));
+		const QString rightPath = dir.filePath(QStringLiteral("right.txt"));
+		{
+			QFile f(leftPath);
+			f.open(QIODevice::WriteOnly);
+			f.write("a\nx\ny\nb\n");
+		}
+		{
+			QFile f(rightPath);
+			f.open(QIODevice::WriteOnly);
+			f.write("a\nb\n");
+		}
+		FileCompareView view;
+		QString error;
+		if (!view.compare({ leftPath, rightPath }, &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		const QStringList original{ QStringLiteral("a"), QStringLiteral("b") };
+		const QStringList merged{ QStringLiteral("a"), QStringLiteral("x"),
+			QStringLiteral("y"), QStringLiteral("b") };
+		view.gotoFirstDiff();
+		view.copyCurrentDiff(0);
+		bool ok = view.diffCount() == 0
+			&& view.realLinesForTest(1) == merged;
+		view.undoActive();
+		const bool undone = view.realLinesForTest(1) == original
+			&& view.diffCount() == 1;
+		view.redoActive();
+		const bool redone = view.realLinesForTest(1) == merged
+			&& view.diffCount() == 0;
+		printf("merged ok: %d, undone: %d, redone: %d\n", ok, undone, redone);
+		return (ok && undone && redone) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestMerge3Opt))
 	{
