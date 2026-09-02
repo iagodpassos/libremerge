@@ -228,6 +228,10 @@ private:
 		// they replay silently around the user's own edits, like
 		// WinMerge's rescan (whose ghost operations bypass undo)
 		bool alignment = false;
+		// a block-copy command: undoing it re-selects the difference,
+		// like WinMerge's OnEditUndo (CE_ACTION_MERGE -> OnCurdiff);
+		// undone typing selects nothing there
+		bool merge = false;
 		// ghost flags of the whole pane before/after a programmatic
 		// command (alignment or merge); undo/redo restores them, since
 		// Qt does not bring block user data back. Empty for user edits.

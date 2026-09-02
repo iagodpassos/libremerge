@@ -1825,6 +1825,12 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide,
 		flagsAfter[v] = ghost.at(v - block.viewBegin);
 	tagLastCommand(target, false,
 		joinUndo ? QList<bool>() : flagsBase, flagsAfter);
+	for (int k = m_undoOrder.size() - 1; k >= 0; --k)
+		if (m_undoOrder[k].side == target)
+		{
+			m_undoOrder[k].merge = true;
+			break;
+		}
 
 	const int srcLen = qMax(0, block.end[sourceSide] - block.begin[sourceSide] + 1);
 	const int tgtLen = qMax(0, block.end[target] - block.begin[target] + 1);
@@ -2163,9 +2169,9 @@ void FileCompareView::undoActive()
 		for (int i = 0; i < m_paneCount; ++i)
 			m_panes[i]->verticalScrollBar()->setValue(topLine);
 		m_syncing = false;
-		if (undidReal)
+		if (undidReal && realRef.merge)
 			selectDiffAtViewLine(realRef.viewLine);
-		else
+		else if (!undidReal)
 		{
 			m_diffStale = true;
 			updateStatus();
