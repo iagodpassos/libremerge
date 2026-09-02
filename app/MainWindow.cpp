@@ -24,6 +24,7 @@
 #include <QMessageBox>
 #include "Dialogs.h"
 #include <QPushButton>
+#include <QPointer>
 #include <QTabWidget>
 #include <QTimer>
 
@@ -811,22 +812,27 @@ void MainWindow::openSelector(const QStringList &paths)
 
 	auto *selector = new NewComparisonView(this);
 	selector->addPaths(paths);
+	const auto closeSelectorLater = [this, guard = QPointer(selector)]() {
+		QTimer::singleShot(0, this, [this, guard]() {
+			const int index = guard ? m_tabs->indexOf(guard) : -1;
+			if (index >= 0 && m_tabs->count() > 1)
+				closeTab(index);
+		});
+	};
+	// closing the selector tab is deferred one event-loop cycle: these
+	// signals come from deep inside the selector's own child widgets
+	// (Enter in a path field, a button click), and closeTab deletes the
+	// page while that code is still on the stack
 	connect(selector, &NewComparisonView::compareRequested, this,
-		[this, selector](const QStringList &selected, const QList<bool> &readOnly,
+		[this, closeSelectorLater](const QStringList &selected, const QList<bool> &readOnly,
 			bool folders) {
 			if (folders)
 				openFolderComparison(selected.at(0), selected.at(1));
 			else
 				openFileComparison(selected, readOnly);
-			const int index = m_tabs->indexOf(selector);
-			if (index >= 0 && m_tabs->count() > 1)
-				closeTab(index);
+			closeSelectorLater();
 		});
-	connect(selector, &NewComparisonView::cancelled, this, [this, selector]() {
-		const int index = m_tabs->indexOf(selector);
-		if (index >= 0)
-			closeTab(index);
-	});
+	connect(selector, &NewComparisonView::cancelled, this, closeSelectorLater);
 	const int index = m_tabs->addTab(selector, tr("Select Files or Folders"));
 	m_tabs->setCurrentIndex(index);
 }

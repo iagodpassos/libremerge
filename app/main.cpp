@@ -7,6 +7,8 @@
 #include <QFileInfo>
 #include <QLibraryInfo>
 #include <QLocale>
+#include <QKeyEvent>
+#include <QLineEdit>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -17,6 +19,7 @@
 #include "FileOps.h"
 #include "FolderCompareDriver.h"
 #include "MainWindow.h"
+#include "NewComparisonView.h"
 #include "EngineOptions.h"
 #include "OptionsDialog.h"
 #ifdef Q_OS_MACOS
@@ -165,7 +168,52 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestUndoGhostsOpt(QStringLiteral("selftest-undo-ghosts"),
 		QStringLiteral("Merge over ghost filler, undo and verify no phantom lines (for testing)"));
 	parser.addOption(selftestUndoGhostsOpt);
+	QCommandLineOption selftestOpenEnterOpt(QStringLiteral("selftest-open-enter"),
+		QStringLiteral("Press Enter in the selector's path field and verify the comparison opens (for testing)"));
+	parser.addOption(selftestOpenEnterOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestOpenEnterOpt))
+	{
+		// regression: Enter in a path field triggers Compare, whose
+		// handler used to delete the selector page while its line
+		// edit's key handling was still on the stack (crashed)
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString leftPath = dir.filePath(QStringLiteral("left.txt"));
+		const QString rightPath = dir.filePath(QStringLiteral("right.txt"));
+		{
+			QFile f(leftPath);
+			f.open(QIODevice::WriteOnly);
+			f.write("a\nb\n");
+		}
+		{
+			QFile f(rightPath);
+			f.open(QIODevice::WriteOnly);
+			f.write("a\nc\n");
+		}
+		MainWindow window;
+		window.openSelector({ leftPath, rightPath });
+		auto *selector = window.findChild<NewComparisonView *>();
+		auto *pathEdit = selector != nullptr
+			? selector->findChild<QLineEdit *>() : nullptr;
+		if (pathEdit == nullptr)
+			return 2;
+		QKeyEvent press(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+		QCoreApplication::sendEvent(pathEdit, &press);
+		QKeyEvent release(QEvent::KeyRelease, Qt::Key_Return, Qt::NoModifier);
+		QCoreApplication::sendEvent(pathEdit, &release);
+		QCoreApplication::processEvents();
+		QCoreApplication::processEvents();
+		const bool selectorClosed =
+			window.findChild<NewComparisonView *>() == nullptr;
+		const bool comparisonOpen =
+			window.findChild<FileCompareView *>() != nullptr;
+		printf("selector closed: %d, comparison open: %d\n",
+			selectorClosed, comparisonOpen);
+		return (selectorClosed && comparisonOpen) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestUndoRescanOpt))
 	{

@@ -51,6 +51,7 @@ for t in selftest-merge selftest-save selftest-undo selftest-undo-scroll \
 done
 run_one selftest-undo-rescan
 run_one selftest-undo-ghosts
+run_one selftest-open-enter
 run_one selftest-table "$TMP/left.csv" "$TMP/right.csv"
 run_one selftest-image "$TMP/left.png" "$TMP/right.png"
 run_one selftest-merge3 "$TMP/w3a.txt" "$TMP/w3b.txt" "$TMP/w3c.txt"
