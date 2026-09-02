@@ -81,6 +81,13 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 		// drops off the event reaches our dropEvent, which resolves the
 		// local path and targets the slot under the cursor
 		m_slots[i].path->lineEdit()->setAcceptDrops(false);
+		// Enter in a path field starts the comparison, like WinMerge's
+		// open screen (Enter fires IDOK/OnOK there). The button's
+		// default flag alone only works inside a QDialog, and this page
+		// lives in a tab. With the dropdown open, Enter still just
+		// picks the highlighted item.
+		connect(m_slots[i].path->lineEdit(), &QLineEdit::returnPressed,
+			this, &NewComparisonView::compare);
 		layout->addWidget(m_slots[i].path);
 
 		auto *row = new QGridLayout;
