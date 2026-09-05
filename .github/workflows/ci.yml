@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: brew install ninja qt poco boost icu4c googletest re2c lemon
+        run: brew install ninja qt poco boost icu4c googletest re2c lemon libarchive
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
       - name: Build
@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build libpoco-dev libboost-dev \
-            libicu-dev re2c lemon qt6-base-dev libgl1-mesa-dev
+            libicu-dev re2c lemon qt6-base-dev libgl1-mesa-dev libarchive-dev
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
       - name: Build

@@ -23,6 +23,10 @@ public:
 	/** Empty, editable comparison (WinMerge's File > New). */
 	void openBlankComparison();
 	void openFolderComparison(const QString &leftDir, const QString &rightDir);
+	/** Extract two archives to temp folders and open them as a folder
+	    comparison (WinMerge's DecompressArchive flow). */
+	void openArchiveComparison(const QString &leftArchive,
+		const QString &rightArchive);
 
 	/** Open (or focus) the "Select Files or Folders" page, optionally
 	    pre-filling dropped/opened paths. */

@@ -25,7 +25,9 @@
 #include "Dialogs.h"
 #include <QPushButton>
 #include <QPointer>
+#include <QProgressDialog>
 #include <QTabWidget>
+#include <QTemporaryDir>
 #include <QTimer>
 
 #include "FileCompareView.h"
@@ -34,6 +36,7 @@
 #include "ImageFormats.h"
 #include "OptionsDialog.h"
 #include "Theme.h"
+#include "ArchiveCompare.h"
 #include "FolderCompareView.h"
 #include "NewComparisonView.h"
 
@@ -497,6 +500,15 @@ void MainWindow::openFileComparison(const QString &leftPath, const QString &righ
 void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> &readOnly,
 	bool forceText)
 {
+	// a pair of archives extracts to temp folders and opens as a folder
+	// comparison, like WinMerge's DecompressArchive
+	if (!forceText && paths.size() == 2
+		&& lm::isArchivePath(paths.at(0)) && lm::isArchivePath(paths.at(1)))
+	{
+		openArchiveComparison(paths.at(0), paths.at(1));
+		return;
+	}
+
 	// image pairs/triples open as an image comparison (WinMerge's image
 	// file patterns decide, checked before the table patterns like
 	// upstream; 3-way image compare is supported)
@@ -680,6 +692,64 @@ void MainWindow::openFolderComparison(const QString &leftDir, const QString &rig
 	m_tabs->setCurrentIndex(index);
 	rememberComparison({ leftDir, rightDir });
 	view->start(leftDir, rightDir);
+}
+
+void MainWindow::openArchiveComparison(const QString &leftArchive,
+	const QString &rightArchive)
+{
+	QProgressDialog progress(QString(), tr("Cancel"), 0, 0, this);
+	progress.setWindowModality(Qt::WindowModal);
+	progress.setMinimumDuration(300);
+
+	std::vector<std::unique_ptr<QTemporaryDir>> temps;
+	QString roots[2];
+	const QString archives[2] = { leftArchive, rightArchive };
+	for (int side = 0; side < 2; ++side)
+	{
+		progress.setLabelText(tr("Extracting %1\xE2\x80\xA6")
+			.arg(QFileInfo(archives[side]).fileName()));
+		auto dir = std::make_unique<QTemporaryDir>(
+			QDir::tempPath() + QStringLiteral("/libremerge-archive-XXXXXX"));
+		if (!dir->isValid())
+		{
+			lm::warning(this, tr("LibreMerge"),
+				tr("Could not create a temporary folder for extraction."));
+			return;
+		}
+		QString error;
+		bool cancelled = false;
+		const bool ok = lm::extractArchive(archives[side], dir->path(), &error,
+			[&progress, &cancelled](const QString &) {
+				QCoreApplication::processEvents();
+				cancelled = progress.wasCanceled();
+				return !cancelled;
+			});
+		if (!ok)
+		{
+			if (!cancelled)
+				lm::warning(this, tr("LibreMerge"),
+					tr("Could not read the archive:\n%1\n\n%2")
+						.arg(archives[side], error));
+			return; // the temp dirs clean themselves up
+		}
+		roots[side] = dir->path();
+		temps.push_back(std::move(dir));
+	}
+	progress.close();
+
+	auto *view = new FolderCompareView(this);
+	connect(view, &FolderCompareView::openFileComparisonRequested, this,
+		qOverload<const QString &, const QString &>(&MainWindow::openFileComparison));
+	view->adoptTempDirs(std::move(temps));
+	// the tab carries the archives' names, not the temp paths, like
+	// WinMerge's display roots
+	const QString title = displayName(leftArchive)
+		+ QString::fromUtf8(" \xE2\x86\x94 ") + displayName(rightArchive);
+	const int index = m_tabs->addTab(view, title);
+	m_tabs->setTabToolTip(index, leftArchive + QStringLiteral("\n") + rightArchive);
+	m_tabs->setCurrentIndex(index);
+	rememberComparison({ leftArchive, rightArchive });
+	view->start(roots[0], roots[1]);
 }
 
 void MainWindow::showOptions()

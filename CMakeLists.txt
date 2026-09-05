@@ -25,6 +25,10 @@ find_package(ICU REQUIRED COMPONENTS uc i18n)
 if(APPLE AND EXISTS /opt/homebrew/opt/qt)
   list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/qt)
 endif()
+if(APPLE AND EXISTS /opt/homebrew/opt/libarchive)
+  # keg-only in Homebrew: it never lands in the default prefix
+  list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/libarchive)
+endif()
 
 if(UNIX AND NOT APPLE)
   # `cpack -G DEB` in the build dir produces the .deb; runtime

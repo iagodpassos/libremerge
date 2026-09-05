@@ -1,4 +1,5 @@
 find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent)
+find_package(LibArchive REQUIRED)
 
 qt_standard_project_setup()
 
@@ -25,6 +26,7 @@ qt_add_executable(LibreMerge
   Theme.cpp
   FolderCompareView.cpp
   FolderCompareDriver.cpp
+  ArchiveCompare.cpp
   FileOps.cpp
   EngineOptions.cpp
 )
@@ -64,6 +66,7 @@ set_target_properties(LibreMerge PROPERTIES
 target_link_libraries(LibreMerge PRIVATE
   Qt6::Widgets
   Qt6::Concurrent
+  LibArchive::LibArchive
   libremerge-engine
   libremerge-imgmerge
 )

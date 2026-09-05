@@ -2,8 +2,10 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 #include <QFutureWatcher>
 #include <QHash>
+#include <QTemporaryDir>
 #include <QWidget>
 #include "FolderCompareDriver.h"
 
@@ -35,6 +37,13 @@ public:
 	/** Start the comparison asynchronously. */
 	void start(const QString &leftDir, const QString &rightDir);
 
+	/** Keep extracted-archive temp trees alive for this view's
+	    lifetime (WinMerge's CTempPathContext). */
+	void adoptTempDirs(std::vector<std::unique_ptr<QTemporaryDir>> dirs)
+	{
+		m_tempDirs = std::move(dirs);
+	}
+
 public slots:
 	void recompare();
 
@@ -60,6 +69,7 @@ private:
 	QString intendedSidePath(QTreeWidgetItem *row, int side) const;
 
 	QString m_roots[2];
+	std::vector<std::unique_ptr<QTemporaryDir>> m_tempDirs;
 	lm::FolderCompareResult m_result;
 	QLineEdit *m_filterEdit;
 	QTreeWidget *m_tree;

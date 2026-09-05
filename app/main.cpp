@@ -18,6 +18,10 @@
 #include "ImageCompareView.h"
 #include "FileOps.h"
 #include "FolderCompareDriver.h"
+#include <archive.h>
+#include <archive_entry.h>
+#include <QDir>
+#include "ArchiveCompare.h"
 #include "MainWindow.h"
 #include "NewComparisonView.h"
 #include "EngineOptions.h"
@@ -171,7 +175,87 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestOpenEnterOpt(QStringLiteral("selftest-open-enter"),
 		QStringLiteral("Press Enter in the selector's path field and verify the comparison opens (for testing)"));
 	parser.addOption(selftestOpenEnterOpt);
+	QCommandLineOption selftestArchiveOpt(QStringLiteral("selftest-archive"),
+		QStringLiteral("Build a zip and a tar.gz, extract both and folder-compare them (for testing)"));
+	parser.addOption(selftestArchiveOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestArchiveOpt))
+	{
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		// two small archives with one differing file, one identical
+		// file and one side-only file each; zip on one side, tar.gz on
+		// the other so both the format and the filter paths run
+		struct Entry { const char *name; const char *content; };
+		const auto writeArchive = [](const QString &path, bool tarGz,
+			std::initializer_list<Entry> entries) {
+			struct archive *a = archive_write_new();
+			if (tarGz)
+			{
+				archive_write_set_format_pax_restricted(a);
+				archive_write_add_filter_gzip(a);
+			}
+			else
+				archive_write_set_format_zip(a);
+			bool ok = archive_write_open_filename(a,
+				QFile::encodeName(path).constData()) == ARCHIVE_OK;
+			for (const Entry &e : entries)
+			{
+				if (!ok)
+					break;
+				struct archive_entry *entry = archive_entry_new();
+				archive_entry_set_pathname(entry, e.name);
+				archive_entry_set_size(entry,
+					static_cast<la_int64_t>(strlen(e.content)));
+				archive_entry_set_filetype(entry, AE_IFREG);
+				archive_entry_set_perm(entry, 0644);
+				ok = archive_write_header(a, entry) == ARCHIVE_OK
+					&& archive_write_data(a, e.content,
+						strlen(e.content)) >= 0;
+				archive_entry_free(entry);
+			}
+			ok = archive_write_close(a) == ARCHIVE_OK && ok;
+			archive_write_free(a);
+			return ok;
+		};
+		const QString zipPath = dir.filePath(QStringLiteral("left.zip"));
+		const QString tgzPath = dir.filePath(QStringLiteral("right.tar.gz"));
+		if (!writeArchive(zipPath, false,
+				{ { "a.txt", "hello\n" }, { "sub/same.txt", "same\n" },
+				  { "left-only.txt", "extra\n" } })
+			|| !writeArchive(tgzPath, true,
+				{ { "a.txt", "world\n" }, { "sub/same.txt", "same\n" },
+				  { "right-only.txt", "extra\n" } }))
+		{
+			fprintf(stderr, "building the fixtures failed\n");
+			return 2;
+		}
+		if (!lm::isArchivePath(zipPath) || !lm::isArchivePath(tgzPath)
+			|| lm::isArchivePath(QStringLiteral("a.txt")))
+		{
+			fprintf(stderr, "isArchivePath misdetects\n");
+			return 1;
+		}
+		const QString leftDir = dir.filePath(QStringLiteral("L"));
+		const QString rightDir = dir.filePath(QStringLiteral("R"));
+		QDir().mkpath(leftDir);
+		QDir().mkpath(rightDir);
+		QString error;
+		if (!lm::extractArchive(zipPath, leftDir, &error)
+			|| !lm::extractArchive(tgzPath, rightDir, &error))
+		{
+			fprintf(stderr, "extract failed: %s\n", qPrintable(error));
+			return 1;
+		}
+		const lm::FolderCompareResult result =
+			lm::compareFolders(leftDir, rightDir, true);
+		printf("different: %d, identical: %d, unique: %d\n",
+			result.different, result.identical, result.unique);
+		return (result.different == 1 && result.identical == 2
+			&& result.unique == 2) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestOpenEnterOpt))
 	{
