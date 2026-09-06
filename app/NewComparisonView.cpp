@@ -130,9 +130,15 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	for (const Qt::Key key : { Qt::Key_Return, Qt::Key_Enter })
 	{
 		auto *shortcut = new QShortcut(QKeySequence(key), this);
-		shortcut->setContext(Qt::WidgetWithChildrenShortcut);
-		connect(shortcut, &QShortcut::activated,
-			this, &NewComparisonView::compare);
+		// window scope, not widget scope: after a drag and drop the
+		// focus may sit outside this page (the tab bar), where a
+		// child-scoped shortcut never fires. The visibility guard
+		// keeps Enter working normally on the other tabs.
+		shortcut->setContext(Qt::WindowShortcut);
+		connect(shortcut, &QShortcut::activated, this, [this]() {
+			if (isVisible())
+				compare();
+		});
 	}
 	buttons->addWidget(compareButton, 0, 1);
 	auto *cancelButton = new QPushButton(tr("Cancel"), content);
@@ -150,6 +156,11 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	m_hint->setContentsMargins(8, 4, 8, 4);
 	outer->addWidget(m_hint);
 	setHint(tr("Select two (or three) folders/files to compare."), false);
+}
+
+void NewComparisonView::focusFirstField()
+{
+	m_slots[0].path->setFocus();
 }
 
 void NewComparisonView::addPaths(const QStringList &paths)

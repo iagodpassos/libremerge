@@ -922,6 +922,7 @@ void MainWindow::openSelector(const QStringList &paths)
 	connect(selector, &NewComparisonView::cancelled, this, closeSelectorLater);
 	const int index = m_tabs->addTab(selector, tr("Select Files or Folders"));
 	m_tabs->setCurrentIndex(index);
+	selector->focusFirstField();
 }
 
 void MainWindow::gotoFirstDifference()

@@ -22,6 +22,9 @@ public:
 	/** Fill the first empty slots with the given paths. */
 	void addPaths(const QStringList &paths);
 
+	/** Put the keyboard focus on the first path field. */
+	void focusFirstField();
+
 signals:
 	void compareRequested(const QStringList &paths, const QList<bool> &readOnly,
 		bool folders);
