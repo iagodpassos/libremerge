@@ -1441,6 +1441,14 @@ void FileCompareView::updatePaneStatus(int side)
 		.arg(realLine).arg(col).arg(maxCol));
 }
 
+void FileCompareView::setSideCaption(int side, const QString &caption)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	m_sides[side].caption = caption;
+	updateHeader(side);
+}
+
 void FileCompareView::updateHeader(int side)
 {
 	const Side &s = m_sides[side];

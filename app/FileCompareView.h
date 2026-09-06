@@ -120,6 +120,10 @@ public:
 	void findNext(bool backward);
 	void recompare();
 	bool saveModified(QString *error);
+	/** Header text override for one pane, like WinMerge's display root
+	    for files opened out of an archive (the real path stays in use
+	    for loading and saving). */
+	void setSideCaption(int side, const QString &caption);
 
 signals:
 	void modifiedChanged(bool modified);

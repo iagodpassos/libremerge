@@ -739,7 +739,24 @@ void MainWindow::openArchiveComparison(const QString &leftArchive,
 
 	auto *view = new FolderCompareView(this);
 	connect(view, &FolderCompareView::openFileComparisonRequested, this,
-		qOverload<const QString &, const QString &>(&MainWindow::openFileComparison));
+		[this, leftArchive, rightArchive,
+			leftRoot = roots[0], rightRoot = roots[1]]
+		(const QString &l, const QString &r) {
+			openFileComparison(l, r);
+			// pane headers show the path inside the archive, WinMerge's
+			// display roots, instead of the extraction temp path
+			auto *fc = qobject_cast<FileCompareView *>(m_tabs->currentWidget());
+			if (fc == nullptr)
+				return;
+			const auto pretty = [](const QString &archive,
+				const QString &root, const QString &path) {
+				return QFileInfo(archive).fileName() + path.mid(root.length());
+			};
+			if (l.startsWith(leftRoot))
+				fc->setSideCaption(0, pretty(leftArchive, leftRoot, l));
+			if (r.startsWith(rightRoot))
+				fc->setSideCaption(1, pretty(rightArchive, rightRoot, r));
+		});
 	view->adoptTempDirs(std::move(temps));
 	// the tab carries the archives' names, not the temp paths, like
 	// WinMerge's display roots
