@@ -79,15 +79,9 @@ ctest --test-dir build        # engine test suite (369 tests)
 chmod +x LibreMerge-<version>-x86_64.AppImage && ./LibreMerge-<version>-x86_64.AppImage
 ```
 
-**Debian 13** (amd64): a native `.deb` for apt integration — dependencies resolve from the official repositories:
-
-```sh
-sudo apt install ./libremerge_<version>_amd64_debian13.deb
-```
-
 **Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` in this repository builds and installs cleanly with `makepkg -si`.
 
-Other formats (Ubuntu-specific builds, Flatpak) are planned — open an issue if you need one and it moves up the list.
+Other formats (native .deb packages, Flatpak) come back if there is demand — open an issue if you need one and it moves up the list.
 
 ## Use with git
 

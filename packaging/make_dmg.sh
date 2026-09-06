@@ -11,14 +11,15 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="0.9.2"
+VERSION="0.9.3"
 DMG="$ROOT/LibreMerge-$VERSION.dmg"
 
 # Universal (arm64 + x86_64, macOS 12+) toolchain: official Qt + ICU/Poco
 # built by packaging/build_deps.sh. Falls back to the Homebrew toolchain
 # (arm64-only, host-OS floor) when deps/ is absent.
 QT_DEPS="$ROOT/deps/qt/6.8.3/macos"
-if [ -d "$QT_DEPS" ] && [ -d "$ROOT/deps/icu" ] && [ -d "$ROOT/deps/poco" ]; then
+if [ -d "$QT_DEPS" ] && [ -d "$ROOT/deps/icu" ] && [ -d "$ROOT/deps/poco" ] \
+    && [ -d "$ROOT/deps/libarchive" ]; then
   echo "==> Release build (universal, macOS 12+)"
   BUILD="$ROOT/build-universal"
   QT_BIN="$QT_DEPS/bin"
@@ -26,7 +27,7 @@ if [ -d "$QT_DEPS" ] && [ -d "$ROOT/deps/icu" ] && [ -d "$ROOT/deps/poco" ]; the
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
-    -DCMAKE_PREFIX_PATH="$QT_DEPS;$ROOT/deps/icu;$ROOT/deps/poco" \
+    -DCMAKE_PREFIX_PATH="$QT_DEPS;$ROOT/deps/icu;$ROOT/deps/poco;$ROOT/deps/libarchive" \
     -DCMAKE_DISABLE_FIND_PACKAGE_GTest=ON > /dev/null
 else
   echo "==> Release build (Homebrew toolchain, arm64-only)"
