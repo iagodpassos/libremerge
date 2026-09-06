@@ -11,6 +11,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QShortcut>
 #include <QMimeData>
 #include <QPushButton>
 #include <QSettings>
@@ -119,6 +120,20 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	auto *compareButton = new QPushButton(tr("Compare"), content);
 	compareButton->setDefault(true);
 	connect(compareButton, &QPushButton::clicked, this, &NewComparisonView::compare);
+	// Enter anywhere on the page starts the comparison, the IDOK
+	// semantics of WinMerge's open dialog. The returnPressed hookup on
+	// the path fields alone was not enough: with the focus elsewhere
+	// (or older Qt routing the key into the history completer) the
+	// press never reached them. No button here has autoDefault (the
+	// page is not a QDialog), so the key is free; an open dropdown or
+	// completer popup still grabs it first to pick the highlighted item.
+	for (const Qt::Key key : { Qt::Key_Return, Qt::Key_Enter })
+	{
+		auto *shortcut = new QShortcut(QKeySequence(key), this);
+		shortcut->setContext(Qt::WidgetWithChildrenShortcut);
+		connect(shortcut, &QShortcut::activated,
+			this, &NewComparisonView::compare);
+	}
 	buttons->addWidget(compareButton, 0, 1);
 	auto *cancelButton = new QPushButton(tr("Cancel"), content);
 	connect(cancelButton, &QPushButton::clicked, this, &NewComparisonView::cancelled);
