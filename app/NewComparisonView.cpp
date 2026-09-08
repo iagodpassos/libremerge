@@ -300,13 +300,6 @@ void NewComparisonView::compare()
 			"select two files, three files or two folders."), true);
 		return;
 	}
-	if (folders && paths.size() == 3)
-	{
-		setHint(tr("3-way folder comparison is not available yet \xE2\x80\x94 "
-			"select two folders."), true);
-		return;
-	}
-
 	rememberPaths(paths);
 	emit compareRequested(paths, readOnly, folders);
 }

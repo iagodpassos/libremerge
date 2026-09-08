@@ -323,6 +323,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Tamanho direito</translation>
     </message>
     <message>
+        <source>Middle size</source>
+        <translation>Tamanho do meio</translation>
+    </message>
+    <message>
         <source>Left date</source>
         <translation>Data esquerda</translation>
     </message>
@@ -337,6 +341,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>Cancelling…</source>
         <translation>Cancelando…</translation>
+    </message>
+    <message>
+        <source>Middle date</source>
+        <translation>Data do meio</translation>
     </message>
     <message>
         <source>Scanning…</source>
@@ -1082,7 +1090,7 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     </message>
     <message>
         <source>3-way folder comparison is not available yet — select two folders.</source>
-        <translation>A comparação de pastas em 3 vias ainda não está disponível — selecione duas pastas.</translation>
+        <translation type="vanished">A comparação de pastas em 3 vias ainda não está disponível — selecione duas pastas.</translation>
     </message>
 </context>
 <context>
@@ -1215,8 +1223,24 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Somente à esquerda</translation>
     </message>
     <message>
+        <source>Middle only</source>
+        <translation>Somente no meio</translation>
+    </message>
+    <message>
         <source>Right only</source>
         <translation>Somente à direita</translation>
+    </message>
+    <message>
+        <source>Does not exist on the left</source>
+        <translation>Não existe ã esquerda</translation>
+    </message>
+    <message>
+        <source>Does not exist in the middle</source>
+        <translation>Não existe no meio</translation>
+    </message>
+    <message>
+        <source>Does not exist on the right</source>
+        <translation>Não existe ã direita</translation>
     </message>
     <message>
         <source>Skipped</source>
@@ -1225,6 +1249,18 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>Error</source>
         <translation>Erro</translation>
+    </message>
+    <message>
+        <source> (middle and right are identical)</source>
+        <translation> (meio e direita são idênticos)</translation>
+    </message>
+    <message>
+        <source> (left and right are identical)</source>
+        <translation> (esquerda e direita são idênticas)</translation>
+    </message>
+    <message>
+        <source> (left and middle are identical)</source>
+        <translation> (esquerda e meio são idênticos)</translation>
     </message>
     <message>
         <source>Folder: %1</source>

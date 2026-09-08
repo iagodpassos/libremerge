@@ -36,7 +36,9 @@ QString sideString(const String &s)
 	return QString::fromUtf8(s.data(), static_cast<int>(s.size()));
 }
 
-FolderCompareItem::Category classify(const DIFFITEM &di)
+/** WinMerge's ColStatusGet decision ladder; the order matters (skipped
+    before unique, unique before the missing-on-one-side cases). */
+FolderCompareItem::Category classify(const DIFFITEM &di, int sides)
 {
 	if (di.diffcode.isResultError())
 		return FolderCompareItem::Error;
@@ -45,10 +47,32 @@ FolderCompareItem::Category classify(const DIFFITEM &di)
 	if (di.diffcode.isSideFirstOnly())
 		return FolderCompareItem::LeftOnly;
 	if (di.diffcode.isSideSecondOnly())
+		return sides < 3 ? FolderCompareItem::RightOnly
+		                 : FolderCompareItem::MiddleOnly;
+	if (di.diffcode.isSideThirdOnly())
 		return FolderCompareItem::RightOnly;
+	if (sides > 2 && !di.diffcode.existsFirst())
+		return FolderCompareItem::MissingLeft;
+	if (sides > 2 && !di.diffcode.existsSecond())
+		return FolderCompareItem::MissingMiddle;
+	if (sides > 2 && !di.diffcode.existsThird())
+		return FolderCompareItem::MissingRight;
 	if (di.diffcode.isResultSame())
 		return FolderCompareItem::Identical;
 	return FolderCompareItem::Different;
+}
+
+/** Which pair stayed identical (the 3-way suffix of WinMerge's Result
+    column). */
+FolderCompareItem::ThreeWayInfo threeWayInfo(const DIFFITEM &di)
+{
+	switch (di.diffcode.diffcode & DIFFCODE::COMPAREFLAGS3WAY)
+	{
+	case DIFFCODE::DIFF1STONLY: return FolderCompareItem::MiddleRightIdentical;
+	case DIFFCODE::DIFF2NDONLY: return FolderCompareItem::LeftRightIdentical;
+	case DIFFCODE::DIFF3RDONLY: return FolderCompareItem::LeftMiddleIdentical;
+	}
+	return FolderCompareItem::NoInfo;
 }
 
 class JobAbortable : public IAbortable
@@ -65,8 +89,8 @@ private:
 
 } // namespace
 
-FolderCompareJob::FolderCompareJob()
-	: m_stats(new CompareStats(2))
+FolderCompareJob::FolderCompareJob(int sides)
+	: m_stats(new CompareStats(sides))
 {
 	m_stats->SetCompareThreadCount(1);
 }
@@ -87,12 +111,25 @@ FolderCompareResult compareFolders(const QString &leftDir, const QString &rightD
 	bool recursive, const std::shared_ptr<FolderCompareJob> &jobIn,
 	const QString &filterMask)
 {
+	return compareFolders(QStringList{ leftDir, rightDir }, recursive,
+		jobIn, filterMask);
+}
+
+FolderCompareResult compareFolders(const QStringList &dirs,
+	bool recursive, const std::shared_ptr<FolderCompareJob> &jobIn,
+	const QString &filterMask)
+{
+	const int sides = dirs.size();
 	FolderCompareResult result;
+	result.sides = sides;
 	std::shared_ptr<FolderCompareJob> job = jobIn;
 	if (!job)
-		job = std::make_shared<FolderCompareJob>();
+		job = std::make_shared<FolderCompareJob>(sides);
 
-	PathContext paths(leftDir.toStdString(), rightDir.toStdString());
+	PathContext paths;
+	paths.SetSize(sides);
+	for (int i = 0; i < sides; ++i)
+		paths.SetPath(i, dirs.at(i).toStdString(), false);
 	CDiffContext ctxt(paths, CMP_CONTENT);
 
 	ctxt.m_pCompareStats = job->stats();
@@ -155,22 +192,26 @@ FolderCompareResult compareFolders(const QString &leftDir, const QString &rightD
 		const DIFFITEM &di = ctxt.GetNextDiffPosition(pos);
 
 		FolderCompareItem item;
-		const int side = di.diffcode.exists(0) ? 0 : 1;
+		int side = 0;
+		while (side < sides - 1 && !di.diffcode.exists(side))
+			++side;
 		item.name = sideString(di.diffFileInfo[side].filename.get());
 		item.folder = sideString(di.diffFileInfo[side].path.get());
 		item.isDir = di.diffcode.isDirectory();
-		item.category = classify(di);
+		item.category = classify(di, sides);
+		if (sides > 2 && (item.category == FolderCompareItem::Different
+			|| item.category == FolderCompareItem::MissingLeft
+			|| item.category == FolderCompareItem::MissingMiddle
+			|| item.category == FolderCompareItem::MissingRight))
+			item.threeWay = threeWayInfo(di);
 
 		PathContext files;
 		ctxt.GetComparePaths(di, files);
-		if (di.diffcode.exists(0))
-			item.leftPath = sideString(files[0]);
-		if (di.diffcode.exists(1))
-			item.rightPath = sideString(files[1]);
-		for (int i = 0; i < 2; ++i)
+		for (int i = 0; i < sides; ++i)
 		{
 			if (!di.diffcode.exists(i))
 				continue;
+			item.path[i] = sideString(files[i]);
 			item.size[i] = di.diffFileInfo[i].size == DirItem::FILE_SIZE_NONE
 				? -1 : static_cast<qint64>(di.diffFileInfo[i].size);
 			item.mtime[i] = QDateTime::fromSecsSinceEpoch(
@@ -180,8 +221,12 @@ FolderCompareResult compareFolders(const QString &leftDir, const QString &rightD
 		switch (item.category)
 		{
 		case FolderCompareItem::Identical: ++result.identical; break;
-		case FolderCompareItem::Different: ++result.different; break;
+		case FolderCompareItem::Different:
+		case FolderCompareItem::MissingLeft:
+		case FolderCompareItem::MissingMiddle:
+		case FolderCompareItem::MissingRight: ++result.different; break;
 		case FolderCompareItem::LeftOnly:
+		case FolderCompareItem::MiddleOnly:
 		case FolderCompareItem::RightOnly: ++result.unique; break;
 		default: break;
 		}

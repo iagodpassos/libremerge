@@ -23,6 +23,8 @@ public:
 	/** Empty, editable comparison (WinMerge's File > New). */
 	void openBlankComparison();
 	void openFolderComparison(const QString &leftDir, const QString &rightDir);
+	/** Two or three folders (WinMerge's 3-way folder compare). */
+	void openFolderComparison(const QStringList &dirs);
 	/** Extract two archives to temp folders and open them as a folder
 	    comparison (WinMerge's DecompressArchive flow). */
 	void openArchiveComparison(const QString &leftArchive,
@@ -34,6 +36,9 @@ public:
 
 	/** Route paths dropped on the window or opened via Finder/Dock. */
 	void handleIncomingPaths(const QStringList &paths);
+	/** Close the untouched blank comparison the startup opened, when a
+	    comparison arriving from outside made it redundant. */
+	void closeStartupPlaceholder();
 
 	/** Jump to the first difference of the current file comparison
 	    (used by tests; same as pressing Next after opening). */

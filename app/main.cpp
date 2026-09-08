@@ -178,7 +178,120 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestArchiveOpt(QStringLiteral("selftest-archive"),
 		QStringLiteral("Build a zip and a tar.gz, extract both and folder-compare them (for testing)"));
 	parser.addOption(selftestArchiveOpt);
+	QCommandLineOption selftestFolder3Opt(QStringLiteral("selftest-folder3"),
+		QStringLiteral("Build three folder trees and verify the 3-way comparison (for testing)"));
+	parser.addOption(selftestFolder3Opt);
+	QCommandLineOption selftestServiceOpt(QStringLiteral("selftest-service"),
+		QStringLiteral("Simulate the Finder service arriving after a cold start (for testing)"));
+	parser.addOption(selftestServiceOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestServiceOpt))
+	{
+		// cold start: the app opens its blank placeholder, then the
+		// Finder service delivers a pair; the placeholder must go
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString leftPath = dir.filePath(QStringLiteral("a.txt"));
+		const QString rightPath = dir.filePath(QStringLiteral("b.txt"));
+		{
+			QFile f(leftPath);
+			f.open(QIODevice::WriteOnly);
+			f.write("x\n");
+		}
+		{
+			QFile f(rightPath);
+			f.open(QIODevice::WriteOnly);
+			f.write("y\n");
+		}
+		MainWindow window;
+		window.openBlankComparison();
+		window.handleIncomingPaths({ leftPath, rightPath });
+		QCoreApplication::processEvents();
+		const auto tabs = window.findChildren<FileCompareView *>();
+		bool blankLeft = false;
+		for (const FileCompareView *view : tabs)
+		{
+			bool blank = true;
+			for (const QString &path : view->paths())
+				blank = blank && path.isEmpty();
+			blankLeft = blankLeft || blank;
+		}
+		printf("comparisons: %lld, placeholder left: %d\n",
+			static_cast<long long>(tabs.size()), blankLeft);
+		return (tabs.size() == 1 && !blankLeft) ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestFolder3Opt))
+	{
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString roots[3] = { dir.filePath(QStringLiteral("A")),
+			dir.filePath(QStringLiteral("B")), dir.filePath(QStringLiteral("C")) };
+		const auto put = [&roots](int side, const QString &rel,
+			const QByteArray &content) {
+			const QString path = roots[side] + QLatin1Char('/') + rel;
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.write(content);
+		};
+		for (int i = 0; i < 3; ++i)
+		{
+			put(i, QStringLiteral("same.txt"), "x" + QByteArray(1, '\n'));
+			put(i, QStringLiteral("diff-left.txt"), i == 0 ? "a\n" : "b\n");
+			put(i, QStringLiteral("diff-middle.txt"), i == 1 ? "a\n" : "b\n");
+			put(i, QStringLiteral("diff-right.txt"), i == 2 ? "a\n" : "b\n");
+			put(i, QStringLiteral("diff-all.txt"), QByteArray::number(i) + "\n");
+			put(i, QStringLiteral("sub/nested.txt"), i == 2 ? "n2\n" : "n\n");
+		}
+		put(0, QStringLiteral("left-only.txt"), "u\n");
+		put(1, QStringLiteral("middle-only.txt"), "u\n");
+		put(2, QStringLiteral("right-only.txt"), "u\n");
+		put(1, QStringLiteral("no-left.txt"), "m\n");
+		put(2, QStringLiteral("no-left.txt"), "m\n");
+
+		const lm::FolderCompareResult result = lm::compareFolders(
+			{ roots[0], roots[1], roots[2] }, true);
+		using Item = lm::FolderCompareItem;
+		QHash<QString, const Item *> byName;
+		for (const Item &item : result.items)
+			byName.insert(item.name, &item);
+		const auto is = [&byName](const QString &name, Item::Category cat,
+			Item::ThreeWayInfo info = Item::NoInfo) {
+			const Item *item = byName.value(name);
+			const bool ok = item != nullptr && item->category == cat
+				&& (info == Item::NoInfo || item->threeWay == info);
+			if (!ok)
+				fprintf(stderr, "unexpected: %s cat=%d 3way=%d\n",
+					qPrintable(name), item ? item->category : -1,
+					item ? item->threeWay : -1);
+			return ok;
+		};
+		bool ok = result.sides == 3 && result.items.size() == 11;
+		ok = is(QStringLiteral("same.txt"), Item::Identical) && ok;
+		ok = is(QStringLiteral("diff-left.txt"), Item::Different,
+			Item::MiddleRightIdentical) && ok;
+		ok = is(QStringLiteral("diff-middle.txt"), Item::Different,
+			Item::LeftRightIdentical) && ok;
+		ok = is(QStringLiteral("diff-right.txt"), Item::Different,
+			Item::LeftMiddleIdentical) && ok;
+		ok = is(QStringLiteral("diff-all.txt"), Item::Different) && ok;
+		ok = is(QStringLiteral("left-only.txt"), Item::LeftOnly) && ok;
+		ok = is(QStringLiteral("middle-only.txt"), Item::MiddleOnly) && ok;
+		ok = is(QStringLiteral("right-only.txt"), Item::RightOnly) && ok;
+		ok = is(QStringLiteral("no-left.txt"), Item::MissingLeft) && ok;
+		ok = is(QStringLiteral("nested.txt"), Item::Different,
+			Item::LeftMiddleIdentical) && ok;
+		ok = is(QStringLiteral("sub"), Item::Different) && ok;
+		printf("items: %lld, different: %d, unique: %d, identical: %d, ok: %d\n",
+			static_cast<long long>(result.items.size()), result.different,
+			result.unique, result.identical, ok);
+		return (ok && result.different == 7 && result.unique == 3
+			&& result.identical == 1) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestArchiveOpt))
 	{
@@ -711,7 +824,12 @@ int main(int argc, char *argv[])
 	}
 	else if (args.size() == 3)
 	{
-		window.openFileComparison(args);
+		const bool allDirs = QFileInfo(args.at(0)).isDir()
+			&& QFileInfo(args.at(1)).isDir() && QFileInfo(args.at(2)).isDir();
+		if (allDirs)
+			window.openFolderComparison(args);
+		else
+			window.openFileComparison(args);
 	}
 	else if (!args.isEmpty())
 	{

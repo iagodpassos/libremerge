@@ -682,16 +682,28 @@ void MainWindow::attachFileView(FileCompareView *view)
 
 void MainWindow::openFolderComparison(const QString &leftDir, const QString &rightDir)
 {
+	openFolderComparison(QStringList{ leftDir, rightDir });
+}
+
+void MainWindow::openFolderComparison(const QStringList &dirs)
+{
 	auto *view = new FolderCompareView(this);
 	connect(view, &FolderCompareView::openFileComparisonRequested, this,
 		qOverload<const QString &, const QString &>(&MainWindow::openFileComparison));
-	const QString title = displayName(leftDir)
-		+ QString::fromUtf8(" \xE2\x86\x94 ") + displayName(rightDir);
-	const int index = m_tabs->addTab(view, title);
-	m_tabs->setTabToolTip(index, leftDir + QStringLiteral("\n") + rightDir);
+	connect(view, &FolderCompareView::openFileComparison3Requested, this,
+		[this](const QStringList &paths) { openFileComparison(paths); });
+	QStringList names, tips;
+	for (const QString &dir : dirs)
+	{
+		names.append(displayName(dir));
+		tips.append(dir);
+	}
+	const int index = m_tabs->addTab(view,
+		names.join(QString::fromUtf8(" \xE2\x86\x94 ")));
+	m_tabs->setTabToolTip(index, tips.join(QStringLiteral("\n")));
 	m_tabs->setCurrentIndex(index);
-	rememberComparison({ leftDir, rightDir });
-	view->start(leftDir, rightDir);
+	rememberComparison(dirs);
+	view->start(dirs);
 }
 
 void MainWindow::openArchiveComparison(const QString &leftArchive,
@@ -914,7 +926,7 @@ void MainWindow::openSelector(const QStringList &paths)
 		[this, closeSelectorLater](const QStringList &selected, const QList<bool> &readOnly,
 			bool folders) {
 			if (folders)
-				openFolderComparison(selected.at(0), selected.at(1));
+				openFolderComparison(selected);
 			else
 				openFileComparison(selected, readOnly);
 			closeSelectorLater();
@@ -958,14 +970,44 @@ void MainWindow::handleIncomingPaths(const QStringList &paths)
 	if (paths.size() == 2 && dirs == 2)
 	{
 		openFolderComparison(paths.at(0), paths.at(1));
+		closeStartupPlaceholder();
 		return;
 	}
 	if ((paths.size() == 2 || paths.size() == 3) && files == paths.size())
 	{
 		openFileComparison(paths);
+		closeStartupPlaceholder();
 		return;
 	}
 	openSelector(paths);
+	closeStartupPlaceholder();
+}
+
+/** A comparison arriving from the Finder (the Services entry, a file
+    association, a Dock drop) right after a cold start lands next to
+    the blank untitled comparison the startup opened; WinMerge's shell
+    integration leaves no such empty document behind. Only the lone,
+    untouched placeholder goes: anything typed into it, or any second
+    tab the user made, stays. */
+void MainWindow::closeStartupPlaceholder()
+{
+	if (m_tabs->count() != 2)
+		return; // just the placeholder plus what was opened now
+	for (int i = 0; i < m_tabs->count(); ++i)
+	{
+		auto *view = qobject_cast<FileCompareView *>(m_tabs->widget(i));
+		if (view == nullptr || view->isModified())
+			continue;
+		bool blank = true;
+		const QStringList sidePaths = view->paths();
+		for (const QString &path : sidePaths)
+			blank = blank && path.isEmpty();
+		if (blank)
+		{
+			closeTab(i);
+			return;
+		}
+	}
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event)

@@ -35,11 +35,7 @@ enum Column
 	ColName = 0,
 	ColFolder,
 	ColResult,
-	ColLeftSize,
-	ColRightSize,
-	ColLeftDate,
-	ColRightDate,
-	ColCount,
+	// per-side size and date columns follow, laid out by colSize()/colDate()
 };
 
 enum ItemRole
@@ -47,9 +43,10 @@ enum ItemRole
 	RoleLeftPath = Qt::UserRole,
 	RoleRightPath,
 	RoleIsFile,
-	RoleBothSides,
+	RoleBothSides, ///< the item exists on every compared side
 	RoleFolder,
 	RoleName,
+	RoleMiddlePath, ///< 3-way only
 };
 
 const QString kFilterSettingsKey = QStringLiteral("FolderCompare/Filter");
@@ -62,9 +59,33 @@ QString categoryText(lm::FolderCompareItem::Category category)
 	case lm::FolderCompareItem::Identical: return QObject::tr("Identical");
 	case lm::FolderCompareItem::Different: return QObject::tr("Different");
 	case lm::FolderCompareItem::LeftOnly: return QObject::tr("Left only");
+	case lm::FolderCompareItem::MiddleOnly: return QObject::tr("Middle only");
 	case lm::FolderCompareItem::RightOnly: return QObject::tr("Right only");
+	case lm::FolderCompareItem::MissingLeft:
+		return QObject::tr("Does not exist on the left");
+	case lm::FolderCompareItem::MissingMiddle:
+		return QObject::tr("Does not exist in the middle");
+	case lm::FolderCompareItem::MissingRight:
+		return QObject::tr("Does not exist on the right");
 	case lm::FolderCompareItem::Skipped: return QObject::tr("Skipped");
 	case lm::FolderCompareItem::Error: return QObject::tr("Error");
+	}
+	return {};
+}
+
+/** WinMerge's COMPAREFLAGS3WAY suffix on the Result column. */
+QString threeWayText(lm::FolderCompareItem::ThreeWayInfo info)
+{
+	switch (info)
+	{
+	case lm::FolderCompareItem::MiddleRightIdentical:
+		return QObject::tr(" (middle and right are identical)");
+	case lm::FolderCompareItem::LeftRightIdentical:
+		return QObject::tr(" (left and right are identical)");
+	case lm::FolderCompareItem::LeftMiddleIdentical:
+		return QObject::tr(" (left and middle are identical)");
+	case lm::FolderCompareItem::NoInfo:
+		break;
 	}
 	return {};
 }
@@ -77,8 +98,12 @@ QColor categoryColor(lm::FolderCompareItem::Category category)
 		// (matching the dark set in lm::diffColors())
 		switch (category)
 		{
-		case lm::FolderCompareItem::Different: return QColor(105, 92, 38);
+		case lm::FolderCompareItem::Different:
+		case lm::FolderCompareItem::MissingLeft:
+		case lm::FolderCompareItem::MissingMiddle:
+		case lm::FolderCompareItem::MissingRight: return QColor(105, 92, 38);
 		case lm::FolderCompareItem::LeftOnly: return QColor(42, 62, 96);
+		case lm::FolderCompareItem::MiddleOnly: return QColor(74, 52, 96);
 		case lm::FolderCompareItem::RightOnly: return QColor(38, 82, 58);
 		case lm::FolderCompareItem::Error: return QColor(110, 48, 48);
 		default: return {};
@@ -86,8 +111,12 @@ QColor categoryColor(lm::FolderCompareItem::Category category)
 	}
 	switch (category)
 	{
-	case lm::FolderCompareItem::Different: return QColor(255, 243, 176);
+	case lm::FolderCompareItem::Different:
+	case lm::FolderCompareItem::MissingLeft:
+	case lm::FolderCompareItem::MissingMiddle:
+	case lm::FolderCompareItem::MissingRight: return QColor(255, 243, 176);
 	case lm::FolderCompareItem::LeftOnly: return QColor(224, 236, 255);
+	case lm::FolderCompareItem::MiddleOnly: return QColor(238, 224, 255);
 	case lm::FolderCompareItem::RightOnly: return QColor(224, 255, 232);
 	case lm::FolderCompareItem::Error: return QColor(255, 214, 214);
 	default: return {};
@@ -104,45 +133,55 @@ QString dateText(const QDateTime &dt)
 	return dt.isValid() ? QLocale().toString(dt, QLocale::ShortFormat) : QString();
 }
 
-void setRowCategory(QTreeWidgetItem *row, lm::FolderCompareItem::Category category,
-	bool isDir)
+} // namespace
+
+void FolderCompareView::setRowCategory(QTreeWidgetItem *row,
+	lm::FolderCompareItem::Category category,
+	lm::FolderCompareItem::ThreeWayInfo threeWay, bool isDir)
 {
+	const QString text = categoryText(category) + threeWayText(threeWay);
 	row->setText(ColResult, isDir
-		? QObject::tr("Folder: %1").arg(categoryText(category)) : categoryText(category));
+		? QObject::tr("Folder: %1").arg(text) : text);
 	const QColor color = categoryColor(category);
 	// explicit text color so the row stays readable whatever the
 	// platform palette is: black on the light pastels, near-white on
 	// the dark category colors
-	const QColor text = lm::Theme::instance()->dark()
+	const QColor textColor = lm::Theme::instance()->dark()
 		? QColor(0xd4, 0xd4, 0xd4) : QColor(Qt::black);
-	for (int col = 0; col < ColCount; ++col)
+	for (int col = 0; col < colCount(); ++col)
 	{
 		row->setBackground(col, color.isValid() ? QBrush(color) : QBrush());
-		row->setForeground(col, color.isValid() ? QBrush(text) : QBrush());
+		row->setForeground(col, color.isValid() ? QBrush(textColor) : QBrush());
 	}
 }
 
-void fillRow(QTreeWidgetItem *row, const lm::FolderCompareItem &item)
+void FolderCompareView::fillRow(QTreeWidgetItem *row,
+	const lm::FolderCompareItem &item)
 {
 	row->setText(ColName, item.name);
 	row->setText(ColFolder, item.folder);
-	row->setText(ColLeftSize, sizeText(item.size[0]));
-	row->setText(ColRightSize, sizeText(item.size[1]));
-	row->setText(ColLeftDate, dateText(item.mtime[0]));
-	row->setText(ColRightDate, dateText(item.mtime[1]));
-	row->setTextAlignment(ColLeftSize, Qt::AlignRight | Qt::AlignVCenter);
-	row->setTextAlignment(ColRightSize, Qt::AlignRight | Qt::AlignVCenter);
-	setRowCategory(row, item.category, item.isDir);
-	row->setData(0, RoleLeftPath, item.leftPath);
-	row->setData(0, RoleRightPath, item.rightPath);
+	bool allSides = true;
+	for (int i = 0; i < m_sides; ++i)
+	{
+		row->setText(colSize(i), sizeText(item.size[i]));
+		row->setText(colDate(i), dateText(item.mtime[i]));
+		row->setTextAlignment(colSize(i), Qt::AlignRight | Qt::AlignVCenter);
+		allSides = allSides && !item.path[i].isEmpty();
+	}
+	setRowCategory(row, item.category, item.threeWay, item.isDir);
+	row->setData(0, RoleLeftPath, item.path[0]);
+	if (m_sides == 3)
+	{
+		row->setData(0, RoleMiddlePath, item.path[1]);
+		row->setData(0, RoleRightPath, item.path[2]);
+	}
+	else
+		row->setData(0, RoleRightPath, item.path[1]);
 	row->setData(0, RoleIsFile, !item.isDir);
-	row->setData(0, RoleBothSides,
-		!item.leftPath.isEmpty() && !item.rightPath.isEmpty());
+	row->setData(0, RoleBothSides, allSides);
 	row->setData(0, RoleFolder, item.folder);
 	row->setData(0, RoleName, item.name);
 }
-
-} // namespace
 
 FolderCompareView::FolderCompareView(QWidget *parent)
 	: QWidget(parent)
@@ -208,9 +247,7 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	layout->addWidget(toolbar);
 
 	m_tree = new QTreeWidget(this);
-	m_tree->setColumnCount(ColCount);
-	m_tree->setHeaderLabels({ tr("Name"), tr("Folder"), tr("Comparison result"),
-		tr("Left size"), tr("Right size"), tr("Left date"), tr("Right date") });
+	setupColumns();
 	m_tree->setRootIsDecorated(false);
 	m_tree->setAlternatingRowColors(true);
 	m_tree->setSortingEnabled(true);
@@ -323,10 +360,32 @@ FolderCompareView::~FolderCompareView()
 	m_watcher.waitForFinished();
 }
 
+/** Header labels for the current side count: 2-way keeps the classic
+    left/right pairs, 3-way inserts the middle columns. */
+void FolderCompareView::setupColumns()
+{
+	QStringList labels{ tr("Name"), tr("Folder"), tr("Comparison result") };
+	if (m_sides == 3)
+		labels << tr("Left size") << tr("Middle size") << tr("Right size")
+			<< tr("Left date") << tr("Middle date") << tr("Right date");
+	else
+		labels << tr("Left size") << tr("Right size")
+			<< tr("Left date") << tr("Right date");
+	m_tree->setColumnCount(labels.size());
+	m_tree->setHeaderLabels(labels);
+}
+
 void FolderCompareView::start(const QString &leftDir, const QString &rightDir)
 {
-	m_roots[0] = leftDir;
-	m_roots[1] = rightDir;
+	start(QStringList{ leftDir, rightDir });
+}
+
+void FolderCompareView::start(const QStringList &dirs)
+{
+	m_sides = dirs.size();
+	for (int i = 0; i < 3; ++i)
+		m_roots[i] = i < m_sides ? dirs.at(i) : QString();
+	setupColumns();
 	m_result = lm::FolderCompareResult();
 	m_tree->clear();
 	updateActions();
@@ -335,7 +394,7 @@ void FolderCompareView::start(const QString &leftDir, const QString &rightDir)
 	QSettings().setValue(kFilterSettingsKey,
 		filterMask.isEmpty() ? QStringLiteral("*.*") : filterMask);
 
-	m_job = std::make_shared<lm::FolderCompareJob>();
+	m_job = std::make_shared<lm::FolderCompareJob>(m_sides);
 	m_status->setText(tr("Scanning\xE2\x80\xA6"));
 	m_progress->setRange(0, 0); // busy until totals are known
 	m_progress->setVisible(true);
@@ -344,8 +403,8 @@ void FolderCompareView::start(const QString &leftDir, const QString &rightDir)
 	m_progressTimer->start();
 
 	auto job = m_job;
-	m_watcher.setFuture(QtConcurrent::run([leftDir, rightDir, job, filterMask]() {
-		return lm::compareFolders(leftDir, rightDir, true, job, filterMask);
+	m_watcher.setFuture(QtConcurrent::run([dirs, job, filterMask]() {
+		return lm::compareFolders(dirs, true, job, filterMask);
 	}));
 }
 
@@ -353,8 +412,14 @@ void FolderCompareView::recompare()
 {
 	if (m_job)
 		return; // already comparing
-	if (!m_roots[0].isEmpty() && !m_roots[1].isEmpty())
-		start(m_roots[0], m_roots[1]);
+	QStringList dirs;
+	for (int i = 0; i < m_sides; ++i)
+	{
+		if (m_roots[i].isEmpty())
+			return;
+		dirs.append(m_roots[i]);
+	}
+	start(dirs);
 }
 
 void FolderCompareView::updateProgress()
@@ -441,7 +506,7 @@ void FolderCompareView::rebuildRows()
 	m_tree->sortByColumn(treeMode ? ColName : ColFolder, Qt::AscendingOrder);
 	if (treeMode)
 		m_tree->expandAll();
-	for (int col = 0; col < ColCount; ++col)
+	for (int col = 0; col < colCount(); ++col)
 		m_tree->resizeColumnToContents(col);
 	updateActions();
 }
@@ -464,15 +529,18 @@ QTreeWidgetItem *FolderCompareView::folderNode(const QString &folder,
 		? new QTreeWidgetItem(parent) : new QTreeWidgetItem(m_tree);
 	row->setText(ColName, name);
 	row->setText(ColFolder, parentFolder);
-	const QString paths[2] = {
-		m_roots[0] + QLatin1Char('/') + folder,
-		m_roots[1] + QLatin1Char('/') + folder,
-	};
-	const bool exists[2] = { QFileInfo(paths[0]).isDir(), QFileInfo(paths[1]).isDir() };
-	row->setData(0, RoleLeftPath, exists[0] ? paths[0] : QString());
-	row->setData(0, RoleRightPath, exists[1] ? paths[1] : QString());
+	bool allSides = true;
+	for (int i = 0; i < m_sides; ++i)
+	{
+		const QString path = m_roots[i] + QLatin1Char('/') + folder;
+		const bool exists = QFileInfo(path).isDir();
+		const int role = i == 0 ? int(RoleLeftPath)
+			: (m_sides == 3 && i == 1) ? int(RoleMiddlePath) : int(RoleRightPath);
+		row->setData(0, role, exists ? path : QString());
+		allSides = allSides && exists;
+	}
 	row->setData(0, RoleIsFile, false);
-	row->setData(0, RoleBothSides, exists[0] && exists[1]);
+	row->setData(0, RoleBothSides, allSides);
 	row->setData(0, RoleFolder, parentFolder);
 	row->setData(0, RoleName, name);
 	nodes.insert(folder, row);
@@ -481,7 +549,9 @@ QTreeWidgetItem *FolderCompareView::folderNode(const QString &folder,
 
 QString FolderCompareView::sidePath(QTreeWidgetItem *row, int side) const
 {
-	return row->data(0, side == 0 ? RoleLeftPath : RoleRightPath).toString();
+	const int role = side == 0 ? int(RoleLeftPath)
+		: (m_sides == 3 && side == 1) ? int(RoleMiddlePath) : int(RoleRightPath);
+	return row->data(0, role).toString();
 }
 
 /** The path this row has (or would have) on the given side. */
@@ -501,6 +571,17 @@ void FolderCompareView::updateActions()
 {
 	const bool hasSelection = !m_tree->selectedItems().isEmpty();
 	const bool busy = m_job != nullptr;
+	if (m_sides == 3)
+	{
+		// v1 of the 3-way folder compare is read-only: WinMerge's
+		// pane-relative copy/delete matrix is not wired yet
+		m_actCopyRight->setEnabled(false);
+		m_actCopyLeft->setEnabled(false);
+		m_actDeleteLeft->setEnabled(false);
+		m_actDeleteRight->setEnabled(false);
+		m_actDeleteBoth->setEnabled(false);
+		return;
+	}
 	bool anyLeft = false, anyRight = false;
 	for (QTreeWidgetItem *row : m_tree->selectedItems())
 	{
@@ -524,10 +605,10 @@ void FolderCompareView::updateRowFromDisk(QTreeWidgetItem *row)
 	row->setData(0, RoleLeftPath, exists[0] ? paths[0] : QString());
 	row->setData(0, RoleRightPath, exists[1] ? paths[1] : QString());
 	row->setData(0, RoleBothSides, exists[0] && exists[1]);
-	row->setText(ColLeftSize, exists[0] && !isDir ? sizeText(infos[0].size()) : QString());
-	row->setText(ColRightSize, exists[1] && !isDir ? sizeText(infos[1].size()) : QString());
-	row->setText(ColLeftDate, exists[0] ? dateText(infos[0].lastModified()) : QString());
-	row->setText(ColRightDate, exists[1] ? dateText(infos[1].lastModified()) : QString());
+	row->setText(colSize(0), exists[0] && !isDir ? sizeText(infos[0].size()) : QString());
+	row->setText(colSize(1), exists[1] && !isDir ? sizeText(infos[1].size()) : QString());
+	row->setText(colDate(0), exists[0] ? dateText(infos[0].lastModified()) : QString());
+	row->setText(colDate(1), exists[1] ? dateText(infos[1].lastModified()) : QString());
 
 	if (!exists[0] && !exists[1])
 	{
@@ -541,7 +622,7 @@ void FolderCompareView::updateRowFromDisk(QTreeWidgetItem *row)
 		category = lm::FolderCompareItem::RightOnly;
 	else
 		category = lm::FolderCompareItem::Identical; // post-copy state
-	setRowCategory(row, category, isDir);
+	setRowCategory(row, category, lm::FolderCompareItem::NoInfo, isDir);
 }
 
 void FolderCompareView::copySelected(int sourceSide)
@@ -624,9 +705,26 @@ void FolderCompareView::deleteSelected(bool leftSide, bool rightSide)
 void FolderCompareView::itemActivated(QTreeWidgetItem *item, int column)
 {
 	Q_UNUSED(column);
-	if (item == nullptr)
+	if (item == nullptr || !item->data(0, RoleIsFile).toBool())
 		return;
-	if (!item->data(0, RoleIsFile).toBool() || !item->data(0, RoleBothSides).toBool())
+	if (m_sides == 3)
+	{
+		// present on all three sides opens the 3-way comparison; on
+		// exactly two, the 2-way of the pair that exists
+		QStringList present;
+		for (int i = 0; i < 3; ++i)
+		{
+			const QString path = sidePath(item, i);
+			if (!path.isEmpty())
+				present.append(path);
+		}
+		if (present.size() == 3)
+			emit openFileComparison3Requested(present);
+		else if (present.size() == 2)
+			emit openFileComparisonRequested(present.at(0), present.at(1));
+		return;
+	}
+	if (!item->data(0, RoleBothSides).toBool())
 		return;
 	emit openFileComparisonRequested(item->data(0, RoleLeftPath).toString(),
 		item->data(0, RoleRightPath).toString());
