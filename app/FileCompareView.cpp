@@ -1183,7 +1183,33 @@ void FileCompareView::computeWordSpans()
 			for (int side = 0; side < m_paneCount; ++side)
 			{
 				if (wd.end[side] < wd.begin[side])
+				{
+					// nothing on this side: keep a zero-length span at
+					// the insertion point, so a thin marker shows where
+					// the other side's text would land (WinMerge draws
+					// its zero-width word diffs the same way, issue #6)
+					const int pos = wd.begin[side];
+					for (int li = 0;
+						li < static_cast<int>(lineStart[side].size()); ++li)
+					{
+						const int start = lineStart[side][li];
+						const int len = lineBytes[side].at(li).size();
+						if (pos < start || pos > start + len)
+							continue;
+						WordSpan span;
+						span.side = side;
+						span.line = block.begin[side] + li;
+						span.blockIndex = static_cast<int>(b);
+						span.oneSided = true;
+						span.start = QString::fromUtf8(
+							lineBytes[side].at(li).constData(),
+							qBound(0, pos - start, len)).size();
+						span.length = 0;
+						m_wordSpans.push_back(span);
+						break;
+					}
 					continue;
+				}
 				// split the byte range on the '\n' joins, one span per line
 				for (int li = 0; li < static_cast<int>(lineStart[side].size()); ++li)
 				{
@@ -1257,7 +1283,9 @@ void FileCompareView::applyHighlights()
 			}
 		}
 
-		// word-level spans on top of the line backgrounds
+		// word-level spans on top of the line backgrounds; zero-length
+		// spans become thin insertion markers, painted by the pane
+		QList<DiffTextEdit::InsertionMarker> markers;
 		for (const WordSpan &span : m_wordSpans)
 		{
 			if (span.side != side
@@ -1268,6 +1296,16 @@ void FileCompareView::applyHighlights()
 			if (!textBlock.isValid())
 				continue;
 			const bool current = (span.blockIndex == m_current);
+			if (span.length == 0)
+			{
+				DiffTextEdit::InsertionMarker marker;
+				marker.viewLine = m_realToView[side][span.line];
+				marker.column = span.start;
+				marker.color = current ? C.selWordDiffDeleted
+				                       : C.wordDiffDeleted;
+				markers.append(marker);
+				continue;
+			}
 			QTextEdit::ExtraSelection selection;
 			selection.format.setBackground(current
 				? (span.oneSided ? C.selWordDiffDeleted : C.selWordDiff)
@@ -1279,6 +1317,7 @@ void FileCompareView::applyHighlights()
 			selection.cursor = cursor;
 			selections.append(selection);
 		}
+		m_panes[side]->setInsertionMarkers(markers);
 		m_panes[side]->setExtraSelections(selections);
 		m_panes[side]->setGutterLineColors(gutterColors);
 	}

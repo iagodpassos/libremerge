@@ -2,6 +2,7 @@
 #pragma once
 
 #include <functional>
+#include <QColor>
 #include <QHash>
 #include <QList>
 #include <QPlainTextEdit>
@@ -39,6 +40,17 @@ public:
 	    lines (no number drawn). Empty list falls back to 1:1 numbering. */
 	void setLineNumbers(const QList<int> &numbers);
 
+	/** A thin vertical mark at a text position: the insertion point of
+	    text that exists only on the other side, WinMerge's zero-width
+	    "deleted" block (issue #6). column is UTF-16, within the line. */
+	struct InsertionMarker
+	{
+		int viewLine = 0;
+		int column = 0;
+		QColor color;
+	};
+	void setInsertionMarkers(const QList<InsertionMarker> &markers);
+
 	/** Called with the view line on double-click, before the default
 	    word selection (the compare view selects the difference there,
 	    like WinMerge's OnLButtonDblClk). */
@@ -63,6 +75,7 @@ public:
 
 protected:
 	bool event(QEvent *event) override;
+	void paintEvent(QPaintEvent *event) override;
 	void mouseDoubleClickEvent(QMouseEvent *event) override;
 	void resizeEvent(QResizeEvent *event) override;
 	QMimeData *createMimeDataFromSelection() const override;
@@ -77,6 +90,7 @@ private:
 	QWidget *m_gutter;
 	QHash<int, QColor> m_lineColors;
 	QList<int> m_lineNumbers;
+	QList<InsertionMarker> m_markers;
 	std::function<void(int)> m_doubleClickHook;
 	std::function<void(const QString &)> m_fileDropHook;
 };

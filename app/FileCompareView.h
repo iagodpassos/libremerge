@@ -69,6 +69,16 @@ public:
 	{
 		return collectRealLines(side);
 	}
+	/** Zero-length word spans (insertion markers) on one side (for
+	    tests). */
+	int insertionMarkersForTest(int side) const
+	{
+		int count = 0;
+		for (const WordSpan &span : m_wordSpans)
+			if (span.side == side && span.length == 0)
+				++count;
+		return count;
+	}
 
 	/** Mark sides as read-only before compare(): the pane rejects edits
 	    and merge operations refuse to target it. */

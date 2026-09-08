@@ -184,7 +184,49 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestServiceOpt(QStringLiteral("selftest-service"),
 		QStringLiteral("Simulate the Finder service arriving after a cold start (for testing)"));
 	parser.addOption(selftestServiceOpt);
+	QCommandLineOption selftestMarkerOpt(QStringLiteral("selftest-marker"),
+		QStringLiteral("Verify insertion markers where one side lacks text (for testing)"));
+	parser.addOption(selftestMarkerOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestMarkerOpt))
+	{
+		// issue #6: text present on one side only must leave a
+		// zero-length marker span at the other side's insertion point
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString leftPath = dir.filePath(QStringLiteral("l.txt"));
+		const QString rightPath = dir.filePath(QStringLiteral("r.txt"));
+		{
+			QFile f(leftPath);
+			f.open(QIODevice::WriteOnly);
+			f.write("this is a test\nword only here\n");
+		}
+		{
+			QFile f(rightPath);
+			f.open(QIODevice::WriteOnly);
+			f.write("this is test\nword here\n");
+		}
+		FileCompareView view;
+		QString error;
+		if (!view.compare(leftPath, rightPath, &error))
+		{
+			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		const int leftMarkers = view.insertionMarkersForTest(0);
+		const int rightMarkers = view.insertionMarkersForTest(1);
+		FileCompareView swapped;
+		if (!swapped.compare(rightPath, leftPath, &error))
+			return 2;
+		const int swappedLeft = swapped.insertionMarkersForTest(0);
+		const int swappedRight = swapped.insertionMarkersForTest(1);
+		printf("markers L/R: %d/%d, swapped L/R: %d/%d\n",
+			leftMarkers, rightMarkers, swappedLeft, swappedRight);
+		return (leftMarkers == 0 && rightMarkers == 2
+			&& swappedLeft == 2 && swappedRight == 0) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestServiceOpt))
 	{

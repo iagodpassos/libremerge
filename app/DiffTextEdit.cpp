@@ -166,6 +166,41 @@ void DiffTextEdit::setLineNumbers(const QList<int> &numbers)
 	m_gutter->update();
 }
 
+void DiffTextEdit::setInsertionMarkers(const QList<InsertionMarker> &markers)
+{
+	m_markers = markers;
+	viewport()->update();
+}
+
+/** Extra selections cannot paint a zero-length range, so the insertion
+    markers are drawn by hand on top of the text. */
+void DiffTextEdit::paintEvent(QPaintEvent *event)
+{
+	QPlainTextEdit::paintEvent(event);
+	if (m_markers.isEmpty())
+		return;
+	QPainter painter(viewport());
+	for (const InsertionMarker &marker : m_markers)
+	{
+		const QTextBlock block =
+			document()->findBlockByNumber(marker.viewLine);
+		if (!block.isValid() || !block.isVisible())
+			continue;
+		QTextLayout *layout = block.layout();
+		if (layout == nullptr || layout->lineCount() == 0)
+			continue;
+		const int column = qBound(0, marker.column, block.length() - 1);
+		const QTextLine line = layout->lineForTextPosition(column);
+		if (!line.isValid())
+			continue;
+		const QRectF geometry =
+			blockBoundingGeometry(block).translated(contentOffset());
+		const qreal x = geometry.x() + line.cursorToX(column);
+		painter.fillRect(QRectF(x - 1.0, geometry.y() + line.y(),
+			2.0, line.height()), marker.color);
+	}
+}
+
 int DiffTextEdit::gutterWidth() const
 {
 	int digits = 1;

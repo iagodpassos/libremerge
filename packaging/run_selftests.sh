@@ -55,6 +55,7 @@ run_one selftest-open-enter
 run_one selftest-archive
 run_one selftest-folder3
 run_one selftest-service
+run_one selftest-marker
 run_one selftest-table "$TMP/left.csv" "$TMP/right.csv"
 run_one selftest-image "$TMP/left.png" "$TMP/right.png"
 run_one selftest-merge3 "$TMP/w3a.txt" "$TMP/w3b.txt" "$TMP/w3c.txt"
