@@ -1232,7 +1232,7 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     </message>
     <message>
         <source>Does not exist on the left</source>
-        <translation>Não existe ã esquerda</translation>
+        <translation>Não existe à esquerda</translation>
     </message>
     <message>
         <source>Does not exist in the middle</source>
@@ -1240,7 +1240,7 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     </message>
     <message>
         <source>Does not exist on the right</source>
-        <translation>Não existe ã direita</translation>
+        <translation>Não existe à direita</translation>
     </message>
     <message>
         <source>Skipped</source>
