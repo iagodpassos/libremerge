@@ -137,6 +137,9 @@ public:
 
 signals:
 	void modifiedChanged(bool modified);
+	/** A successful save, with the compared paths and the significant
+	    difference count (WinMerge's UpdateChangedItem notification). */
+	void fileSaved(const QStringList &paths, int significantDiffs);
 	void pathsChanged();
 	void optionsRequested();
 

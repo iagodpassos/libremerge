@@ -48,6 +48,9 @@ public:
 	void recompare();
 
 signals:
+	/** A successful save, with the compared paths and the current
+	    difference count (for folder-comparison row updates). */
+	void fileSaved(const QStringList &paths, int significantDiffs);
 	void modifiedChanged(bool modified);
 	void pathsChanged();
 	void openAsTextRequested(const QString &leftPath, const QString &rightPath);

@@ -39,6 +39,18 @@ public:
 	/** Same, for two or three folders (3-way folder compare). */
 	void start(const QStringList &dirs);
 
+	/** A file opened from this comparison was saved: refresh its row,
+	    WinMerge's CDirDoc::UpdateChangedItem. */
+	void updateSavedItem(const QStringList &paths, int significantDiffs);
+
+	/** Whether the background comparison is still running (for tests). */
+	bool isComparingForTest() const { return m_job != nullptr; }
+	/** Activate a row by file name, like a double click (for tests). */
+	void activateRowForTest(const QString &name);
+	/** The category role of a row by file name, -1 if absent (for
+	    tests). */
+	int rowCategoryForTest(const QString &name) const;
+
 	/** Keep extracted-archive temp trees alive for this view's
 	    lifetime (WinMerge's CTempPathContext). */
 	void adoptTempDirs(std::vector<std::unique_ptr<QTemporaryDir>> dirs)
@@ -66,6 +78,8 @@ private:
 	void populate(const lm::FolderCompareResult &result);
 	void rebuildRows();
 	void setupColumns();
+	QTreeWidgetItem *findRowByName(const QString &name) const;
+	void updateStatusLine();
 	int colSize(int side) const { return 3 + side; }
 	int colDate(int side) const { return 3 + m_sides + side; }
 	int colCount() const { return 3 + 2 * m_sides; }

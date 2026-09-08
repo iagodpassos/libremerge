@@ -5,6 +5,7 @@
 
 class QTabWidget;
 class FileCompareView;
+class FolderCompareView;
 
 class MainWindow : public QMainWindow
 {
@@ -39,6 +40,9 @@ public:
 	/** Close the untouched blank comparison the startup opened, when a
 	    comparison arriving from outside made it redundant. */
 	void closeStartupPlaceholder();
+	/** Connect the tab just opened from a folder comparison so saving
+	    in it refreshes the matching folder row (UpdateChangedItem). */
+	void wireFolderRowSync(FolderCompareView *folder);
 
 	/** Jump to the first difference of the current file comparison
 	    (used by tests; same as pressing Next after opening). */

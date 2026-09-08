@@ -24,6 +24,7 @@
 #include <QTimer>
 #include <QToolBar>
 #include <QTreeWidget>
+#include <QTreeWidgetItemIterator>
 #include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrent>
 
@@ -47,6 +48,7 @@ enum ItemRole
 	RoleFolder,
 	RoleName,
 	RoleMiddlePath, ///< 3-way only
+	RoleCategory,   ///< lm::FolderCompareItem::Category as int
 };
 
 const QString kFilterSettingsKey = QStringLiteral("FolderCompare/Filter");
@@ -142,6 +144,7 @@ void FolderCompareView::setRowCategory(QTreeWidgetItem *row,
 	const QString text = categoryText(category) + threeWayText(threeWay);
 	row->setText(ColResult, isDir
 		? QObject::tr("Folder: %1").arg(text) : text);
+	row->setData(0, RoleCategory, static_cast<int>(category));
 	const QColor color = categoryColor(category);
 	// explicit text color so the row stays readable whatever the
 	// platform palette is: black on the light pastels, near-white on
@@ -458,13 +461,95 @@ void FolderCompareView::populate(const lm::FolderCompareResult &result)
 	// results are in: move focus to the list (also keeps macOS from
 	// painting its native focus treatment over the themed filter field)
 	m_tree->setFocus();
+	updateStatusLine();
+}
 
+void FolderCompareView::updateStatusLine()
+{
 	QString text = tr("%1 item(s): %2 different, %3 unique, %4 identical")
-		.arg(result.items.size()).arg(result.different).arg(result.unique)
-		.arg(result.identical);
-	if (result.aborted)
+		.arg(m_result.items.size()).arg(m_result.different)
+		.arg(m_result.unique).arg(m_result.identical);
+	if (m_result.aborted)
 		text = tr("Cancelled \xE2\x80\x94 partial results. ") + text;
 	m_status->setText(text);
+}
+
+QTreeWidgetItem *FolderCompareView::findRowByName(const QString &name) const
+{
+	for (QTreeWidgetItemIterator it(m_tree); *it != nullptr; ++it)
+		if ((*it)->data(0, RoleName).toString() == name)
+			return *it;
+	return nullptr;
+}
+
+void FolderCompareView::activateRowForTest(const QString &name)
+{
+	if (QTreeWidgetItem *row = findRowByName(name))
+		itemActivated(row, 0);
+}
+
+int FolderCompareView::rowCategoryForTest(const QString &name) const
+{
+	QTreeWidgetItem *row = findRowByName(name);
+	return row != nullptr ? row->data(0, RoleCategory).toInt() : -1;
+}
+
+/** A file comparison opened from here saved its files: bring the row in
+    line without a rescan, WinMerge's CDirDoc::UpdateChangedItem. The
+    3-way identical-pair suffix is dropped (the diff count alone cannot
+    tell which pair matches); a recompare restores it. */
+void FolderCompareView::updateSavedItem(const QStringList &paths,
+	int significantDiffs)
+{
+	if (paths.size() != m_sides)
+		return;
+	for (QTreeWidgetItemIterator it(m_tree); *it != nullptr; ++it)
+	{
+		QTreeWidgetItem *row = *it;
+		bool match = true;
+		for (int i = 0; i < m_sides && match; ++i)
+			match = sidePath(row, i) == paths.at(i);
+		if (!match)
+			continue;
+
+		for (int i = 0; i < m_sides; ++i)
+		{
+			const QFileInfo info(paths.at(i));
+			row->setText(colSize(i), info.exists()
+				? sizeText(info.size()) : QString());
+			row->setText(colDate(i), info.exists()
+				? dateText(info.lastModified()) : QString());
+		}
+		const auto oldCategory = static_cast<lm::FolderCompareItem::Category>(
+			row->data(0, RoleCategory).toInt());
+		const lm::FolderCompareItem::Category newCategory = significantDiffs == 0
+			? lm::FolderCompareItem::Identical
+			: lm::FolderCompareItem::Different;
+		setRowCategory(row, newCategory, lm::FolderCompareItem::NoInfo, false);
+		if (oldCategory != newCategory)
+		{
+			const auto bucket = [this](lm::FolderCompareItem::Category c) -> int * {
+				switch (c)
+				{
+				case lm::FolderCompareItem::Identical:
+					return &m_result.identical;
+				case lm::FolderCompareItem::Different:
+				case lm::FolderCompareItem::MissingLeft:
+				case lm::FolderCompareItem::MissingMiddle:
+				case lm::FolderCompareItem::MissingRight:
+					return &m_result.different;
+				default:
+					return nullptr;
+				}
+			};
+			if (int *from = bucket(oldCategory))
+				--*from;
+			if (int *to = bucket(newCategory))
+				++*to;
+			updateStatusLine();
+		}
+		return;
+	}
 }
 
 void FolderCompareView::rebuildRows()

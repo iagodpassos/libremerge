@@ -677,6 +677,7 @@ bool ImageCompareView::saveModified(QString *error)
 		if (!savePane(i, error))
 			return false;
 	afterBufferChange();
+	emit fileSaved(paths(), diffCount());
 	return true;
 }
 

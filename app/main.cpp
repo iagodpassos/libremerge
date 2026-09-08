@@ -11,6 +11,7 @@
 #include <QLineEdit>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QThread>
 #include <QTimer>
 #include <QTranslator>
 #include "FileCompareView.h"
@@ -18,6 +19,7 @@
 #include "ImageCompareView.h"
 #include "FileOps.h"
 #include "FolderCompareDriver.h"
+#include "FolderCompareView.h"
 #include <archive.h>
 #include <archive_entry.h>
 #include <QDir>
@@ -187,7 +189,67 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestMarkerOpt(QStringLiteral("selftest-marker"),
 		QStringLiteral("Verify insertion markers where one side lacks text (for testing)"));
 	parser.addOption(selftestMarkerOpt);
+	QCommandLineOption selftestFolderSyncOpt(QStringLiteral("selftest-folder-sync"),
+		QStringLiteral("Save a file opened from a folder compare and verify its row updates (for testing)"));
+	parser.addOption(selftestFolderSyncOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestFolderSyncOpt))
+	{
+		// WinMerge's UpdateChangedItem: saving a comparison opened from
+		// the folder view refreshes that row without a rescan
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString leftDir = dir.filePath(QStringLiteral("L"));
+		const QString rightDir = dir.filePath(QStringLiteral("R"));
+		QDir().mkpath(leftDir);
+		QDir().mkpath(rightDir);
+		{
+			QFile f(leftDir + QStringLiteral("/a.txt"));
+			f.open(QIODevice::WriteOnly);
+			f.write("x\n");
+		}
+		{
+			QFile f(rightDir + QStringLiteral("/a.txt"));
+			f.open(QIODevice::WriteOnly);
+			f.write("y\n");
+		}
+		MainWindow window;
+		window.openFolderComparison(QStringList{ leftDir, rightDir });
+		auto *folder = window.findChild<FolderCompareView *>();
+		if (folder == nullptr)
+			return 2;
+		for (int i = 0; i < 400 && folder->isComparingForTest(); ++i)
+		{
+			QThread::msleep(25);
+			QCoreApplication::processEvents();
+		}
+		const int before = folder->rowCategoryForTest(QStringLiteral("a.txt"));
+		folder->activateRowForTest(QStringLiteral("a.txt"));
+		QCoreApplication::processEvents();
+		FileCompareView *file = nullptr;
+		for (FileCompareView *candidate : window.findChildren<FileCompareView *>())
+			if (!candidate->paths().at(0).isEmpty())
+				file = candidate;
+		if (file == nullptr)
+		{
+			fprintf(stderr, "no file comparison opened\n");
+			return 2;
+		}
+		file->copyCurrentDiff(0);
+		QString error;
+		if (!file->saveModified(&error))
+		{
+			fprintf(stderr, "save failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		const int after = folder->rowCategoryForTest(QStringLiteral("a.txt"));
+		printf("category before: %d, after: %d\n", before, after);
+		return (before == static_cast<int>(lm::FolderCompareItem::Different)
+			&& after == static_cast<int>(lm::FolderCompareItem::Identical))
+			? 0 : 1;
+	}
 
 	if (parser.isSet(selftestMarkerOpt))
 	{

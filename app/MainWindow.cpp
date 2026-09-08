@@ -680,6 +680,22 @@ void MainWindow::attachFileView(FileCompareView *view)
 	}
 }
 
+void MainWindow::wireFolderRowSync(FolderCompareView *folder)
+{
+	QWidget *tab = m_tabs->currentWidget();
+	QPointer<FolderCompareView> guard(folder);
+	const auto forward = [guard](const QStringList &paths, int diffs) {
+		if (!guard.isNull())
+			guard->updateSavedItem(paths, diffs);
+	};
+	if (auto *file = qobject_cast<FileCompareView *>(tab))
+		connect(file, &FileCompareView::fileSaved, folder, forward);
+	else if (auto *table = qobject_cast<TableCompareView *>(tab))
+		connect(table, &TableCompareView::fileSaved, folder, forward);
+	else if (auto *image = qobject_cast<ImageCompareView *>(tab))
+		connect(image, &ImageCompareView::fileSaved, folder, forward);
+}
+
 void MainWindow::openFolderComparison(const QString &leftDir, const QString &rightDir)
 {
 	openFolderComparison(QStringList{ leftDir, rightDir });
@@ -689,9 +705,15 @@ void MainWindow::openFolderComparison(const QStringList &dirs)
 {
 	auto *view = new FolderCompareView(this);
 	connect(view, &FolderCompareView::openFileComparisonRequested, this,
-		qOverload<const QString &, const QString &>(&MainWindow::openFileComparison));
+		[this, view](const QString &l, const QString &r) {
+			openFileComparison(l, r);
+			wireFolderRowSync(view);
+		});
 	connect(view, &FolderCompareView::openFileComparison3Requested, this,
-		[this](const QStringList &paths) { openFileComparison(paths); });
+		[this, view](const QStringList &paths) {
+			openFileComparison(paths);
+			wireFolderRowSync(view);
+		});
 	QStringList names, tips;
 	for (const QString &dir : dirs)
 	{
@@ -768,6 +790,10 @@ void MainWindow::openArchiveComparison(const QString &leftArchive,
 				fc->setSideCaption(0, pretty(leftArchive, leftRoot, l));
 			if (r.startsWith(rightRoot))
 				fc->setSideCaption(1, pretty(rightArchive, rightRoot, r));
+		});
+	connect(view, &FolderCompareView::openFileComparisonRequested, this,
+		[this, view](const QString &, const QString &) {
+			wireFolderRowSync(view);
 		});
 	view->adoptTempDirs(std::move(temps));
 	// the tab carries the archives' names, not the temp paths, like

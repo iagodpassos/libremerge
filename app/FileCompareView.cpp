@@ -2434,10 +2434,23 @@ void FileCompareView::setSideModified(int side, bool modified)
 
 bool FileCompareView::saveModified(QString *error)
 {
+	bool savedAny = false;
 	for (int side = 0; side < m_paneCount; ++side)
 	{
-		if (m_sides[side].modified && !saveSide(side, error))
+		if (!m_sides[side].modified)
+			continue;
+		if (!saveSide(side, error))
 			return false;
+		savedAny = true;
+	}
+	if (savedAny)
+	{
+		// a folder comparison that opened this tab updates its row from
+		// this, like WinMerge's UpdateChangedItem; refresh the count
+		// first so it reflects what was written
+		if (m_diffStale)
+			recompare();
+		emit fileSaved(paths(), m_diffCount);
 	}
 	return true;
 }
@@ -2463,7 +2476,12 @@ bool FileCompareView::saveSideAt(int side, QString *error)
 {
 	if (side < 0 || side >= m_paneCount)
 		return false;
-	return saveSide(side, error);
+	if (!saveSide(side, error))
+		return false;
+	if (m_diffStale)
+		recompare();
+	emit fileSaved(paths(), m_diffCount);
+	return true;
 }
 
 bool FileCompareView::saveSide(int side, QString *error)

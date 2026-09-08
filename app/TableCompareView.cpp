@@ -884,5 +884,6 @@ bool TableCompareView::saveModified(QString *error)
 		setSideModified(side, false);
 		++m_saveSerial[side]; // older snapshots no longer match the disk
 	}
+	emit fileSaved(paths(), m_diffCount);
 	return true;
 }
