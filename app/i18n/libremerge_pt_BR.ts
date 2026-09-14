@@ -335,6 +335,30 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Data direita</translation>
     </message>
     <message>
+        <source>Copy %1 to %2</source>
+        <translation>Copiar %1 para %2</translation>
+    </message>
+    <message>
+        <source>Delete %1</source>
+        <translation>Excluir %1</translation>
+    </message>
+    <message>
+        <source>Delete all sides</source>
+        <translation>Excluir de todos os lados</translation>
+    </message>
+    <message>
+        <source>left</source>
+        <translation>esquerda</translation>
+    </message>
+    <message>
+        <source>middle</source>
+        <translation>meio</translation>
+    </message>
+    <message>
+        <source>right</source>
+        <translation>direita</translation>
+    </message>
+    <message>
         <source>Cancel</source>
         <translation>Cancelar</translation>
     </message>
@@ -368,11 +392,11 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     </message>
     <message>
         <source>left → right</source>
-        <translation>esquerda → direita</translation>
+        <translation type="vanished">esquerda → direita</translation>
     </message>
     <message>
         <source>right → left</source>
-        <translation>direita → esquerda</translation>
+        <translation type="vanished">direita → esquerda</translation>
     </message>
     <message>
         <source>LibreMerge</source>

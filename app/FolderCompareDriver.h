@@ -27,6 +27,8 @@ struct FolderCompareItem
 		MissingRight,  ///< 3-way: exists everywhere but on the right
 		Skipped,
 		Error,
+		NotCompared,   ///< result unknown after a copy/delete (WinMerge's
+		               ///  NOCMP; a recompare resolves it)
 	};
 
 	/** WinMerge's COMPAREFLAGS3WAY: which pair stayed identical when a

@@ -192,7 +192,98 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolderSyncOpt(QStringLiteral("selftest-folder-sync"),
 		QStringLiteral("Save a file opened from a folder compare and verify its row updates (for testing)"));
 	parser.addOption(selftestFolderSyncOpt);
+	QCommandLineOption selftestFolder3OpsOpt(QStringLiteral("selftest-folder3-ops"),
+		QStringLiteral("Copy and delete rows in a 3-way folder compare and verify (for testing)"));
+	parser.addOption(selftestFolder3OpsOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestFolder3OpsOpt))
+	{
+		// WinMerge's 3-way DirView operations: pairwise copies leave the
+		// row "not compared", deletes recompute from existence and drop
+		// rows that ran out of sides
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString roots[3] = { dir.filePath(QStringLiteral("A")),
+			dir.filePath(QStringLiteral("B")), dir.filePath(QStringLiteral("C")) };
+		const auto put = [&roots](int side, const QString &rel,
+			const QByteArray &content) {
+			const QString path = roots[side] + QLatin1Char('/') + rel;
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.write(content);
+		};
+		for (int i = 0; i < 3; ++i)
+		{
+			put(i, QStringLiteral("a.txt"), QByteArray::number(i) + "\n");
+			put(i, QStringLiteral("c.txt"), "c\n");
+			put(i, QStringLiteral("e.txt"), "e\n");
+		}
+		put(0, QStringLiteral("b.txt"), "b\n");
+		put(1, QStringLiteral("d.txt"), "d\n");
+
+		FolderCompareView view;
+		const auto wait = [&view]() {
+			for (int i = 0; i < 400 && view.isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+		};
+		view.start(QStringList{ roots[0], roots[1], roots[2] });
+		wait();
+
+		using Item = lm::FolderCompareItem;
+		bool ok = true;
+		const auto expect = [&view, &ok](const QString &name, int category,
+			const char *when) {
+			const int got = view.rowCategoryForTest(name);
+			if (got != category)
+			{
+				fprintf(stderr, "%s: %s category %d, expected %d\n",
+					when, qPrintable(name), got, category);
+				ok = false;
+			}
+		};
+
+		view.copyRowForTest(QStringLiteral("a.txt"), 0, 1);
+		expect(QStringLiteral("a.txt"), Item::NotCompared, "after copy");
+		{
+			QFile fa(roots[1] + QStringLiteral("/a.txt"));
+			fa.open(QIODevice::ReadOnly);
+			if (fa.readAll() != "0\n")
+			{
+				fprintf(stderr, "copy did not reach the middle\n");
+				ok = false;
+			}
+		}
+		view.copyRowForTest(QStringLiteral("b.txt"), 0, 2);
+		expect(QStringLiteral("b.txt"), Item::MissingMiddle, "after copy");
+		view.deleteRowForTest(QStringLiteral("c.txt"), { 2 });
+		expect(QStringLiteral("c.txt"), Item::MissingRight, "after delete");
+		if (QFileInfo::exists(roots[2] + QStringLiteral("/c.txt")))
+		{
+			fprintf(stderr, "right c.txt still on disk\n");
+			ok = false;
+		}
+		view.deleteRowForTest(QStringLiteral("d.txt"), { 1 });
+		expect(QStringLiteral("d.txt"), -1, "after lone-side delete");
+		view.deleteRowForTest(QStringLiteral("e.txt"), { 0, 1, 2 });
+		expect(QStringLiteral("e.txt"), -1, "after delete all");
+
+		// a recompare resolves every unknown against the disk
+		view.recompare();
+		wait();
+		expect(QStringLiteral("a.txt"), Item::Different, "after recompare");
+		expect(QStringLiteral("b.txt"), Item::MissingMiddle, "after recompare");
+		expect(QStringLiteral("c.txt"), Item::MissingRight, "after recompare");
+		expect(QStringLiteral("d.txt"), -1, "after recompare");
+		expect(QStringLiteral("e.txt"), -1, "after recompare");
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestFolderSyncOpt))
 	{

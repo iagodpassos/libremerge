@@ -12,6 +12,7 @@
 class QAction;
 class QLabel;
 class QLineEdit;
+class QMenu;
 class QProgressBar;
 class QPushButton;
 class QTimer;
@@ -50,6 +51,11 @@ public:
 	/** The category role of a row by file name, -1 if absent (for
 	    tests). */
 	int rowCategoryForTest(const QString &name) const;
+	/** Copy one row between sides without the confirmation (for
+	    tests). */
+	void copyRowForTest(const QString &name, int sourceSide, int targetSide);
+	/** Delete one row's sides without the confirmation (for tests). */
+	void deleteRowForTest(const QString &name, const QList<int> &sides);
 
 	/** Keep extracted-archive temp trees alive for this view's
 	    lifetime (WinMerge's CTempPathContext). */
@@ -71,8 +77,8 @@ private slots:
 	void itemActivated(QTreeWidgetItem *item, int column);
 	void updateProgress();
 	void compareFinished();
-	void copySelected(int sourceSide);
-	void deleteSelected(bool leftSide, bool rightSide);
+	void copySelected(int sourceSide, int targetSide);
+	void deleteSelected(const QList<int> &sides);
 
 private:
 	void populate(const lm::FolderCompareResult &result);
@@ -80,6 +86,14 @@ private:
 	void setupColumns();
 	QTreeWidgetItem *findRowByName(const QString &name) const;
 	void updateStatusLine();
+	QString sideName(int side) const;
+	void copyRows(const QList<QTreeWidgetItem *> &rows, int sourceSide,
+		int targetSide);
+	void deleteRows(const QList<QTreeWidgetItem *> &rows,
+		const QList<int> &sides);
+	void adjustCategoryCounters(lm::FolderCompareItem::Category from,
+		lm::FolderCompareItem::Category to);
+	void buildContextMenu(QMenu *menu);
 	int colSize(int side) const { return 3 + side; }
 	int colDate(int side) const { return 3 + m_sides + side; }
 	int colCount() const { return 3 + 2 * m_sides; }
@@ -96,6 +110,7 @@ private:
 
 	QString m_roots[3];
 	int m_sides = 2;
+	int m_rowsRemoved = 0; // rows dropped since the scan (delete ops)
 	std::vector<std::unique_ptr<QTemporaryDir>> m_tempDirs;
 	lm::FolderCompareResult m_result;
 	QLineEdit *m_filterEdit;

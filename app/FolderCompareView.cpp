@@ -71,6 +71,7 @@ QString categoryText(lm::FolderCompareItem::Category category)
 		return QObject::tr("Does not exist on the right");
 	case lm::FolderCompareItem::Skipped: return QObject::tr("Skipped");
 	case lm::FolderCompareItem::Error: return QObject::tr("Error");
+	case lm::FolderCompareItem::NotCompared: return QString();
 	}
 	return {};
 }
@@ -225,20 +226,20 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	toolbar->addSeparator();
 	m_actCopyRight = toolbar->addAction(lm::icon(lm::Icon::CopyRight), tr("Copy to Right"));
 	m_actCopyRight->setToolTip(tr("Copy to Right"));
-	connect(m_actCopyRight, &QAction::triggered, this, [this]() { copySelected(0); });
+	connect(m_actCopyRight, &QAction::triggered, this, [this]() { copySelected(0, 1); });
 	m_actCopyLeft = toolbar->addAction(lm::icon(lm::Icon::CopyLeft), tr("Copy to Left"));
 	m_actCopyLeft->setToolTip(tr("Copy to Left"));
-	connect(m_actCopyLeft, &QAction::triggered, this, [this]() { copySelected(1); });
+	connect(m_actCopyLeft, &QAction::triggered, this, [this]() { copySelected(1, 0); });
 	toolbar->addSeparator();
 	m_actDeleteLeft = toolbar->addAction(lm::icon(lm::Icon::DeleteLeft), tr("Delete Left"));
 	m_actDeleteLeft->setToolTip(tr("Delete Left"));
-	connect(m_actDeleteLeft, &QAction::triggered, this, [this]() { deleteSelected(true, false); });
+	connect(m_actDeleteLeft, &QAction::triggered, this, [this]() { deleteSelected({ 0 }); });
 	m_actDeleteRight = toolbar->addAction(lm::icon(lm::Icon::DeleteRight), tr("Delete Right"));
 	m_actDeleteRight->setToolTip(tr("Delete Right"));
-	connect(m_actDeleteRight, &QAction::triggered, this, [this]() { deleteSelected(false, true); });
+	connect(m_actDeleteRight, &QAction::triggered, this, [this]() { deleteSelected({ 1 }); });
 	m_actDeleteBoth = toolbar->addAction(lm::icon(lm::Icon::DeleteBoth), tr("Delete Both"));
 	m_actDeleteBoth->setToolTip(tr("Delete Both"));
-	connect(m_actDeleteBoth, &QAction::triggered, this, [this]() { deleteSelected(true, true); });
+	connect(m_actDeleteBoth, &QAction::triggered, this, [this]() { deleteSelected({ 0, 1 }); });
 	// tag with the lm::Icon so applyToolbarTheme() can re-render them
 	applyAction->setData(static_cast<int>(lm::Icon::Refresh));
 	m_actTreeMode->setData(static_cast<int>(lm::Icon::TreeView));
@@ -261,12 +262,7 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	connect(m_tree, &QTreeWidget::itemSelectionChanged, this, &FolderCompareView::updateActions);
 	connect(m_tree, &QTreeWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
 		QMenu menu(this);
-		menu.addAction(m_actCopyRight);
-		menu.addAction(m_actCopyLeft);
-		menu.addSeparator();
-		menu.addAction(m_actDeleteLeft);
-		menu.addAction(m_actDeleteRight);
-		menu.addAction(m_actDeleteBoth);
+		buildContextMenu(&menu);
 		menu.exec(m_tree->viewport()->mapToGlobal(pos));
 	});
 	layout->addWidget(m_tree, 1);
@@ -388,6 +384,14 @@ void FolderCompareView::start(const QStringList &dirs)
 	m_sides = dirs.size();
 	for (int i = 0; i < 3; ++i)
 		m_roots[i] = i < m_sides ? dirs.at(i) : QString();
+	// the pairwise toolbar buttons are 2-way; the 3-way operations live
+	// in the context menu (the full direction matrix, like WinMerge)
+	const bool twoWay = (m_sides == 2);
+	m_actCopyRight->setVisible(twoWay);
+	m_actCopyLeft->setVisible(twoWay);
+	m_actDeleteLeft->setVisible(twoWay);
+	m_actDeleteRight->setVisible(twoWay);
+	m_actDeleteBoth->setVisible(twoWay);
 	setupColumns();
 	m_result = lm::FolderCompareResult();
 	m_tree->clear();
@@ -457,6 +461,7 @@ void FolderCompareView::populate(const lm::FolderCompareResult &result)
 	}
 
 	m_result = result;
+	m_rowsRemoved = 0;
 	rebuildRows();
 	// results are in: move focus to the list (also keeps macOS from
 	// painting its native focus treatment over the themed filter field)
@@ -467,11 +472,117 @@ void FolderCompareView::populate(const lm::FolderCompareResult &result)
 void FolderCompareView::updateStatusLine()
 {
 	QString text = tr("%1 item(s): %2 different, %3 unique, %4 identical")
-		.arg(m_result.items.size()).arg(m_result.different)
+		.arg(m_result.items.size() - m_rowsRemoved).arg(m_result.different)
 		.arg(m_result.unique).arg(m_result.identical);
 	if (m_result.aborted)
 		text = tr("Cancelled \xE2\x80\x94 partial results. ") + text;
 	m_status->setText(text);
+}
+
+/** Keep the status-line buckets in step with a row's category change,
+    including rows that leave the list entirely (to = NotCompared with
+    the row removed). */
+void FolderCompareView::adjustCategoryCounters(
+	lm::FolderCompareItem::Category from, lm::FolderCompareItem::Category to)
+{
+	const auto bucket = [this](lm::FolderCompareItem::Category c) -> int * {
+		switch (c)
+		{
+		case lm::FolderCompareItem::Identical:
+			return &m_result.identical;
+		case lm::FolderCompareItem::Different:
+		case lm::FolderCompareItem::MissingLeft:
+		case lm::FolderCompareItem::MissingMiddle:
+		case lm::FolderCompareItem::MissingRight:
+			return &m_result.different;
+		case lm::FolderCompareItem::LeftOnly:
+		case lm::FolderCompareItem::MiddleOnly:
+		case lm::FolderCompareItem::RightOnly:
+			return &m_result.unique;
+		default:
+			return nullptr;
+		}
+	};
+	if (from == to)
+		return;
+	if (int *fromBucket = bucket(from))
+		--*fromBucket;
+	if (int *toBucket = bucket(to))
+		++*toBucket;
+}
+
+/** The selection operations, 2-way as before and 3-way with WinMerge's
+    full direction matrix (every pairwise copy, delete per side and
+    delete on all sides). Enablement follows IsItemCopyableOnTo and
+    IsItemDeletableOn: the source (or deleted) side must exist on at
+    least one selected row. */
+void FolderCompareView::buildContextMenu(QMenu *menu)
+{
+	if (m_sides == 2)
+	{
+		menu->addAction(m_actCopyRight);
+		menu->addAction(m_actCopyLeft);
+		menu->addSeparator();
+		menu->addAction(m_actDeleteLeft);
+		menu->addAction(m_actDeleteRight);
+		menu->addAction(m_actDeleteBoth);
+		return;
+	}
+
+	const bool busy = m_job != nullptr;
+	bool anySide[3] = {};
+	bool anyAllSides = false;
+	for (QTreeWidgetItem *row : m_tree->selectedItems())
+	{
+		bool all = true;
+		for (int i = 0; i < 3; ++i)
+		{
+			const bool has = !sidePath(row, i).isEmpty();
+			anySide[i] = anySide[i] || has;
+			all = all && has;
+		}
+		anyAllSides = anyAllSides || all;
+	}
+
+	const int directions[6][2] = {
+		{ 0, 1 }, { 0, 2 }, { 1, 0 }, { 1, 2 }, { 2, 0 }, { 2, 1 },
+	};
+	for (const auto &dir : directions)
+	{
+		const int src = dir[0], dst = dir[1];
+		QAction *action = menu->addAction(
+			tr("Copy %1 to %2").arg(sideName(src), sideName(dst)));
+		action->setEnabled(!busy && anySide[src]);
+		connect(action, &QAction::triggered, this,
+			[this, src, dst]() { copySelected(src, dst); });
+	}
+	menu->addSeparator();
+	for (int side = 0; side < 3; ++side)
+	{
+		QAction *action = menu->addAction(
+			tr("Delete %1").arg(sideName(side)));
+		action->setEnabled(!busy && anySide[side]);
+		connect(action, &QAction::triggered, this,
+			[this, side]() { deleteSelected({ side }); });
+	}
+	QAction *deleteAll = menu->addAction(tr("Delete all sides"));
+	deleteAll->setEnabled(!busy && anyAllSides);
+	connect(deleteAll, &QAction::triggered, this,
+		[this]() { deleteSelected({ 0, 1, 2 }); });
+}
+
+void FolderCompareView::copyRowForTest(const QString &name, int sourceSide,
+	int targetSide)
+{
+	if (QTreeWidgetItem *row = findRowByName(name))
+		copyRows({ row }, sourceSide, targetSide);
+}
+
+void FolderCompareView::deleteRowForTest(const QString &name,
+	const QList<int> &sides)
+{
+	if (QTreeWidgetItem *row = findRowByName(name))
+		deleteRows({ row }, sides);
 }
 
 QTreeWidgetItem *FolderCompareView::findRowByName(const QString &name) const
@@ -528,24 +639,7 @@ void FolderCompareView::updateSavedItem(const QStringList &paths,
 		setRowCategory(row, newCategory, lm::FolderCompareItem::NoInfo, false);
 		if (oldCategory != newCategory)
 		{
-			const auto bucket = [this](lm::FolderCompareItem::Category c) -> int * {
-				switch (c)
-				{
-				case lm::FolderCompareItem::Identical:
-					return &m_result.identical;
-				case lm::FolderCompareItem::Different:
-				case lm::FolderCompareItem::MissingLeft:
-				case lm::FolderCompareItem::MissingMiddle:
-				case lm::FolderCompareItem::MissingRight:
-					return &m_result.different;
-				default:
-					return nullptr;
-				}
-			};
-			if (int *from = bucket(oldCategory))
-				--*from;
-			if (int *to = bucket(newCategory))
-				++*to;
+			adjustCategoryCounters(oldCategory, newCategory);
 			updateStatusLine();
 		}
 		return;
@@ -658,13 +752,8 @@ void FolderCompareView::updateActions()
 	const bool busy = m_job != nullptr;
 	if (m_sides == 3)
 	{
-		// v1 of the 3-way folder compare is read-only: WinMerge's
-		// pane-relative copy/delete matrix is not wired yet
-		m_actCopyRight->setEnabled(false);
-		m_actCopyLeft->setEnabled(false);
-		m_actDeleteLeft->setEnabled(false);
-		m_actDeleteRight->setEnabled(false);
-		m_actDeleteBoth->setEnabled(false);
+		// the pairwise toolbar buttons are hidden in 3-way; the full
+		// direction matrix lives in the context menu, built on demand
 		return;
 	}
 	bool anyLeft = false, anyRight = false;
@@ -680,39 +769,101 @@ void FolderCompareView::updateActions()
 	m_actDeleteBoth->setEnabled(hasSelection && !busy && (anyLeft || anyRight));
 }
 
+/** Bring a row in line with the disk after a copy or delete, following
+    WinMerge's UpdateDiffAfterOperation: existence drives the side-only
+    and missing-on-one-side texts; when every side still exists, 2-way
+    marks the pair identical (the copy just made it so) while 3-way
+    reports nothing (NOCMP), because a pairwise copy says nothing about
+    the third side. A recompare resolves the unknowns. */
 void FolderCompareView::updateRowFromDisk(QTreeWidgetItem *row)
 {
-	const QString paths[2] = { intendedSidePath(row, 0), intendedSidePath(row, 1) };
-	const QFileInfo infos[2] = { QFileInfo(paths[0]), QFileInfo(paths[1]) };
-	const bool exists[2] = { infos[0].exists(), infos[1].exists() };
-	const bool isDir = (exists[0] && infos[0].isDir()) || (exists[1] && infos[1].isDir());
-
-	row->setData(0, RoleLeftPath, exists[0] ? paths[0] : QString());
-	row->setData(0, RoleRightPath, exists[1] ? paths[1] : QString());
-	row->setData(0, RoleBothSides, exists[0] && exists[1]);
-	row->setText(colSize(0), exists[0] && !isDir ? sizeText(infos[0].size()) : QString());
-	row->setText(colSize(1), exists[1] && !isDir ? sizeText(infos[1].size()) : QString());
-	row->setText(colDate(0), exists[0] ? dateText(infos[0].lastModified()) : QString());
-	row->setText(colDate(1), exists[1] ? dateText(infos[1].lastModified()) : QString());
-
-	if (!exists[0] && !exists[1])
+	const auto oldCategory = static_cast<lm::FolderCompareItem::Category>(
+		row->data(0, RoleCategory).toInt());
+	QString paths[3];
+	QFileInfo infos[3];
+	bool exists[3] = {};
+	int existCount = 0;
+	bool isDir = false;
+	for (int i = 0; i < m_sides; ++i)
 	{
+		paths[i] = intendedSidePath(row, i);
+		infos[i] = QFileInfo(paths[i]);
+		exists[i] = infos[i].exists();
+		existCount += exists[i] ? 1 : 0;
+		isDir = isDir || (exists[i] && infos[i].isDir());
+	}
+
+	bool allSides = true;
+	for (int i = 0; i < m_sides; ++i)
+	{
+		const int role = i == 0 ? int(RoleLeftPath)
+			: (m_sides == 3 && i == 1) ? int(RoleMiddlePath) : int(RoleRightPath);
+		row->setData(0, role, exists[i] ? paths[i] : QString());
+		row->setText(colSize(i), exists[i] && !isDir
+			? sizeText(infos[i].size()) : QString());
+		row->setText(colDate(i), exists[i]
+			? dateText(infos[i].lastModified()) : QString());
+		allSides = allSides && exists[i];
+	}
+	row->setData(0, RoleBothSides, allSides);
+
+	if (existCount == 0)
+	{
+		adjustCategoryCounters(oldCategory, lm::FolderCompareItem::NotCompared);
+		++m_rowsRemoved;
+		updateStatusLine();
 		delete row;
 		return;
 	}
+
 	lm::FolderCompareItem::Category category;
-	if (!exists[1])
-		category = lm::FolderCompareItem::LeftOnly;
-	else if (!exists[0])
-		category = lm::FolderCompareItem::RightOnly;
+	if (m_sides == 2)
+	{
+		if (!exists[1])
+			category = lm::FolderCompareItem::LeftOnly;
+		else if (!exists[0])
+			category = lm::FolderCompareItem::RightOnly;
+		else
+			category = lm::FolderCompareItem::Identical; // post-copy state
+	}
+	else if (existCount == 1)
+	{
+		category = exists[0] ? lm::FolderCompareItem::LeftOnly
+			: exists[1] ? lm::FolderCompareItem::MiddleOnly
+			            : lm::FolderCompareItem::RightOnly;
+	}
+	else if (existCount == 2)
+	{
+		category = !exists[0] ? lm::FolderCompareItem::MissingLeft
+			: !exists[1] ? lm::FolderCompareItem::MissingMiddle
+			             : lm::FolderCompareItem::MissingRight;
+	}
 	else
-		category = lm::FolderCompareItem::Identical; // post-copy state
+	{
+		category = lm::FolderCompareItem::NotCompared;
+	}
 	setRowCategory(row, category, lm::FolderCompareItem::NoInfo, isDir);
+	adjustCategoryCounters(oldCategory, category);
+	updateStatusLine();
 }
 
-void FolderCompareView::copySelected(int sourceSide)
+/** Localized side name for confirmation texts and menu labels. */
+QString FolderCompareView::sideName(int side) const
 {
-	const int target = 1 - sourceSide;
+	if (m_sides == 3)
+	{
+		switch (side)
+		{
+		case 0: return tr("left");
+		case 1: return tr("middle");
+		default: return tr("right");
+		}
+	}
+	return side == 0 ? tr("left") : tr("right");
+}
+
+void FolderCompareView::copySelected(int sourceSide, int targetSide)
+{
 	QList<QTreeWidgetItem *> rows;
 	for (QTreeWidgetItem *row : m_tree->selectedItems())
 	{
@@ -722,18 +873,24 @@ void FolderCompareView::copySelected(int sourceSide)
 	if (rows.isEmpty())
 		return;
 
-	const QString direction = sourceSide == 0
-		? tr("left \xE2\x86\x92 right") : tr("right \xE2\x86\x92 left");
+	const QString direction = sideName(sourceSide)
+		+ QString::fromUtf8(" \xE2\x86\x92 ") + sideName(targetSide);
 	if (lm::question(this, tr("LibreMerge"),
 		tr("Copy %n item(s) (%1)? Overwritten files go to the Trash.", nullptr,
 			rows.size()).arg(direction)) != QMessageBox::Yes)
 		return;
 
+	copyRows(rows, sourceSide, targetSide);
+}
+
+void FolderCompareView::copyRows(const QList<QTreeWidgetItem *> &rows,
+	int sourceSide, int targetSide)
+{
 	int failures = 0;
 	for (QTreeWidgetItem *row : rows)
 	{
 		const QString src = sidePath(row, sourceSide);
-		const QString dst = intendedSidePath(row, target);
+		const QString dst = intendedSidePath(row, targetSide);
 		if (lm::copyRecursively(src, dst))
 			updateRowFromDisk(row);
 		else
@@ -745,13 +902,15 @@ void FolderCompareView::copySelected(int sourceSide)
 	updateActions();
 }
 
-void FolderCompareView::deleteSelected(bool leftSide, bool rightSide)
+void FolderCompareView::deleteSelected(const QList<int> &sides)
 {
 	QList<QTreeWidgetItem *> rows;
 	for (QTreeWidgetItem *row : m_tree->selectedItems())
 	{
-		if ((leftSide && !sidePath(row, 0).isEmpty())
-			|| (rightSide && !sidePath(row, 1).isEmpty()))
+		bool any = false;
+		for (const int side : sides)
+			any = any || !sidePath(row, side).isEmpty();
+		if (any)
 			rows.append(row);
 	}
 	if (rows.isEmpty())
@@ -761,19 +920,19 @@ void FolderCompareView::deleteSelected(bool leftSide, bool rightSide)
 		tr("Move %n item(s) to the Trash?", nullptr, rows.size())) != QMessageBox::Yes)
 		return;
 
+	deleteRows(rows, sides);
+}
+
+void FolderCompareView::deleteRows(const QList<QTreeWidgetItem *> &rows,
+	const QList<int> &sides)
+{
 	int failures = 0;
 	for (QTreeWidgetItem *row : rows)
 	{
 		bool ok = true;
-		if (leftSide)
+		for (const int side : sides)
 		{
-			const QString path = sidePath(row, 0);
-			if (!path.isEmpty() && !QFile::moveToTrash(path))
-				ok = false;
-		}
-		if (rightSide)
-		{
-			const QString path = sidePath(row, 1);
+			const QString path = sidePath(row, side);
 			if (!path.isEmpty() && !QFile::moveToTrash(path))
 				ok = false;
 		}
