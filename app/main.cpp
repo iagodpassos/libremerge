@@ -207,6 +207,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestAboutOpt(QStringLiteral("selftest-about"),
 		QStringLiteral("Verify the About box contents (for testing)"));
 	parser.addOption(selftestAboutOpt);
+	QCommandLineOption selftestQtI18nOpt(QStringLiteral("selftest-qt-i18n"),
+		QStringLiteral("Verify Qt's own strings are translated for the UI language (for testing)"));
+	parser.addOption(selftestQtI18nOpt);
 	QCommandLineOption selftestMenuRolesOpt(QStringLiteral("selftest-menu-roles"),
 		QStringLiteral("Verify every menu-bar action has an explicit macOS menu role (for testing)"));
 	parser.addOption(selftestMenuRolesOpt);
@@ -214,6 +217,27 @@ int main(int argc, char *argv[])
 		QStringLiteral("Verify which actions macOS merged into the application menu (for testing)"));
 	parser.addOption(selftestAppMenuOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestQtI18nOpt))
+	{
+		// Qt's own strings (dialog buttons, text-field context menus, the
+		// macOS application menu) come from qtbase_<lang>.qm, which the
+		// packages must ship next to the app: the 0.9.4 dmg and AppImages
+		// did not, so pt-BR users saw "Cancel" and "Paste" in English
+		const QString language = locale.name();
+		if (language.startsWith(QStringLiteral("en")))
+		{
+			printf("skipped: English UI\n");
+			return 0;
+		}
+		const QString cancel = QCoreApplication::translate("QPlatformTheme", "Cancel");
+		const QString paste = QCoreApplication::translate("QWidgetTextControl", "&Paste");
+		printf("%s: Cancel -> %s, &Paste -> %s (translations: %s)\n",
+			qPrintable(language), qPrintable(cancel), qPrintable(paste),
+			qPrintable(QLibraryInfo::path(QLibraryInfo::TranslationsPath)));
+		return (cancel != QStringLiteral("Cancel")
+			&& paste != QStringLiteral("&Paste")) ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestMenuRolesOpt))
 	{

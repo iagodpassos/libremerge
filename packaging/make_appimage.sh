@@ -8,7 +8,8 @@
 #
 # Produces <work-dir>/LibreMerge-<version>-<arch>.AppImage with Qt, ICU,
 # Poco and the wayland+xcb platform plugins bundled (the .deb lesson:
-# platform plugins are dlopen'd and easy to miss).
+# platform plugins are dlopen'd and easy to miss), plus Qt's own
+# translations (the container needs qt6-translations-l10n).
 set -euo pipefail
 
 SRC="${1:?usage: make_appimage.sh <source-dir> <work-dir>}"
@@ -65,6 +66,35 @@ export EXTRA_QT_PLUGINS="wayland-decoration-client;wayland-graphics-integration-
 # deploy first (generates an AppRun that sources apprun-hooks/*.sh at
 # runtime), then add our hook, then pack
 ./linuxdeploy-"$ARCH".AppImage --appdir AppDir --plugin qt
+
+# Qt's own strings (dialog buttons, text-field context menus) come from
+# qtbase_<lang>.qm. The qt plugin deploys them into usr/translations
+# (where its qt.conf, Prefix=../, points Qt) only when Debian's
+# qt6-translations-l10n is installed; the 0.9.4 containers lacked it and
+# the AppImages showed "Cancel" and "Paste" in English to pt-BR users.
+# Guard the app's languages (fail loudly if the package goes missing) and
+# drop the rest, like the dmg: a UI language LibreMerge is not
+# translated to stays English throughout instead of half-translated.
+QT_TRANSLATIONS="$(/usr/bin/qmake6 -query QT_INSTALL_TRANSLATIONS)"
+mkdir -p AppDir/usr/translations
+keep=""
+for ts in "$SRC"/app/i18n/libremerge_*.ts; do
+  lang="$(basename "$ts" .ts)"
+  lang="${lang#libremerge_}"
+  qm="$QT_TRANSLATIONS/qtbase_$lang.qm"
+  if [ ! -f "$qm" ]; then
+    echo "ERROR: $qm not found (install qt6-translations-l10n)" >&2
+    exit 1
+  fi
+  cp "$qm" AppDir/usr/translations/
+  keep="$keep qtbase_$lang.qm"
+done
+for qm in AppDir/usr/translations/*.qm; do
+  case " $keep " in
+    *" $(basename "$qm") "*) ;;
+    *) rm -f "$qm" ;;
+  esac
+done
 
 # the bundled Qt (Debian 12's 6.4) cannot position windows on a native
 # Wayland session, so dialogs land in a screen corner instead of being
