@@ -60,6 +60,8 @@ run_one selftest-folder-sync
 run_one selftest-folder3-ops
 # native menu check: runs under cocoa (dmg validation), skips offscreen
 LIBREMERGE_LANGUAGE=pt_BR run_one selftest-app-menu
+run_one selftest-about
+run_one selftest-menu-roles
 run_one selftest-table "$TMP/left.csv" "$TMP/right.csv"
 run_one selftest-image "$TMP/left.png" "$TMP/right.png"
 run_one selftest-merge3 "$TMP/w3a.txt" "$TMP/w3b.txt" "$TMP/w3c.txt"

@@ -36,6 +36,7 @@
 #include "ImageFormats.h"
 #include "OptionsDialog.h"
 #include "Theme.h"
+#include "AboutDialog.h"
 #include "ArchiveCompare.h"
 #include "FolderCompareView.h"
 #include "NewComparisonView.h"
@@ -503,15 +504,8 @@ MainWindow::MainWindow(QWidget *parent)
 	QAction *aboutAction = helpMenu->addAction(tr("&About LibreMerge"));
 	aboutAction->setMenuRole(QAction::AboutRole);
 	connect(aboutAction, &QAction::triggered, this, [this]() {
-		QMessageBox::about(this, tr("About LibreMerge"),
-			tr("<b>LibreMerge %1</b><br/>"
-			   "A free differencing and merging tool for macOS and Linux.<br/><br/>"
-			   "Based on the comparison engine of <a href=\"https://winmerge.org\">WinMerge</a>, "
-			   "\xC2\xA9 Dean P. Grimm / Thingamahoochie Software and the WinMerge contributors "
-			   "(GPL-2.0-or-later).<br/>"
-			   "LibreMerge is licensed under the GNU GPL v3.0 or later.<br/><br/>"
-			   "Not affiliated with or endorsed by the WinMerge project.")
-				.arg(QApplication::applicationVersion()));
+		AboutDialog dialog(this);
+		dialog.exec();
 	});
 
 	disableMenuRoleHeuristics(menuBar());

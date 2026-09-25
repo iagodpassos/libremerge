@@ -27,6 +27,7 @@ qt_add_executable(LibreMerge
   FolderCompareView.cpp
   FolderCompareDriver.cpp
   ArchiveCompare.cpp
+  AboutDialog.cpp
   FileOps.cpp
   EngineOptions.cpp
 )
@@ -35,6 +36,19 @@ qt_add_resources(LibreMerge "i18n"
   PREFIX "/i18n"
   BASE i18n
   FILES i18n/libremerge_pt_BR.qm
+)
+
+# About box: the contributors list (shown by the Contributors button) and
+# the application icon for the banner, both from outside app/
+set(LM_ABOUT_CONTRIBUTORS ${CMAKE_SOURCE_DIR}/CONTRIBUTORS.md)
+set(LM_ABOUT_ICON ${CMAKE_SOURCE_DIR}/packaging/linux/icons/libremerge-512.png)
+set_source_files_properties(${LM_ABOUT_CONTRIBUTORS}
+  PROPERTIES QT_RESOURCE_ALIAS CONTRIBUTORS.md)
+set_source_files_properties(${LM_ABOUT_ICON}
+  PROPERTIES QT_RESOURCE_ALIAS icon.png)
+qt_add_resources(LibreMerge "about"
+  PREFIX "/about"
+  FILES ${LM_ABOUT_CONTRIBUTORS} ${LM_ABOUT_ICON}
 )
 
 if(APPLE)

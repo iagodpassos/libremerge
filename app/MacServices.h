@@ -18,4 +18,8 @@ void installMacServices(MainWindow *window);
     merges menu actions into the application menu by role). */
 QStringList appMenuItemsForTest(const QString &menuTitle = QString());
 
+/** Bring the application to the front, so macOS installs the active
+    window's menu bar (for tests launched from a terminal). */
+void activateAppForTest();
+
 } // namespace lm

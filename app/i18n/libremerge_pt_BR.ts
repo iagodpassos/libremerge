@@ -2,6 +2,45 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="pt_BR">
 <context>
+    <name>AboutDialog</name>
+    <message>
+        <source>About LibreMerge</source>
+        <translation>Sobre o LibreMerge</translation>
+    </message>
+    <message>
+        <source>LibreMerge comes with ABSOLUTELY NO WARRANTY. It is free software and can be redistributed under the conditions of the %1, version 3 or later.</source>
+        <translation>O LibreMerge vem com ABSOLUTAMENTE NENHUMA GARANTIA. Ele é um software livre e pode ser redistribuído sob as condiçôes da %1, versão 3 ou posterior.</translation>
+    </message>
+    <message>
+        <source>GNU General Public License</source>
+        <translation>Licença Pública Geral GNU</translation>
+    </message>
+    <message>
+        <source>(c) 2026 Iago Passos and the LibreMerge contributors.</source>
+        <translation>(c) 2026 Iago Passos e os contribuidores do LibreMerge.</translation>
+    </message>
+    <message>
+        <source>Based on the comparison engine of %1, (c) 1996-2026 Dean P. Grimm / Thingamahoochie Software and the WinMerge contributors (GPL-2.0-or-later). Not affiliated with or endorsed by the WinMerge project.</source>
+        <translation>Baseado no motor de comparação do %1, (c) 1996-2026 Dean P. Grimm / Thingamahoochie Software e os contribuidores do WinMerge (GPL-2.0-or-later). Não afiliado ao projeto WinMerge nem endossado por ele.</translation>
+    </message>
+    <message>
+        <source>Contributors</source>
+        <translation>Contribuidores</translation>
+    </message>
+    <message>
+        <source>Visit the LibreMerge page on GitHub!</source>
+        <translation>Visite a página do LibreMerge no GitHub!</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Version %1 (%2)</source>
+        <translation>Versão %1 (%2)</translation>
+    </message>
+</context>
+<context>
     <name>FileCompareView</name>
     <message>
         <source>First Difference</source>
@@ -945,11 +984,11 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     </message>
     <message>
         <source>About LibreMerge</source>
-        <translation>Sobre o LibreMerge</translation>
+        <translation type="vanished">Sobre o LibreMerge</translation>
     </message>
     <message>
         <source>&lt;b&gt;LibreMerge %1&lt;/b&gt;&lt;br/&gt;A free differencing and merging tool for macOS and Linux.&lt;br/&gt;&lt;br/&gt;Based on the comparison engine of &lt;a href=&quot;https://winmerge.org&quot;&gt;WinMerge&lt;/a&gt;, © Dean P. Grimm / Thingamahoochie Software and the WinMerge contributors (GPL-2.0-or-later).&lt;br/&gt;LibreMerge is licensed under the GNU GPL v3.0 or later.&lt;br/&gt;&lt;br/&gt;Not affiliated with or endorsed by the WinMerge project.</source>
-        <translation>&lt;b&gt;LibreMerge %1&lt;/b&gt;&lt;br/&gt;Uma ferramenta livre de comparação e mesclagem para macOS e Linux.&lt;br/&gt;&lt;br/&gt;Baseado no motor de comparação do &lt;a href=&quot;https://winmerge.org&quot;&gt;WinMerge&lt;/a&gt;, © Dean P. Grimm / Thingamahoochie Software e os contribuidores do WinMerge (GPL-2.0-or-later).&lt;br/&gt;O LibreMerge é licenciado sob a GNU GPL v3.0 ou posterior.&lt;br/&gt;&lt;br/&gt;Não afiliado ao projeto WinMerge nem endossado por ele.</translation>
+        <translation type="vanished">&lt;b&gt;LibreMerge %1&lt;/b&gt;&lt;br/&gt;Uma ferramenta livre de comparação e mesclagem para macOS e Linux.&lt;br/&gt;&lt;br/&gt;Baseado no motor de comparação do &lt;a href=&quot;https://winmerge.org&quot;&gt;WinMerge&lt;/a&gt;, © Dean P. Grimm / Thingamahoochie Software e os contribuidores do WinMerge (GPL-2.0-or-later).&lt;br/&gt;O LibreMerge é licenciado sob a GNU GPL v3.0 ou posterior.&lt;br/&gt;&lt;br/&gt;Não afiliado ao projeto WinMerge nem endossado por ele.</translation>
     </message>
     <message>
         <source>LibreMerge</source>

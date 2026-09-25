@@ -133,4 +133,4 @@ LibreMerge as a whole is distributed under the **GNU GPL v3.0 or later** ([LICEN
 
 Binary/hex compare, 3-way folders, HTML reports, notarized builds, Linux packages (AUR first), and — if it proves itself — offering the portable engine fixes back to WinMerge upstream ([WinMerge/winmerge#141](https://github.com/WinMerge/winmerge/issues/141) tracks the idea of a cross-platform UI).
 
-Issues and pull requests are welcome.
+Issues and pull requests are welcome. Everyone who helps is credited in [CONTRIBUTORS.md](CONTRIBUTORS.md), which the About box shows too.

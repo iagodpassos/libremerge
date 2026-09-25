@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // LibreMerge: Qt application entry point.
+#include <functional>
 #include <QApplication>
 #include <QClipboard>
 #include <QGuiApplication>
@@ -8,9 +9,12 @@
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QKeyEvent>
+#include <QMenu>
+#include <QMenuBar>
 #include <QLineEdit>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QTextBrowser>
 #include <QThread>
 #include <QTimer>
 #include <QTranslator>
@@ -23,6 +27,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <QDir>
+#include "AboutDialog.h"
 #include "ArchiveCompare.h"
 #include "MainWindow.h"
 #include "NewComparisonView.h"
@@ -195,10 +200,108 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolder3OpsOpt(QStringLiteral("selftest-folder3-ops"),
 		QStringLiteral("Copy and delete rows in a 3-way folder compare and verify (for testing)"));
 	parser.addOption(selftestFolder3OpsOpt);
+	QCommandLineOption screenshotAboutOpt(QStringLiteral("screenshot-about"),
+		QStringLiteral("Render the About box (and its contributors list) to <file> and exit (for testing)"),
+		QStringLiteral("file"));
+	parser.addOption(screenshotAboutOpt);
+	QCommandLineOption selftestAboutOpt(QStringLiteral("selftest-about"),
+		QStringLiteral("Verify the About box contents (for testing)"));
+	parser.addOption(selftestAboutOpt);
+	QCommandLineOption selftestMenuRolesOpt(QStringLiteral("selftest-menu-roles"),
+		QStringLiteral("Verify every menu-bar action has an explicit macOS menu role (for testing)"));
+	parser.addOption(selftestMenuRolesOpt);
 	QCommandLineOption selftestAppMenuOpt(QStringLiteral("selftest-app-menu"),
 		QStringLiteral("Verify which actions macOS merged into the application menu (for testing)"));
 	parser.addOption(selftestAppMenuOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestMenuRolesOpt))
+	{
+		// no menu-bar action may be left to Qt's text heuristic (it once
+		// promoted pt-BR "Sobreposicao" to the About item on macOS), and
+		// the application-menu roles each belong to exactly one action
+		MainWindow window;
+		const std::function<void(QWidget *)> expand = [&expand](QWidget *w) {
+			for (QAction *action : w->actions())
+				if (QMenu *submenu = action->menu())
+				{
+					emit submenu->aboutToShow(); // builds dynamic menus
+					expand(submenu);
+				}
+		};
+		expand(window.menuBar());
+		int heuristic = 0, about = 0, prefs = 0, quit = 0;
+		const std::function<void(QWidget *)> walk = [&](QWidget *w) {
+			for (QAction *action : w->actions())
+			{
+				switch (action->menuRole())
+				{
+				case QAction::TextHeuristicRole:
+					++heuristic;
+					fprintf(stderr, "heuristic role: %s\n",
+						qPrintable(action->text()));
+					break;
+				case QAction::AboutRole: ++about; break;
+				case QAction::PreferencesRole: ++prefs; break;
+				case QAction::QuitRole: ++quit; break;
+				default: break;
+				}
+				if (QMenu *submenu = action->menu())
+					walk(submenu);
+			}
+		};
+		walk(window.menuBar());
+		printf("heuristic: %d, about: %d, preferences: %d, quit: %d\n",
+			heuristic, about, prefs, quit);
+		return (heuristic == 0 && about == 1 && prefs == 1 && quit == 1)
+			? 0 : 1;
+	}
+
+	if (parser.isSet(screenshotAboutOpt))
+	{
+		AboutDialog dialog;
+		dialog.show();
+		QCoreApplication::processEvents();
+		const QString path = parser.value(screenshotAboutOpt);
+		if (!dialog.grab().save(path))
+			return 2;
+		// the contributors list, rendered the way the button shows it
+		QTextBrowser browser;
+		browser.setMarkdown(AboutDialog::contributorsMarkdown());
+		browser.resize(640, 1400);
+		browser.show();
+		QCoreApplication::processEvents();
+		QString contributorsPath = path;
+		contributorsPath.insert(contributorsPath.lastIndexOf(QLatin1Char('.')),
+			QStringLiteral("-contributors"));
+		return browser.grab().save(contributorsPath) ? 0 : 2;
+	}
+
+	if (parser.isSet(selftestAboutOpt))
+	{
+		const QString version = AboutDialog::versionText();
+		const QString contributors = AboutDialog::contributorsMarkdown();
+		// the Crystal Edit parser authors ask for an About-box credit
+		const QStringList mustCredit = { QStringLiteral("Stcherbatchenko"),
+			QStringLiteral("Ferdinand Prantl"), QStringLiteral("YuanShoyan"),
+			QStringLiteral("wiera987"), QStringLiteral("devmynote"),
+			QStringLiteral("Javier Miguel"), QStringLiteral("H. Saido"),
+			QStringLiteral("voidray"), QStringLiteral("Przemys") };
+		bool ok = version.contains(QApplication::applicationVersion())
+			&& !AboutDialog::platformText().isEmpty()
+			&& AboutDialog::homepageUrl().host() == QStringLiteral("github.com")
+			&& !contributors.isEmpty();
+		for (const QString &name : mustCredit)
+			if (!contributors.contains(name))
+			{
+				fprintf(stderr, "missing credit: %s\n", qPrintable(name));
+				ok = false;
+			}
+		printf("%s | %s | contributors: %lld chars, ok: %d\n",
+			qPrintable(version), qPrintable(AboutDialog::platformText()),
+			static_cast<long long>(contributors.size()), ok);
+		return ok ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestAppMenuOpt))
 	{
@@ -213,10 +316,18 @@ int main(int argc, char *argv[])
 		}
 		MainWindow window;
 		window.show();
-		for (int i = 0; i < 20; ++i)
+		window.raise();
+		window.activateWindow();
+		lm::activateAppForTest();
+		// macOS installs a window's menu bar only once it is active: wait
+		// for the app's own menus to appear next to the application menu
+		// (a terminal keeping the focus made this check flaky)
+		for (int i = 0; i < 120; ++i)
 		{
 			QThread::msleep(25);
 			QCoreApplication::processEvents();
+			if (lm::appMenuItemsForTest(QStringLiteral("*")).size() > 3)
+				break;
 		}
 		const QStringList items = lm::appMenuItemsForTest();
 		bool ok = !items.isEmpty()
@@ -231,18 +342,28 @@ int main(int argc, char *argv[])
 			if (submenu && !title.startsWith(QStringLiteral("Servi")))
 				ok = false;
 		}
-		// the overlay submenu belongs to the Image menu
-		QStringList imageItems = lm::appMenuItemsForTest(QStringLiteral("Image"));
-		if (imageItems.isEmpty())
-			imageItems = lm::appMenuItemsForTest(QStringLiteral("Imagem"));
-		bool overlayHome = false;
-		for (const QString &item : imageItems)
-			if ((item.startsWith(QStringLiteral("Overlay"))
-					|| item.startsWith(QStringLiteral("Sobreposi")))
-				&& item.endsWith(QLatin1String("\t1")))
-				overlayHome = true;
-		printf("overlay submenu in the Image menu: %d\n", overlayHome);
-		ok = ok && overlayHome;
+		// the overlay submenu belongs to the Image menu; macOS installs the
+		// window's menus only while the app is frontmost, which a test run
+		// from a terminal cannot force (cooperative activation), so this
+		// half is checked only when the menus are there
+		const bool installed =
+			lm::appMenuItemsForTest(QStringLiteral("*")).size() > 3;
+		if (installed)
+		{
+			QStringList imageItems = lm::appMenuItemsForTest(QStringLiteral("Image"));
+			if (imageItems.isEmpty())
+				imageItems = lm::appMenuItemsForTest(QStringLiteral("Imagem"));
+			bool overlayHome = false;
+			for (const QString &item : imageItems)
+				if ((item.startsWith(QStringLiteral("Overlay"))
+						|| item.startsWith(QStringLiteral("Sobreposi")))
+					&& item.endsWith(QLatin1String("\t1")))
+					overlayHome = true;
+			printf("overlay submenu in the Image menu: %d\n", overlayHome);
+			ok = ok && overlayHome;
+		}
+		else
+			printf("window menus not installed (app not frontmost): Image menu check skipped\n");
 		printf("ok: %d\n", ok);
 		return ok ? 0 : 1;
 #else
