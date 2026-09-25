@@ -64,4 +64,27 @@ void installMacServices(MainWindow *window)
 	[NSApp setServicesProvider:provider];
 }
 
+QStringList appMenuItemsForTest(const QString &menuTitle)
+{
+	QStringList items;
+	NSMenu *mainMenu = [NSApp mainMenu];
+	if (mainMenu == nil || mainMenu.numberOfItems == 0)
+		return items;
+	NSMenu *appMenu = [mainMenu itemAtIndex:0].submenu;
+	if (!menuTitle.isEmpty())
+	{
+		NSMenuItem *top = [mainMenu itemWithTitle:menuTitle.toNSString()];
+		appMenu = top != nil ? top.submenu : nil;
+	}
+	for (NSMenuItem *item in appMenu.itemArray)
+	{
+		if (item.isSeparatorItem || item.isHidden)
+			continue;
+		items.append(QString::fromNSString(item.title)
+			+ QLatin1Char('\t')
+			+ (item.hasSubmenu ? QLatin1Char('1') : QLatin1Char('0')));
+	}
+	return items;
+}
+
 } // namespace lm

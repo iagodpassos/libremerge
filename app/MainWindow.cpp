@@ -59,6 +59,24 @@ QString displayName(const QString &path)
 	return name.isEmpty() ? trimmed : name;
 }
 
+/** macOS moves menu-bar actions into the application menu by role, and
+    an action without an explicit role gets one guessed from its text:
+    anything starting or ending with the translated "About" becomes the
+    About item, "Options"/"Settings" the Preferences item, "Quit"/"Exit"
+    the Quit item. In pt-BR "Sobre" (About) also opens words like
+    "Sobreposicao" (Overlay), which hijacked the About slot. Every action
+    keeps its menu unless given a role on purpose. */
+void disableMenuRoleHeuristics(QWidget *menuContainer)
+{
+	for (QAction *action : menuContainer->actions())
+	{
+		if (action->menuRole() == QAction::TextHeuristicRole)
+			action->setMenuRole(QAction::NoRole);
+		if (QMenu *submenu = action->menu())
+			disableMenuRoleHeuristics(submenu);
+	}
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
@@ -137,6 +155,9 @@ MainWindow::MainWindow(QWidget *parent)
 				QSettings().remove(QStringLiteral("RecentComparisons/List"));
 			});
 		}
+		// entries carry file names: a folder called "sobre" or "options"
+		// must not be promoted into the application menu
+		disableMenuRoleHeuristics(recentMenu);
 	});
 	fileMenu->addSeparator();
 	addMenuAction(fileMenu, tr("&Save"), QKeySequence::Save,
@@ -152,8 +173,9 @@ MainWindow::MainWindow(QWidget *parent)
 	addMenuAction(fileMenu, tr("&Close Tab"), QKeySequence::Close,
 		[this]() { closeTab(m_tabs->currentIndex()); });
 	fileMenu->addSeparator();
-	addMenuAction(fileMenu, tr("&Quit"), QKeySequence::Quit,
+	QAction *quitAction = addMenuAction(fileMenu, tr("&Quit"), QKeySequence::Quit,
 		[]() { QApplication::quit(); });
+	quitAction->setMenuRole(QAction::QuitRole);
 
 	QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
 	addMenuAction(editMenu, tr("&Undo"), QKeySequence::Undo,
@@ -479,6 +501,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 	QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
 	QAction *aboutAction = helpMenu->addAction(tr("&About LibreMerge"));
+	aboutAction->setMenuRole(QAction::AboutRole);
 	connect(aboutAction, &QAction::triggered, this, [this]() {
 		QMessageBox::about(this, tr("About LibreMerge"),
 			tr("<b>LibreMerge %1</b><br/>"
@@ -490,6 +513,8 @@ MainWindow::MainWindow(QWidget *parent)
 			   "Not affiliated with or endorsed by the WinMerge project.")
 				.arg(QApplication::applicationVersion()));
 	});
+
+	disableMenuRoleHeuristics(menuBar());
 }
 
 void MainWindow::openFileComparison(const QString &leftPath, const QString &rightPath)

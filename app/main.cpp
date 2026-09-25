@@ -195,7 +195,61 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolder3OpsOpt(QStringLiteral("selftest-folder3-ops"),
 		QStringLiteral("Copy and delete rows in a 3-way folder compare and verify (for testing)"));
 	parser.addOption(selftestFolder3OpsOpt);
+	QCommandLineOption selftestAppMenuOpt(QStringLiteral("selftest-app-menu"),
+		QStringLiteral("Verify which actions macOS merged into the application menu (for testing)"));
+	parser.addOption(selftestAppMenuOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestAppMenuOpt))
+	{
+		// Qt moves menu actions into the macOS application menu by role;
+		// a text heuristic once promoted the pt-BR "Sobreposicao" submenu
+		// to "About", hiding the real About. Only the native menu tells.
+#ifdef Q_OS_MACOS
+		if (QGuiApplication::platformName() != QStringLiteral("cocoa"))
+		{
+			printf("skipped: needs the cocoa platform\n");
+			return 0;
+		}
+		MainWindow window;
+		window.show();
+		for (int i = 0; i < 20; ++i)
+		{
+			QThread::msleep(25);
+			QCoreApplication::processEvents();
+		}
+		const QStringList items = lm::appMenuItemsForTest();
+		bool ok = !items.isEmpty()
+			&& items.first().endsWith(QLatin1String("\t0"));
+		for (const QString &item : items)
+		{
+			printf("%s\n", qPrintable(item));
+			const QString title = item.section(QLatin1Char('\t'), 0, 0);
+			const bool submenu = item.endsWith(QLatin1String("\t1"));
+			// the Services entry is the only application-menu item that
+			// legitimately opens a submenu
+			if (submenu && !title.startsWith(QStringLiteral("Servi")))
+				ok = false;
+		}
+		// the overlay submenu belongs to the Image menu
+		QStringList imageItems = lm::appMenuItemsForTest(QStringLiteral("Image"));
+		if (imageItems.isEmpty())
+			imageItems = lm::appMenuItemsForTest(QStringLiteral("Imagem"));
+		bool overlayHome = false;
+		for (const QString &item : imageItems)
+			if ((item.startsWith(QStringLiteral("Overlay"))
+					|| item.startsWith(QStringLiteral("Sobreposi")))
+				&& item.endsWith(QLatin1String("\t1")))
+				overlayHome = true;
+		printf("overlay submenu in the Image menu: %d\n", overlayHome);
+		ok = ok && overlayHome;
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+#else
+		printf("skipped: macOS only\n");
+		return 0;
+#endif
+	}
 
 	if (parser.isSet(selftestFolder3OpsOpt))
 	{
