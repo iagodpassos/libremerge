@@ -4,13 +4,14 @@
 
 * Iago Passos ([@iagodpassos](https://github.com/iagodpassos))
 
-## Community: bug reports, feature requests and testing
+## Community: code, bug reports, feature requests and testing
 
-Every one of these reports shaped a release.
+Every one of these contributions shaped a release.
 
 * [@Jammmmm](https://github.com/Jammmmm): Linux AppImage ([#1](https://github.com/iagodpassos/libremerge/issues/1)), scroll to the first difference ([#3](https://github.com/iagodpassos/libremerge/issues/3)), recent files or folders ([#4](https://github.com/iagodpassos/libremerge/issues/4))
 * [@evpix](https://github.com/evpix): image comparison ([#2](https://github.com/iagodpassos/libremerge/issues/2))
 * [@voidray](https://github.com/voidray): insertion marker for text present on one side only ([#6](https://github.com/iagodpassos/libremerge/issues/6))
+* [@ta7mid](https://github.com/ta7mid): Homebrew on Linux, installing the AppImage through the cask ([homebrew-tap#1](https://github.com/iagodpassos/homebrew-tap/pull/1))
 
 ## Translations
 

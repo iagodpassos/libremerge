@@ -79,6 +79,12 @@ ctest --test-dir build        # engine test suite (369 tests)
 chmod +x LibreMerge-<version>-x86_64.AppImage && ./LibreMerge-<version>-x86_64.AppImage
 ```
 
+**Homebrew on Linux**: the same cask installs the AppImage for your architecture into `~/Applications` (glibc 2.36+ as above):
+
+```sh
+brew install --cask iagodpassos/tap/libremerge
+```
+
 **Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` in this repository builds and installs cleanly with `makepkg -si`.
 
 Other formats (native .deb packages, Flatpak) come back if there is demand — open an issue if you need one and it moves up the list.
