@@ -64,6 +64,7 @@ LIBREMERGE_LANGUAGE=pt_BR run_one selftest-app-menu
 run_one selftest-about
 run_one selftest-menu-roles
 LIBREMERGE_LANGUAGE=pt_BR run_one selftest-qt-i18n
+run_one selftest-desktop-integration
 run_one selftest-table "$TMP/left.csv" "$TMP/right.csv"
 run_one selftest-image "$TMP/left.png" "$TMP/right.png"
 run_one selftest-merge3 "$TMP/w3a.txt" "$TMP/w3b.txt" "$TMP/w3c.txt"

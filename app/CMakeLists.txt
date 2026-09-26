@@ -28,6 +28,7 @@ qt_add_executable(LibreMerge
   FolderCompareDriver.cpp
   ArchiveCompare.cpp
   AboutDialog.cpp
+  DesktopIntegration.cpp
   FileOps.cpp
   EngineOptions.cpp
 )
@@ -49,6 +50,22 @@ set_source_files_properties(${LM_ABOUT_ICON}
 qt_add_resources(LibreMerge "about"
   PREFIX "/about"
   FILES ${LM_ABOUT_CONTRIBUTORS} ${LM_ABOUT_ICON}
+)
+
+# Linux desktop integration (--install-desktop-integration): the packaged
+# desktop entry, retargeted at the AppImage, and the hicolor icons
+set(LM_DESKTOP_FILES ${CMAKE_SOURCE_DIR}/packaging/linux/libremerge.desktop)
+set_source_files_properties(${CMAKE_SOURCE_DIR}/packaging/linux/libremerge.desktop
+  PROPERTIES QT_RESOURCE_ALIAS libremerge.desktop)
+foreach(_size 16 32 64 128 256 512)
+  set(_icon ${CMAKE_SOURCE_DIR}/packaging/linux/icons/libremerge-${_size}.png)
+  set_source_files_properties(${_icon}
+    PROPERTIES QT_RESOURCE_ALIAS icons/libremerge-${_size}.png)
+  list(APPEND LM_DESKTOP_FILES ${_icon})
+endforeach()
+qt_add_resources(LibreMerge "desktop"
+  PREFIX "/desktop"
+  FILES ${LM_DESKTOP_FILES}
 )
 
 if(APPLE)

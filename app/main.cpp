@@ -28,6 +28,7 @@
 #include <archive_entry.h>
 #include <QDir>
 #include "AboutDialog.h"
+#include "DesktopIntegration.h"
 #include "ArchiveCompare.h"
 #include "MainWindow.h"
 #include "NewComparisonView.h"
@@ -128,6 +129,12 @@ bool writeTestArchive(const QString &path, bool tarGz,
 
 int main(int argc, char *argv[])
 {
+	// menu integration runs headless (package-manager hooks): handle it
+	// before a GUI application needs a display
+	const int integration = lm::runDesktopIntegrationCommand(argc, argv);
+	if (integration >= 0)
+		return integration;
+
 	QApplication app(argc, argv);
 	QGuiApplication::setDesktopFileName(QStringLiteral("libremerge"));
 	QApplication::setApplicationName(QStringLiteral("LibreMerge"));
@@ -238,6 +245,16 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolder3OpsOpt(QStringLiteral("selftest-folder3-ops"),
 		QStringLiteral("Copy and delete rows in a 3-way folder compare and verify (for testing)"));
 	parser.addOption(selftestFolder3OpsOpt);
+	parser.addOption(QCommandLineOption(QStringLiteral("install-desktop-integration"),
+		QStringLiteral("Linux AppImage: add LibreMerge to the applications menu")));
+	parser.addOption(QCommandLineOption(QStringLiteral("remove-desktop-integration"),
+		QStringLiteral("Linux AppImage: remove it from the applications menu")));
+	parser.addOption(QCommandLineOption(QStringLiteral("data-home"),
+		QStringLiteral("With the two options above: the data directory to use instead of $XDG_DATA_HOME or ~/.local/share"),
+		QStringLiteral("dir")));
+	QCommandLineOption selftestDesktopOpt(QStringLiteral("selftest-desktop-integration"),
+		QStringLiteral("Install and remove the menu integration in a scratch data home (for testing)"));
+	parser.addOption(selftestDesktopOpt);
 	QCommandLineOption screenshotAboutOpt(QStringLiteral("screenshot-about"),
 		QStringLiteral("Render the About box (and its contributors list) to <file> and exit (for testing)"),
 		QStringLiteral("file"));
@@ -433,6 +450,56 @@ int main(int argc, char *argv[])
 			heuristic, about, prefs, quit);
 		return (heuristic == 0 && about == 1 && prefs == 1 && quit == 1)
 			? 0 : 1;
+	}
+
+	if (parser.isSet(selftestDesktopOpt))
+	{
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString home = dir.path();
+		// a launcher path with a space and a reserved character exercises
+		// the Exec quoting of the Desktop Entry spec
+		const QString launcher = home + QStringLiteral("/My Apps/LibreMerge$1.AppImage");
+		QStringList written;
+		QString error;
+		bool ok = lm::installDesktopIntegration(home, launcher, &written, &error);
+		const QString desktopFile = home + QStringLiteral("/applications/libremerge.desktop");
+		QFile file(desktopFile);
+		file.open(QIODevice::ReadOnly);
+		const QString entry = QString::fromUtf8(file.readAll());
+		file.close();
+		const QString expectedExec = QStringLiteral(
+			"Exec=\"") + home + QStringLiteral("/My Apps/LibreMerge\\\\$1.AppImage\" %F");
+		ok = ok && written.size() == 7 && entry.contains(expectedExec)
+			&& entry.contains(QStringLiteral("TryExec=") + launcher)
+			&& entry.contains(QStringLiteral("Name=LibreMerge"))
+			&& entry.contains(QStringLiteral("Icon=libremerge"))
+			&& entry.contains(QStringLiteral("X-LibreMerge-Launcher="))
+			&& QFileInfo::exists(home + QStringLiteral("/icons/hicolor/512x512/apps/libremerge.png"));
+		printf("installed: %lld files, exec ok %d\n",
+			static_cast<long long>(written.size()), entry.contains(expectedExec));
+		if (!ok)
+			fprintf(stderr, "%s\n%s\n", qPrintable(error), qPrintable(entry));
+
+		QStringList removed;
+		ok = lm::removeDesktopIntegration(home, &removed, &error) && ok
+			&& removed.size() == 7 && !QFileInfo::exists(desktopFile)
+			&& !QFileInfo::exists(home + QStringLiteral("/icons/hicolor/16x16/apps/libremerge.png"));
+		printf("removed: %lld files\n", static_cast<long long>(removed.size()));
+
+		// an entry LibreMerge did not write is left alone
+		QDir().mkpath(home + QStringLiteral("/applications"));
+		QFile foreign(desktopFile);
+		foreign.open(QIODevice::WriteOnly);
+		foreign.write("[Desktop Entry]\nName=Mine\nExec=libremerge\n");
+		foreign.close();
+		const bool refused = !lm::removeDesktopIntegration(home, nullptr, &error)
+			&& QFileInfo::exists(desktopFile);
+		printf("foreign entry kept: %d\n", refused);
+		ok = ok && refused;
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
 	}
 
 	if (parser.isSet(screenshotAboutOpt))
