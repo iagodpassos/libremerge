@@ -81,7 +81,7 @@ chmod +x LibreMerge-<version>-x86_64.AppImage && ./LibreMerge-<version>-x86_64.A
 
 To add the AppImage to your applications menu (GNOME, KDE and others), run it once with `--install-desktop-integration`; it writes a menu entry pointing at the AppImage and its icons under `~/.local/share`, and `--remove-desktop-integration` takes them out again.
 
-**Homebrew on Linux**: the same cask installs the AppImage for your architecture into `~/Applications`, with a `libremerge` command on your PATH (glibc 2.36+ as above):
+**Homebrew on Linux**: the same cask installs the AppImage for your architecture into `~/Applications`, adds it to the applications menu and puts a `libremerge` command on your PATH (glibc 2.36+ as above):
 
 ```sh
 brew install --cask iagodpassos/tap/libremerge
