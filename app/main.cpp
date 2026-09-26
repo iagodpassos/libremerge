@@ -356,10 +356,11 @@ int main(int argc, char *argv[])
 		QCoreApplication::sendEvent(pathEdit, &press);
 		QCoreApplication::processEvents();
 		QCoreApplication::processEvents();
-		const bool selectorOpened =
-			windowSel.findChild<FolderCompareView *>() != nullptr;
-		printf("open screen: folder comparison opened %d\n", selectorOpened);
-		ok = ok && selectorOpened;
+		const qsizetype opened = windowSel.findChildren<FolderCompareView *>().size();
+		const bool selectorGone = windowSel.findChild<NewComparisonView *>() == nullptr;
+		printf("open screen: folder comparisons opened %lld, selector closed %d\n",
+			static_cast<long long>(opened), selectorGone);
+		ok = ok && opened == 1 && selectorGone;
 		printf("ok: %d\n", ok);
 		return ok ? 0 : 1;
 	}
@@ -920,11 +921,12 @@ int main(int argc, char *argv[])
 		QCoreApplication::processEvents();
 		const bool selectorClosed =
 			window.findChild<NewComparisonView *>() == nullptr;
-		const bool comparisonOpen =
-			window.findChild<FileCompareView *>() != nullptr;
-		printf("selector closed: %d, comparison open: %d\n",
-			selectorClosed, comparisonOpen);
-		return (selectorClosed && comparisonOpen) ? 0 : 1;
+		// exactly one: a single Enter used to reach compare() twice when
+		// the window-wide shortcut did not take the key first
+		const qsizetype comparisons = window.findChildren<FileCompareView *>().size();
+		printf("selector closed: %d, comparisons open: %lld\n",
+			selectorClosed, static_cast<long long>(comparisons));
+		return (selectorClosed && comparisons == 1) ? 0 : 1;
 	}
 
 	if (parser.isSet(selftestUndoRescanOpt))

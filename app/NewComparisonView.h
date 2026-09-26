@@ -52,4 +52,5 @@ private:
 
 	Slot m_slots[3];
 	QLabel *m_hint;
+	bool m_compareArmed = false; // a compare already ran this cycle
 };

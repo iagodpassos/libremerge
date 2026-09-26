@@ -17,6 +17,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QToolButton>
+#include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -258,6 +259,18 @@ void NewComparisonView::rememberPaths(const QStringList &paths)
 
 void NewComparisonView::compare()
 {
+	// one Enter can land here twice: QLineEdit emits returnPressed and then
+	// ignores the key (for a dialog's default button), the key propagates
+	// to the editable combo, which hands it back to the line edit for a
+	// second returnPressed. The window-wide shortcut usually takes the key
+	// first, but not when the window is inactive; either way one press is
+	// one comparison, so repeats within the same event-loop cycle are
+	// dropped.
+	if (m_compareArmed)
+		return;
+	m_compareArmed = true;
+	QTimer::singleShot(0, this, [this]() { m_compareArmed = false; });
+
 	QStringList paths;
 	QList<bool> readOnly;
 	for (int i = 0; i < 3; ++i)

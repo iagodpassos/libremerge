@@ -1003,18 +1003,25 @@ void MainWindow::openSelector(const QStringList &paths)
 				closeTab(index);
 		});
 	};
-	// closing the selector tab is deferred one event-loop cycle: these
-	// signals come from deep inside the selector's own child widgets
-	// (Enter in a path field, a button click), and closeTab deletes the
-	// page while that code is still on the stack
+	// these signals come from deep inside the selector's own child widgets
+	// (Enter in a path field, a button click), so the work is deferred one
+	// event-loop cycle: closeTab deletes the page, and opening an archive
+	// runs processEvents() for its progress dialog, which would let an
+	// already queued close delete the path field while its key handling is
+	// still on the stack (the archive x folder crash of cb41cac's CI run)
 	connect(selector, &NewComparisonView::compareRequested, this,
-		[this, closeSelectorLater](const QStringList &selected, const QList<bool> &readOnly,
-			bool folders) {
-			if (folders)
-				openFolderComparison(selected);
-			else
-				openFileComparison(selected, readOnly);
-			closeSelectorLater();
+		[this, guard = QPointer(selector)](const QStringList &selected,
+			const QList<bool> &readOnly, bool folders) {
+			QTimer::singleShot(0, this,
+				[this, guard, selected, readOnly, folders]() {
+					if (folders)
+						openFolderComparison(selected);
+					else
+						openFileComparison(selected, readOnly);
+					const int index = guard ? m_tabs->indexOf(guard) : -1;
+					if (index >= 0 && m_tabs->count() > 1)
+						closeTab(index);
+				});
 		});
 	connect(selector, &NewComparisonView::cancelled, this, closeSelectorLater);
 	const int index = m_tabs->addTab(selector, tr("Select Files or Folders"));
@@ -1107,8 +1114,10 @@ void MainWindow::dropEvent(QDropEvent *event)
 		if (url.isLocalFile())
 			paths.append(url.toLocalFile());
 	}
-	handleIncomingPaths(paths);
 	event->acceptProposedAction();
+	// open from a clean stack, not from inside the drop handler: an archive
+	// among the paths extracts with processEvents() for its progress
+	QTimer::singleShot(0, this, [this, paths]() { handleIncomingPaths(paths); });
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

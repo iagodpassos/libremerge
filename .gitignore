@@ -11,6 +11,7 @@ CMakeUserPresets.json
 build-release/
 *.dmg
 build-universal/
+build-debug/
 deps/
 *.deb
 *.AppImage
