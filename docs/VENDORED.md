@@ -81,6 +81,10 @@ branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
   `BinaryCompare` keeps two 256 KiB read buffers on the stack; macOS
   gives secondary threads 512 KiB, so on Intel Macs any folder compare
   reaching `BinaryCompare` overflowed (arm64 had about 12 KiB to spare)
+- `diffutils/src/util.c` (`message5`): no console output on POSIX.
+  diff(1)'s messages, such as "Binary files ... differ" for every binary
+  pair of a folder compare, went nowhere in WinMerge's windowed app but
+  reach the terminal a POSIX app was started from
 - `paths.h`: `/dev/null` as the native null device, `/` trailing slash,
   `constexpr const` fix
 - `unicoder.cpp`: the conversion pivot uses `xchar_t` (UTF-16 code unit:

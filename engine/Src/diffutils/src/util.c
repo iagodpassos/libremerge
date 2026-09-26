@@ -120,9 +120,16 @@ message5 (char const *format, char const *arg1, char const *arg2, char const *ar
     }
   else
     {
+#ifdef _WIN32
       if (sdiff_help_sdiff)
 	putchar (' ');
       printf (format, arg1, arg2, arg3, arg4);
+#else
+      /* WinMerge's GUI has no console, so diff(1)'s messages ("Binary
+	 files ... differ") went nowhere; started from a terminal, a POSIX
+	 app would print one per binary pair of a folder compare */
+      (void) format; (void) arg1; (void) arg2; (void) arg3; (void) arg4;
+#endif
     }
 }
 
