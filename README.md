@@ -13,7 +13,7 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - **Side-by-side file comparison and merging** (2-way and 3-way) with the classic WinMerge look: gold difference blocks, word-level highlights inside lines, gray filler keeping the panes aligned line by line
 - **Free editing with live remerge**: type directly in the panes, copy differences (or all of them) in either direction, undo/redo, recompare with F5; files are saved with their original encoding, BOM and line endings preserved
 - **Folder comparison** (2-way and 3-way) with a hierarchical tree or flat list, background scanning with progress and cancel, file masks / regex / expression filters, copy between sides and delete to Trash (every pairwise direction in 3-way, from the context menu); the 3-way view marks which pair stayed identical on each difference, like WinMerge
-- **Archive comparison** (zip, 7z, tar and compressed tar, plus single-file gz/bz2/xz/zst): a pair of archives extracts to temporary folders and opens as a folder comparison, WinMerge style, with nested archives unwrapped automatically
+- **Archive comparison** (zip, 7z, tar and compressed tar, plus single-file gz/bz2/xz/zst): archives extract to temporary folders and open as a folder comparison, WinMerge style, against another archive or a plain folder, 2- or 3-way, with nested archives unwrapped automatically
 - **Diff pane** showing the current difference per file, **location pane** minimap, per-pane headers and status bars (line/column, encoding, EOL)
 - **CSV/TSV table comparison** as side-by-side grids: cell-level difference highlighting, delimiter auto-detection (`,` `;` tab `|`), quoted fields, first-row headers
 - **Image comparison** (2-way and 3-way) with WinMerge's own image-diff engine: block-level pixel differences with adjustable block size and color-distance threshold, insertion/deletion detection for shifted rows/columns, XOR and alpha-blend overlays, blink mode, wipe and rectangle-select dragging, multi-page navigation (animated GIF, multi-page TIFF), rotation/flips, copy between sides with undo, and a clickable difference minimap
@@ -109,7 +109,7 @@ To use it, run `git mergetool` after a conflict: resolve it in the middle pane, 
 ## Known limitations
 
 - Binary files are detected and refused — binary/hex comparison is planned, not implemented
-- Archive comparison works on read-only extracted copies: edits are not packed back into the archive, and comparing an archive against a plain folder is not supported yet
+- Archive comparison works on extracted copies: edits are not packed back into the archive (WinMerge behaves the same)
 - Image comparison: animated GIF and multi-page TIFF open and compare, but cannot be saved back (no Qt encoder — Save As offers PNG); SVG/PDF comparison is not supported yet
 - Table comparison copies whole differences (no per-cell editing or undo yet)
 
@@ -131,6 +131,6 @@ LibreMerge as a whole is distributed under the **GNU GPL v3.0 or later** ([LICEN
 
 ## Roadmap
 
-Binary/hex compare, 3-way folders, HTML reports, notarized builds, Linux packages (AUR first), and — if it proves itself — offering the portable engine fixes back to WinMerge upstream ([WinMerge/winmerge#141](https://github.com/WinMerge/winmerge/issues/141) tracks the idea of a cross-platform UI).
+Binary/hex compare, HTML reports and patch generation, notarized builds, Linux packages (AUR first), and — if it proves itself — offering the portable engine fixes back to WinMerge upstream ([WinMerge/winmerge#141](https://github.com/WinMerge/winmerge/issues/141) tracks the idea of a cross-platform UI).
 
 Issues and pull requests are welcome. Everyone who helps is credited in [CONTRIBUTORS.md](CONTRIBUTORS.md), which the About box shows too.

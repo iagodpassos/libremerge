@@ -430,14 +430,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Cancelado — resultados parciais. </translation>
     </message>
     <message>
-        <source>left → right</source>
-        <translation type="vanished">esquerda → direita</translation>
-    </message>
-    <message>
-        <source>right → left</source>
-        <translation type="vanished">direita → esquerda</translation>
-    </message>
-    <message>
         <source>LibreMerge</source>
         <translation>LibreMerge</translation>
     </message>
@@ -983,14 +975,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>&amp;Sobre o LibreMerge</translation>
     </message>
     <message>
-        <source>About LibreMerge</source>
-        <translation type="vanished">Sobre o LibreMerge</translation>
-    </message>
-    <message>
-        <source>&lt;b&gt;LibreMerge %1&lt;/b&gt;&lt;br/&gt;A free differencing and merging tool for macOS and Linux.&lt;br/&gt;&lt;br/&gt;Based on the comparison engine of &lt;a href=&quot;https://winmerge.org&quot;&gt;WinMerge&lt;/a&gt;, © Dean P. Grimm / Thingamahoochie Software and the WinMerge contributors (GPL-2.0-or-later).&lt;br/&gt;LibreMerge is licensed under the GNU GPL v3.0 or later.&lt;br/&gt;&lt;br/&gt;Not affiliated with or endorsed by the WinMerge project.</source>
-        <translation type="vanished">&lt;b&gt;LibreMerge %1&lt;/b&gt;&lt;br/&gt;Uma ferramenta livre de comparação e mesclagem para macOS e Linux.&lt;br/&gt;&lt;br/&gt;Baseado no motor de comparação do &lt;a href=&quot;https://winmerge.org&quot;&gt;WinMerge&lt;/a&gt;, © Dean P. Grimm / Thingamahoochie Software e os contribuidores do WinMerge (GPL-2.0-or-later).&lt;br/&gt;O LibreMerge é licenciado sob a GNU GPL v3.0 ou posterior.&lt;br/&gt;&lt;br/&gt;Não afiliado ao projeto WinMerge nem endossado por ele.</translation>
-    </message>
-    <message>
         <source>LibreMerge</source>
         <translation>LibreMerge</translation>
     </message>
@@ -1148,12 +1132,8 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>O caminho não existe: %1</translation>
     </message>
     <message>
-        <source>Mixing files and folders is not supported — select two files, three files or two folders.</source>
-        <translation>Misturar arquivos e pastas não é suportado — selecione dois arquivos, três arquivos ou duas pastas.</translation>
-    </message>
-    <message>
-        <source>3-way folder comparison is not available yet — select two folders.</source>
-        <translation type="vanished">A comparação de pastas em 3 vias ainda não está disponível — selecione duas pastas.</translation>
+        <source>Mixing files and folders is not supported: select two or three files, or two or three folders or archives.</source>
+        <translation>Misturar arquivos e pastas não é suportado: selecione dois ou três arquivos, ou duas ou três pastas ou arquivos compactados.</translation>
     </message>
 </context>
 <context>

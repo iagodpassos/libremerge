@@ -26,10 +26,16 @@ public:
 	void openFolderComparison(const QString &leftDir, const QString &rightDir);
 	/** Two or three folders (WinMerge's 3-way folder compare). */
 	void openFolderComparison(const QStringList &dirs);
-	/** Extract two archives to temp folders and open them as a folder
+	/** Two or three sides, each a folder or an archive: archives are
+	    extracted to temp folders and the lot opens as a folder
 	    comparison (WinMerge's DecompressArchive flow). */
-	void openArchiveComparison(const QString &leftArchive,
-		const QString &rightArchive);
+	void openArchiveComparison(const QStringList &sources);
+
+	/** A folder, or an archive standing in for one (the sides a folder
+	    comparison accepts). */
+	static bool isFolderLike(const QString &path);
+	/** 2 or 3 folder-like sources: open the folder comparison. */
+	static bool allFolderLike(const QStringList &paths);
 
 	/** Open (or focus) the "Select Files or Folders" page, optionally
 	    pre-filling dropped/opened paths. */

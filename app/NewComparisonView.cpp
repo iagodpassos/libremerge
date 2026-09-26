@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "NewComparisonView.h"
+#include "ArchiveCompare.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -281,23 +282,27 @@ void NewComparisonView::compare()
 		return;
 	}
 
-	int files = 0, dirs = 0;
+	// archives count as folders: they extract and compare as such, alone
+	// or against real folders, like WinMerge
+	int plainFiles = 0, folderLike = 0;
 	for (const QString &path : paths)
 	{
 		const QFileInfo info(path);
-		if (info.isFile()) ++files;
-		else if (info.isDir()) ++dirs;
+		if (info.isDir() || (info.isFile() && lm::isArchivePath(path)))
+			++folderLike;
+		else if (info.isFile())
+			++plainFiles;
 		else
 		{
 			setHint(tr("Path does not exist: %1").arg(path), true);
 			return;
 		}
 	}
-	const bool folders = dirs == paths.size();
-	if (!folders && files != paths.size())
+	const bool folders = folderLike == paths.size();
+	if (!folders && plainFiles != paths.size())
 	{
-		setHint(tr("Mixing files and folders is not supported \xE2\x80\x94 "
-			"select two files, three files or two folders."), true);
+		setHint(tr("Mixing files and folders is not supported: select two or "
+			"three files, or two or three folders or archives."), true);
 		return;
 	}
 	rememberPaths(paths);

@@ -134,6 +134,10 @@ public:
 	    for files opened out of an archive (the real path stays in use
 	    for loading and saving). */
 	void setSideCaption(int side, const QString &caption);
+	QString sideCaption(int side) const
+	{
+		return side >= 0 && side < 3 ? m_sides[side].caption : QString();
+	}
 
 signals:
 	void modifiedChanged(bool modified);

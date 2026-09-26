@@ -511,6 +511,22 @@ MainWindow::MainWindow(QWidget *parent)
 	disableMenuRoleHeuristics(menuBar());
 }
 
+bool MainWindow::isFolderLike(const QString &path)
+{
+	const QFileInfo info(path);
+	return info.isDir() || (info.isFile() && lm::isArchivePath(path));
+}
+
+bool MainWindow::allFolderLike(const QStringList &paths)
+{
+	if (paths.size() != 2 && paths.size() != 3)
+		return false;
+	for (const QString &path : paths)
+		if (!isFolderLike(path))
+			return false;
+	return true;
+}
+
 void MainWindow::openFileComparison(const QString &leftPath, const QString &rightPath)
 {
 	openFileComparison(QStringList{ leftPath, rightPath });
@@ -519,12 +535,11 @@ void MainWindow::openFileComparison(const QString &leftPath, const QString &righ
 void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> &readOnly,
 	bool forceText)
 {
-	// a pair of archives extracts to temp folders and opens as a folder
-	// comparison, like WinMerge's DecompressArchive
-	if (!forceText && paths.size() == 2
-		&& lm::isArchivePath(paths.at(0)) && lm::isArchivePath(paths.at(1)))
+	// archives (with each other or with folders) extract to temp folders
+	// and open as a folder comparison, like WinMerge's DecompressArchive
+	if (!forceText && allFolderLike(paths))
 	{
-		openArchiveComparison(paths.at(0), paths.at(1));
+		openFolderComparison(paths);
 		return;
 	}
 
@@ -722,6 +737,13 @@ void MainWindow::openFolderComparison(const QString &leftDir, const QString &rig
 
 void MainWindow::openFolderComparison(const QStringList &dirs)
 {
+	for (const QString &dir : dirs)
+		if (!QFileInfo(dir).isDir())
+		{
+			// an archive among the sides: extract, then compare
+			openArchiveComparison(dirs);
+			return;
+		}
 	auto *view = new FolderCompareView(this);
 	connect(view, &FolderCompareView::openFileComparisonRequested, this,
 		[this, view](const QString &l, const QString &r) {
@@ -747,20 +769,28 @@ void MainWindow::openFolderComparison(const QStringList &dirs)
 	view->start(dirs);
 }
 
-void MainWindow::openArchiveComparison(const QString &leftArchive,
-	const QString &rightArchive)
+void MainWindow::openArchiveComparison(const QStringList &sources)
 {
+	// WinMerge's DecompressArchive handles every side on its own: archives
+	// are extracted to temporary folders, folders are compared in place,
+	// so an archive compares against a plain folder, two or three ways
 	QProgressDialog progress(QString(), tr("Cancel"), 0, 0, this);
 	progress.setWindowModality(Qt::WindowModal);
 	progress.setMinimumDuration(300);
 
 	std::vector<std::unique_ptr<QTemporaryDir>> temps;
-	QString roots[2];
-	const QString archives[2] = { leftArchive, rightArchive };
-	for (int side = 0; side < 2; ++side)
+	QStringList roots;
+	QStringList archiveNames; // empty for sides that are plain folders
+	for (const QString &source : sources)
 	{
+		if (QFileInfo(source).isDir())
+		{
+			roots.append(source);
+			archiveNames.append(QString());
+			continue;
+		}
 		progress.setLabelText(tr("Extracting %1\xE2\x80\xA6")
-			.arg(QFileInfo(archives[side]).fileName()));
+			.arg(QFileInfo(source).fileName()));
 		auto dir = std::make_unique<QTemporaryDir>(
 			QDir::tempPath() + QStringLiteral("/libremerge-archive-XXXXXX"));
 		if (!dir->isValid())
@@ -771,7 +801,7 @@ void MainWindow::openArchiveComparison(const QString &leftArchive,
 		}
 		QString error;
 		bool cancelled = false;
-		const bool ok = lm::extractArchive(archives[side], dir->path(), &error,
+		const bool ok = lm::extractArchive(source, dir->path(), &error,
 			[&progress, &cancelled](const QString &) {
 				QCoreApplication::processEvents();
 				cancelled = progress.wasCanceled();
@@ -782,48 +812,60 @@ void MainWindow::openArchiveComparison(const QString &leftArchive,
 			if (!cancelled)
 				lm::warning(this, tr("LibreMerge"),
 					tr("Could not read the archive:\n%1\n\n%2")
-						.arg(archives[side], error));
+						.arg(source, error));
 			return; // the temp dirs clean themselves up
 		}
-		roots[side] = dir->path();
+		roots.append(dir->path());
+		archiveNames.append(QFileInfo(source).fileName());
 		temps.push_back(std::move(dir));
 	}
 	progress.close();
 
 	auto *view = new FolderCompareView(this);
+	// pane headers show the path inside the archive, WinMerge's display
+	// roots, instead of the extraction temp path; folder sides keep their
+	// real paths
+	const auto captionPanes = [this, roots, archiveNames](
+		const QStringList &opened) {
+		auto *fc = qobject_cast<FileCompareView *>(m_tabs->currentWidget());
+		if (fc == nullptr)
+			return;
+		for (int pane = 0; pane < opened.size(); ++pane)
+			for (int side = 0; side < roots.size(); ++side)
+			{
+				const QString root = roots.at(side) + QLatin1Char('/');
+				if (!archiveNames.at(side).isEmpty()
+					&& opened.at(pane).startsWith(root))
+				{
+					fc->setSideCaption(pane, archiveNames.at(side)
+						+ opened.at(pane).mid(roots.at(side).length()));
+					break;
+				}
+			}
+	};
 	connect(view, &FolderCompareView::openFileComparisonRequested, this,
-		[this, leftArchive, rightArchive,
-			leftRoot = roots[0], rightRoot = roots[1]]
-		(const QString &l, const QString &r) {
+		[this, view, captionPanes](const QString &l, const QString &r) {
 			openFileComparison(l, r);
-			// pane headers show the path inside the archive, WinMerge's
-			// display roots, instead of the extraction temp path
-			auto *fc = qobject_cast<FileCompareView *>(m_tabs->currentWidget());
-			if (fc == nullptr)
-				return;
-			const auto pretty = [](const QString &archive,
-				const QString &root, const QString &path) {
-				return QFileInfo(archive).fileName() + path.mid(root.length());
-			};
-			if (l.startsWith(leftRoot))
-				fc->setSideCaption(0, pretty(leftArchive, leftRoot, l));
-			if (r.startsWith(rightRoot))
-				fc->setSideCaption(1, pretty(rightArchive, rightRoot, r));
+			captionPanes({ l, r });
+			wireFolderRowSync(view);
 		});
-	connect(view, &FolderCompareView::openFileComparisonRequested, this,
-		[this, view](const QString &, const QString &) {
+	connect(view, &FolderCompareView::openFileComparison3Requested, this,
+		[this, view, captionPanes](const QStringList &paths) {
+			openFileComparison(paths);
+			captionPanes(paths);
 			wireFolderRowSync(view);
 		});
 	view->adoptTempDirs(std::move(temps));
-	// the tab carries the archives' names, not the temp paths, like
-	// WinMerge's display roots
-	const QString title = displayName(leftArchive)
-		+ QString::fromUtf8(" \xE2\x86\x94 ") + displayName(rightArchive);
-	const int index = m_tabs->addTab(view, title);
-	m_tabs->setTabToolTip(index, leftArchive + QStringLiteral("\n") + rightArchive);
+	// the tab carries the sources' names, not the temp paths
+	QStringList names;
+	for (const QString &source : sources)
+		names.append(displayName(source));
+	const int index = m_tabs->addTab(view,
+		names.join(QString::fromUtf8(" \xE2\x86\x94 ")));
+	m_tabs->setTabToolTip(index, sources.join(QStringLiteral("\n")));
 	m_tabs->setCurrentIndex(index);
-	rememberComparison({ leftArchive, rightArchive });
-	view->start(roots[0], roots[1]);
+	rememberComparison(sources);
+	view->start(roots);
 }
 
 void MainWindow::showOptions()
@@ -931,12 +973,10 @@ void MainWindow::rememberComparison(const QStringList &paths)
 
 void MainWindow::reopenComparison(const QStringList &paths)
 {
-	int dirs = 0;
-	for (const QString &path : paths)
-		if (QFileInfo(path).isDir())
-			++dirs;
-	if (paths.size() == 2 && dirs == 2)
-		openFolderComparison(paths.at(0), paths.at(1));
+	// 2- and 3-way folder comparisons, archives included (a 3-way folder
+	// entry used to reopen as a file comparison)
+	if (allFolderLike(paths))
+		openFolderComparison(paths);
 	else
 		openFileComparison(paths);
 }
@@ -1004,17 +1044,15 @@ void MainWindow::handleIncomingPaths(const QStringList &paths)
 		}
 	}
 
-	// like WinMerge: dropping a complete pair/triple starts the comparison
-	int files = 0, dirs = 0;
+	// like WinMerge: dropping a complete pair/triple starts the comparison;
+	// folders and archives, in any mix, open as a folder comparison
+	int files = 0;
 	for (const QString &path : paths)
+		if (QFileInfo(path).isFile())
+			++files;
+	if (allFolderLike(paths))
 	{
-		const QFileInfo info(path);
-		if (info.isFile()) ++files;
-		else if (info.isDir()) ++dirs;
-	}
-	if (paths.size() == 2 && dirs == 2)
-	{
-		openFolderComparison(paths.at(0), paths.at(1));
+		openFolderComparison(paths);
 		closeStartupPlaceholder();
 		return;
 	}
