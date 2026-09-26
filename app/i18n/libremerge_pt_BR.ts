@@ -1254,8 +1254,32 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>não foi possível criar as opções de comparação</translation>
     </message>
     <message>
+        <source>Text files are identical</source>
+        <translation>Os arquivos de texto são idênticos</translation>
+    </message>
+    <message>
+        <source>Binary files are identical</source>
+        <translation>Os arquivos binários são idênticos</translation>
+    </message>
+    <message>
+        <source>Image files are identical</source>
+        <translation>Os arquivos de imagem são idênticos</translation>
+    </message>
+    <message>
         <source>Identical</source>
         <translation>Idêntico</translation>
+    </message>
+    <message>
+        <source>Text files are different</source>
+        <translation>Os arquivos de texto são diferentes</translation>
+    </message>
+    <message>
+        <source>Binary files are different</source>
+        <translation>Os arquivos binários são diferentes</translation>
+    </message>
+    <message>
+        <source>Image files are different</source>
+        <translation>Os arquivos de imagem são diferentes</translation>
     </message>
     <message>
         <source>Different</source>

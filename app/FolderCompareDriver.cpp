@@ -145,6 +145,18 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 		return result;
 	}
 
+	// WinMerge's InitDiffContext with the OptionsInit defaults. Full
+	// Contents diffs files up to 4 MB as text, compares up to 64 MB with
+	// Quick Contents and only larger files byte by byte; left at 0, every
+	// file went byte by byte, ignoring the whitespace/case/EOL options
+	// and the line filters
+	ctxt.m_nQuickCompareLimit = 4 * 1024 * 1024;
+	ctxt.m_nBinaryCompareLimit = 64 * 1024 * 1024;
+	// OPT_CP_DETECT outside the CJK locales: valid UTF-8 reads as UTF-8,
+	// HTML/XML/.rc files by their declared charset
+	ctxt.m_iGuessEncodingType = (50001 << 16) | 1;
+	ctxt.m_pFilterList = currentLineFilters();
+
 	FileFilterHelper filter;
 	const QString mask = filterMask.trimmed().isEmpty()
 		? QStringLiteral("*.*") : filterMask.trimmed();
@@ -199,6 +211,12 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 		item.folder = sideString(di.diffFileInfo[side].path.get());
 		item.isDir = di.diffcode.isDirectory();
 		item.category = classify(di, sides);
+		if (di.diffcode.isText())
+			item.fileType = FolderCompareItem::TextFiles;
+		else if (di.diffcode.isBin())
+			item.fileType = FolderCompareItem::BinaryFiles;
+		else if (di.diffcode.isImage())
+			item.fileType = FolderCompareItem::ImageFiles;
 		if (sides > 2 && (item.category == FolderCompareItem::Different
 			|| item.category == FolderCompareItem::MissingLeft
 			|| item.category == FolderCompareItem::MissingMiddle

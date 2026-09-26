@@ -51,6 +51,8 @@ public:
 	/** The category role of a row by file name, -1 if absent (for
 	    tests). */
 	int rowCategoryForTest(const QString &name) const;
+	/** The Result column text of a row by file name (for tests). */
+	QString rowResultForTest(const QString &name) const;
 	/** Copy one row between sides without the confirmation (for
 	    tests). */
 	void copyRowForTest(const QString &name, int sourceSide, int targetSide);

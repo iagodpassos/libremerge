@@ -49,17 +49,46 @@ enum ItemRole
 	RoleName,
 	RoleMiddlePath, ///< 3-way only
 	RoleCategory,   ///< lm::FolderCompareItem::Category as int
+	RoleFileType,   ///< lm::FolderCompareItem::FileType as int; kept
+	                ///  across row updates, like WinMerge's type flags
 };
 
 const QString kFilterSettingsKey = QStringLiteral("FolderCompare/Filter");
 const QString kTreeSettingsKey = QStringLiteral("FolderCompare/TreeView");
 
-QString categoryText(lm::FolderCompareItem::Category category)
+/** Result column text. Like WinMerge's ColStatusGet, identical and
+    different files are named by what the content compare took them for. */
+QString categoryText(lm::FolderCompareItem::Category category,
+	lm::FolderCompareItem::FileType type)
 {
 	switch (category)
 	{
-	case lm::FolderCompareItem::Identical: return QObject::tr("Identical");
-	case lm::FolderCompareItem::Different: return QObject::tr("Different");
+	case lm::FolderCompareItem::Identical:
+		switch (type)
+		{
+		case lm::FolderCompareItem::TextFiles:
+			return QObject::tr("Text files are identical");
+		case lm::FolderCompareItem::BinaryFiles:
+			return QObject::tr("Binary files are identical");
+		case lm::FolderCompareItem::ImageFiles:
+			return QObject::tr("Image files are identical");
+		case lm::FolderCompareItem::UnknownType:
+			break;
+		}
+		return QObject::tr("Identical");
+	case lm::FolderCompareItem::Different:
+		switch (type)
+		{
+		case lm::FolderCompareItem::TextFiles:
+			return QObject::tr("Text files are different");
+		case lm::FolderCompareItem::BinaryFiles:
+			return QObject::tr("Binary files are different");
+		case lm::FolderCompareItem::ImageFiles:
+			return QObject::tr("Image files are different");
+		case lm::FolderCompareItem::UnknownType:
+			break;
+		}
+		return QObject::tr("Different");
 	case lm::FolderCompareItem::LeftOnly: return QObject::tr("Left only");
 	case lm::FolderCompareItem::MiddleOnly: return QObject::tr("Middle only");
 	case lm::FolderCompareItem::RightOnly: return QObject::tr("Right only");
@@ -142,7 +171,9 @@ void FolderCompareView::setRowCategory(QTreeWidgetItem *row,
 	lm::FolderCompareItem::Category category,
 	lm::FolderCompareItem::ThreeWayInfo threeWay, bool isDir)
 {
-	const QString text = categoryText(category) + threeWayText(threeWay);
+	const auto type = static_cast<lm::FolderCompareItem::FileType>(
+		row->data(0, RoleFileType).toInt());
+	const QString text = categoryText(category, type) + threeWayText(threeWay);
 	row->setText(ColResult, isDir
 		? QObject::tr("Folder: %1").arg(text) : text);
 	row->setData(0, RoleCategory, static_cast<int>(category));
@@ -172,6 +203,7 @@ void FolderCompareView::fillRow(QTreeWidgetItem *row,
 		row->setTextAlignment(colSize(i), Qt::AlignRight | Qt::AlignVCenter);
 		allSides = allSides && !item.path[i].isEmpty();
 	}
+	row->setData(0, RoleFileType, static_cast<int>(item.fileType));
 	setRowCategory(row, item.category, item.threeWay, item.isDir);
 	row->setData(0, RoleLeftPath, item.path[0]);
 	if (m_sides == 3)
@@ -603,6 +635,12 @@ int FolderCompareView::rowCategoryForTest(const QString &name) const
 {
 	QTreeWidgetItem *row = findRowByName(name);
 	return row != nullptr ? row->data(0, RoleCategory).toInt() : -1;
+}
+
+QString FolderCompareView::rowResultForTest(const QString &name) const
+{
+	QTreeWidgetItem *row = findRowByName(name);
+	return row != nullptr ? row->text(ColResult) : QString();
 }
 
 /** A file comparison opened from here saved its files: bring the row in

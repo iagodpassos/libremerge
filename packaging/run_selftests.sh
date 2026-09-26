@@ -59,6 +59,7 @@ run_one selftest-service
 run_one selftest-marker
 run_one selftest-folder-sync
 run_one selftest-folder3-ops
+run_one selftest-folder-content
 # native menu check: runs under cocoa (dmg validation), skips offscreen
 LIBREMERGE_LANGUAGE=pt_BR run_one selftest-app-menu
 run_one selftest-about

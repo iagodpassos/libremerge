@@ -41,6 +41,17 @@ struct FolderCompareItem
 		LeftMiddleIdentical,  ///< only the right side differs
 	};
 
+	/** What the content compare took the files for (WinMerge's DIFFCODE
+	    TEXT/BIN/IMAGE flags), which the Result column names. Unknown
+	    when no content compare ran: folders, unique items, errors. */
+	enum FileType
+	{
+		UnknownType,
+		TextFiles,
+		BinaryFiles,
+		ImageFiles,
+	};
+
 	QString name;         ///< item filename
 	QString folder;       ///< relative folder inside the compared roots
 	QString path[3];      ///< full path per side (empty if missing there)
@@ -48,6 +59,7 @@ struct FolderCompareItem
 	QDateTime mtime[3];
 	Category category = Identical;
 	ThreeWayInfo threeWay = NoInfo;
+	FileType fileType = UnknownType;
 	bool isDir = false;
 };
 

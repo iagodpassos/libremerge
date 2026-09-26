@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QVariant>
 
+#include "FilterList.h"
 #include "OptionsMgr.h"
 #include "OptionsDef.h"
 #include "options_global.h"
@@ -174,6 +175,41 @@ DIFFOPTIONS currentDiffOptions()
 	options.nDiffAlgorithm = mgr->GetInt(OPT_CMP_DIFF_ALGORITHM);
 	options.bIndentHeuristic = mgr->GetBool(OPT_CMP_INDENT_HEURISTIC);
 	return options;
+}
+
+std::shared_ptr<FilterList> currentLineFilters()
+{
+	auto filterList = std::make_shared<FilterList>();
+	const QStringList entries = QSettings()
+		.value(QStringLiteral("LineFilters/List")).toStringList();
+	for (const QString &entry : entries)
+	{
+		if (entry.startsWith(QStringLiteral("1\t")))
+		{
+			try
+			{
+				filterList->AddRegExp(entry.mid(2).toStdString());
+			}
+			catch (...)
+			{
+				// invalid expression: skip it
+			}
+		}
+	}
+	return filterList->HasRegExps() ? filterList : nullptr;
+}
+
+void setCompareOptionsForTest(int ignoreWhitespace)
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr)
+		return;
+	// Set, not SaveOption: nothing reaches QSettings
+	mgr->Set(OPT_CMP_IGNORE_WHITESPACE, ignoreWhitespace);
+	mgr->Set(OPT_CMP_IGNORE_BLANKLINES, false);
+	mgr->Set(OPT_CMP_IGNORE_CASE, false);
+	mgr->Set(OPT_CMP_IGNORE_NUMBERS, false);
+	mgr->Set(OPT_CMP_IGNORE_EOL, false);
 }
 
 } // namespace lm

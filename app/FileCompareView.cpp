@@ -729,24 +729,7 @@ bool FileCompareView::runDiff(QString *error)
 
 	// line filters: diffs whose lines all match an enabled expression
 	// become trivial, like WinMerge's Tools > Filters
-	auto filterList = std::make_shared<FilterList>();
-	const QStringList filterEntries = QSettings()
-		.value(QStringLiteral("LineFilters/List")).toStringList();
-	for (const QString &entry : filterEntries)
-	{
-		if (entry.startsWith(QStringLiteral("1\t")))
-		{
-			try
-			{
-				filterList->AddRegExp(entry.mid(2).toStdString());
-			}
-			catch (...)
-			{
-				// invalid expression: skip it
-			}
-		}
-	}
-	if (filterList->HasRegExps())
+	if (auto filterList = lm::currentLineFilters())
 		wrapper.SetFilterList(filterList);
 
 	COptionsMgr *mgr = GetOptionsMgr();

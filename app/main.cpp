@@ -250,6 +250,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolder3OpsOpt(QStringLiteral("selftest-folder3-ops"),
 		QStringLiteral("Copy and delete rows in a 3-way folder compare and verify (for testing)"));
 	parser.addOption(selftestFolder3OpsOpt);
+	QCommandLineOption selftestFolderContentOpt(QStringLiteral("selftest-folder-content"),
+		QStringLiteral("Verify the folder compare's Full Contents method: text diff, ignore options, file types (for testing)"));
+	parser.addOption(selftestFolderContentOpt);
 	parser.addOption(QCommandLineOption(QStringLiteral("install-desktop-integration"),
 		QStringLiteral("Linux AppImage: add LibreMerge to the applications menu")));
 	parser.addOption(QCommandLineOption(QStringLiteral("remove-desktop-integration"),
@@ -764,6 +767,68 @@ int main(int argc, char *argv[])
 		printf("category before: %d, after: %d\n", before, after);
 		return (before == static_cast<int>(lm::FolderCompareItem::Different)
 			&& after == static_cast<int>(lm::FolderCompareItem::Identical))
+			? 0 : 1;
+	}
+
+	if (parser.isSet(selftestFolderContentOpt))
+	{
+		// Full Contents like WinMerge: text files diff as text, so the
+		// ignore options apply; Quick Contents above 4 MB; the Result
+		// column names the file type
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString leftDir = dir.filePath(QStringLiteral("L"));
+		const QString rightDir = dir.filePath(QStringLiteral("R"));
+		QDir().mkpath(leftDir);
+		QDir().mkpath(rightDir);
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.write(bytes);
+		};
+		const QByteArray big = QByteArray("line of text\n").repeated(400000);
+		write(leftDir + QStringLiteral("/same.txt"), "alpha\n");
+		write(rightDir + QStringLiteral("/same.txt"), "alpha\n");
+		write(leftDir + QStringLiteral("/spaces.txt"), "a b\n");
+		write(rightDir + QStringLiteral("/spaces.txt"), "a   b\n");
+		write(leftDir + QStringLiteral("/big.txt"), big);
+		write(rightDir + QStringLiteral("/big.txt"), big);
+		write(leftDir + QStringLiteral("/data.bin"), QByteArray("\x00\x01\x02", 3));
+		write(rightDir + QStringLiteral("/data.bin"), QByteArray("\x00\x01\x03", 3));
+
+		const auto results = [&](int ignoreWhitespace)
+		{
+			lm::setCompareOptionsForTest(ignoreWhitespace);
+			FolderCompareView view;
+			view.start(QStringList{ leftDir, rightDir });
+			for (int i = 0; i < 400 && view.isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+			QMap<QString, QString> texts;
+			for (const QString &name : { QStringLiteral("same.txt"),
+					QStringLiteral("spaces.txt"), QStringLiteral("big.txt"),
+					QStringLiteral("data.bin") })
+			{
+				texts[name] = view.rowResultForTest(name);
+				printf("ignore whitespace %d: %s -> %s\n", ignoreWhitespace,
+					qPrintable(name), qPrintable(texts[name]));
+			}
+			return texts;
+		};
+		const QMap<QString, QString> exact = results(0);
+		const QMap<QString, QString> ignoring = results(2); // ignore all
+		const QString textSame = QObject::tr("Text files are identical");
+		const QString textDiff = QObject::tr("Text files are different");
+		const QString binDiff = QObject::tr("Binary files are different");
+		return (exact[QStringLiteral("same.txt")] == textSame
+			&& exact[QStringLiteral("spaces.txt")] == textDiff
+			&& ignoring[QStringLiteral("spaces.txt")] == textSame
+			&& exact[QStringLiteral("big.txt")] == textSame
+			&& exact[QStringLiteral("data.bin")] == binDiff)
 			? 0 : 1;
 	}
 
