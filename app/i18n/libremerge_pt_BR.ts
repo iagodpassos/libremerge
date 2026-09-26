@@ -342,6 +342,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Excluir Ambos</translation>
     </message>
     <message>
+        <source>Compare method</source>
+        <translation>Método de comparação</translation>
+    </message>
+    <message>
         <source>Name</source>
         <translation>Nome</translation>
     </message>
@@ -1151,6 +1155,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Comparar</translation>
     </message>
     <message>
+        <source>Folder</source>
+        <translation>Pasta</translation>
+    </message>
+    <message>
         <source>Defaults</source>
         <translation>Padrões</translation>
     </message>
@@ -1246,13 +1254,17 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <source>Open comparisons pick the new options up on Recompare (F5) or when reopened.</source>
         <translation>Comparações abertas aplicam as novas opções ao Recomparar (F5) ou ao serem reabertas.</translation>
     </message>
+    <message>
+        <source>Compare method:</source>
+        <translation>Método de comparação:</translation>
+    </message>
+    <message>
+        <source>The status bar of a folder comparison shows the method in use; click it to switch and recompare.</source>
+        <translation>A barra de status de uma comparação de pastas mostra o método em uso; clique nele para trocar e recomparar.</translation>
+    </message>
 </context>
 <context>
     <name>QObject</name>
-    <message>
-        <source>could not create compare options</source>
-        <translation>não foi possível criar as opções de comparação</translation>
-    </message>
     <message>
         <source>Text files are identical</source>
         <translation>Os arquivos de texto são idênticos</translation>
@@ -1284,6 +1296,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>Different</source>
         <translation>Diferente</translation>
+    </message>
+    <message>
+        <source>Files are different</source>
+        <translation>Os arquivos são diferentes</translation>
     </message>
     <message>
         <source>Left only</source>
@@ -1332,6 +1348,34 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>Folder: %1</source>
         <translation>Pasta: %1</translation>
+    </message>
+    <message>
+        <source>Quick Contents</source>
+        <translation>Conteúdo Rápido</translation>
+    </message>
+    <message>
+        <source>Binary Contents</source>
+        <translation>Conteúdo Binário</translation>
+    </message>
+    <message>
+        <source>Modified Date</source>
+        <translation>Data de Modificação</translation>
+    </message>
+    <message>
+        <source>Modified Date and Size</source>
+        <translation>Data de Modificação e Tamanho</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Tamanho</translation>
+    </message>
+    <message>
+        <source>Existence</source>
+        <translation>Existência</translation>
+    </message>
+    <message>
+        <source>Full Contents</source>
+        <translation>Conteúdo Completo</translation>
     </message>
 </context>
 <context>

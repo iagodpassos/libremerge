@@ -16,6 +16,7 @@ class QMenu;
 class QProgressBar;
 class QPushButton;
 class QTimer;
+class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
 
@@ -53,6 +54,8 @@ public:
 	int rowCategoryForTest(const QString &name) const;
 	/** The Result column text of a row by file name (for tests). */
 	QString rowResultForTest(const QString &name) const;
+	/** The compare method shown on the status bar (for tests). */
+	QString compareMethodTextForTest() const;
 	/** Copy one row between sides without the confirmation (for
 	    tests). */
 	void copyRowForTest(const QString &name, int sourceSide, int targetSide);
@@ -118,6 +121,10 @@ private:
 	QLineEdit *m_filterEdit;
 	QTreeWidget *m_tree;
 	QLabel *m_status;
+	// WinMerge's compare method pane: the method of the last run, a
+	// click away from another one (saved, then recompared)
+	QToolButton *m_methodButton;
+	int m_compareMethod = 0;
 	QProgressBar *m_progress;
 	QPushButton *m_cancelButton;
 	QTimer *m_progressTimer;

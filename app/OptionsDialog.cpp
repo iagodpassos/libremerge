@@ -2,6 +2,7 @@
 #include "pch.h"
 
 #include "OptionsDialog.h"
+#include "EngineOptions.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -63,12 +64,13 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 
 	auto *body = new QHBoxLayout;
 	m_categories = new QListWidget(this);
-	m_categories->addItems({ tr("General"), tr("Compare") });
+	m_categories->addItems({ tr("General"), tr("Compare"), tr("Folder") });
 	m_categories->setFixedWidth(140);
 	body->addWidget(m_categories);
 	m_pages = new QStackedWidget(this);
 	m_pages->addWidget(buildGeneralPage());
 	m_pages->addWidget(buildComparePage());
+	m_pages->addWidget(buildFolderPage());
 	body->addWidget(m_pages, 1);
 	layout->addLayout(body, 1);
 	connect(m_categories, &QListWidget::currentRowChanged,
@@ -175,6 +177,33 @@ QWidget *OptionsDialog::buildComparePage()
 	return page;
 }
 
+/** WinMerge's Compare > Folder page (PropCompareFolder). */
+QWidget *OptionsDialog::buildFolderPage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+
+	auto *methodRow = new QHBoxLayout;
+	methodRow->addWidget(new QLabel(tr("Compare method:"), page));
+	m_cmbCompareMethod = new QComboBox(page);
+	for (int method = 0; method < lm::kCompareMethodCount; ++method)
+		m_cmbCompareMethod->addItem(lm::compareMethodName(method));
+	methodRow->addWidget(m_cmbCompareMethod, 1);
+	box->addLayout(methodRow);
+
+	auto *note = new QLabel(tr("Open comparisons pick the new options up on "
+		"Recompare (F5) or when reopened."), page);
+	note->setWordWrap(true);
+	box->addWidget(note);
+	auto *statusNote = new QLabel(tr("The status bar of a folder comparison "
+		"shows the method in use; click it to switch and recompare."), page);
+	statusNote->setWordWrap(true);
+	box->addWidget(statusNote);
+
+	box->addStretch(1);
+	return page;
+}
+
 void OptionsDialog::load()
 {
 	QSettings settings;
@@ -199,6 +228,7 @@ void OptionsDialog::load()
 		m_cmbAlgorithm->setCurrentIndex(mgr->GetInt(OPT_CMP_DIFF_ALGORITHM));
 		m_chkMovedBlocks->setChecked(mgr->GetBool(OPT_CMP_MOVED_BLOCKS));
 	}
+	m_cmbCompareMethod->setCurrentIndex(lm::currentCompareMethod());
 }
 
 void OptionsDialog::save()
@@ -226,6 +256,7 @@ void OptionsDialog::save()
 		mgr->SaveOption(OPT_CMP_MOVED_BLOCKS, m_chkMovedBlocks->isChecked());
 		mgr->FlushOptions();
 	}
+	lm::saveCompareMethod(m_cmbCompareMethod->currentIndex());
 }
 
 void OptionsDialog::restoreDefaults()
@@ -243,4 +274,5 @@ void OptionsDialog::restoreDefaults()
 	m_chkIgnoreNumbers->setChecked(false);
 	m_cmbAlgorithm->setCurrentIndex(0);
 	m_chkMovedBlocks->setChecked(false);
+	m_cmbCompareMethod->setCurrentIndex(0); // Full Contents
 }

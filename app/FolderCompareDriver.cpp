@@ -117,9 +117,10 @@ FolderCompareResult compareFolders(const QString &leftDir, const QString &rightD
 
 FolderCompareResult compareFolders(const QStringList &dirs,
 	bool recursive, const std::shared_ptr<FolderCompareJob> &jobIn,
-	const QString &filterMask)
+	const QString &filterMask, int compareMethod)
 {
 	const int sides = dirs.size();
+	const int method = compareMethod >= 0 ? compareMethod : currentCompareMethod();
 	FolderCompareResult result;
 	result.sides = sides;
 	std::shared_ptr<FolderCompareJob> job = jobIn;
@@ -130,7 +131,7 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	paths.SetSize(sides);
 	for (int i = 0; i < sides; ++i)
 		paths.SetPath(i, dirs.at(i).toStdString(), false);
-	CDiffContext ctxt(paths, CMP_CONTENT);
+	CDiffContext ctxt(paths, method);
 
 	ctxt.m_pCompareStats = job->stats();
 	ctxt.m_bRecursive = recursive;
@@ -138,12 +139,9 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	JobAbortable abortable(job.get());
 	ctxt.SetAbortable(&abortable);
 
-	const DIFFOPTIONS options = currentDiffOptions();
-	if (!ctxt.CreateCompareOptions(CMP_CONTENT, options))
-	{
-		result.error = QObject::tr("could not create compare options");
-		return result;
-	}
+	// false for Binary Contents, which takes no options: WinMerge's
+	// InitDiffContext ignores the result as well
+	ctxt.CreateCompareOptions(method, currentDiffOptions());
 
 	// WinMerge's InitDiffContext with the OptionsInit defaults. Full
 	// Contents diffs files up to 4 MB as text, compares up to 64 MB with

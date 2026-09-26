@@ -2,6 +2,7 @@
 #pragma once
 
 #include <memory>
+#include <QString>
 #include "CompareOptions.h"
 
 class FilterList;
@@ -21,6 +22,18 @@ DIFFOPTIONS currentDiffOptions();
     list: differences whose lines all match become trivial. Null when no
     expression is enabled. */
 std::shared_ptr<FilterList> currentLineFilters();
+
+/** How a folder comparison decides two files are equal: a COMPARE_TYPE
+    from CMP_CONTENT (Full Contents) to CMP_EXISTENCE, WinMerge's
+    OPT_CMP_METHOD. */
+int currentCompareMethod();
+void saveCompareMethod(int method);
+/** The methods offered, CMP_CONTENT through CMP_EXISTENCE. */
+constexpr int kCompareMethodCount = 7;
+/** Display name of a method, WinMerge's IDS_COMPMETHOD_* texts. */
+QString compareMethodName(int method);
+/** Set the method in memory only, like setCompareOptionsForTest. */
+void setCompareMethodForTest(int method);
 
 /** Turn every ignore option off except whitespace, which takes the
     given OPT_CMP_IGNORE_WHITESPACE value; in memory only, the saved

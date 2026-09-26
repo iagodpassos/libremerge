@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QVariant>
 
+#include "DiffWrapper.h"
 #include "FilterList.h"
 #include "OptionsMgr.h"
 #include "OptionsDef.h"
@@ -159,6 +160,43 @@ void installEngineOptions()
 	options.InitOption(OPT_CMP_DIFF_ALGORITHM, 0);
 	options.InitOption(OPT_CMP_INDENT_HEURISTIC, true); // upstream default
 	options.InitOption(OPT_CMP_MOVED_BLOCKS, false);    // upstream default
+	options.InitOption(OPT_CMP_METHOD, static_cast<int>(CMP_CONTENT));
+}
+
+int currentCompareMethod()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	const int method = mgr != nullptr ? mgr->GetInt(OPT_CMP_METHOD) : CMP_CONTENT;
+	return method >= CMP_CONTENT && method <= CMP_EXISTENCE ? method : CMP_CONTENT;
+}
+
+void saveCompareMethod(int method)
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+	{
+		mgr->SaveOption(OPT_CMP_METHOD, method);
+		mgr->FlushOptions();
+	}
+}
+
+QString compareMethodName(int method)
+{
+	switch (method)
+	{
+	case CMP_QUICK_CONTENT: return QObject::tr("Quick Contents");
+	case CMP_BINARY_CONTENT: return QObject::tr("Binary Contents");
+	case CMP_DATE: return QObject::tr("Modified Date");
+	case CMP_DATE_SIZE: return QObject::tr("Modified Date and Size");
+	case CMP_SIZE: return QObject::tr("Size");
+	case CMP_EXISTENCE: return QObject::tr("Existence");
+	default: return QObject::tr("Full Contents");
+	}
+}
+
+void setCompareMethodForTest(int method)
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+		mgr->Set(OPT_CMP_METHOD, method);
 }
 
 DIFFOPTIONS currentDiffOptions()

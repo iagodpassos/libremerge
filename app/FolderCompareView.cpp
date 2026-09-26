@@ -2,11 +2,13 @@
 #include "pch.h"
 
 #include "FolderCompareView.h"
+#include "EngineOptions.h"
 #include "FileOps.h"
 #include "Icons.h"
 #include "Theme.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QDir>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -23,6 +25,7 @@
 #include <QSettings>
 #include <QTimer>
 #include <QToolBar>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
 #include <QVBoxLayout>
@@ -57,9 +60,10 @@ const QString kFilterSettingsKey = QStringLiteral("FolderCompare/Filter");
 const QString kTreeSettingsKey = QStringLiteral("FolderCompare/TreeView");
 
 /** Result column text. Like WinMerge's ColStatusGet, identical and
-    different files are named by what the content compare took them for. */
+    different files are named by what the content compare took them for;
+    the date, size and existence methods leave the type unknown. */
 QString categoryText(lm::FolderCompareItem::Category category,
-	lm::FolderCompareItem::FileType type)
+	lm::FolderCompareItem::FileType type, bool isDir)
 {
 	switch (category)
 	{
@@ -88,7 +92,8 @@ QString categoryText(lm::FolderCompareItem::Category category,
 		case lm::FolderCompareItem::UnknownType:
 			break;
 		}
-		return QObject::tr("Different");
+		return isDir ? QObject::tr("Different")
+			: QObject::tr("Files are different");
 	case lm::FolderCompareItem::LeftOnly: return QObject::tr("Left only");
 	case lm::FolderCompareItem::MiddleOnly: return QObject::tr("Middle only");
 	case lm::FolderCompareItem::RightOnly: return QObject::tr("Right only");
@@ -173,7 +178,8 @@ void FolderCompareView::setRowCategory(QTreeWidgetItem *row,
 {
 	const auto type = static_cast<lm::FolderCompareItem::FileType>(
 		row->data(0, RoleFileType).toInt());
-	const QString text = categoryText(category, type) + threeWayText(threeWay);
+	const QString text = categoryText(category, type, isDir)
+		+ threeWayText(threeWay);
 	row->setText(ColResult, isDir
 		? QObject::tr("Folder: %1").arg(text) : text);
 	row->setData(0, RoleCategory, static_cast<int>(category));
@@ -303,6 +309,34 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	statusRow->setContentsMargins(6, 3, 6, 3);
 	m_status = new QLabel(this);
 	statusRow->addWidget(m_status, 1);
+	// WinMerge's compare method status pane (DirView::OnStatusBarClick):
+	// picking a method saves it and rescans this comparison
+	m_methodButton = new QToolButton(this);
+	m_methodButton->setToolTip(tr("Compare method"));
+	m_methodButton->setPopupMode(QToolButton::InstantPopup);
+	auto *methodMenu = new QMenu(m_methodButton);
+	auto *methodGroup = new QActionGroup(methodMenu);
+	for (int method = 0; method < lm::kCompareMethodCount; ++method)
+	{
+		QAction *action = methodMenu->addAction(lm::compareMethodName(method));
+		action->setCheckable(true);
+		action->setData(method);
+		methodGroup->addAction(action);
+		connect(action, &QAction::triggered, this, [this, method]() {
+			lm::saveCompareMethod(method);
+			recompare();
+		});
+	}
+	// the radio follows the saved option, as upstream's does
+	connect(methodMenu, &QMenu::aboutToShow, this, [methodMenu]() {
+		const int saved = lm::currentCompareMethod();
+		for (QAction *action : methodMenu->actions())
+			action->setChecked(action->data().toInt() == saved);
+	});
+	m_methodButton->setMenu(methodMenu);
+	m_compareMethod = lm::currentCompareMethod();
+	m_methodButton->setText(lm::compareMethodName(m_compareMethod));
+	statusRow->addWidget(m_methodButton);
 	m_progress = new QProgressBar(this);
 	m_progress->setMaximumWidth(240);
 	m_progress->setVisible(false);
@@ -378,6 +412,19 @@ void FolderCompareView::applyTheme()
 	m_status->setStyleSheet(dark
 		? QStringLiteral("QLabel { background: #2c2c2c; color: #b8b8b8; }")
 		: QStringLiteral("QLabel { background: #ececec; color: #303030; }"));
+	// room on the right for the menu arrow, which otherwise sits on the text
+	const QString methodArrow = QStringLiteral(
+		" QToolButton::menu-indicator { subcontrol-origin: padding;"
+		" subcontrol-position: right center; right: 5px; }");
+	m_methodButton->setStyleSheet((dark
+		? QStringLiteral("QToolButton { background: #2c2c2c; color: #b8b8b8;"
+			" border: 1px solid #4a4a4a; border-radius: 3px;"
+			" padding: 1px 20px 1px 6px; }"
+			" QToolButton:hover { background: #3a3a3a; }")
+		: QStringLiteral("QToolButton { background: #ececec; color: #303030;"
+			" border: 1px solid #c4c4c4; border-radius: 3px;"
+			" padding: 1px 20px 1px 6px; }"
+			" QToolButton:hover { background: #dedede; }")) + methodArrow);
 	// header row of the tree follows the view palette on all platforms
 	m_tree->header()->setPalette(pal);
 	lm::applyToolbarTheme(this);
@@ -433,6 +480,10 @@ void FolderCompareView::start(const QStringList &dirs)
 	QSettings().setValue(kFilterSettingsKey,
 		filterMask.isEmpty() ? QStringLiteral("*.*") : filterMask);
 
+	m_compareMethod = lm::currentCompareMethod();
+	m_methodButton->setText(lm::compareMethodName(m_compareMethod));
+	m_methodButton->setEnabled(false);
+
 	m_job = std::make_shared<lm::FolderCompareJob>(m_sides);
 	m_status->setText(tr("Scanning\xE2\x80\xA6"));
 	m_progress->setRange(0, 0); // busy until totals are known
@@ -442,8 +493,9 @@ void FolderCompareView::start(const QStringList &dirs)
 	m_progressTimer->start();
 
 	auto job = m_job;
-	m_watcher.setFuture(QtConcurrent::run([dirs, job, filterMask]() {
-		return lm::compareFolders(dirs, true, job, filterMask);
+	const int method = m_compareMethod;
+	m_watcher.setFuture(QtConcurrent::run([dirs, job, filterMask, method]() {
+		return lm::compareFolders(dirs, true, job, filterMask, method);
 	}));
 }
 
@@ -480,6 +532,7 @@ void FolderCompareView::compareFinished()
 	m_progressTimer->stop();
 	m_progress->setVisible(false);
 	m_cancelButton->setVisible(false);
+	m_methodButton->setEnabled(true);
 	populate(m_watcher.result());
 	m_job.reset();
 }
@@ -641,6 +694,11 @@ QString FolderCompareView::rowResultForTest(const QString &name) const
 {
 	QTreeWidgetItem *row = findRowByName(name);
 	return row != nullptr ? row->text(ColResult) : QString();
+}
+
+QString FolderCompareView::compareMethodTextForTest() const
+{
+	return m_methodButton->text();
 }
 
 /** A file comparison opened from here saved its files: bring the row in

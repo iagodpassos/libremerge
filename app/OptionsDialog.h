@@ -10,10 +10,10 @@ class QStackedWidget;
 
 /**
  * The application options dialog, WinMerge style: a category list on the
- * left (General, Compare) and the matching page on the right. General
- * holds app-wide behavior (scroll to first difference, startup screen,
- * closing confirmation, backups, language); Compare holds the engine's
- * comparison options.
+ * left (General, Compare, Folder) and the matching page on the right.
+ * General holds app-wide behavior (scroll to first difference, startup
+ * screen, closing confirmation, backups, language); Compare holds the
+ * engine's comparison options; Folder the folder compare method.
  */
 class OptionsDialog : public QDialog
 {
@@ -30,6 +30,7 @@ public:
 private:
 	QWidget *buildGeneralPage();
 	QWidget *buildComparePage();
+	QWidget *buildFolderPage();
 	void load();
 	void save();
 	void restoreDefaults();
@@ -53,4 +54,6 @@ private:
 	QCheckBox *m_chkIgnoreNumbers;
 	QComboBox *m_cmbAlgorithm;
 	QCheckBox *m_chkMovedBlocks;
+	// Folder
+	QComboBox *m_cmbCompareMethod;
 };

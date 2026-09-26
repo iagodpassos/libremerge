@@ -253,6 +253,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolderContentOpt(QStringLiteral("selftest-folder-content"),
 		QStringLiteral("Verify the folder compare's Full Contents method: text diff, ignore options, file types (for testing)"));
 	parser.addOption(selftestFolderContentOpt);
+	QCommandLineOption selftestCompareMethodsOpt(QStringLiteral("selftest-compare-methods"),
+		QStringLiteral("Run a folder compare with each of WinMerge's seven compare methods and verify (for testing)"));
+	parser.addOption(selftestCompareMethodsOpt);
 	parser.addOption(QCommandLineOption(QStringLiteral("install-desktop-integration"),
 		QStringLiteral("Linux AppImage: add LibreMerge to the applications menu")));
 	parser.addOption(QCommandLineOption(QStringLiteral("remove-desktop-integration"),
@@ -830,6 +833,83 @@ int main(int argc, char *argv[])
 			&& exact[QStringLiteral("big.txt")] == textSame
 			&& exact[QStringLiteral("data.bin")] == binDiff)
 			? 0 : 1;
+	}
+
+	if (parser.isSet(selftestCompareMethodsOpt))
+	{
+		// WinMerge's seven folder compare methods against three pairs:
+		// same bytes with another date, other bytes of the same size, and
+		// another size (the last two share one date)
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString leftDir = dir.filePath(QStringLiteral("L"));
+		const QString rightDir = dir.filePath(QStringLiteral("R"));
+		QDir().mkpath(leftDir);
+		QDir().mkpath(rightDir);
+		const QDateTime older(QDate(2020, 1, 1), QTime(10, 0));
+		const QDateTime newer(QDate(2021, 1, 1), QTime(10, 0));
+		const auto write = [](const QString &path, const QByteArray &bytes,
+			const QDateTime &mtime)
+		{
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.write(bytes);
+			f.flush(); // or closing would write, and date, again
+			f.setFileTime(mtime, QFileDevice::FileModificationTime);
+		};
+		write(leftDir + QStringLiteral("/touched.txt"), "same\n", older);
+		write(rightDir + QStringLiteral("/touched.txt"), "same\n", newer);
+		write(leftDir + QStringLiteral("/edited.txt"), "aaaa\n", older);
+		write(rightDir + QStringLiteral("/edited.txt"), "bbbb\n", older);
+		write(leftDir + QStringLiteral("/grown.txt"), "a\n", older);
+		write(rightDir + QStringLiteral("/grown.txt"), "abc\n", older);
+
+		// per method: touched, edited, grown; 0 identical, 1 different
+		const int expected[lm::kCompareMethodCount][3] = {
+			{ 0, 1, 1 }, // Full Contents
+			{ 0, 1, 1 }, // Quick Contents
+			{ 0, 1, 1 }, // Binary Contents
+			{ 1, 0, 0 }, // Modified Date
+			{ 1, 0, 1 }, // Modified Date and Size
+			{ 0, 0, 1 }, // Size
+			{ 0, 0, 0 }, // Existence
+		};
+		const QString names[3] = { QStringLiteral("touched.txt"),
+			QStringLiteral("edited.txt"), QStringLiteral("grown.txt") };
+		lm::setCompareOptionsForTest(0);
+		bool ok = true;
+		for (int method = 0; method < lm::kCompareMethodCount; ++method)
+		{
+			lm::setCompareMethodForTest(method);
+			FolderCompareView view;
+			view.start(QStringList{ leftDir, rightDir });
+			for (int i = 0; i < 400 && view.isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+			const bool shown =
+				view.compareMethodTextForTest() == lm::compareMethodName(method);
+			printf("%-24s", qPrintable(view.compareMethodTextForTest()));
+			for (int f = 0; f < 3; ++f)
+			{
+				const int category = view.rowCategoryForTest(names[f]);
+				const int want = expected[method][f] == 0
+					? static_cast<int>(lm::FolderCompareItem::Identical)
+					: static_cast<int>(lm::FolderCompareItem::Different);
+				printf("  %s=%d%s", qPrintable(names[f]), category,
+					category == want ? "" : " (wrong)");
+				ok = ok && category == want;
+			}
+			printf("\n");
+			ok = ok && shown;
+			// no content compare ran: the Result column says "Files are ..."
+			if (method == 3) // Modified Date
+				ok = ok && view.rowResultForTest(names[0])
+					== QObject::tr("Files are different");
+		}
+		return ok ? 0 : 1;
 	}
 
 	if (parser.isSet(selftestMarkerOpt))

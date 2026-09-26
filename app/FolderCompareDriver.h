@@ -110,9 +110,11 @@ FolderCompareResult compareFolders(const QString &leftDir, const QString &rightD
 	const QString &filterMask = QStringLiteral("*.*"));
 
 /** Same, for two or three folders (WinMerge's 3-way folder compare).
-    A three-sided run needs a job created with sides = 3. */
+    A three-sided run needs a job created with sides = 3. compareMethod
+    is a COMPARE_TYPE, Full Contents through Existence; -1 takes the
+    saved option. */
 FolderCompareResult compareFolders(const QStringList &dirs,
 	bool recursive, const std::shared_ptr<FolderCompareJob> &job = {},
-	const QString &filterMask = QStringLiteral("*.*"));
+	const QString &filterMask = QStringLiteral("*.*"), int compareMethod = -1);
 
 } // namespace lm
