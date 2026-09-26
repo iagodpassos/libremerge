@@ -16,6 +16,7 @@
 #include <QTemporaryDir>
 #include <QTextBrowser>
 #include <QThread>
+#include <QThreadPool>
 #include <QTimer>
 #include <QTranslator>
 #include "FileCompareView.h"
@@ -140,6 +141,10 @@ int main(int argc, char *argv[])
 	QApplication::setApplicationName(QStringLiteral("LibreMerge"));
 	QApplication::setApplicationVersion(QStringLiteral("0.9.5"));
 	QApplication::setOrganizationName(QStringLiteral("LibreMerge"));
+	// the folder scan runs the engine on QtConcurrent's pool; the engine
+	// expects Windows' 1 MiB thread stacks and macOS gives 512 KiB, so use
+	// glibc's 8 MiB default like DirScan's compare pool
+	QThreadPool::globalInstance()->setStackSize(8 * 1024 * 1024);
 
 	// translations follow the system language unless overridden by the
 	// Options dialog (Appearance/Language) or, for testing, by the

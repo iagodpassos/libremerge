@@ -487,7 +487,14 @@ int DirScan_CompareItems(DiffFuncStruct *myStruct, DIFFITEM *parentdiffpos)
 		maxWorkers = std::clamp(nworkers * 2, 1, static_cast<int>(Environment::processorCount()));
 	}
 
+#ifdef _WIN32
 	ThreadPool threadPool(maxWorkers, maxWorkers);
+#else
+	// the workers inherit Windows' 1 MiB default stack upstream, and
+	// BinaryCompare alone keeps 512 KiB of read buffers on it; macOS gives
+	// secondary threads 512 KiB, so ask for glibc's 8 MiB default
+	ThreadPool threadPool(maxWorkers, maxWorkers, 60, 8 * 1024 * 1024);
+#endif
 	std::vector<DiffWorkerPtr> workers;
 	NotificationQueue queue;
 	std::atomic<bool> terminate{ false };

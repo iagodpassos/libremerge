@@ -76,6 +76,11 @@ branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
   both open helpers returned stale errno on success (upstream bug in a
   branch that never compiled before)
 - `TFile.h`: `wpath()` accessor on POSIX (returns the narrow path)
+- `DirScan.cpp`: the compare `ThreadPool` asks for an 8 MiB stack on
+  POSIX. Upstream's workers get Windows' 1 MiB default, and
+  `BinaryCompare` keeps two 256 KiB read buffers on the stack; macOS
+  gives secondary threads 512 KiB, so on Intel Macs any folder compare
+  reaching `BinaryCompare` overflowed (arm64 had about 12 KiB to spare)
 - `paths.h`: `/dev/null` as the native null device, `/` trailing slash,
   `constexpr const` fix
 - `unicoder.cpp`: the conversion pivot uses `xchar_t` (UTF-16 code unit:
