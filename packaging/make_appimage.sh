@@ -1,15 +1,18 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Build a self-contained Linux AppImage. Meant to run INSIDE a Debian 12
-# (bookworm) container/system - the oldest base we build on, which sets
-# the glibc floor of the resulting AppImage.
+# (bookworm) container/system. Its glibc is 2.36, but nothing bundled may
+# use a symbol newer than 2.35, so the AppImage runs on Ubuntu 22.04 (the
+# oldest LTS AppImageHub tests on); the build checks that at the end.
 #
 #   packaging/make_appimage.sh <source-dir> <work-dir>
 #
 # Produces <work-dir>/LibreMerge-<version>-<arch>.AppImage with Qt, ICU,
-# Poco and the wayland+xcb platform plugins bundled (the .deb lesson:
-# platform plugins are dlopen'd and easy to miss), plus Qt's own
-# translations (the container needs qt6-translations-l10n).
+# Poco, libarchive and the wayland+xcb platform plugins bundled (the .deb
+# lesson: platform plugins are dlopen'd and easy to miss), plus Qt's own
+# translations. Besides the app's build dependencies the container needs
+# qt6-translations-l10n, and zlib1g-dev, libbz2-dev, liblzma-dev and
+# libzstd-dev for libarchive (built here, see below).
 set -euo pipefail
 
 SRC="${1:?usage: make_appimage.sh <source-dir> <work-dir>}"
@@ -20,8 +23,48 @@ export VERSION="0.9.5"
 mkdir -p "$WORK"
 cd "$WORK"
 
+# libarchive from source rather than Debian's: bookworm's libarchive13
+# calls arc4random_buf, new in glibc 2.36 and the only symbol in the whole
+# bundle above 2.35, which kept the AppImage off Ubuntu 22.04 and failed
+# AppImageHub's test. Without it libarchive uses its own generator
+# (archive_random.c). Same version and options as the dmg (build_deps.sh).
+LIBARCHIVE_VER="3.8.1"
+LIBARCHIVE_SHA256="bde832a5e3344dc723cfe9cc37f8e54bde04565bfe6f136bc1bd31ab352e9fab"
+LIBARCHIVE="$PWD/libarchive"
+if [ ! -f "$LIBARCHIVE/lib/libarchive.so" ]; then
+  curl -fsSL -o libarchive.tar.gz \
+    "https://github.com/libarchive/libarchive/releases/download/v$LIBARCHIVE_VER/libarchive-$LIBARCHIVE_VER.tar.gz"
+  echo "$LIBARCHIVE_SHA256  libarchive.tar.gz" | sha256sum -c --quiet
+  tar xzf libarchive.tar.gz
+  cmake -S "libarchive-$LIBARCHIVE_VER" -B libarchive-build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$LIBARCHIVE" \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DHAVE_ARC4RANDOM_BUF=OFF \
+    -DENABLE_OPENSSL=OFF -DENABLE_LIBXML2=OFF -DENABLE_EXPAT=OFF \
+    -DENABLE_LZ4=OFF -DENABLE_LIBB2=OFF -DENABLE_MBEDTLS=OFF \
+    -DENABLE_NETTLE=OFF -DENABLE_TAR=OFF -DENABLE_CPIO=OFF \
+    -DENABLE_CAT=OFF -DENABLE_UNZIP=OFF -DENABLE_TEST=OFF \
+    -DENABLE_ACL=OFF > /dev/null
+  cmake --build libarchive-build > /dev/null
+  cmake --install libarchive-build > /dev/null
+fi
+# a missing -dev package silently drops a codec: zip, 7z, tar.xz and
+# tar.zst need all four
+needed="$(objdump -p "$LIBARCHIVE/lib/libarchive.so" | awk '/NEEDED/ {print $2}')"
+for codec in libz.so libbz2.so liblzma.so libzstd.so; do
+  if ! grep -q "^$codec" <<< "$needed"; then
+    echo "ERROR: libarchive built without ${codec%.so} (install its -dev package)" >&2
+    exit 1
+  fi
+done
+# linuxdeploy resolves the app's libarchive here, not in the system
+export LD_LIBRARY_PATH="$LIBARCHIVE/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
 cmake -S "$SRC" -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_INSTALL_PREFIX=/usr
+  -DCMAKE_INSTALL_PREFIX=/usr \
+  -DLibArchive_INCLUDE_DIR="$LIBARCHIVE/include" \
+  -DLibArchive_LIBRARY="$LIBARCHIVE/lib/libarchive.so"
 cmake --build build --target LibreMerge
 rm -rf AppDir
 DESTDIR="$PWD/AppDir" cmake --install build
@@ -104,6 +147,19 @@ mkdir -p AppDir/apprun-hooks
 cat > AppDir/apprun-hooks/00-libremerge-platform.sh <<'EOF'
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
 EOF
+
+# the glibc floor: nothing bundled may need more than 2.35 (Ubuntu 22.04)
+too_new=""
+while IFS= read -r -d '' elf; do
+  syms="$(objdump -T "$elf" 2>/dev/null || true)"
+  if grep -qE 'GLIBC_2\.(3[6-9]|[4-9][0-9])' <<< "$syms"; then
+    too_new="$too_new ${elf#AppDir/}"
+  fi
+done < <(find AppDir -type f \( -name '*.so*' -o -perm -u+x \) -print0)
+if [ -n "$too_new" ]; then
+  echo "ERROR: glibc newer than 2.35 needed by:$too_new" >&2
+  exit 1
+fi
 
 ./linuxdeploy-"$ARCH".AppImage --appdir AppDir --output appimage
 
