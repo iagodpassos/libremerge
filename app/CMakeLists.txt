@@ -113,6 +113,9 @@ if(UNIX AND NOT APPLE)
   install(TARGETS LibreMerge RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
   install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/libremerge.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+  install(FILES
+    ${CMAKE_SOURCE_DIR}/packaging/linux/io.github.iagodpassos.libremerge.appdata.xml
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
   foreach(_size 16 32 64 128 256 512)
     install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/icons/libremerge-${_size}.png
       DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${_size}x${_size}/apps

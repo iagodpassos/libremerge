@@ -161,6 +161,10 @@ if [ -n "$too_new" ]; then
   exit 1
 fi
 
+# appimagetool warns that "usr/share/metainfo/libremerge.appdata.xml" is
+# missing: it expects the desktop file's name, while validate-tree wants
+# the component ID's (io.github.iagodpassos.libremerge.appdata.xml, which
+# CI validates and AppImageHub reads). The warning is expected.
 ./linuxdeploy-"$ARCH".AppImage --appdir AppDir --output appimage
 
 ls -la LibreMerge*.AppImage
