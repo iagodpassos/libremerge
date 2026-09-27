@@ -12,7 +12,7 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 
 - **Side-by-side file comparison and merging** (2-way and 3-way) with the classic WinMerge look: gold difference blocks, word-level highlights inside lines, gray filler keeping the panes aligned line by line
 - **Free editing with live remerge**: type directly in the panes, copy differences (or all of them) in either direction, undo/redo, recompare with F5; files are saved with their original encoding, BOM and line endings preserved
-- **Folder comparison** (2-way and 3-way) with a hierarchical tree or flat list, background scanning with progress and cancel, file masks / regex / expression filters, copy between sides and delete to Trash (every pairwise direction in 3-way, from the context menu); the 3-way view marks which pair stayed identical on each difference, like WinMerge
+- **Folder comparison** (2-way and 3-way) with a hierarchical tree or flat list, background scanning with progress and cancel, file masks / regex / expression filters, copy between sides and delete to Trash (every pairwise direction in 3-way, from the context menu); the 3-way view marks which pair stayed identical on each difference, like WinMerge. WinMerge's seven compare methods (full, quick or binary contents, modified date, date and size, size, existence), switched from the status bar, and its View menu filters to show or hide identical, different, unique, skipped or binary items
 - **Archive comparison** (zip, 7z, tar and compressed tar, plus single-file gz/bz2/xz/zst): archives extract to temporary folders and open as a folder comparison, WinMerge style, against another archive or a plain folder, 2- or 3-way, with nested archives unwrapped automatically
 - **Diff pane** showing the current difference per file, **location pane** minimap, per-pane headers and status bars (line/column, encoding, EOL)
 - **CSV/TSV table comparison** as side-by-side grids: cell-level difference highlighting, delimiter auto-detection (`,` `;` tab `|`), quoted fields, first-row headers
@@ -73,7 +73,7 @@ ctest --test-dir build        # engine test suite (369 tests)
 
 ## Install (Linux)
 
-**AppImage** (recommended — any distro, x86_64 or arm64): download the `LibreMerge-<version>-<arch>.AppImage` for your architecture from the [releases page](https://github.com/iagodpassos/libremerge/releases), make it executable and run — Qt, ICU and Poco are bundled, nothing to install. Needs glibc 2.36+ (Debian 12+, Ubuntu 24.04+, Mint 22+, Fedora 37+, Arch):
+**AppImage** (recommended — any distro, x86_64 or arm64): download the `LibreMerge-<version>-<arch>.AppImage` for your architecture from the [releases page](https://github.com/iagodpassos/libremerge/releases), make it executable and run — Qt, ICU and Poco are bundled, nothing to install. Needs glibc 2.35+ (Debian 12+, Ubuntu 22.04+, Mint 21+, Fedora 36+, Arch):
 
 ```sh
 chmod +x LibreMerge-<version>-x86_64.AppImage && ./LibreMerge-<version>-x86_64.AppImage
@@ -81,7 +81,7 @@ chmod +x LibreMerge-<version>-x86_64.AppImage && ./LibreMerge-<version>-x86_64.A
 
 To add the AppImage to your applications menu (GNOME, KDE and others), run it once with `--install-desktop-integration`; it writes a menu entry pointing at the AppImage and its icons under `~/.local/share`, and `--remove-desktop-integration` takes them out again.
 
-**Homebrew on Linux**: the same cask installs the AppImage for your architecture into `~/Applications`, adds it to the applications menu and puts a `libremerge` command on your PATH (glibc 2.36+ as above):
+**Homebrew on Linux**: the same cask installs the AppImage for your architecture into `~/Applications`, adds it to the applications menu and puts a `libremerge` command on your PATH (glibc 2.35+ as above):
 
 ```sh
 brew install --cask iagodpassos/tap/libremerge
