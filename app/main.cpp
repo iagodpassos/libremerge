@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 	QApplication app(argc, argv);
 	QGuiApplication::setDesktopFileName(QStringLiteral("libremerge"));
 	QApplication::setApplicationName(QStringLiteral("LibreMerge"));
-	QApplication::setApplicationVersion(QStringLiteral("0.9.5"));
+	QApplication::setApplicationVersion(QStringLiteral("0.9.6"));
 	QApplication::setOrganizationName(QStringLiteral("LibreMerge"));
 	// the folder scan runs the engine on QtConcurrent's pool; the engine
 	// expects Windows' 1 MiB thread stacks and macOS gives 512 KiB, so use
