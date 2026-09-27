@@ -5,15 +5,17 @@
 
 class QCheckBox;
 class QComboBox;
-class QListWidget;
+class QRadioButton;
 class QStackedWidget;
+class QTreeWidget;
+class QTreeWidgetItem;
 
 /**
- * The application options dialog, WinMerge style: a category list on the
- * left (General, Compare, Folder) and the matching page on the right.
- * General holds app-wide behavior (scroll to first difference, startup
- * screen, closing confirmation, backups, language); Compare holds the
- * engine's comparison options; Folder the folder compare method.
+ * The application options dialog, laid out like WinMerge's (Preferences
+ * dialog): a page tree on the left, where a category's pages sit indented
+ * under it (General; Compare > General, Folder; Backup Files), and the
+ * selected page on the right with its own Defaults button. Every option
+ * sits on the page and at the position WinMerge gives it.
  */
 class OptionsDialog : public QDialog
 {
@@ -27,33 +29,59 @@ public:
 	static bool showSelectorAtStartup();
 	static bool askBeforeClosingMultipleTabs();
 
+	/** The pages, in the order the tree lists them. */
+	enum Page
+	{
+		GeneralPage,
+		ComparePage, ///< Compare > General
+		FolderPage,  ///< Compare > Folder
+		BackupPage,
+	};
+	/** The tree's items in display order, with their depth and the page
+	    each opens (for tests). */
+	struct CategoryInfo
+	{
+		QString text;
+		int depth;
+		int page;
+	};
+	QList<CategoryInfo> categoriesForTest() const;
+	/** Select the n-th tree item in display order (for tests). */
+	void selectCategoryForTest(int index);
+	int currentPageForTest() const;
+	QWidget *pageForTest(Page page) const;
+	/** Press the current page's Defaults button (for tests). */
+	void restoreDefaultsForTest();
+
 private:
 	QWidget *buildGeneralPage();
 	QWidget *buildComparePage();
 	QWidget *buildFolderPage();
+	QWidget *buildBackupPage();
+	void selectCategory(QTreeWidgetItem *item);
 	void load();
 	void save();
-	void restoreDefaults();
+	void restoreDefaults(int page);
 
-	QListWidget *m_categories;
+	QTreeWidget *m_categories;
 	QStackedWidget *m_pages;
 
 	// General
 	QCheckBox *m_chkScrollFirst;
 	QCheckBox *m_chkScrollFirstInline;
-	QCheckBox *m_chkShowSelector;
 	QCheckBox *m_chkAskClose;
-	QCheckBox *m_chkBackup;
+	QCheckBox *m_chkShowSelector;
 	QComboBox *m_cmbLanguage;
-
-	// Compare
-	QComboBox *m_cmbWhitespace;
-	QCheckBox *m_chkIgnoreCase;
+	// Compare > General
+	QRadioButton *m_radWhitespace[3];
 	QCheckBox *m_chkIgnoreBlank;
+	QCheckBox *m_chkIgnoreCase;
 	QCheckBox *m_chkIgnoreEol;
 	QCheckBox *m_chkIgnoreNumbers;
-	QComboBox *m_cmbAlgorithm;
 	QCheckBox *m_chkMovedBlocks;
-	// Folder
+	QComboBox *m_cmbAlgorithm;
+	// Compare > Folder
 	QComboBox *m_cmbCompareMethod;
+	// Backup Files
+	QCheckBox *m_chkBackup;
 };

@@ -8,6 +8,7 @@
 #include <QFileInfo>
 #include <QLibraryInfo>
 #include <QLocale>
+#include <QCheckBox>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMenuBar>
@@ -276,6 +277,13 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestAboutOpt(QStringLiteral("selftest-about"),
 		QStringLiteral("Verify the About box contents (for testing)"));
 	parser.addOption(selftestAboutOpt);
+	QCommandLineOption screenshotOptionsOpt(QStringLiteral("screenshot-options"),
+		QStringLiteral("Render every Options page to <file>-<n>.png and exit (for testing)"),
+		QStringLiteral("file"));
+	parser.addOption(screenshotOptionsOpt);
+	QCommandLineOption selftestOptionsOpt(QStringLiteral("selftest-options"),
+		QStringLiteral("Verify the Options dialog's page tree, titles and per-page defaults (for testing)"));
+	parser.addOption(selftestOptionsOpt);
 	QCommandLineOption selftestArchiveMixedOpt(QStringLiteral("selftest-archive-mixed"),
 		QStringLiteral("Compare a folder against an archive, 2- and 3-way (for testing)"));
 	parser.addOption(selftestArchiveMixedOpt);
@@ -534,6 +542,83 @@ int main(int argc, char *argv[])
 		contributorsPath.insert(contributorsPath.lastIndexOf(QLatin1Char('.')),
 			QStringLiteral("-contributors"));
 		return browser.grab().save(contributorsPath) ? 0 : 2;
+	}
+
+	if (parser.isSet(screenshotOptionsOpt))
+	{
+		// every tree item in display order, one image each
+		OptionsDialog dialog;
+		dialog.show();
+		const QString path = parser.value(screenshotOptionsOpt);
+		const int dot = path.lastIndexOf(QLatin1Char('.'));
+		for (int i = 0; i < dialog.categoriesForTest().size(); ++i)
+		{
+			dialog.selectCategoryForTest(i);
+			QCoreApplication::processEvents();
+			QString target = path;
+			target.insert(dot < 0 ? target.size() : dot,
+				QStringLiteral("-%1").arg(i));
+			if (!dialog.grab().save(target))
+				return 2;
+		}
+		return 0;
+	}
+
+	if (parser.isSet(selftestOptionsOpt))
+	{
+		// WinMerge's Preferences layout: the page tree, a category opening
+		// its first page with the path in the title, the backup switch on
+		// Backup Files, and Defaults resetting the current page only.
+		// Nothing is saved: the dialog is never accepted.
+		OptionsDialog dialog;
+		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
+		const int depths[] = { 0, 0, 1, 1, 0 };
+		const int pages[] = { OptionsDialog::GeneralPage, -1,
+			OptionsDialog::ComparePage, OptionsDialog::FolderPage,
+			OptionsDialog::BackupPage };
+		bool ok = tree.size() == 5;
+		for (int i = 0; ok && i < tree.size(); ++i)
+			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
+		printf("tree: %s\n", ok ? "ok" : "wrong");
+
+		// the Compare category shows Compare > General
+		const int expectedPage[] = { OptionsDialog::GeneralPage,
+			OptionsDialog::ComparePage, OptionsDialog::ComparePage,
+			OptionsDialog::FolderPage, OptionsDialog::BackupPage };
+		for (int i = 0; ok && i < 5; ++i)
+		{
+			dialog.selectCategoryForTest(i);
+			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
+			printf("item %d: page %d, title \"%s\"\n", i,
+				dialog.currentPageForTest(), qPrintable(dialog.windowTitle()));
+			ok = dialog.currentPageForTest() == expectedPage[i]
+				&& nested == (i >= 1 && i <= 3);
+		}
+
+		const auto boxes = [&dialog](OptionsDialog::Page page) {
+			return dialog.pageForTest(page)->findChildren<QCheckBox *>();
+		};
+		ok = ok && boxes(OptionsDialog::GeneralPage).size() == 4
+			&& boxes(OptionsDialog::BackupPage).size() == 1;
+
+		// Defaults on another page leaves General alone
+		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
+			box->setChecked(true);
+		boxes(OptionsDialog::BackupPage).first()->setChecked(false);
+		dialog.selectCategoryForTest(2); // Compare > General
+		dialog.restoreDefaultsForTest();
+		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
+			ok = ok && box->isChecked();
+		ok = ok && !boxes(OptionsDialog::BackupPage).first()->isChecked();
+		dialog.selectCategoryForTest(0); // General
+		dialog.restoreDefaultsForTest();
+		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
+			ok = ok && !box->isChecked();
+		dialog.selectCategoryForTest(4); // Backup Files
+		dialog.restoreDefaultsForTest();
+		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
+		printf("options dialog: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
 	}
 
 	if (parser.isSet(selftestAboutOpt))

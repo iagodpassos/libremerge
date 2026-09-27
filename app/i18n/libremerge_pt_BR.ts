@@ -1219,8 +1219,16 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Pasta</translation>
     </message>
     <message>
+        <source>Backup Files</source>
+        <translation>Arquivos de Backup</translation>
+    </message>
+    <message>
         <source>Defaults</source>
         <translation>Padrões</translation>
+    </message>
+    <message>
+        <source>Options (%1)</source>
+        <translation>Opções (%1)</translation>
     </message>
     <message>
         <source>Automatically scroll to first difference</source>
@@ -1235,12 +1243,20 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Mostrar a tela &quot;Selecionar Arquivos ou Pastas&quot; ao iniciar</translation>
     </message>
     <message>
-        <source>Ask before closing a window with multiple tabs</source>
-        <translation>Perguntar antes de fechar uma janela com várias abas</translation>
+        <source>Create backup files for:</source>
+        <translation>Criar arquivos de backup para:</translation>
     </message>
     <message>
-        <source>Back up the original file when saving (.bak)</source>
-        <translation>Fazer backup do arquivo original ao salvar (.bak)</translation>
+        <source>File compare</source>
+        <translation>Comparação de arquivos</translation>
+    </message>
+    <message>
+        <source>The backup is written next to the original file, with the .bak extension.</source>
+        <translation>O backup é gravado na mesma pasta do arquivo original, com a extensão .bak.</translation>
+    </message>
+    <message>
+        <source>Ask before closing a window with multiple tabs</source>
+        <translation>Perguntar antes de fechar uma janela com várias abas</translation>
     </message>
     <message>
         <source>Language:</source>
@@ -1253,10 +1269,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>Language changes take effect after restarting LibreMerge.</source>
         <translation>A mudança de idioma entra em vigor após reiniciar o LibreMerge.</translation>
-    </message>
-    <message>
-        <source>Whitespace:</source>
-        <translation>Espaços em branco:</translation>
     </message>
     <message>
         <source>Ignore changes</source>
@@ -1289,6 +1301,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>Default</source>
         <translation>Padrão</translation>
+    </message>
+    <message>
+        <source>Whitespace</source>
+        <translation>Espaços em branco</translation>
     </message>
     <message>
         <source>Minimal</source>

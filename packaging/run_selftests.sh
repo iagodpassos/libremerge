@@ -65,6 +65,7 @@ run_one selftest-show-filters
 # native menu check: runs under cocoa (dmg validation), skips offscreen
 LIBREMERGE_LANGUAGE=pt_BR run_one selftest-app-menu
 run_one selftest-about
+run_one selftest-options
 run_one selftest-menu-roles
 LIBREMERGE_LANGUAGE=pt_BR run_one selftest-qt-i18n
 run_one selftest-desktop-integration
