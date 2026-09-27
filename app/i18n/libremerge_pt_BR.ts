@@ -378,6 +378,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Data direita</translation>
     </message>
     <message>
+        <source>, %1 hidden by the View filters</source>
+        <translation>, %1 ocultos pelos filtros do menu Ver</translation>
+    </message>
+    <message>
         <source>Copy %1 to %2</source>
         <translation>Copiar %1 para %2</translation>
     </message>
@@ -777,6 +781,62 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>&amp;View</source>
         <translation>&amp;Ver</translation>
+    </message>
+    <message>
+        <source>Show &amp;Identical Items</source>
+        <translation>Mostrar &amp;Itens Idênticos</translation>
+    </message>
+    <message>
+        <source>Show &amp;Different Items</source>
+        <translation>Mostrar Itens &amp;Diferentes</translation>
+    </message>
+    <message>
+        <source>Show L&amp;eft Unique Items</source>
+        <translation>Mostrar I&amp;tens Únicos à Esquerda</translation>
+    </message>
+    <message>
+        <source>Show Midd&amp;le Unique Items</source>
+        <translation>Mostrar It&amp;ens Únicos no Meio</translation>
+    </message>
+    <message>
+        <source>Show Ri&amp;ght Unique Items</source>
+        <translation>Mostrar Ite&amp;ns Únicos à Direita</translation>
+    </message>
+    <message>
+        <source>Show S&amp;kipped Items</source>
+        <translation>Mostrar Iten&amp;s Pulados</translation>
+    </message>
+    <message>
+        <source>S&amp;how Binary Files</source>
+        <translation>M&amp;ostrar Arquivos Binários</translation>
+    </message>
+    <message>
+        <source>&amp;3-way Compare</source>
+        <translation>&amp;Comparação Tripla</translation>
+    </message>
+    <message>
+        <source>Show &amp;Left Only Different Items</source>
+        <translation>Mostrar Só Itens Diferentes à &amp;Esquerda</translation>
+    </message>
+    <message>
+        <source>Show &amp;Middle Only Different Items</source>
+        <translation>Mostrar Só Itens Diferentes no &amp;Meio</translation>
+    </message>
+    <message>
+        <source>Show &amp;Right Only Different Items</source>
+        <translation>Mostrar Só Itens Diferentes à &amp;Direita</translation>
+    </message>
+    <message>
+        <source>Show L&amp;eft Only Missing Items</source>
+        <translation>Mostrar Só &amp;Itens Ausentes à Esquerda</translation>
+    </message>
+    <message>
+        <source>Show Mi&amp;ddle Only Missing Items</source>
+        <translation>Mostrar Só I&amp;tens Ausentes no Meio</translation>
+    </message>
+    <message>
+        <source>Show Rig&amp;ht Only Missing Items</source>
+        <translation>Mostrar Só It&amp;ens Ausentes à Direita</translation>
     </message>
     <message>
         <source>&amp;Theme</source>

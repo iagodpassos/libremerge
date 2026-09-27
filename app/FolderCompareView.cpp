@@ -30,6 +30,8 @@
 #include <QTreeWidgetItemIterator>
 #include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrent>
+#include <functional>
+#include <iterator>
 
 namespace
 {
@@ -54,9 +56,34 @@ enum ItemRole
 	RoleCategory,   ///< lm::FolderCompareItem::Category as int
 	RoleFileType,   ///< lm::FolderCompareItem::FileType as int; kept
 	                ///  across row updates, like WinMerge's type flags
+	RoleThreeWay,   ///< lm::FolderCompareItem::ThreeWayInfo as int
 };
 
 const QString kFilterSettingsKey = QStringLiteral("FolderCompare/Filter");
+
+/** Saved keys and defaults of the View menu filters: WinMerge's OPT_SHOW_*
+    (OptionsDef.h, OptionsInit.cpp), in ShowFilter order. */
+const struct
+{
+	const char *key;
+	bool fallback;
+} kShowFilterOptions[] = {
+	{ "Settings/ShowIdentical", true },
+	{ "Settings/ShowDifferent", true },
+	{ "Settings/ShowUniqueLeft", true },
+	{ "Settings/ShowUniqueMiddle", true },
+	{ "Settings/ShowUniqueRight", true },
+	{ "Settings/ShowSkipped", false },
+	{ "Settings/ShowBinaries", true },
+	{ "Settings/ShowDifferentLeftOnly", true },
+	{ "Settings/ShowDifferentMiddleOnly", true },
+	{ "Settings/ShowDifferentRightOnly", true },
+	{ "Settings/ShowMissingLeftOnly", true },
+	{ "Settings/ShowMissingMiddleOnly", true },
+	{ "Settings/ShowMissingRightOnly", true },
+};
+static_assert(std::size(kShowFilterOptions) == FolderCompareView::ShowFilterCount,
+	"one saved option per View filter");
 const QString kTreeSettingsKey = QStringLiteral("FolderCompare/TreeView");
 
 /** Result column text. Like WinMerge's ColStatusGet, identical and
@@ -183,6 +210,7 @@ void FolderCompareView::setRowCategory(QTreeWidgetItem *row,
 	row->setText(ColResult, isDir
 		? QObject::tr("Folder: %1").arg(text) : text);
 	row->setData(0, RoleCategory, static_cast<int>(category));
+	row->setData(0, RoleThreeWay, static_cast<int>(threeWay));
 	const QColor color = categoryColor(category);
 	// explicit text color so the row stays readable whatever the
 	// platform palette is: black on the light pastels, near-white on
@@ -228,6 +256,9 @@ void FolderCompareView::fillRow(QTreeWidgetItem *row,
 FolderCompareView::FolderCompareView(QWidget *parent)
 	: QWidget(parent)
 {
+	for (int filter = 0; filter < ShowFilterCount; ++filter)
+		m_show[filter] = savedShowFilter(static_cast<ShowFilter>(filter));
+
 	auto *layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(0);
@@ -474,6 +505,7 @@ void FolderCompareView::start(const QStringList &dirs)
 	setupColumns();
 	m_result = lm::FolderCompareResult();
 	m_tree->clear();
+	m_hiddenRows = 0;
 	updateActions();
 
 	const QString filterMask = m_filterEdit->text().trimmed();
@@ -559,6 +591,8 @@ void FolderCompareView::updateStatusLine()
 	QString text = tr("%1 item(s): %2 different, %3 unique, %4 identical")
 		.arg(m_result.items.size() - m_rowsRemoved).arg(m_result.different)
 		.arg(m_result.unique).arg(m_result.identical);
+	if (m_hiddenRows > 0)
+		text += tr(", %1 hidden by the View filters").arg(m_hiddenRows);
 	if (m_result.aborted)
 		text = tr("Cancelled \xE2\x80\x94 partial results. ") + text;
 	m_status->setText(text);
@@ -701,6 +735,126 @@ QString FolderCompareView::compareMethodTextForTest() const
 	return m_methodButton->text();
 }
 
+bool FolderCompareView::savedShowFilter(ShowFilter filter)
+{
+	const auto &option = kShowFilterOptions[filter];
+	return QSettings().value(QLatin1String(option.key), option.fallback).toBool();
+}
+
+/** WinMerge's CDirView::OnOptionsShow*: save the option and redisplay. */
+void FolderCompareView::setShowFilter(ShowFilter filter, bool on)
+{
+	QSettings().setValue(QLatin1String(kShowFilterOptions[filter].key), on);
+	setShowFilterForTest(filter, on);
+}
+
+void FolderCompareView::setShowFilterForTest(ShowFilter filter, bool on)
+{
+	m_show[filter] = on;
+	applyShowFilters();
+}
+
+bool FolderCompareView::rowShownForTest(const QString &name) const
+{
+	QTreeWidgetItem *row = findRowByName(name);
+	for (QTreeWidgetItem *item = row; item != nullptr; item = item->parent())
+		if (item->isHidden())
+			return false;
+	return row != nullptr;
+}
+
+/** Hide the rows WinMerge's IsShowable leaves out. A row changed later by
+    a copy or a save keeps its place until the next redisplay, as upstream
+    only repaints such an item (UpdateDiffItemStatus). */
+void FolderCompareView::applyShowFilters()
+{
+	const bool treeMode = m_actTreeMode->isChecked();
+	// children first: a folder that fails its own filter still shows
+	// when something inside it does
+	std::function<bool(QTreeWidgetItem *)> apply = [&](QTreeWidgetItem *row) {
+		bool anyChildShown = false;
+		for (int i = 0; i < row->childCount(); ++i)
+			anyChildShown = apply(row->child(i)) || anyChildShown;
+		const bool shown = rowShowable(row, treeMode, anyChildShown);
+		row->setHidden(!shown);
+		return shown;
+	};
+	for (int i = 0; i < m_tree->topLevelItemCount(); ++i)
+		apply(m_tree->topLevelItem(i));
+
+	// result items left out, directly or under a hidden folder
+	m_hiddenRows = 0;
+	for (QTreeWidgetItemIterator it(m_tree); *it != nullptr; ++it)
+	{
+		if (!(*it)->data(0, RoleCategory).isValid())
+			continue; // folder node synthesized for the tree
+		for (QTreeWidgetItem *row = *it; row != nullptr; row = row->parent())
+		{
+			if (row->isHidden())
+			{
+				++m_hiddenRows;
+				break;
+			}
+		}
+	}
+	if (!m_job)
+		updateStatusLine();
+}
+
+/** IsShowable (DirActions.cpp) over a row's data. Folders filter by
+    result only in tree mode: in the flat list a folder's files carry
+    their own results. */
+bool FolderCompareView::rowShowable(QTreeWidgetItem *row, bool treeMode,
+	bool anyChildShown) const
+{
+	using Item = lm::FolderCompareItem;
+	const QVariant categoryData = row->data(0, RoleCategory);
+	if (!categoryData.isValid())
+		return anyChildShown; // folder node synthesized for the tree
+	const auto category = static_cast<Item::Category>(categoryData.toInt());
+	const bool isDir = !row->data(0, RoleIsFile).toBool();
+
+	// skipped is a super-flag: shown whenever skipped items are
+	if (category == Item::Skipped)
+		return m_show[ShowSkipped];
+
+	// side filters
+	switch (category)
+	{
+	case Item::LeftOnly: if (!m_show[ShowUniqueLeft]) return false; break;
+	case Item::MiddleOnly: if (!m_show[ShowUniqueMiddle]) return false; break;
+	case Item::RightOnly: if (!m_show[ShowUniqueRight]) return false; break;
+	case Item::MissingLeft: if (!m_show[ShowMissingLeftOnly]) return false; break;
+	case Item::MissingMiddle: if (!m_show[ShowMissingMiddleOnly]) return false; break;
+	case Item::MissingRight: if (!m_show[ShowMissingRightOnly]) return false; break;
+	default: break;
+	}
+	if (isDir && !treeMode)
+		return true;
+
+	// file type filter
+	if (!isDir && !m_show[ShowBinaries] && static_cast<Item::FileType>(
+			row->data(0, RoleFileType).toInt()) == Item::BinaryFiles)
+		return false;
+
+	// result filters; an identical folder hides with its contents
+	if (category == Item::Identical)
+		return m_show[ShowIdentical];
+	bool shown = true;
+	if (category == Item::Different || category == Item::MissingLeft
+		|| category == Item::MissingMiddle || category == Item::MissingRight)
+	{
+		switch (static_cast<Item::ThreeWayInfo>(row->data(0, RoleThreeWay).toInt()))
+		{
+		case Item::MiddleRightIdentical: shown = m_show[ShowDifferentLeftOnly]; break;
+		case Item::LeftRightIdentical: shown = m_show[ShowDifferentMiddleOnly]; break;
+		case Item::LeftMiddleIdentical: shown = m_show[ShowDifferentRightOnly]; break;
+		case Item::NoInfo: shown = m_show[ShowDifferent]; break;
+		}
+	}
+	return shown || (isDir && anyChildShown);
+}
+
 /** A file comparison opened from here saved its files: bring the row in
     line without a rescan, WinMerge's CDirDoc::UpdateChangedItem. The
     3-way identical-pair suffix is dropped (the diff count alone cannot
@@ -781,6 +935,7 @@ void FolderCompareView::rebuildRows()
 	m_tree->sortByColumn(treeMode ? ColName : ColFolder, Qt::AscendingOrder);
 	if (treeMode)
 		m_tree->expandAll();
+	applyShowFilters();
 	for (int col = 0; col < colCount(); ++col)
 		m_tree->resizeColumnToContents(col);
 	updateActions();

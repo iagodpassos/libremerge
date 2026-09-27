@@ -223,6 +223,69 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(optionsAction, &QAction::triggered, this, &MainWindow::showOptions);
 
 	QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
+	// WinMerge's folder window View menu: which rows the list shows, per
+	// folder comparison (CDirView::OnOptionsShow*)
+	auto folderView = [this]() {
+		return qobject_cast<FolderCompareView *>(m_tabs->currentWidget());
+	};
+	QList<QAction *> showActions;
+	auto addShowAction = [this, folderView, &showActions](QMenu *menu,
+		FolderCompareView::ShowFilter filter, const QString &text) {
+		QAction *action = menu->addAction(text);
+		action->setCheckable(true);
+		action->setData(static_cast<int>(filter));
+		connect(action, &QAction::triggered, this, [folderView, filter](bool on) {
+			if (auto *folder = folderView())
+				folder->setShowFilter(filter, on);
+		});
+		showActions.append(action);
+	};
+	addShowAction(viewMenu, FolderCompareView::ShowIdentical,
+		tr("Show &Identical Items"));
+	addShowAction(viewMenu, FolderCompareView::ShowDifferent,
+		tr("Show &Different Items"));
+	addShowAction(viewMenu, FolderCompareView::ShowUniqueLeft,
+		tr("Show L&eft Unique Items"));
+	addShowAction(viewMenu, FolderCompareView::ShowUniqueMiddle,
+		tr("Show Midd&le Unique Items"));
+	addShowAction(viewMenu, FolderCompareView::ShowUniqueRight,
+		tr("Show Ri&ght Unique Items"));
+	addShowAction(viewMenu, FolderCompareView::ShowSkipped,
+		tr("Show S&kipped Items"));
+	addShowAction(viewMenu, FolderCompareView::ShowBinaries,
+		tr("S&how Binary Files"));
+	QMenu *threeWayMenu = viewMenu->addMenu(tr("&3-way Compare"));
+	addShowAction(threeWayMenu, FolderCompareView::ShowDifferentLeftOnly,
+		tr("Show &Left Only Different Items"));
+	addShowAction(threeWayMenu, FolderCompareView::ShowDifferentMiddleOnly,
+		tr("Show &Middle Only Different Items"));
+	addShowAction(threeWayMenu, FolderCompareView::ShowDifferentRightOnly,
+		tr("Show &Right Only Different Items"));
+	threeWayMenu->addSeparator();
+	addShowAction(threeWayMenu, FolderCompareView::ShowMissingLeftOnly,
+		tr("Show L&eft Only Missing Items"));
+	addShowAction(threeWayMenu, FolderCompareView::ShowMissingMiddleOnly,
+		tr("Show Mi&ddle Only Missing Items"));
+	addShowAction(threeWayMenu, FolderCompareView::ShowMissingRightOnly,
+		tr("Show Rig&ht Only Missing Items"));
+	// the checks follow the active folder comparison; the middle and
+	// 3-way items need three folders (OnUpdateOptionsShow*)
+	connect(viewMenu, &QMenu::aboutToShow, this,
+		[folderView, showActions, threeWayMenu]() {
+			FolderCompareView *folder = folderView();
+			const bool threeWay = folder != nullptr && folder->sideCount() == 3;
+			threeWayMenu->setEnabled(threeWay);
+			for (QAction *action : showActions)
+			{
+				const auto filter = static_cast<FolderCompareView::ShowFilter>(
+					action->data().toInt());
+				action->setEnabled(folder != nullptr
+					&& (filter != FolderCompareView::ShowUniqueMiddle || threeWay));
+				action->setChecked(folder != nullptr ? folder->showFilter(filter)
+					: FolderCompareView::savedShowFilter(filter));
+			}
+		});
+	viewMenu->addSeparator();
 	QMenu *themeMenu = viewMenu->addMenu(tr("&Theme"));
 	auto *themeGroup = new QActionGroup(this);
 	auto addThemeAction = [themeMenu, themeGroup](const QString &text,

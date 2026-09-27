@@ -256,6 +256,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestCompareMethodsOpt(QStringLiteral("selftest-compare-methods"),
 		QStringLiteral("Run a folder compare with each of WinMerge's seven compare methods and verify (for testing)"));
 	parser.addOption(selftestCompareMethodsOpt);
+	QCommandLineOption selftestShowFiltersOpt(QStringLiteral("selftest-show-filters"),
+		QStringLiteral("Toggle the folder view's View menu filters, 2- and 3-way, and verify (for testing)"));
+	parser.addOption(selftestShowFiltersOpt);
 	parser.addOption(QCommandLineOption(QStringLiteral("install-desktop-integration"),
 		QStringLiteral("Linux AppImage: add LibreMerge to the applications menu")));
 	parser.addOption(QCommandLineOption(QStringLiteral("remove-desktop-integration"),
@@ -909,6 +912,118 @@ int main(int argc, char *argv[])
 				ok = ok && view.rowResultForTest(names[0])
 					== QObject::tr("Files are different");
 		}
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestShowFiltersOpt))
+	{
+		// WinMerge's View menu filters: switching one off hides exactly
+		// the rows it names, 2- and 3-way; nothing is saved
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.write(bytes);
+		};
+		const QString a = dir.filePath(QStringLiteral("A"));
+		const QString b = dir.filePath(QStringLiteral("B"));
+		const QString c = dir.filePath(QStringLiteral("C"));
+		const QString l2 = dir.filePath(QStringLiteral("L2"));
+		const QString r2 = dir.filePath(QStringLiteral("R2"));
+		write(l2 + QStringLiteral("/same.txt"), "x\n");
+		write(r2 + QStringLiteral("/same.txt"), "x\n");
+		write(l2 + QStringLiteral("/diff.txt"), "x\n");
+		write(r2 + QStringLiteral("/diff.txt"), "y\n");
+		write(l2 + QStringLiteral("/left.txt"), "x\n");
+		write(r2 + QStringLiteral("/right.txt"), "x\n");
+		write(l2 + QStringLiteral("/data.bin"), QByteArray("\x00\x01", 2));
+		write(r2 + QStringLiteral("/data.bin"), QByteArray("\x00\x02", 2));
+		// 3-way: which side differs, all three differ, middle only,
+		// missing on the left only
+		write(a + QStringLiteral("/leftdiff.txt"), "x\n");
+		write(b + QStringLiteral("/leftdiff.txt"), "a\n");
+		write(c + QStringLiteral("/leftdiff.txt"), "a\n");
+		write(a + QStringLiteral("/middiff.txt"), "a\n");
+		write(b + QStringLiteral("/middiff.txt"), "x\n");
+		write(c + QStringLiteral("/middiff.txt"), "a\n");
+		write(a + QStringLiteral("/rightdiff.txt"), "a\n");
+		write(b + QStringLiteral("/rightdiff.txt"), "a\n");
+		write(c + QStringLiteral("/rightdiff.txt"), "x\n");
+		write(a + QStringLiteral("/alldiff.txt"), "a\n");
+		write(b + QStringLiteral("/alldiff.txt"), "b\n");
+		write(c + QStringLiteral("/alldiff.txt"), "c\n");
+		write(b + QStringLiteral("/middleonly.txt"), "x\n");
+		write(b + QStringLiteral("/noleft.txt"), "x\n");
+		write(c + QStringLiteral("/noleft.txt"), "x\n");
+
+		lm::setCompareMethodForTest(0);
+		lm::setCompareOptionsForTest(0);
+		using F = FolderCompareView::ShowFilter;
+		// one filter off at a time, from the defaults: the rows that
+		// must disappear, every other row staying listed
+		const auto check = [](FolderCompareView &view, const QStringList &all,
+			F filter, const QStringList &gone)
+		{
+			for (int f = 0; f < FolderCompareView::ShowFilterCount; ++f)
+				view.setShowFilterForTest(static_cast<F>(f),
+					f != FolderCompareView::ShowSkipped);
+			view.setShowFilterForTest(filter, false);
+			bool ok = view.hiddenRowsForTest() == gone.size();
+			for (const QString &name : all)
+			{
+				const bool shown = view.rowShownForTest(name);
+				ok = ok && shown != gone.contains(name);
+				if (shown == gone.contains(name))
+					printf("filter %d: %s wrongly %s\n", int(filter),
+						qPrintable(name), shown ? "shown" : "hidden");
+			}
+			return ok;
+		};
+		const auto run = [](const QStringList &dirs, FolderCompareView &view)
+		{
+			view.start(dirs);
+			for (int i = 0; i < 400 && view.isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+		};
+
+		FolderCompareView two;
+		run(QStringList{ l2, r2 }, two);
+		const QStringList twoRows{ QStringLiteral("same.txt"),
+			QStringLiteral("diff.txt"), QStringLiteral("left.txt"),
+			QStringLiteral("right.txt"), QStringLiteral("data.bin") };
+		bool ok = check(two, twoRows, F::ShowIdentical, { QStringLiteral("same.txt") })
+			&& check(two, twoRows, F::ShowDifferent,
+				{ QStringLiteral("diff.txt"), QStringLiteral("data.bin") })
+			&& check(two, twoRows, F::ShowUniqueLeft, { QStringLiteral("left.txt") })
+			&& check(two, twoRows, F::ShowUniqueRight, { QStringLiteral("right.txt") })
+			&& check(two, twoRows, F::ShowBinaries, { QStringLiteral("data.bin") });
+
+		FolderCompareView three;
+		run(QStringList{ a, b, c }, three);
+		const QStringList threeRows{ QStringLiteral("leftdiff.txt"),
+			QStringLiteral("middiff.txt"), QStringLiteral("rightdiff.txt"),
+			QStringLiteral("alldiff.txt"), QStringLiteral("middleonly.txt"),
+			QStringLiteral("noleft.txt") };
+		ok = ok
+			&& check(three, threeRows, F::ShowDifferentLeftOnly,
+				{ QStringLiteral("leftdiff.txt"), QStringLiteral("noleft.txt") })
+			&& check(three, threeRows, F::ShowDifferentMiddleOnly,
+				{ QStringLiteral("middiff.txt") })
+			&& check(three, threeRows, F::ShowDifferentRightOnly,
+				{ QStringLiteral("rightdiff.txt") })
+			&& check(three, threeRows, F::ShowDifferent, { QStringLiteral("alldiff.txt") })
+			&& check(three, threeRows, F::ShowUniqueMiddle,
+				{ QStringLiteral("middleonly.txt") })
+			&& check(three, threeRows, F::ShowMissingLeftOnly,
+				{ QStringLiteral("noleft.txt") });
+		printf("show filters: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

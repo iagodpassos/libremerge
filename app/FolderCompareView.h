@@ -56,6 +56,36 @@ public:
 	QString rowResultForTest(const QString &name) const;
 	/** The compare method shown on the status bar (for tests). */
 	QString compareMethodTextForTest() const;
+
+	/** WinMerge's View menu filters (DirViewFilterSettings): which rows
+	    the list shows. Each view keeps its own set, loaded from the saved
+	    options; toggling one saves it and redisplays this view. */
+	enum ShowFilter
+	{
+		ShowIdentical,
+		ShowDifferent,
+		ShowUniqueLeft,
+		ShowUniqueMiddle,
+		ShowUniqueRight,
+		ShowSkipped,
+		ShowBinaries,
+		ShowDifferentLeftOnly,   ///< 3-way: only the left side differs
+		ShowDifferentMiddleOnly,
+		ShowDifferentRightOnly,
+		ShowMissingLeftOnly,     ///< 3-way: missing on the left only
+		ShowMissingMiddleOnly,
+		ShowMissingRightOnly,
+		ShowFilterCount
+	};
+	bool showFilter(ShowFilter filter) const { return m_show[filter]; }
+	void setShowFilter(ShowFilter filter, bool on);
+	static bool savedShowFilter(ShowFilter filter);
+	int sideCount() const { return m_sides; }
+	/** Apply a filter without saving it (for tests). */
+	void setShowFilterForTest(ShowFilter filter, bool on);
+	/** Whether a row, by file name, is listed (for tests). */
+	bool rowShownForTest(const QString &name) const;
+	int hiddenRowsForTest() const { return m_hiddenRows; }
 	/** Copy one row between sides without the confirmation (for
 	    tests). */
 	void copyRowForTest(const QString &name, int sourceSide, int targetSide);
@@ -109,6 +139,9 @@ private:
 	QTreeWidgetItem *folderNode(const QString &folder,
 		QHash<QString, QTreeWidgetItem *> &nodes);
 	void updateRowFromDisk(QTreeWidgetItem *row);
+	void applyShowFilters();
+	bool rowShowable(QTreeWidgetItem *row, bool treeMode,
+		bool anyChildShown) const;
 	void updateActions();
 	QString sidePath(QTreeWidgetItem *row, int side) const;
 	QString intendedSidePath(QTreeWidgetItem *row, int side) const;
@@ -116,6 +149,8 @@ private:
 	QString m_roots[3];
 	int m_sides = 2;
 	int m_rowsRemoved = 0; // rows dropped since the scan (delete ops)
+	bool m_show[ShowFilterCount] = {};
+	int m_hiddenRows = 0; // result items the View filters leave out
 	std::vector<std::unique_ptr<QTemporaryDir>> m_tempDirs;
 	lm::FolderCompareResult m_result;
 	QLineEdit *m_filterEdit;
