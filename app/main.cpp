@@ -20,6 +20,7 @@
 #include <QCompleter>
 #include <QFileSystemModel>
 #include <QImage>
+#include <QPushButton>
 #include <QTableView>
 #include <QTabWidget>
 #include <QTreeWidget>
@@ -838,6 +839,37 @@ int main(int argc, char *argv[])
 			pressEsc(selector != nullptr ? selector->findChild<QLineEdit *>() : nullptr);
 			check(window.findChild<NewComparisonView *>() == nullptr,
 				"Esc cancels the selection screen");
+		}
+		{
+			// the last tab too, and before the window weighs Esc: in
+			// "main window if only one tab" it closes the screen only
+			setEsc(OptionsDialog::EscMainWindowIfOneTab);
+			MainWindow window;
+			window.show();
+			window.openSelector({});
+			auto *selector = window.findChild<NewComparisonView *>();
+			pressEsc(selector != nullptr ? selector->findChild<QLineEdit *>() : nullptr);
+			check(window.findChild<NewComparisonView *>() == nullptr
+				&& tabCount(window) == 0 && window.isVisible(),
+				"Esc on a lone selection screen closes it, not the window");
+		}
+		{
+			// Cancel closes a lone selection screen (COpenView::OnCancel)
+			MainWindow window;
+			window.show();
+			window.openSelector({});
+			QPushButton *cancel = nullptr;
+			for (QPushButton *button : window.findChild<NewComparisonView *>()
+					->findChildren<QPushButton *>())
+				if (button->text() == NewComparisonView::tr("Cancel"))
+					cancel = button;
+			if (cancel == nullptr)
+				return 2;
+			cancel->click();
+			QCoreApplication::processEvents();
+			QCoreApplication::processEvents();
+			check(window.findChild<NewComparisonView *>() == nullptr
+				&& window.isVisible(), "Cancel closes a lone selection screen");
 		}
 
 		// Preserve file time: the saved file keeps its date

@@ -1066,10 +1066,12 @@ void MainWindow::openSelector(const QStringList &paths)
 
 	auto *selector = new NewComparisonView(this);
 	selector->addPaths(paths);
+	// Cancel closes the screen even when it is the last tab, leaving the
+	// window empty, like COpenView::OnCancel (ID_FILE_CLOSE)
 	const auto closeSelectorLater = [this, guard = QPointer(selector)]() {
 		QTimer::singleShot(0, this, [this, guard]() {
 			const int index = guard ? m_tabs->indexOf(guard) : -1;
-			if (index >= 0 && m_tabs->count() > 1)
+			if (index >= 0)
 				closeTab(index);
 		});
 	};
@@ -1213,6 +1215,14 @@ void MainWindow::handleEscape()
 {
 	const OptionsDialog::CloseWithEsc mode = OptionsDialog::closeWithEsc();
 	const int count = m_tabs->count();
+	// the selection screen takes Esc as its Cancel button, whatever the
+	// option and before the window weighs it: WinMerge's open dialog
+	// consumes the key as IDCANCEL ahead of CMainFrame
+	if (qobject_cast<NewComparisonView *>(m_tabs->currentWidget()) != nullptr)
+	{
+		closeTab(m_tabs->currentIndex());
+		return;
+	}
 	if (mode == OptionsDialog::EscMainWindowIfOneTab && count <= 1)
 	{
 		close();
@@ -1222,14 +1232,6 @@ void MainWindow::handleEscape()
 	{
 		if (mode == OptionsDialog::EscTabOrMainWindow)
 			close();
-		return;
-	}
-	// the selection screen takes Esc as its Cancel button, whatever the
-	// option, like the IDCANCEL of WinMerge's open dialog
-	if (qobject_cast<NewComparisonView *>(m_tabs->currentWidget()) != nullptr)
-	{
-		if (count > 1)
-			closeTab(m_tabs->currentIndex());
 		return;
 	}
 	if (mode != OptionsDialog::EscDisabled)
