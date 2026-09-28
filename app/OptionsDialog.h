@@ -28,6 +28,27 @@ public:
 	static bool scrollToFirstInlineDiff();
 	static bool showSelectorAtStartup();
 	static bool askBeforeClosingMultipleTabs();
+	/** WinMerge's OPT_CLOSE_WITH_ESC. */
+	enum CloseWithEsc
+	{
+		EscDisabled,
+		EscTabOrMainWindow,  ///< the tab; with none left, the app
+		EscTabOnly,
+		EscMainWindowIfOneTab,
+	};
+	static CloseWithEsc closeWithEsc();
+	/** WinMerge's OPT_PRESERVE_FILETIMES: saving keeps the file's date. */
+	static bool preserveFileTime();
+	/** WinMerge's OPT_CLOSE_WITH_OK: Compare closes the selection tab. */
+	static bool closeSelectorOnCompare();
+	/** WinMerge's OPT_AUTO_COMPLETE_SOURCE for the selection's paths. */
+	enum AutoCompleteSource
+	{
+		AutoCompleteDisabled,
+		AutoCompleteFileSystem,
+		AutoCompleteRecentList,
+	};
+	static AutoCompleteSource autoCompleteSource();
 
 	/** The pages, in the order the tree lists them. */
 	enum Page
@@ -69,8 +90,12 @@ private:
 	// General
 	QCheckBox *m_chkScrollFirst;
 	QCheckBox *m_chkScrollFirstInline;
+	QComboBox *m_cmbCloseWithEsc;
 	QCheckBox *m_chkAskClose;
+	QCheckBox *m_chkPreserveFileTime;
 	QCheckBox *m_chkShowSelector;
+	QCheckBox *m_chkCloseSelector;
+	QComboBox *m_cmbAutoComplete;
 	QComboBox *m_cmbLanguage;
 	// Compare > General
 	QRadioButton *m_radWhitespace[3];

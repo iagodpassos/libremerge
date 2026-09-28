@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "NewComparisonView.h"
 #include "ArchiveCompare.h"
+#include "OptionsDialog.h"
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCompleter>
+#include <QDir>
 #include <QDragEnterEvent>
+#include <QFileSystemModel>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
@@ -26,6 +30,42 @@ namespace
 
 const QString kHistoryKey = QStringLiteral("NewComparison/History");
 constexpr int kHistoryMax = 12;
+
+/** WinMerge's OPT_AUTO_COMPLETE_SOURCE on a path field: suggestions from
+    the file system as the path is typed, from the recent paths, or none. */
+void applyAutoComplete(QComboBox *combo)
+{
+	QCompleter *completer = nullptr;
+	switch (OptionsDialog::autoCompleteSource())
+	{
+	case OptionsDialog::AutoCompleteDisabled:
+		break;
+	case OptionsDialog::AutoCompleteFileSystem:
+	{
+		completer = new QCompleter(combo);
+		auto *model = new QFileSystemModel(completer);
+		model->setOption(QFileSystemModel::DontWatchForChanges);
+		model->setFilter(QDir::AllDirs | QDir::Files | QDir::Drives
+			| QDir::NoDotAndDotDot);
+		model->setRootPath(QString());
+		completer->setModel(model);
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
+		completer->setCaseSensitivity(Qt::CaseInsensitive);
+#else
+		completer->setCaseSensitivity(Qt::CaseSensitive);
+#endif
+		break;
+	}
+	case OptionsDialog::AutoCompleteRecentList:
+		completer = new QCompleter(combo->model(), combo);
+		completer->setCaseSensitivity(Qt::CaseInsensitive);
+		break;
+	}
+	if (completer != nullptr)
+		completer->setCompletionMode(QCompleter::PopupCompletion);
+	// null drops the combo's own inline completion too: "Disabled"
+	combo->setCompleter(completer);
+}
 
 } // namespace
 
@@ -76,6 +116,7 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 		m_slots[i].path->setEditable(true);
 		m_slots[i].path->setInsertPolicy(QComboBox::NoInsert);
 		m_slots[i].path->addItems(pathHistory);
+		applyAutoComplete(m_slots[i].path);
 		m_slots[i].path->setCurrentText(QString());
 		m_slots[i].path->lineEdit()->setPlaceholderText(
 			tr("Type a path, pick a recent one, drop a file here or browse\xE2\x80\xA6"));

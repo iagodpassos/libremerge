@@ -58,6 +58,9 @@ protected:
 	void dragEnterEvent(QDragEnterEvent *event) override;
 	void dropEvent(QDropEvent *event) override;
 	void closeEvent(QCloseEvent *event) override;
+	/** Esc that no page used (to close its find bar, cancel a selection
+	    or a scan) closes the tab or the window, per the options. */
+	void keyPressEvent(QKeyEvent *event) override;
 	bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
@@ -67,6 +70,7 @@ private slots:
 	void closeTab(int index);
 
 private:
+	void handleEscape();
 	void attachFileView(FileCompareView *view);
 	/** Record a successful comparison in File > Recent Files or Folders. */
 	void rememberComparison(const QStringList &paths);

@@ -13,6 +13,7 @@
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QKeyEvent>
 #include <QStyleFactory>
 #include <QLabel>
 #include <QLineEdit>
@@ -543,6 +544,17 @@ void FolderCompareView::recompare()
 		dirs.append(m_roots[i]);
 	}
 	start(dirs);
+}
+
+void FolderCompareView::keyPressEvent(QKeyEvent *event)
+{
+	if (event->key() == Qt::Key_Escape && m_job && m_cancelButton->isEnabled())
+	{
+		m_cancelButton->click();
+		event->accept();
+		return;
+	}
+	QWidget::keyPressEvent(event);
 }
 
 void FolderCompareView::updateProgress()

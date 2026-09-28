@@ -28,6 +28,7 @@
 #include <QProgressDialog>
 #include <QTabWidget>
 #include <QTemporaryDir>
+#include <QKeyEvent>
 #include <QTimer>
 
 #include "FileCompareView.h"
@@ -1081,6 +1082,10 @@ void MainWindow::openSelector(const QStringList &paths)
 						openFolderComparison(selected);
 					else
 						openFileComparison(selected, readOnly);
+					// WinMerge's OPT_CLOSE_WITH_OK, off by default: the
+					// selection stays open for the next comparison
+					if (!OptionsDialog::closeSelectorOnCompare())
+						return;
 					const int index = guard ? m_tabs->indexOf(guard) : -1;
 					if (index >= 0 && m_tabs->count() > 1)
 						closeTab(index);
@@ -1181,6 +1186,48 @@ void MainWindow::dropEvent(QDropEvent *event)
 	// open from a clean stack, not from inside the drop handler: an archive
 	// among the paths extracts with processEvents() for its progress
 	QTimer::singleShot(0, this, [this, paths]() { handleIncomingPaths(paths); });
+}
+
+void MainWindow::keyPressEvent(QKeyEvent *event)
+{
+	if (event->key() == Qt::Key_Escape && event->modifiers() == Qt::NoModifier)
+	{
+		event->accept();
+		// the key came up through the page's own widgets: closing (and
+		// deleting) the page waits one event-loop cycle
+		QTimer::singleShot(0, this, [this]() { handleEscape(); });
+		return;
+	}
+	QMainWindow::keyPressEvent(event);
+}
+
+/** WinMerge's OPT_CLOSE_WITH_ESC, as its views and CMainFrame apply it
+    (MDI child windows being this window's tabs). */
+void MainWindow::handleEscape()
+{
+	const OptionsDialog::CloseWithEsc mode = OptionsDialog::closeWithEsc();
+	const int count = m_tabs->count();
+	if (mode == OptionsDialog::EscMainWindowIfOneTab && count <= 1)
+	{
+		close();
+		return;
+	}
+	if (count == 0)
+	{
+		if (mode == OptionsDialog::EscTabOrMainWindow)
+			close();
+		return;
+	}
+	// the selection screen takes Esc as its Cancel button, whatever the
+	// option, like the IDCANCEL of WinMerge's open dialog
+	if (qobject_cast<NewComparisonView *>(m_tabs->currentWidget()) != nullptr)
+	{
+		if (count > 1)
+			closeTab(m_tabs->currentIndex());
+		return;
+	}
+	if (mode != OptionsDialog::EscDisabled)
+		closeTab(m_tabs->currentIndex());
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

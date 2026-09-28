@@ -39,6 +39,7 @@
 #include "Icons.h"
 #include "LocationPane.h"
 #include "SyntaxHighlighter.h"
+#include "FileOps.h"
 #include "OptionsDialog.h"
 #include "Theme.h"
 
@@ -2490,6 +2491,8 @@ bool FileCompareView::saveSide(int side, QString *error)
 		emit pathsChanged();
 	}
 
+	const QDateTime originalTime = lm::timeToPreserve(s.path);
+
 	// like WinMerge (OPT_BACKUP_FILECMP, on by default): keep the
 	// original as <name>.bak next to it before overwriting
 	if (QSettings().value(QStringLiteral("Backup/FileCompare"), true).toBool()
@@ -2528,6 +2531,7 @@ bool FileCompareView::saveSide(int side, QString *error)
 			file.WriteString(eol);
 	}
 	file.Close();
+	lm::restoreFileTime(s.path, originalTime);
 	m_syncing = true;
 	m_panes[side]->document()->setModified(false);
 	m_syncing = false;

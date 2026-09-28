@@ -1354,8 +1354,20 @@ void ImageCompareView::paneKey(int pane, QKeyEvent *event)
 			QAbstractSlider::SliderPageStepAdd);
 		return;
 	case Qt::Key_Escape:
-		cancelSelection();
+	{
+		// Esc cancels a selection or a pasted image first; with none,
+		// it goes up to the window, which may close the tab (Options >
+		// Close windows with 'Esc')
+		bool pending = false;
+		for (int i = 0; i < m_paneCount; ++i)
+			pending = pending || m_panes[i]->selectionVisible()
+				|| m_panes[i]->hasFloatingImage();
+		if (pending)
+			cancelSelection();
+		else
+			event->ignore();
 		return;
+	}
 	case Qt::Key_Return:
 	case Qt::Key_Enter:
 		commitFloatingImage(pane);

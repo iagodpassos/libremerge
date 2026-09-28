@@ -29,6 +29,11 @@ const QString kScrollFirstInline =
 	QStringLiteral("General/ScrollToFirstInlineDiff");
 const QString kShowSelector = QStringLiteral("General/ShowSelectorAtStartup");
 const QString kAskClose = QStringLiteral("General/AskCloseMultipleTabs");
+// defaults: WinMerge's OptionsInit
+const QString kCloseWithEsc = QStringLiteral("General/CloseWithEsc");
+const QString kPreserveFileTime = QStringLiteral("General/PreserveFileTime");
+const QString kCloseSelector = QStringLiteral("General/CloseSelectorOnCompare");
+const QString kAutoComplete = QStringLiteral("General/AutoCompleteSource");
 const QString kBackup = QStringLiteral("Backup/FileCompare");
 const QString kLanguage = QStringLiteral("Appearance/Language");
 
@@ -65,6 +70,30 @@ bool OptionsDialog::showSelectorAtStartup()
 bool OptionsDialog::askBeforeClosingMultipleTabs()
 {
 	return QSettings().value(kAskClose, false).toBool();
+}
+
+OptionsDialog::CloseWithEsc OptionsDialog::closeWithEsc()
+{
+	const int mode = QSettings().value(kCloseWithEsc, EscTabOrMainWindow).toInt();
+	return mode >= EscDisabled && mode <= EscMainWindowIfOneTab
+		? static_cast<CloseWithEsc>(mode) : EscTabOrMainWindow;
+}
+
+bool OptionsDialog::preserveFileTime()
+{
+	return QSettings().value(kPreserveFileTime, false).toBool();
+}
+
+bool OptionsDialog::closeSelectorOnCompare()
+{
+	return QSettings().value(kCloseSelector, false).toBool();
+}
+
+OptionsDialog::AutoCompleteSource OptionsDialog::autoCompleteSource()
+{
+	const int source = QSettings().value(kAutoComplete, AutoCompleteFileSystem).toInt();
+	return source >= AutoCompleteDisabled && source <= AutoCompleteRecentList
+		? static_cast<AutoCompleteSource>(source) : AutoCompleteFileSystem;
 }
 
 OptionsDialog::OptionsDialog(QWidget *parent)
@@ -167,12 +196,32 @@ QWidget *OptionsDialog::buildGeneralPage()
 	m_chkScrollFirstInline = new QCheckBox(
 		tr("Automatically scroll to first inline difference"), page);
 	box->addWidget(m_chkScrollFirstInline);
+	// WinMerge's MDI child windows are this window's tabs
+	m_cmbCloseWithEsc = new QComboBox(page);
+	m_cmbCloseWithEsc->addItems({ tr("Disabled"), tr("Tab or main window"),
+		tr("Tab only"), tr("Close main window if only one tab") });
+	addLabeled(box, tr("Close windows with 'Esc':"), m_cmbCloseWithEsc);
+
+	box->addSpacing(4);
 	m_chkAskClose = new QCheckBox(
 		tr("Ask before closing a window with multiple tabs"), page);
 	box->addWidget(m_chkAskClose);
+	m_chkPreserveFileTime = new QCheckBox(
+		tr("Preserve file time in file compare"), page);
+	box->addWidget(m_chkPreserveFileTime);
 	m_chkShowSelector = new QCheckBox(
 		tr("Show \"Select Files or Folders\" screen at startup"), page);
 	box->addWidget(m_chkShowSelector);
+	m_chkCloseSelector = new QCheckBox(
+		tr("Close \"Select Files or Folders\" screen on clicking the Compare button"),
+		page);
+	box->addWidget(m_chkCloseSelector);
+
+	m_cmbAutoComplete = new QComboBox(page);
+	m_cmbAutoComplete->addItems({ tr("Disabled"), tr("From file system"),
+		tr("From Most Recently Used list") });
+	addLabeled(box, tr("\"Select Files or Folders\" auto completion:"),
+		m_cmbAutoComplete);
 
 	box->addSpacing(8);
 	m_cmbLanguage = new QComboBox(page);
@@ -279,9 +328,13 @@ void OptionsDialog::load()
 	m_chkScrollFirst->setChecked(settings.value(kScrollFirst, false).toBool());
 	m_chkScrollFirstInline->setChecked(
 		settings.value(kScrollFirstInline, false).toBool());
+	m_cmbCloseWithEsc->setCurrentIndex(closeWithEsc());
 	m_chkAskClose->setChecked(settings.value(kAskClose, false).toBool());
+	m_chkPreserveFileTime->setChecked(preserveFileTime());
 	m_chkShowSelector->setChecked(
 		settings.value(kShowSelector, false).toBool());
+	m_chkCloseSelector->setChecked(closeSelectorOnCompare());
+	m_cmbAutoComplete->setCurrentIndex(autoCompleteSource());
 	const int langIndex =
 		m_cmbLanguage->findData(settings.value(kLanguage).toString());
 	m_cmbLanguage->setCurrentIndex(qMax(0, langIndex));
@@ -307,8 +360,12 @@ void OptionsDialog::save()
 	QSettings settings;
 	settings.setValue(kScrollFirst, m_chkScrollFirst->isChecked());
 	settings.setValue(kScrollFirstInline, m_chkScrollFirstInline->isChecked());
+	settings.setValue(kCloseWithEsc, m_cmbCloseWithEsc->currentIndex());
 	settings.setValue(kAskClose, m_chkAskClose->isChecked());
+	settings.setValue(kPreserveFileTime, m_chkPreserveFileTime->isChecked());
 	settings.setValue(kShowSelector, m_chkShowSelector->isChecked());
+	settings.setValue(kCloseSelector, m_chkCloseSelector->isChecked());
+	settings.setValue(kAutoComplete, m_cmbAutoComplete->currentIndex());
 	settings.setValue(kLanguage, m_cmbLanguage->currentData().toString());
 	settings.setValue(kBackup, m_chkBackup->isChecked());
 
@@ -341,8 +398,12 @@ void OptionsDialog::restoreDefaults(int page)
 	case GeneralPage:
 		m_chkScrollFirst->setChecked(false);
 		m_chkScrollFirstInline->setChecked(false);
+		m_cmbCloseWithEsc->setCurrentIndex(EscTabOrMainWindow);
 		m_chkAskClose->setChecked(false);
+		m_chkPreserveFileTime->setChecked(false);
 		m_chkShowSelector->setChecked(false);
+		m_chkCloseSelector->setChecked(false);
+		m_cmbAutoComplete->setCurrentIndex(AutoCompleteFileSystem);
 		m_cmbLanguage->setCurrentIndex(0);
 		break;
 	case ComparePage:

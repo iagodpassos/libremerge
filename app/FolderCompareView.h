@@ -107,6 +107,11 @@ signals:
 	/** 3-way activation: the item exists on all three sides. */
 	void openFileComparison3Requested(const QStringList &paths);
 
+protected:
+	/** Esc stops a running comparison, like CDirView; otherwise it goes
+	    up to the window (Options > Close windows with 'Esc'). */
+	void keyPressEvent(QKeyEvent *event) override;
+
 private slots:
 	void applyTheme();
 	void itemActivated(QTreeWidgetItem *item, int column);

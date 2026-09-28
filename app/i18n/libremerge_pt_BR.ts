@@ -1239,8 +1239,48 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Rolar automaticamente para a primeira diferença em linha</translation>
     </message>
     <message>
+        <source>Disabled</source>
+        <translation>Desabilitado</translation>
+    </message>
+    <message>
+        <source>Tab or main window</source>
+        <translation>Aba ou janela principal</translation>
+    </message>
+    <message>
+        <source>Tab only</source>
+        <translation>Só a aba</translation>
+    </message>
+    <message>
+        <source>Close main window if only one tab</source>
+        <translation>Fechar a janela principal se só houver uma aba</translation>
+    </message>
+    <message>
+        <source>Close windows with &apos;Esc&apos;:</source>
+        <translation>Fechar janelas com &apos;Esc&apos;:</translation>
+    </message>
+    <message>
+        <source>Preserve file time in file compare</source>
+        <translation>Preservar hora do arquivo na comparação de arquivos</translation>
+    </message>
+    <message>
         <source>Show &quot;Select Files or Folders&quot; screen at startup</source>
         <translation>Mostrar a tela &quot;Selecionar Arquivos ou Pastas&quot; ao iniciar</translation>
+    </message>
+    <message>
+        <source>Close &quot;Select Files or Folders&quot; screen on clicking the Compare button</source>
+        <translation>Fechar a tela &quot;Selecionar Arquivos ou Pastas&quot; ao clicar no botão Comparar</translation>
+    </message>
+    <message>
+        <source>From file system</source>
+        <translation>Do sistema de arquivos</translation>
+    </message>
+    <message>
+        <source>From Most Recently Used list</source>
+        <translation>Da lista Mais Recentemente Usados</translation>
+    </message>
+    <message>
+        <source>&quot;Select Files or Folders&quot; auto completion:</source>
+        <translation>Preenchimento automático da tela &quot;Selecionar Arquivos ou Pastas&quot;:</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

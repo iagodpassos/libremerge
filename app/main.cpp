@@ -15,6 +15,16 @@
 #include <QLineEdit>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QComboBox>
+#include <QCompleter>
+#include <QFileSystemModel>
+#include <QImage>
+#include <QTableView>
+#include <QTabWidget>
+#include <QTreeWidget>
+#include <cstring>
+#include "DiffTextEdit.h"
+#include "ImagePane.h"
 #include <QTextBrowser>
 #include <QThread>
 #include <QThreadPool>
@@ -142,6 +152,17 @@ int main(int argc, char *argv[])
 	QApplication::setApplicationName(QStringLiteral("LibreMerge"));
 	QApplication::setApplicationVersion(QStringLiteral("0.9.6"));
 	QApplication::setOrganizationName(QStringLiteral("LibreMerge"));
+	// selftests run on settings of their own, emptied first: they neither
+	// depend on the user's options nor change them
+	for (int i = 1; i < argc; ++i)
+	{
+		if (std::strncmp(argv[i], "--selftest", 10) == 0)
+		{
+			QApplication::setOrganizationName(QStringLiteral("LibreMerge-Selftest"));
+			QSettings().clear();
+			break;
+		}
+	}
 	// the folder scan runs the engine on QtConcurrent's pool; the engine
 	// expects Windows' 1 MiB thread stacks and macOS gives 512 KiB, so use
 	// glibc's 8 MiB default like DirScan's compare pool
@@ -284,6 +305,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestOptionsOpt(QStringLiteral("selftest-options"),
 		QStringLiteral("Verify the Options dialog's page tree, titles and per-page defaults (for testing)"));
 	parser.addOption(selftestOptionsOpt);
+	QCommandLineOption selftestGeneralOptionsOpt(QStringLiteral("selftest-general-options"),
+		QStringLiteral("Exercise Close with Esc, Preserve file time, Close the selection on Compare and auto completion (for testing)"));
+	parser.addOption(selftestGeneralOptionsOpt);
 	QCommandLineOption selftestArchiveMixedOpt(QStringLiteral("selftest-archive-mixed"),
 		QStringLiteral("Compare a folder against an archive, 2- and 3-way (for testing)"));
 	parser.addOption(selftestArchiveMixedOpt);
@@ -300,6 +324,8 @@ int main(int argc, char *argv[])
 
 	if (parser.isSet(selftestArchiveMixedOpt))
 	{
+		// the open screen part expects Compare to close it
+		QSettings().setValue(QStringLiteral("General/CloseSelectorOnCompare"), true);
 		// WinMerge's DecompressArchive handles each side on its own: an
 		// archive compares against a plain folder. Enters through the
 		// drop/Finder route (handleIncomingPaths), the one users hit most
@@ -598,7 +624,7 @@ int main(int argc, char *argv[])
 		const auto boxes = [&dialog](OptionsDialog::Page page) {
 			return dialog.pageForTest(page)->findChildren<QCheckBox *>();
 		};
-		ok = ok && boxes(OptionsDialog::GeneralPage).size() == 4
+		ok = ok && boxes(OptionsDialog::GeneralPage).size() == 6
 			&& boxes(OptionsDialog::BackupPage).size() == 1;
 
 		// Defaults on another page leaves General alone
@@ -618,6 +644,263 @@ int main(int argc, char *argv[])
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 		printf("options dialog: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestGeneralOptionsOpt))
+	{
+		// WinMerge's General page options, on this run's own settings
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.write(bytes);
+		};
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		write(left, "a\n");
+		write(right, "b\n");
+		const QString leftCsv = dir.filePath(QStringLiteral("left.csv"));
+		const QString rightCsv = dir.filePath(QStringLiteral("right.csv"));
+		write(leftCsv, "k,v\n1,a\n");
+		write(rightCsv, "k,v\n1,b\n");
+		const QString leftPng = dir.filePath(QStringLiteral("left.png"));
+		const QString rightPng = dir.filePath(QStringLiteral("right.png"));
+		QImage image(8, 8, QImage::Format_RGB32);
+		image.fill(Qt::white);
+		image.save(leftPng);
+		image.fill(Qt::red);
+		image.save(rightPng);
+		const QString leftDir = dir.filePath(QStringLiteral("L"));
+		const QString rightDir = dir.filePath(QStringLiteral("R"));
+		QDir().mkpath(leftDir);
+		QDir().mkpath(rightDir);
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto pressEsc = [](QWidget *target)
+		{
+			QKeyEvent press(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+			QCoreApplication::sendEvent(target, &press);
+			QKeyEvent release(QEvent::KeyRelease, Qt::Key_Escape, Qt::NoModifier);
+			QCoreApplication::sendEvent(target, &release);
+			QCoreApplication::processEvents();
+			QCoreApplication::processEvents();
+		};
+		const auto setEsc = [](int mode)
+		{
+			QSettings().setValue(QStringLiteral("General/CloseWithEsc"), mode);
+		};
+		const auto tabCount = [](MainWindow &window)
+		{
+			return window.findChild<QTabWidget *>()->count();
+		};
+
+		// Esc climbs from each kind of page to the window and closes it
+		setEsc(OptionsDialog::EscTabOrMainWindow);
+		const auto closesPage = [&](const char *what, auto open, auto focusOf)
+		{
+			MainWindow window;
+			window.show();
+			open(window);
+			QCoreApplication::processEvents();
+			const int before = tabCount(window);
+			QWidget *target = focusOf(window);
+			if (target == nullptr)
+			{
+				check(false, what);
+				return;
+			}
+			pressEsc(target);
+			check(tabCount(window) == before - 1, what);
+		};
+		closesPage("Esc closes a file comparison",
+			[&](MainWindow &w) { w.openFileComparison({ left, right }); },
+			[](MainWindow &w) -> QWidget * { return w.findChild<DiffTextEdit *>(); });
+		closesPage("Esc closes a table comparison",
+			[&](MainWindow &w) { w.openFileComparison({ leftCsv, rightCsv }); },
+			[](MainWindow &w) -> QWidget * {
+				auto *table = w.findChild<TableCompareView *>();
+				return table != nullptr ? table->findChild<QTableView *>() : nullptr;
+			});
+		closesPage("Esc closes an image comparison",
+			[&](MainWindow &w) { w.openFileComparison({ leftPng, rightPng }); },
+			[](MainWindow &w) -> QWidget * { return w.findChild<ImagePane *>(); });
+		closesPage("Esc closes a finished folder comparison",
+			[&](MainWindow &w) {
+				w.openFolderComparison({ leftDir, rightDir });
+				auto *folder = w.findChild<FolderCompareView *>();
+				for (int i = 0; i < 400 && folder != nullptr
+					&& folder->isComparingForTest(); ++i)
+				{
+					QThread::msleep(25);
+					QCoreApplication::processEvents();
+				}
+			},
+			[](MainWindow &w) -> QWidget * {
+				auto *folder = w.findChild<FolderCompareView *>();
+				return folder != nullptr ? folder->findChild<QTreeWidget *>() : nullptr;
+			});
+
+		// the find bar keeps its own Esc: it closes, the tab stays
+		{
+			MainWindow window;
+			window.show();
+			window.openFileComparison({ left, right });
+			auto *view = window.findChild<FileCompareView *>();
+			view->showFindBar();
+			QCoreApplication::processEvents();
+			QLineEdit *findEdit = nullptr;
+			for (QLineEdit *edit : view->findChildren<QLineEdit *>())
+				if (edit->isVisible())
+					findEdit = edit;
+			const int before = tabCount(window);
+			pressEsc(findEdit);
+			check(findEdit != nullptr && !findEdit->isVisible()
+				&& tabCount(window) == before, "Esc closes the find bar only");
+		}
+
+		// a running folder comparison: Esc stops it and the tab stays
+		{
+			MainWindow window;
+			window.show();
+			window.openFolderComparison({ leftDir, rightDir });
+			auto *folder = window.findChild<FolderCompareView *>();
+			const int before = tabCount(window);
+			const bool running = folder != nullptr && folder->isComparingForTest();
+			pressEsc(folder != nullptr ? folder->findChild<QTreeWidget *>() : nullptr);
+			check(running && tabCount(window) == before,
+				"Esc stops a running folder comparison first");
+		}
+
+		// the four modes, on file comparisons
+		{
+			setEsc(OptionsDialog::EscDisabled);
+			MainWindow window;
+			window.show();
+			window.openFileComparison({ left, right });
+			const int before = tabCount(window);
+			pressEsc(window.findChild<DiffTextEdit *>());
+			check(tabCount(window) == before, "Disabled keeps the tab");
+		}
+		{
+			setEsc(OptionsDialog::EscTabOrMainWindow);
+			MainWindow window;
+			window.show();
+			window.openFileComparison({ left, right });
+			window.openFileComparison({ right, left });
+			while (tabCount(window) > 0)
+				pressEsc(window.findChild<QTabWidget *>()->currentWidget()
+					->findChild<QWidget *>());
+			check(window.isVisible(), "Tab or main window: tabs go first");
+			pressEsc(&window);
+			check(!window.isVisible(), "Tab or main window: no tab, the window");
+		}
+		{
+			setEsc(OptionsDialog::EscTabOnly);
+			MainWindow window;
+			window.show();
+			window.openFileComparison({ left, right });
+			while (tabCount(window) > 0)
+				pressEsc(window.findChild<QTabWidget *>()->currentWidget()
+					->findChild<QWidget *>());
+			pressEsc(&window);
+			check(window.isVisible(), "Tab only never closes the window");
+		}
+		{
+			setEsc(OptionsDialog::EscMainWindowIfOneTab);
+			MainWindow window;
+			window.show();
+			window.openFileComparison({ left, right });
+			window.openFileComparison({ right, left });
+			while (tabCount(window) > 1)
+				pressEsc(window.findChild<QTabWidget *>()->currentWidget()
+					->findChild<DiffTextEdit *>());
+			check(window.isVisible(), "One tab left: still open");
+			pressEsc(window.findChild<DiffTextEdit *>());
+			check(!window.isVisible(), "Main window if only one tab");
+		}
+		{
+			// the selection screen: Esc is its Cancel button, any mode
+			setEsc(OptionsDialog::EscDisabled);
+			MainWindow window;
+			window.show();
+			window.openFileComparison({ left, right });
+			window.openSelector({ left, right });
+			auto *selector = window.findChild<NewComparisonView *>();
+			pressEsc(selector != nullptr ? selector->findChild<QLineEdit *>() : nullptr);
+			check(window.findChild<NewComparisonView *>() == nullptr,
+				"Esc cancels the selection screen");
+		}
+
+		// Preserve file time: the saved file keeps its date
+		const QDateTime older(QDate(2020, 1, 1), QTime(10, 0));
+		for (const bool preserve : { true, false })
+		{
+			QSettings().setValue(QStringLiteral("General/PreserveFileTime"), preserve);
+			write(left, "a\n");
+			{
+				QFile f(left);
+				f.open(QIODevice::Append);
+				f.setFileTime(older, QFileDevice::FileModificationTime);
+			}
+			FileCompareView view;
+			QString error;
+			view.compare(left, right, &error);
+			view.typeAtForTest(0, 0, QStringLiteral("x"));
+			view.saveModified(&error);
+			const qint64 drift = qAbs(QFileInfo(left).lastModified().secsTo(older));
+			check(preserve ? drift < 2 : drift > 86400,
+				preserve ? "Preserve file time keeps the date"
+				         : "without it the date moves");
+		}
+
+		// Close the selection on Compare: off (WinMerge's default) keeps it
+		for (const bool closeOnCompare : { false, true })
+		{
+			QSettings().setValue(QStringLiteral("General/CloseSelectorOnCompare"),
+				closeOnCompare);
+			MainWindow window;
+			window.openSelector({ left, right });
+			auto *selector = window.findChild<NewComparisonView *>();
+			auto *pathEdit = selector != nullptr
+				? selector->findChild<QLineEdit *>() : nullptr;
+			if (pathEdit == nullptr)
+				return 2;
+			QKeyEvent press(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+			QCoreApplication::sendEvent(pathEdit, &press);
+			QCoreApplication::processEvents();
+			QCoreApplication::processEvents();
+			const bool open = window.findChild<NewComparisonView *>() != nullptr;
+			check(window.findChildren<FileCompareView *>().size() == 1
+				&& open != closeOnCompare,
+				closeOnCompare ? "Compare closes the selection"
+				               : "Compare keeps the selection open");
+		}
+
+		// auto completion of the path fields
+		for (int source = 0; source < 3; ++source)
+		{
+			QSettings().setValue(QStringLiteral("General/AutoCompleteSource"), source);
+			NewComparisonView selector;
+			auto *combo = selector.findChild<QComboBox *>();
+			QCompleter *completer = combo != nullptr ? combo->completer() : nullptr;
+			const bool right = source == 0 ? completer == nullptr
+				: source == 1 ? completer != nullptr
+					&& qobject_cast<QFileSystemModel *>(completer->model()) != nullptr
+				: completer != nullptr && completer->model() == combo->model();
+			check(right, source == 0 ? "no auto completion"
+				: source == 1 ? "completion from the file system"
+				              : "completion from the recent list");
+		}
+
+		printf("general options: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 
@@ -1305,6 +1588,8 @@ int main(int argc, char *argv[])
 
 	if (parser.isSet(selftestOpenEnterOpt))
 	{
+		// the crash below came from closing the screen on Compare
+		QSettings().setValue(QStringLiteral("General/CloseSelectorOnCompare"), true);
 		// regression: Enter in a path field triggers Compare, whose
 		// handler used to delete the selector page while its line
 		// edit's key handling was still on the stack (crashed)

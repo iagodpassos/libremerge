@@ -17,6 +17,7 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+#include "FileOps.h"
 #include "Icons.h"
 #include "Theme.h"
 
@@ -848,6 +849,7 @@ bool TableCompareView::saveModified(QString *error)
 		if (!s.modified)
 			continue;
 
+		const QDateTime originalTime = lm::timeToPreserve(s.path);
 		if (QSettings().value(QStringLiteral("Backup/FileCompare"), true).toBool()
 			&& QFile::exists(s.path))
 		{
@@ -881,6 +883,7 @@ bool TableCompareView::saveModified(QString *error)
 				file.WriteString(eol);
 		}
 		file.Close();
+		lm::restoreFileTime(s.path, originalTime);
 		setSideModified(side, false);
 		++m_saveSerial[side]; // older snapshots no longer match the disk
 	}

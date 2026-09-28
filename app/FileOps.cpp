@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "FileOps.h"
+#include "OptionsDialog.h"
 
 #include <QDir>
 #include <QFile>
@@ -30,6 +31,23 @@ bool copyRecursively(const QString &src, const QString &dst)
 	if (!QDir().mkpath(QFileInfo(dst).path()))
 		return false;
 	return QFile::copy(src, dst);
+}
+
+QDateTime timeToPreserve(const QString &path)
+{
+	const QFileInfo info(path);
+	return OptionsDialog::preserveFileTime() && info.exists()
+		? info.lastModified() : QDateTime();
+}
+
+void restoreFileTime(const QString &path, const QDateTime &time)
+{
+	if (!time.isValid())
+		return;
+	// like CMergeDoc::DoSave, a failure here does not fail the save
+	QFile file(path);
+	if (file.open(QIODevice::Append))
+		file.setFileTime(time, QFileDevice::FileModificationTime);
 }
 
 } // namespace lm
