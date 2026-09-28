@@ -3,6 +3,7 @@
 #include "ArchiveCompare.h"
 #include "OptionsDialog.h"
 
+#include <QAbstractItemView>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QCompleter>
@@ -13,6 +14,7 @@
 #include <QFileInfo>
 #include <QFrame>
 #include <QGridLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
@@ -117,6 +119,9 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 		m_slots[i].path->setInsertPolicy(QComboBox::NoInsert);
 		m_slots[i].path->addItems(pathHistory);
 		applyAutoComplete(m_slots[i].path);
+		m_slots[i].path->view()->installEventFilter(this);
+		m_slots[i].path->setToolTip(tr("Shift+Delete on the open list "
+			"removes the highlighted recent path"));
 		m_slots[i].path->setCurrentText(QString());
 		m_slots[i].path->lineEdit()->setPlaceholderText(
 			tr("Type a path, pick a recent one, drop a file here or browse\xE2\x80\xA6"));
@@ -287,6 +292,46 @@ QStringList NewComparisonView::savedHistory()
 void NewComparisonView::clearSavedHistory()
 {
 	QSettings().remove(kHistoryKey);
+}
+
+bool NewComparisonView::eventFilter(QObject *watched, QEvent *event)
+{
+	if (event->type() == QEvent::KeyPress)
+	{
+		const auto *key = static_cast<QKeyEvent *>(event);
+		// Mac keyboards label Backspace "delete"; forward delete is fn+delete
+		if ((key->key() == Qt::Key_Delete || key->key() == Qt::Key_Backspace)
+			&& key->modifiers() == Qt::ShiftModifier)
+		{
+			for (Slot &slot : m_slots)
+			{
+				if (watched != slot.path->view())
+					continue;
+				const QModelIndex current = slot.path->view()->currentIndex();
+				if (current.isValid())
+					forgetPath(slot.path->itemText(current.row()));
+				return true;
+			}
+		}
+	}
+	return QWidget::eventFilter(watched, event);
+}
+
+void NewComparisonView::forgetPath(const QString &path)
+{
+	QStringList paths = savedHistory();
+	paths.removeAll(path);
+	QSettings().setValue(kHistoryKey, paths);
+	for (Slot &slot : m_slots)
+	{
+		const int row = slot.path->findText(path, Qt::MatchExactly);
+		if (row < 0)
+			continue;
+		// a path typed in the field stays even when it matches
+		const QString typed = slot.path->currentText();
+		slot.path->removeItem(row);
+		slot.path->setCurrentText(typed);
+	}
 }
 
 void NewComparisonView::reloadHistory()

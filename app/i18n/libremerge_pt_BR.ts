@@ -1148,6 +1148,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>3º Arquivo ou Pasta (Opcional)</translation>
     </message>
     <message>
+        <source>Shift+Delete on the open list removes the highlighted recent path</source>
+        <translation>Shift+Delete na lista aberta remove o caminho recente destacado</translation>
+    </message>
+    <message>
         <source>Type a path, pick a recent one, drop a file here or browse…</source>
         <translation>Digite um caminho, escolha um recente, arraste um arquivo para cá ou procure…</translation>
     </message>

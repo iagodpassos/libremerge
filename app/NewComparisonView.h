@@ -41,6 +41,9 @@ signals:
 protected:
 	void dragEnterEvent(QDragEnterEvent *event) override;
 	void dropEvent(QDropEvent *event) override;
+	/** Shift+Delete on an open path dropdown forgets the highlighted
+	    path, like WinMerge's CSuperComboBox. */
+	bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
 	void compare();
@@ -56,6 +59,8 @@ private:
 	void browse(int slot, bool folder);
 	void setHint(const QString &text, bool error);
 	void rememberPaths(const QStringList &paths);
+	/** Drop one path from the history and from every field's dropdown. */
+	void forgetPath(const QString &path);
 
 	Slot m_slots[3];
 	QLabel *m_hint;

@@ -15,6 +15,7 @@
 #include <QLineEdit>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QAbstractItemView>
 #include <QComboBox>
 #include <QCompleter>
 #include <QFileSystemModel>
@@ -917,6 +918,28 @@ int main(int argc, char *argv[])
 				&& combo->completer()->model()->rowCount() == 0
 				&& NewComparisonView::savedHistory().isEmpty(),
 				"clearing the recent items clears the suggestions");
+		}
+
+		// Shift+Delete on an open dropdown forgets the highlighted path,
+		// in every field and in the saved history; a typed path stays
+		{
+			QSettings().setValue(QStringLiteral("NewComparison/History"),
+				QStringList{ left, right });
+			NewComparisonView selector;
+			const auto combos = selector.findChildren<QComboBox *>();
+			QComboBox *first = combos.value(0);
+			QComboBox *second = combos.value(1);
+			if (first == nullptr || second == nullptr)
+				return 2;
+			second->setEditText(QStringLiteral("typed/path"));
+			first->view()->setCurrentIndex(first->model()->index(0, 0));
+			QKeyEvent press(QEvent::KeyPress, Qt::Key_Delete, Qt::ShiftModifier);
+			QCoreApplication::sendEvent(first->view(), &press);
+			check(first->count() == 1 && first->itemText(0) == right
+				&& second->count() == 1
+				&& second->currentText() == QStringLiteral("typed/path")
+				&& NewComparisonView::savedHistory() == QStringList{ right },
+				"Shift+Delete forgets one recent path");
 		}
 
 		printf("general options: %s\n", ok ? "ok" : "FAILED");
