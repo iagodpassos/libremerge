@@ -900,6 +900,25 @@ int main(int argc, char *argv[])
 				              : "completion from the recent list");
 		}
 
+		// clearing the recent items empties the recent-list suggestions,
+		// in a selection screen that is already open too
+		{
+			QSettings().setValue(QStringLiteral("General/AutoCompleteSource"), 2);
+			QSettings().setValue(QStringLiteral("NewComparison/History"),
+				QStringList{ left, right });
+			NewComparisonView selector;
+			auto *combo = selector.findChild<QComboBox *>();
+			const bool had = combo != nullptr && combo->count() == 2
+				&& combo->completer() != nullptr
+				&& combo->completer()->model()->rowCount() == 2;
+			NewComparisonView::clearSavedHistory();
+			selector.reloadHistory();
+			check(had && combo->count() == 0
+				&& combo->completer()->model()->rowCount() == 0
+				&& NewComparisonView::savedHistory().isEmpty(),
+				"clearing the recent items clears the suggestions");
+		}
+
 		printf("general options: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}

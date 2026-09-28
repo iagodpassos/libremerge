@@ -25,6 +25,14 @@ public:
 	/** Put the keyboard focus on the first path field. */
 	void focusFirstField();
 
+	/** The path fields' history (WinMerge's Files\Left, Files\Right...),
+	    which also feeds the "recent list" auto completion. */
+	static QStringList savedHistory();
+	/** Forget it, part of WinMerge's "Clear all recent items". */
+	static void clearSavedHistory();
+	/** Refill the path fields' dropdowns from the saved history. */
+	void reloadHistory();
+
 signals:
 	void compareRequested(const QStringList &paths, const QList<bool> &readOnly,
 		bool folders);
@@ -47,7 +55,6 @@ private:
 	void swapSlots(int a, int b);
 	void browse(int slot, bool folder);
 	void setHint(const QString &text, bool error);
-	QStringList history() const;
 	void rememberPaths(const QStringList &paths);
 
 	Slot m_slots[3];

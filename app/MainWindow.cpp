@@ -150,11 +150,17 @@ MainWindow::MainWindow(QWidget *parent)
 			QAction *empty = recentMenu->addAction(tr("(empty)"));
 			empty->setEnabled(false);
 		}
-		else
+		// like WinMerge's "Clear all recent items": the menu and the
+		// path fields' history, which the recent-list completion offers
+		if (!entries.isEmpty() || !NewComparisonView::savedHistory().isEmpty())
 		{
 			recentMenu->addSeparator();
-			recentMenu->addAction(tr("Clear Menu"), this, []() {
+			recentMenu->addAction(tr("Clear Menu"), this, [this]() {
 				QSettings().remove(QStringLiteral("RecentComparisons/List"));
+				NewComparisonView::clearSavedHistory();
+				for (int i = 0; i < m_tabs->count(); ++i)
+					if (auto *selector = qobject_cast<NewComparisonView *>(m_tabs->widget(i)))
+						selector->reloadHistory();
 			});
 		}
 		// entries carry file names: a folder called "sobre" or "options"

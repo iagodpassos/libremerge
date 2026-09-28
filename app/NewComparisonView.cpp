@@ -103,7 +103,7 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 		tr("2nd File or Folder"),
 		tr("3rd File or Folder (Optional)"),
 	};
-	const QStringList pathHistory = history();
+	const QStringList pathHistory = savedHistory();
 	for (int i = 0; i < 3; ++i)
 	{
 		auto *title = new QLabel(slotTitles[i], content);
@@ -279,9 +279,28 @@ void NewComparisonView::setHint(const QString &text, bool error)
 	m_hint->setStyleSheet(error ? QStringLiteral("color:#c03030") : QString());
 }
 
-QStringList NewComparisonView::history() const
+QStringList NewComparisonView::savedHistory()
 {
 	return QSettings().value(kHistoryKey).toStringList();
+}
+
+void NewComparisonView::clearSavedHistory()
+{
+	QSettings().remove(kHistoryKey);
+}
+
+void NewComparisonView::reloadHistory()
+{
+	const QStringList paths = savedHistory();
+	for (Slot &slot : m_slots)
+	{
+		// the typed paths stay; the recent-list completer shares the
+		// combo's model, so it follows
+		const QString typed = slot.path->currentText();
+		slot.path->clear();
+		slot.path->addItems(paths);
+		slot.path->setCurrentText(typed);
+	}
 }
 
 void NewComparisonView::rememberPaths(const QStringList &paths)
