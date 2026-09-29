@@ -67,6 +67,7 @@ LIBREMERGE_LANGUAGE=pt_BR run_one selftest-app-menu
 run_one selftest-about
 run_one selftest-options
 run_one selftest-general-options
+run_one selftest-identical
 run_one selftest-menu-roles
 LIBREMERGE_LANGUAGE=pt_BR run_one selftest-qt-i18n
 run_one selftest-desktop-integration

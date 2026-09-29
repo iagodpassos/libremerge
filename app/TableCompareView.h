@@ -32,6 +32,9 @@ public:
 	int diffCount() const { return m_diffCount; }
 	QStringList paths() const;
 	QString tabTitle() const;
+	/** WinMerge's file description (strDesc): the tab title shows it
+	    instead of the file name, as "Original File" in a self-compare. */
+	void setSideDescription(int side, const QString &description);
 	bool saveModified(QString *error);
 
 	void gotoFirstDiff();
@@ -46,8 +49,13 @@ public:
 	void swapSides();
 	void focusNextPane();
 	void recompare();
+	/** Recompare asked for by the user (F5, the Recompare button),
+	    followed by rescanned(): WinMerge's OnRefresh, which reports
+	    identical files. */
+	void refreshByUser();
 
 signals:
+	void rescanned();
 	/** A successful save, with the compared paths and the current
 	    difference count (for folder-comparison row updates). */
 	void fileSaved(const QStringList &paths, int significantDiffs);
@@ -108,6 +116,7 @@ private:
 
 	QChar m_delimiter = QChar(',');
 	bool m_firstRowIsHeader = true;
+	QString m_descriptions[2];
 	Side m_sides[2];
 	std::vector<Block> m_blocks;
 	// view row -> real row per side (-1 = ghost)

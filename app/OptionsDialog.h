@@ -2,6 +2,9 @@
 #pragma once
 
 #include <QDialog>
+#include <QList>
+#include <QPair>
+#include <QString>
 
 class QCheckBox;
 class QComboBox;
@@ -13,7 +16,8 @@ class QTreeWidgetItem;
 /**
  * The application options dialog, laid out like WinMerge's (Preferences
  * dialog): a page tree on the left, where a category's pages sit indented
- * under it (General; Compare > General, Folder; Backup Files), and the
+ * under it (General; Compare > General, Folder; Message Boxes; Backup
+ * Files), and the
  * selected page on the right with its own Defaults button. Every option
  * sits on the page and at the position WinMerge gives it.
  */
@@ -59,6 +63,7 @@ public:
 		GeneralPage,
 		ComparePage, ///< Compare > General
 		FolderPage,  ///< Compare > Folder
+		MessageBoxesPage,
 		BackupPage,
 	};
 	/** The tree's items in display order, with their depth and the page
@@ -76,11 +81,20 @@ public:
 	QWidget *pageForTest(Page page) const;
 	/** Press the current page's Defaults button (for tests). */
 	void restoreDefaultsForTest();
+	/** The Message Boxes list: (message, hidden) pairs, and its Reset
+	    button (for tests). */
+	QList<QPair<QString, bool>> messageBoxesForTest() const;
+	void setMessageBoxHiddenForTest(int row, bool hidden);
+	void resetMessageBoxesForTest() { resetMessageBoxes(); }
+	void saveForTest() { save(); }
 
 private:
 	QWidget *buildGeneralPage();
 	QWidget *buildComparePage();
 	QWidget *buildFolderPage();
+	QWidget *buildMessageBoxesPage();
+	void loadMessageBoxes();
+	void resetMessageBoxes();
 	QWidget *buildBackupPage();
 	void selectCategory(QTreeWidgetItem *item);
 	void load();
@@ -111,6 +125,8 @@ private:
 	QComboBox *m_cmbAlgorithm;
 	// Compare > Folder
 	QComboBox *m_cmbCompareMethod;
+	// Message Boxes
+	QTreeWidget *m_messageList;
 	// Backup Files
 	QCheckBox *m_chkBackup;
 };

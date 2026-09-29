@@ -83,6 +83,10 @@ public:
 	/** Mark sides as read-only before compare(): the pane rejects edits
 	    and merge operations refuse to target it. */
 	void setReadOnlySides(const QList<bool> &readOnly);
+	bool isSideReadOnly(int side) const
+	{
+		return side >= 0 && side < 3 && m_readOnly[side];
+	}
 
 	/** Copy the current difference between explicit panes. Like WinMerge,
 	    plain copy stays on the merged spot; pass advance=true for the
@@ -129,6 +133,10 @@ public:
 	void showFindBar();
 	void findNext(bool backward);
 	void recompare();
+	/** Recompare asked for by the user (F5, the Recompare button),
+	    followed by rescanned(): WinMerge's OnRefresh, which reports
+	    identical files. */
+	void refreshByUser();
 	bool saveModified(QString *error);
 	/** Header text override for one pane, like WinMerge's display root
 	    for files opened out of an archive (the real path stays in use
@@ -138,8 +146,13 @@ public:
 	{
 		return side >= 0 && side < 3 ? m_sides[side].caption : QString();
 	}
+	/** WinMerge's file description (strDesc): the header and the tab
+	    title show it instead of the file name, as "Original File" in a
+	    self-compare. */
+	void setSideDescription(int side, const QString &description);
 
 signals:
+	void rescanned();
 	void modifiedChanged(bool modified);
 	/** A successful save, with the compared paths and the significant
 	    difference count (WinMerge's UpdateChangedItem notification). */
@@ -173,6 +186,7 @@ private:
 	{
 		QString path;
 		QString caption;     // user override for the header text
+		bool described = false; // the caption names the tab too
 		int unicoding = 0;   // ucr::UNICODESET
 		int codepage = 65001;
 		bool bom = false;

@@ -254,7 +254,7 @@ TableCompareView::TableCompareView(QWidget *parent)
 	addToolAction(lm::Icon::Swap, tr("Swap Panes"), QString(),
 		[this]() { swapSides(); });
 	addToolAction(lm::Icon::Refresh, tr("Recompare"), QStringLiteral("F5"),
-		[this]() { recompare(); });
+		[this]() { refreshByUser(); });
 	m_actSave = addToolAction(lm::Icon::Save, tr("Save"),
 		QString::fromUtf8("\xE2\x8C\x98S"),
 		[this]() { QString error; saveModified(&error); });
@@ -805,6 +805,12 @@ void TableCompareView::copyAllFrom(int sourceSide)
 	updateStatus();
 }
 
+void TableCompareView::refreshByUser()
+{
+	recompare();
+	emit rescanned();
+}
+
 void TableCompareView::recompare()
 {
 	QString error;
@@ -836,9 +842,17 @@ QStringList TableCompareView::paths() const
 
 QString TableCompareView::tabTitle() const
 {
-	return QFileInfo(m_sides[0].path).fileName()
-		+ QString::fromUtf8(" \xE2\x86\x94 ")
-		+ QFileInfo(m_sides[1].path).fileName();
+	const auto name = [this](int side) {
+		return m_descriptions[side].isEmpty()
+			? QFileInfo(m_sides[side].path).fileName() : m_descriptions[side];
+	};
+	return name(0) + QString::fromUtf8(" \xE2\x86\x94 ") + name(1);
+}
+
+void TableCompareView::setSideDescription(int side, const QString &description)
+{
+	if (side >= 0 && side < 2)
+		m_descriptions[side] = description;
 }
 
 bool TableCompareView::saveModified(QString *error)

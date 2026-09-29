@@ -497,6 +497,17 @@ void NewComparisonView::compare()
 		paths.append(path);
 		readOnly.append(m_slots[i].readOnly->isChecked());
 	}
+	// the first path alone: WinMerge's self-compare for a file (a folder
+	// alone does nothing there), without touching the path history
+	if (paths.size() == 1 && !m_slots[0].path->currentText().trimmed().isEmpty())
+	{
+		const QFileInfo info(paths.first());
+		if (info.isFile())
+			emit compareRequested(paths, readOnly, false);
+		else if (!info.exists())
+			setHint(tr("Path does not exist: %1").arg(paths.first()), true);
+		return;
+	}
 	if (paths.size() < 2)
 	{
 		setHint(tr("Select two (or three) folders/files to compare."), true);

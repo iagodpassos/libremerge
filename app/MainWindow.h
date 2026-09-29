@@ -40,6 +40,9 @@ public:
 	/** Open (or focus) the "Select Files or Folders" page, optionally
 	    pre-filling dropped/opened paths. */
 	void openSelector(const QStringList &paths = {});
+	/** One file against a snapshot of itself, WinMerge's self-compare
+	    (what Compare does with a single file). */
+	void openSelfComparison(const QString &path);
 
 	/** Route paths dropped on the window or opened via Finder/Dock. */
 	void handleIncomingPaths(const QStringList &paths);
@@ -71,6 +74,9 @@ private slots:
 
 private:
 	void handleEscape();
+	/** Report identical files on opening, Recompare and saving. */
+	void watchIdentical(QWidget *page);
+	void reportIfIdentical(QWidget *page, bool opening);
 	void attachFileView(FileCompareView *view);
 	/** Record a successful comparison in File > Recent Files or Folders. */
 	void rememberComparison(const QStringList &paths);

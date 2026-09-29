@@ -27,6 +27,7 @@
 #include <cstring>
 #include "DiffTextEdit.h"
 #include "ImagePane.h"
+#include "MessageBoxes.h"
 #include <QTextBrowser>
 #include <QThread>
 #include <QThreadPool>
@@ -162,6 +163,9 @@ int main(int argc, char *argv[])
 		{
 			QApplication::setOrganizationName(QStringLiteral("LibreMerge-Selftest"));
 			QSettings().clear();
+			// informational boxes (identical files...) would wait forever
+			// for a click in a headless run
+			lm::setMessageSinkForTest([](const QString &) {});
 			break;
 		}
 	}
@@ -310,6 +314,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestGeneralOptionsOpt(QStringLiteral("selftest-general-options"),
 		QStringLiteral("Exercise Close with Esc, Preserve file time, Close the selection on Compare and auto completion (for testing)"));
 	parser.addOption(selftestGeneralOptionsOpt);
+	QCommandLineOption selftestIdenticalOpt(QStringLiteral("selftest-identical"),
+		QStringLiteral("Verify the identical files message, the self-compare and the Message Boxes page (for testing)"));
+	parser.addOption(selftestIdenticalOpt);
 	QCommandLineOption selftestArchiveMixedOpt(QStringLiteral("selftest-archive-mixed"),
 		QStringLiteral("Compare a folder against an archive, 2- and 3-way (for testing)"));
 	parser.addOption(selftestArchiveMixedOpt);
@@ -600,11 +607,11 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 0 };
+		const int depths[] = { 0, 0, 1, 1, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage,
-			OptionsDialog::BackupPage };
-		bool ok = tree.size() == 5;
+			OptionsDialog::MessageBoxesPage, OptionsDialog::BackupPage };
+		bool ok = tree.size() == 6;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -612,8 +619,9 @@ int main(int argc, char *argv[])
 		// the Compare category shows Compare > General
 		const int expectedPage[] = { OptionsDialog::GeneralPage,
 			OptionsDialog::ComparePage, OptionsDialog::ComparePage,
-			OptionsDialog::FolderPage, OptionsDialog::BackupPage };
-		for (int i = 0; ok && i < 5; ++i)
+			OptionsDialog::FolderPage, OptionsDialog::MessageBoxesPage,
+			OptionsDialog::BackupPage };
+		for (int i = 0; ok && i < 6; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
@@ -645,10 +653,178 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(4); // Backup Files
+		dialog.selectCategoryForTest(5); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 		printf("options dialog: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestIdenticalOpt))
+	{
+		// WinMerge's ShowIdenticalMessage, DoSelfCompare and Message
+		// Boxes page; the messages are collected instead of shown
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		QStringList shown;
+		lm::setMessageSinkForTest([&shown](const QString &text) { shown.append(text); });
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.write(bytes);
+		};
+		const auto message = [](const char *text) {
+			return QCoreApplication::translate("MessageBoxes", text);
+		};
+		const QString binaryMatch = message("Selected files are identical (binary match).");
+		const QString binaryDiffer = message("Selected files are identical (with current settings).\n"
+			"But differ at the binary level.");
+		const QString sameFile = message("Same file is opened in both panes.");
+		const QString a = dir.filePath(QStringLiteral("a.txt"));
+		const QString b = dir.filePath(QStringLiteral("b.txt"));
+		const QString spaced = dir.filePath(QStringLiteral("spaced.txt"));
+		const QString other = dir.filePath(QStringLiteral("other.txt"));
+		write(a, "one two\n");
+		write(b, "one two\n");
+		write(spaced, "one   two\n");
+		write(other, "something else\n");
+		lm::setCompareOptionsForTest(0);
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 3; ++i)
+				QCoreApplication::processEvents();
+		};
+		const auto opened = [&](const QStringList &paths) {
+			shown.clear();
+			MainWindow window;
+			window.openFileComparison(paths);
+			settle();
+			return shown;
+		};
+
+		check(opened({ a, b }) == QStringList{ binaryMatch },
+			"identical files: binary match on opening");
+		check(opened({ a, other }).isEmpty(), "different files: no message");
+		check(opened({ a, a }) == QStringList{ sameFile },
+			"same file in both panes");
+		lm::setCompareOptionsForTest(2); // ignore all whitespace
+		check(opened({ a, spaced }) == QStringList{ binaryDiffer },
+			"identical with the options, not in bytes");
+		lm::setCompareOptionsForTest(0);
+		{
+			shown.clear();
+			MainWindow window;
+			window.openBlankComparison();
+			settle();
+			check(shown.isEmpty(), "File > New: no message");
+		}
+		{
+			MainWindow window;
+			window.openFileComparison({ a, b });
+			settle();
+			shown.clear();
+			window.findChild<FileCompareView *>()->refreshByUser();
+			settle();
+			check(shown == QStringList{ binaryMatch }, "Recompare reports again");
+		}
+		{
+			// saving that leaves nothing different reports it too
+			write(other, "one two!\n");
+			MainWindow window;
+			window.openFileComparison({ a, other });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			view->copyCurrentDiff(0, 1, false);
+			shown.clear();
+			QString error;
+			view->saveModified(&error);
+			settle();
+			check(shown == QStringList{ binaryMatch }, "saving to identical reports it");
+			write(other, "something else\n");
+		}
+		{
+			const QString leftPng = dir.filePath(QStringLiteral("l.png"));
+			const QString rightPng = dir.filePath(QStringLiteral("r.png"));
+			QImage image(4, 4, QImage::Format_RGB32);
+			image.fill(Qt::blue);
+			image.save(leftPng);
+			image.save(rightPng);
+			check(opened({ leftPng, rightPng }) == QStringList{ binaryMatch },
+				"identical images: binary match");
+		}
+		lm::setMessageHidden(QStringLiteral("FilesSame"), true);
+		check(opened({ a, b }).isEmpty(), "hidden: no message");
+		lm::resetHiddenMessages();
+
+		// self-compare: a snapshot on the left, read-only, "Original File"
+		{
+			shown.clear();
+			MainWindow window;
+			window.openSelfComparison(a);
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			const QStringList paths = view != nullptr ? view->paths() : QStringList{};
+			const QStringList recent = QSettings()
+				.value(QStringLiteral("RecentComparisons/List")).toStringList();
+			check(view != nullptr && paths.size() == 2 && paths.at(1) == a
+				&& paths.at(0) != a && QFile::exists(paths.at(0))
+				&& view->isSideReadOnly(0) && !view->isSideReadOnly(1)
+				&& view->sideCaption(0) == MainWindow::tr("Original File")
+				&& view->tabTitle().startsWith(MainWindow::tr("Original File"))
+				&& recent.value(0) == a && shown == QStringList{ binaryMatch },
+				"self-compare of a text file");
+		}
+		{
+			const QString csv = dir.filePath(QStringLiteral("t.csv"));
+			write(csv, "k,v\n1,a\n");
+			MainWindow window;
+			window.openSelfComparison(csv);
+			settle();
+			auto *table = window.findChild<TableCompareView *>();
+			check(table != nullptr && table->tabTitle().startsWith(
+				MainWindow::tr("Original File")), "self-compare of a table");
+		}
+		{
+			// Compare with the first path alone; the selection stays
+			MainWindow window;
+			window.openSelector({ b });
+			auto *selector = window.findChild<NewComparisonView *>();
+			auto *pathEdit = selector != nullptr ? selector->findChild<QLineEdit *>() : nullptr;
+			if (pathEdit == nullptr)
+				return 2;
+			QKeyEvent press(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+			QCoreApplication::sendEvent(pathEdit, &press);
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			check(view != nullptr && view->paths().value(1) == b
+				&& window.findChild<NewComparisonView *>() != nullptr,
+				"Compare with one file self-compares");
+		}
+
+		// Options > Message Boxes
+		{
+			OptionsDialog dialog;
+			const auto rows = dialog.messageBoxesForTest();
+			dialog.setMessageBoxHiddenForTest(0, true);
+			dialog.saveForTest();
+			const bool saved = lm::messageHidden(QStringLiteral("FilesSame"));
+			shown.clear();
+			dialog.resetMessageBoxesForTest();
+			check(rows.size() == 2 && !rows.at(0).second && saved
+				&& !lm::messageHidden(QStringLiteral("FilesSame"))
+				&& !dialog.messageBoxesForTest().at(0).second,
+				"Message Boxes page: hide, save and reset");
+		}
+		lm::setMessageSinkForTest([](const QString &) {});
+		printf("identical: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

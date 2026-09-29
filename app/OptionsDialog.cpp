@@ -3,12 +3,14 @@
 
 #include "OptionsDialog.h"
 #include "EngineOptions.h"
+#include "MessageBoxes.h"
 
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
 #include <QRadioButton>
@@ -134,6 +136,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	QTreeWidgetItem *compare = addCategory(nullptr, tr("Compare"), -1);
 	addCategory(compare, tr("General"), ComparePage);
 	addCategory(compare, tr("Folder"), FolderPage);
+	addCategory(nullptr, tr("Message Boxes"), MessageBoxesPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	m_categories->expandAll();
 	body->addWidget(m_categories);
@@ -143,6 +146,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildGeneralPage());
 	m_pages->addWidget(buildComparePage());
 	m_pages->addWidget(buildFolderPage());
+	m_pages->addWidget(buildMessageBoxesPage());
 	m_pages->addWidget(buildBackupPage());
 	pageArea->addWidget(m_pages, 1);
 	// every WinMerge page has its own Defaults button, resetting only it
@@ -310,6 +314,60 @@ QWidget *OptionsDialog::buildFolderPage()
 	return page;
 }
 
+/** WinMerge's Message Boxes page (PropMessageBoxes): the messages a
+    "Don't display this message again" can hide, a tick for each hidden
+    one with its remembered answer, and Reset to show them all again. */
+QWidget *OptionsDialog::buildMessageBoxesPage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+
+	auto *intro = new QHBoxLayout;
+	intro->addWidget(noteLabel(tr("Some messages can be hidden by the user. "
+		"Press Reset to make all messages visible again."), page), 1);
+	auto *reset = new QPushButton(tr("Reset"), page);
+	connect(reset, &QPushButton::clicked, this, [this]() {
+		resetMessageBoxes();
+		lm::showInformation(this, tr("All message boxes are now displayed again."));
+	});
+	intro->addWidget(reset, 0, Qt::AlignTop);
+	box->addLayout(intro);
+
+	m_messageList = new QTreeWidget(page);
+	m_messageList->setRootIsDecorated(false);
+	m_messageList->setHeaderLabels({ tr("Message"), tr("Answer") });
+	m_messageList->header()->setStretchLastSection(false);
+	m_messageList->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+	for (const lm::HideableMessage &message : lm::hideableMessages())
+	{
+		auto *item = new QTreeWidgetItem(m_messageList);
+		item->setText(0, QString(message.text).replace(QLatin1Char('\n'), QLatin1Char(' ')));
+		item->setData(0, Qt::UserRole, message.key);
+		item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+		item->setCheckState(0, Qt::Unchecked);
+	}
+	// a ticked message shows its answer, an unticked one none
+	// (OnLVNItemChanged); these are information boxes: OK
+	connect(m_messageList, &QTreeWidget::itemChanged, this,
+		[this](QTreeWidgetItem *item, int column) {
+			if (column == 0)
+				item->setText(1, item->checkState(0) == Qt::Checked
+					? tr("OK") : QString());
+		});
+	box->addWidget(m_messageList, 1);
+	return page;
+}
+
+void OptionsDialog::loadMessageBoxes()
+{
+	for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)
+	{
+		QTreeWidgetItem *item = m_messageList->topLevelItem(i);
+		item->setCheckState(0, lm::messageHidden(item->data(0, Qt::UserRole).toString())
+			? Qt::Checked : Qt::Unchecked);
+	}
+}
+
 /** WinMerge's Backup Files page (PropBackups): the file compare switch;
     folder, name and the folder compare switch are not offered yet. */
 QWidget *OptionsDialog::buildBackupPage()
@@ -364,6 +422,7 @@ void OptionsDialog::load()
 		m_cmbAlgorithm->setCurrentIndex(mgr->GetInt(OPT_CMP_DIFF_ALGORITHM));
 	}
 	m_cmbCompareMethod->setCurrentIndex(lm::currentCompareMethod());
+	loadMessageBoxes();
 }
 
 void OptionsDialog::save()
@@ -400,6 +459,12 @@ void OptionsDialog::save()
 		mgr->FlushOptions();
 	}
 	lm::saveCompareMethod(m_cmbCompareMethod->currentIndex());
+	for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)
+	{
+		const QTreeWidgetItem *item = m_messageList->topLevelItem(i);
+		lm::setMessageHidden(item->data(0, Qt::UserRole).toString(),
+			item->checkState(0) == Qt::Checked);
+	}
 }
 
 /** One page back to WinMerge's defaults, like its per-page button. */
@@ -430,6 +495,10 @@ void OptionsDialog::restoreDefaults(int page)
 		break;
 	case FolderPage:
 		m_cmbCompareMethod->setCurrentIndex(0); // Full Contents
+		break;
+	case MessageBoxesPage:
+		for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)
+			m_messageList->topLevelItem(i)->setCheckState(0, Qt::Unchecked);
 		break;
 	case BackupPage:
 		m_chkBackup->setChecked(true);
@@ -474,4 +543,28 @@ QWidget *OptionsDialog::pageForTest(Page page) const
 void OptionsDialog::restoreDefaultsForTest()
 {
 	restoreDefaults(m_pages->currentIndex());
+}
+
+QList<QPair<QString, bool>> OptionsDialog::messageBoxesForTest() const
+{
+	QList<QPair<QString, bool>> rows;
+	for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)
+	{
+		const QTreeWidgetItem *item = m_messageList->topLevelItem(i);
+		rows.append({ item->text(0), item->checkState(0) == Qt::Checked });
+	}
+	return rows;
+}
+
+void OptionsDialog::setMessageBoxHiddenForTest(int row, bool hidden)
+{
+	if (QTreeWidgetItem *item = m_messageList->topLevelItem(row))
+		item->setCheckState(0, hidden ? Qt::Checked : Qt::Unchecked);
+}
+
+/** Reset acts at once, like CMessageBoxDialog::ResetMessageBoxes. */
+void OptionsDialog::resetMessageBoxes()
+{
+	lm::resetHiddenMessages();
+	loadMessageBoxes();
 }

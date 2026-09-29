@@ -1069,6 +1069,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>&amp;Opções...</translation>
     </message>
     <message>
+        <source>cannot copy %1</source>
+        <translation>não foi possível copiar %1</translation>
+    </message>
+    <message>
         <source>Cancel</source>
         <translation>Cancelar</translation>
     </message>
@@ -1127,6 +1131,47 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
 %1</source>
         <translation>Não foi possível salvar:
 %1</translation>
+    </message>
+    <message>
+        <source>Original File</source>
+        <translation>Arquivo Original</translation>
+    </message>
+</context>
+<context>
+    <name>MessageBoxes</name>
+    <message>
+        <source>Selected files are identical.</source>
+        <translation>Os arquivos selecionados são idênticos.</translation>
+    </message>
+    <message>
+        <source>Same file is opened in both panes.</source>
+        <translation>O mesmo arquivo está aberto em ambos os painéis.</translation>
+    </message>
+    <message>
+        <source>Selected files are identical (binary match).</source>
+        <translation>Os arquivos selecionados são idênticos (correspondência binária).</translation>
+    </message>
+    <message>
+        <source>Selected files are identical (with current settings).
+But differ at the binary level.</source>
+        <translation>Os arquivos selecionados são idênticos (com as configurações atuais).
+Mas diferem no nível binário.</translation>
+    </message>
+    <message>
+        <source>Selected files are identical (with current settings).
+But binary comparison failed.</source>
+        <translation>Os arquivos selecionados são idênticos (com as configurações atuais).
+Mas a comparação binária falhou.</translation>
+    </message>
+    <message>
+        <source>Don&apos;t display this message again.</source>
+        <translation>Não exibir essa mensagem novamente.</translation>
+    </message>
+    <message>
+        <source>Selected files are identical (with current settings).
+Checking binary identity...</source>
+        <translation>Os arquivos selecionados são idênticos (com as configurações atuais).
+Checando identidade binária...</translation>
     </message>
 </context>
 <context>
@@ -1263,6 +1308,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Pasta</translation>
     </message>
     <message>
+        <source>Message Boxes</source>
+        <translation>Caixas de Mensagens</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Arquivos de Backup</translation>
     </message>
@@ -1329,6 +1378,30 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>&quot;Select Files or Folders&quot; auto completion:</source>
         <translation>Preenchimento automático da tela &quot;Selecionar Arquivos ou Pastas&quot;:</translation>
+    </message>
+    <message>
+        <source>Some messages can be hidden by the user. Press Reset to make all messages visible again.</source>
+        <translation>Algumas mensagens podem ser ocultadas pelo usuário. Pressione Restaurar para tornar todas as mensagens visíveis novamente.</translation>
+    </message>
+    <message>
+        <source>Reset</source>
+        <translation>Restaurar</translation>
+    </message>
+    <message>
+        <source>All message boxes are now displayed again.</source>
+        <translation>Todas as caixas de mensagens agora são exibidas novamente.</translation>
+    </message>
+    <message>
+        <source>Message</source>
+        <translation>Mensagem</translation>
+    </message>
+    <message>
+        <source>Answer</source>
+        <translation>Resposta</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

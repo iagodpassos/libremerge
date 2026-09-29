@@ -215,7 +215,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 	addToolAction(lm::Icon::Swap, tr("Swap Panes"), QString(),
 		[this]() { swapSides(); });
 	addToolAction(lm::Icon::Refresh, tr("Recompare"), QStringLiteral("F5"),
-		[this]() { recompare(); });
+		[this]() { refreshByUser(); });
 	m_actSave = addToolAction(lm::Icon::Save, tr("Save"),
 		QString::fromUtf8("\xE2\x8C\x98S"),
 		[this]() { QString error; saveModified(&error); });
@@ -600,11 +600,19 @@ QString FileCompareView::tabTitle() const
 	for (int side = 0; side < m_paneCount; ++side)
 	{
 		const Side &s = m_sides[side];
-		names.append(s.path.isEmpty()
+		names.append(s.path.isEmpty() || s.described
 			? (s.caption.isEmpty() ? tr("Untitled") : s.caption)
 			: QFileInfo(s.path).fileName());
 	}
 	return names.join(QString::fromUtf8(" \xE2\x86\x94 "));
+}
+
+void FileCompareView::setSideDescription(int side, const QString &description)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	m_sides[side].described = true;
+	setSideCaption(side, description);
 }
 
 bool FileCompareView::loadSide(int side, const QString &path, QString *error)
@@ -1779,6 +1787,12 @@ void FileCompareView::gotoPrevDiff()
 	}
 	if (prev >= 0)
 		gotoDiff(prev);
+}
+
+void FileCompareView::refreshByUser()
+{
+	recompare();
+	emit rescanned();
 }
 
 void FileCompareView::recompare()

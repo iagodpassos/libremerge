@@ -46,6 +46,10 @@ public:
 	int paneCount() const { return m_paneCount; }
 	QStringList paths() const;
 	QString tabTitle() const;
+	/** WinMerge's file description (strDesc): the header and the tab
+	    title show it instead of the file name, as "Original File" in a
+	    self-compare. */
+	void setSideDescription(int side, const QString &description);
 	bool saveModified(QString *error);
 	void setReadOnlySides(const QList<bool> &readOnly);
 
@@ -72,6 +76,10 @@ public:
 	void redo();
 	void focusNextPane();
 	void recompare();
+	/** Recompare asked for by the user (F5, the Recompare button),
+	    followed by rescanned(): WinMerge's OnRefresh, which reports
+	    identical files. */
+	void refreshByUser();
 	void zoomIn();
 	void zoomOut();
 	void zoomReset();
@@ -108,6 +116,7 @@ public:
 	void cancelSelection();
 
 signals:
+	void rescanned();
 	/** A successful save, with the compared paths and the current
 	    difference count (for folder-comparison row updates). */
 	void fileSaved(const QStringList &paths, int significantDiffs);
@@ -160,6 +169,7 @@ private:
 	ImagePane *m_panes[3] = {};
 	QWidget *m_columns[3] = {};
 	QLabel *m_headers[3] = {};
+	QString m_descriptions[3];
 	QLabel *m_paneStatus[3] = {};
 	QSplitter *m_splitter = nullptr;
 	QLabel *m_status = nullptr;

@@ -339,7 +339,7 @@ void ImageCompareView::buildToolbar(QVBoxLayout *layout)
 	m_actRedo->setEnabled(false);
 	toolbar->addSeparator();
 	addToolAction(lm::Icon::Refresh, tr("Recompare"), QStringLiteral("F5"),
-		[this]() { recompare(); });
+		[this]() { refreshByUser(); });
 	m_actSave = addToolAction(lm::Icon::Save, tr("Save"),
 		QString::fromUtf8("\xE2\x8C\x98S"),
 		[this]() { QString error; saveModified(&error); });
@@ -616,8 +616,17 @@ QString ImageCompareView::tabTitle() const
 {
 	QStringList names;
 	for (int i = 0; i < m_paneCount; ++i)
-		names.append(QFileInfo(m_paths[i]).fileName());
+		names.append(m_descriptions[i].isEmpty()
+			? QFileInfo(m_paths[i]).fileName() : m_descriptions[i]);
 	return names.join(QString::fromUtf8(" \xE2\x86\x94 "));
+}
+
+void ImageCompareView::setSideDescription(int side, const QString &description)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	m_descriptions[side] = description;
+	updatePaneHeader(side);
 }
 
 void ImageCompareView::setReadOnlySides(const QList<bool> &readOnly)
@@ -772,6 +781,12 @@ void ImageCompareView::redo()
 void ImageCompareView::focusNextPane()
 {
 	setActivePane((m_activePane + 1) % m_paneCount);
+}
+
+void ImageCompareView::refreshByUser()
+{
+	recompare();
+	emit rescanned();
 }
 
 void ImageCompareView::recompare()
@@ -1474,7 +1489,8 @@ void ImageCompareView::updatePaneHeader(int pane)
 {
 	if (m_headers[pane] == nullptr)
 		return;
-	QString text = QFileInfo(m_paths[pane]).fileName();
+	QString text = m_descriptions[pane].isEmpty()
+		? QFileInfo(m_paths[pane]).fileName() : m_descriptions[pane];
 	if (text.isEmpty())
 	{
 		if (pane == 0)

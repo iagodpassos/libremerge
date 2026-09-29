@@ -28,6 +28,8 @@
 #include <QProgressDialog>
 #include <QTabWidget>
 #include <QTemporaryDir>
+#include <algorithm>
+#include <memory>
 #include <QKeyEvent>
 #include <QTimer>
 
@@ -35,6 +37,7 @@
 #include "TableCompareView.h"
 #include "ImageCompareView.h"
 #include "ImageFormats.h"
+#include "MessageBoxes.h"
 #include "OptionsDialog.h"
 #include "Theme.h"
 #include "AboutDialog.h"
@@ -426,11 +429,11 @@ MainWindow::MainWindow(QWidget *parent)
 	addMenuAction(mergeMenu, tr("Re&compare"), QKeySequence(Qt::Key_F5),
 		[this, fileView, tableView, imageView]() {
 			if (auto *view = fileView())
-				view->recompare();
+				view->refreshByUser();
 			else if (auto *table = tableView())
-				table->recompare();
+				table->refreshByUser();
 			else if (auto *image = imageView())
-				image->recompare();
+				image->refreshByUser();
 			else if (auto *folder = qobject_cast<FolderCompareView *>(
 					m_tabs->currentWidget()))
 				folder->recompare();
@@ -701,6 +704,7 @@ void MainWindow::openTableComparison(const QString &leftPath,
 
 	if (OptionsDialog::scrollToFirstDiff())
 		QTimer::singleShot(0, view, [view]() { view->gotoFirstDiff(); });
+	watchIdentical(view);
 }
 
 void MainWindow::openImageComparison(const QStringList &paths,
@@ -740,6 +744,7 @@ void MainWindow::openImageComparison(const QStringList &paths,
 
 	if (OptionsDialog::scrollToFirstDiff())
 		QTimer::singleShot(0, view, [view]() { view->gotoFirstDiff(); });
+	watchIdentical(view);
 }
 
 void MainWindow::openBlankComparison()
@@ -782,6 +787,120 @@ void MainWindow::attachFileView(FileCompareView *view)
 				view->scrollToFirstInlineDiff();
 		});
 	}
+	watchIdentical(view);
+}
+
+/** WinMerge's identical files message: on opening (OpenDocs), on
+    Recompare (OnRefresh) and, for text and tables, on saving (OnFileSave
+    rescans). Deferred: the triggers come from inside the page. */
+void MainWindow::watchIdentical(QWidget *page)
+{
+	QPointer<QWidget> guard(page);
+	const auto report = [this, guard](bool opening) {
+		QTimer::singleShot(0, this, [this, guard, opening]() {
+			if (guard)
+				reportIfIdentical(guard, opening);
+		});
+	};
+	report(true);
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+	{
+		connect(file, &FileCompareView::rescanned, this, [report]() { report(false); });
+		connect(file, &FileCompareView::fileSaved, this, [report]() { report(false); });
+	}
+	else if (auto *table = qobject_cast<TableCompareView *>(page))
+	{
+		connect(table, &TableCompareView::rescanned, this, [report]() { report(false); });
+		connect(table, &TableCompareView::fileSaved, this, [report]() { report(false); });
+	}
+	else if (auto *image = qobject_cast<ImageCompareView *>(page))
+	{
+		connect(image, &ImageCompareView::rescanned, this, [report]() { report(false); });
+	}
+}
+
+void MainWindow::reportIfIdentical(QWidget *page, bool opening)
+{
+	QStringList paths;
+	int diffs = -1;
+	bool modified = false;
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+	{
+		paths = file->paths();
+		diffs = file->diffCount();
+		modified = file->isModified();
+	}
+	else if (auto *table = qobject_cast<TableCompareView *>(page))
+	{
+		paths = table->paths();
+		diffs = table->diffCount();
+		modified = table->isModified();
+	}
+	else if (auto *image = qobject_cast<ImageCompareView *>(page))
+	{
+		paths = image->paths();
+		diffs = image->diffCount();
+		modified = image->isModified();
+	}
+	if (diffs != 0)
+		return;
+	const auto empty = [](const QString &path) { return path.isEmpty(); };
+	// "Don't show message if new buffers created": never for File > New
+	if (opening && std::all_of(paths.cbegin(), paths.cend(), empty))
+		return;
+	lm::showIdenticalMessage(this, paths,
+		std::none_of(paths.cbegin(), paths.cend(), empty) && !modified);
+}
+
+/** WinMerge's DoSelfCompare: one file against a snapshot of itself taken
+    now, the copy read-only on the left as "Original File", the file
+    itself editable on the right. The recent list keeps the file alone. */
+void MainWindow::openSelfComparison(const QString &path)
+{
+	// keeps the snapshot as long as the comparison it belongs to
+	class SnapshotOwner : public QObject
+	{
+	public:
+		QTemporaryDir dir;
+	};
+	auto owner = std::make_unique<SnapshotOwner>();
+	const QString copy = owner->dir.filePath(QFileInfo(path).fileName());
+	if (!owner->dir.isValid() || !QFile::copy(path, copy))
+	{
+		lm::warning(this, tr("LibreMerge"), tr("Could not compare files:\n%1")
+			.arg(tr("cannot copy %1").arg(path)));
+		return;
+	}
+	const int before = m_tabs->count();
+	openFileComparison({ copy, path }, { true, false });
+	if (m_tabs->count() == before)
+		return;
+	QWidget *page = m_tabs->currentWidget();
+	owner.release()->setParent(page);
+	const QString description = tr("Original File");
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+		file->setSideDescription(0, description);
+	else if (auto *table = qobject_cast<TableCompareView *>(page))
+		table->setSideDescription(0, description);
+	else if (auto *image = qobject_cast<ImageCompareView *>(page))
+		image->setSideDescription(0, description);
+	const int index = m_tabs->indexOf(page);
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+		m_tabs->setTabText(index, file->tabTitle());
+	else if (auto *table = qobject_cast<TableCompareView *>(page))
+		m_tabs->setTabText(index, table->tabTitle());
+	else if (auto *image = qobject_cast<ImageCompareView *>(page))
+		m_tabs->setTabText(index, image->tabTitle());
+	m_tabs->setTabToolTip(index, path);
+
+	// the snapshot pair went into the recent list: keep the file instead
+	QSettings settings;
+	const QString key = QStringLiteral("RecentComparisons/List");
+	QStringList entries = settings.value(key).toStringList();
+	entries.removeAll(QStringList{ copy, path }.join(QChar('\n')));
+	entries.removeAll(path);
+	entries.prepend(path);
+	settings.setValue(key, entries);
 }
 
 void MainWindow::wireFolderRowSync(FolderCompareView *folder)
@@ -1045,7 +1164,9 @@ void MainWindow::reopenComparison(const QStringList &paths)
 {
 	// 2- and 3-way folder comparisons, archives included (a 3-way folder
 	// entry used to reopen as a file comparison)
-	if (allFolderLike(paths))
+	if (paths.size() == 1)
+		openSelfComparison(paths.first()); // a self-compare entry
+	else if (allFolderLike(paths))
 		openFolderComparison(paths);
 	else
 		openFileComparison(paths);
@@ -1086,6 +1207,13 @@ void MainWindow::openSelector(const QStringList &paths)
 			const QList<bool> &readOnly, bool folders) {
 			QTimer::singleShot(0, this,
 				[this, guard, selected, readOnly, folders]() {
+					// one file alone: WinMerge's self-compare, which
+					// leaves the selection open whatever the option
+					if (selected.size() == 1)
+					{
+						openSelfComparison(selected.first());
+						return;
+					}
 					if (folders)
 						openFolderComparison(selected);
 					else
