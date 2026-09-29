@@ -167,6 +167,7 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	buttons->setColumnStretch(0, 1);
 	auto *compareButton = new QPushButton(tr("Compare"), content);
 	compareButton->setDefault(true);
+	m_compareButton = compareButton;
 	connect(compareButton, &QPushButton::clicked, this, &NewComparisonView::compare);
 	// Enter anywhere on the page starts the comparison, the IDOK
 	// semantics of WinMerge's open dialog. The returnPressed hookup on
@@ -204,6 +205,101 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	m_hint->setContentsMargins(8, 4, 8, 4);
 	outer->addWidget(m_hint);
 	setHint(tr("Select two (or three) folders/files to compare."), false);
+
+	// the paths are checked as they change: typed, picked, swapped,
+	// dropped or browsed all go through the edit text
+	m_verifyTimer = new QTimer(this);
+	m_verifyTimer->setSingleShot(true);
+	m_verifyTimer->setInterval(150);
+	connect(m_verifyTimer, &QTimer::timeout, this, &NewComparisonView::verifyPaths);
+	for (Slot &slot : m_slots)
+		connect(slot.path, &QComboBox::editTextChanged,
+			m_verifyTimer, qOverload<>(&QTimer::start));
+	verifyPaths();
+}
+
+/** WinMerge's check of the open dialog's paths (UpdateButtonStatesThread):
+    the status names the invalid paths or a file and folder mix, and
+    Compare is enabled once any path exists. Archives count as folders.
+    One liberty: with every field empty the status stays the neutral
+    prompt rather than "Both paths are invalid!". */
+void NewComparisonView::verifyPaths()
+{
+	m_verifyTimer->stop();
+	const QString prompt = tr("Select two (or three) folders/files to compare.");
+	if (!OptionsDialog::verifyOpenPaths())
+	{
+		m_compareButton->setEnabled(true);
+		return;
+	}
+
+	enum Kind { Missing, File, Folder };
+	QString paths[3];
+	Kind kind[3] = { Missing, Missing, Missing };
+	bool folderLike[3] = {};
+	bool anyExists = false;
+	for (int i = 0; i < 3; ++i)
+	{
+		paths[i] = m_slots[i].path->currentText().trimmed();
+		const QFileInfo info(paths[i]);
+		if (!paths[i].isEmpty() && info.exists())
+			kind[i] = info.isDir() ? Folder : File;
+		folderLike[i] = kind[i] == Folder
+			|| (kind[i] == File && lm::isArchivePath(paths[i]));
+		anyExists = anyExists || kind[i] != Missing;
+	}
+	m_compareButton->setEnabled(anyExists);
+	if (paths[0].isEmpty() && paths[1].isEmpty() && paths[2].isEmpty())
+	{
+		setHint(prompt, false);
+		return;
+	}
+
+	const bool bad[3] = { kind[0] == Missing, kind[1] == Missing, kind[2] == Missing };
+	QString message;
+	if (paths[2].isEmpty())
+	{
+		if (bad[0] && bad[1])
+			message = tr("Both paths are invalid!");
+		else if (bad[0])
+			message = tr("Left (1st) path is invalid!");
+		else if (bad[1])
+		{
+			// a lone file with nothing on the right is still a start
+			if (!(kind[0] == File && paths[1].isEmpty()))
+				message = tr("Right (2nd) path is invalid!");
+		}
+		else if (kind[0] != kind[1] && !(folderLike[0] && folderLike[1]))
+			message = tr("Cannot compare file and folder!");
+	}
+	else if (bad[0] && bad[1] && bad[2])
+		message = tr("All paths are invalid!");
+	else if (bad[1] && bad[2])
+		message = tr("Middle (2nd) and Right (3rd) paths are invalid!");
+	else if (bad[0] && bad[2])
+		message = tr("Left (1st) and Right (3rd) paths are invalid!");
+	else if (bad[2])
+		message = tr("Right (3rd) path is invalid!");
+	else if (bad[0] && bad[1])
+		message = tr("Left (1st) and Middle (2nd) paths are invalid!");
+	else if (bad[1])
+		message = tr("Middle (2nd) path is invalid!");
+	else if (bad[0])
+		message = tr("Left (1st) path is invalid!");
+	else if ((kind[0] != kind[1] || kind[0] != kind[2])
+		&& !(folderLike[0] && folderLike[1] && folderLike[2]))
+		message = tr("Cannot compare file and folder!");
+	setHint(message.isEmpty() ? prompt : message, !message.isEmpty());
+}
+
+QString NewComparisonView::hintForTest() const
+{
+	return m_hint->text();
+}
+
+bool NewComparisonView::compareEnabledForTest() const
+{
+	return m_compareButton->isEnabled();
 }
 
 void NewComparisonView::focusFirstField()
@@ -372,6 +468,13 @@ void NewComparisonView::compare()
 	// one comparison, so repeats within the same event-loop cycle are
 	// dropped.
 	if (m_compareArmed)
+		return;
+	// Enter typed faster than the path check: decide on the paths as
+	// they are now; a disabled Compare ignores Enter, like WinMerge's
+	// default button
+	if (m_verifyTimer->isActive())
+		verifyPaths();
+	if (!m_compareButton->isEnabled())
 		return;
 	m_compareArmed = true;
 	QTimer::singleShot(0, this, [this]() { m_compareArmed = false; });

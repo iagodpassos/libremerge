@@ -37,6 +37,9 @@ public:
 		EscMainWindowIfOneTab,
 	};
 	static CloseWithEsc closeWithEsc();
+	/** WinMerge's OPT_VERIFY_OPEN_PATHS: the selection checks its paths
+	    as they are typed. */
+	static bool verifyOpenPaths();
 	/** WinMerge's OPT_PRESERVE_FILETIMES: saving keeps the file's date. */
 	static bool preserveFileTime();
 	/** WinMerge's OPT_CLOSE_WITH_OK: Compare closes the selection tab. */
@@ -91,6 +94,7 @@ private:
 	QCheckBox *m_chkScrollFirst;
 	QCheckBox *m_chkScrollFirstInline;
 	QComboBox *m_cmbCloseWithEsc;
+	QCheckBox *m_chkVerifyPaths;
 	QCheckBox *m_chkAskClose;
 	QCheckBox *m_chkPreserveFileTime;
 	QCheckBox *m_chkShowSelector;

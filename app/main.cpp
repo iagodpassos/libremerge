@@ -626,7 +626,7 @@ int main(int argc, char *argv[])
 		const auto boxes = [&dialog](OptionsDialog::Page page) {
 			return dialog.pageForTest(page)->findChildren<QCheckBox *>();
 		};
-		ok = ok && boxes(OptionsDialog::GeneralPage).size() == 6
+		ok = ok && boxes(OptionsDialog::GeneralPage).size() == 7
 			&& boxes(OptionsDialog::BackupPage).size() == 1;
 
 		// Defaults on another page leaves General alone
@@ -640,8 +640,11 @@ int main(int argc, char *argv[])
 		ok = ok && !boxes(OptionsDialog::BackupPage).first()->isChecked();
 		dialog.selectCategoryForTest(0); // General
 		dialog.restoreDefaultsForTest();
+		// WinMerge's defaults: all off but "Automatically verify paths"
+		const QString verifyPaths = OptionsDialog::tr(
+			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
-			ok = ok && !box->isChecked();
+			ok = ok && box->isChecked() == (box->text() == verifyPaths);
 		dialog.selectCategoryForTest(4); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
@@ -950,6 +953,69 @@ int main(int argc, char *argv[])
 				&& combo->completer()->model()->rowCount() == 0
 				&& NewComparisonView::savedHistory().isEmpty(),
 				"clearing the recent items clears the suggestions");
+		}
+
+		// Verify paths (on by default): the status names what is wrong and
+		// Compare waits for a path that exists
+		{
+			const QString missing = dir.filePath(QStringLiteral("nothing-here"));
+			const QString zip = dir.filePath(QStringLiteral("pack.zip"));
+			write(zip, "PK");
+			NewComparisonView selector;
+			const auto combos = selector.findChildren<QComboBox *>();
+			const auto fill = [&](const QString &a, const QString &b, const QString &c)
+			{
+				combos.at(0)->setEditText(a);
+				combos.at(1)->setEditText(b);
+				combos.at(2)->setEditText(c);
+				selector.verifyPathsForTest();
+			};
+			const auto expect = [&](const char *what, const char *hint, bool enabled)
+			{
+				check(selector.hintForTest() == NewComparisonView::tr(hint)
+					&& selector.compareEnabledForTest() == enabled, what);
+			};
+			fill({}, {}, {});
+			expect("empty fields: the prompt, Compare off",
+				"Select two (or three) folders/files to compare.", false);
+			fill(missing, missing, {});
+			expect("both invalid", "Both paths are invalid!", false);
+			fill(leftDir, missing, {});
+			expect("right invalid", "Right (2nd) path is invalid!", true);
+			fill(left, {}, {});
+			expect("a lone file is a start",
+				"Select two (or three) folders/files to compare.", true);
+			fill(left, leftDir, {});
+			expect("file and folder", "Cannot compare file and folder!", true);
+			fill(leftDir, zip, {});
+			expect("folder and archive",
+				"Select two (or three) folders/files to compare.", true);
+			fill(left, missing, right);
+			expect("middle invalid", "Middle (2nd) path is invalid!", true);
+			fill(missing, left, missing);
+			expect("left and right invalid",
+				"Left (1st) and Right (3rd) paths are invalid!", true);
+			fill(left, right, leftDir);
+			expect("3-way file and folder", "Cannot compare file and folder!", true);
+
+			QSettings().setValue(QStringLiteral("General/VerifyOpenPaths"), false);
+			fill(missing, missing, {});
+			check(selector.compareEnabledForTest(), "unchecked: Compare always on");
+			QSettings().setValue(QStringLiteral("General/VerifyOpenPaths"), true);
+
+			// Enter with Compare off does nothing
+			MainWindow window;
+			window.openSelector({ missing, missing });
+			auto *screen = window.findChild<NewComparisonView *>();
+			auto *pathEdit = screen != nullptr ? screen->findChild<QLineEdit *>() : nullptr;
+			if (pathEdit == nullptr)
+				return 2;
+			QKeyEvent press(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+			QCoreApplication::sendEvent(pathEdit, &press);
+			QCoreApplication::processEvents();
+			check(window.findChildren<FileCompareView *>().isEmpty()
+				&& window.findChildren<FolderCompareView *>().isEmpty(),
+				"Enter with Compare off opens nothing");
 		}
 
 		// Shift+Delete on an open dropdown forgets the highlighted path,

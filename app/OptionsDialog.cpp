@@ -31,6 +31,7 @@ const QString kShowSelector = QStringLiteral("General/ShowSelectorAtStartup");
 const QString kAskClose = QStringLiteral("General/AskCloseMultipleTabs");
 // defaults: WinMerge's OptionsInit
 const QString kCloseWithEsc = QStringLiteral("General/CloseWithEsc");
+const QString kVerifyPaths = QStringLiteral("General/VerifyOpenPaths");
 const QString kPreserveFileTime = QStringLiteral("General/PreserveFileTime");
 const QString kCloseSelector = QStringLiteral("General/CloseSelectorOnCompare");
 const QString kAutoComplete = QStringLiteral("General/AutoCompleteSource");
@@ -77,6 +78,11 @@ OptionsDialog::CloseWithEsc OptionsDialog::closeWithEsc()
 	const int mode = QSettings().value(kCloseWithEsc, EscTabOrMainWindow).toInt();
 	return mode >= EscDisabled && mode <= EscMainWindowIfOneTab
 		? static_cast<CloseWithEsc>(mode) : EscTabOrMainWindow;
+}
+
+bool OptionsDialog::verifyOpenPaths()
+{
+	return QSettings().value(kVerifyPaths, true).toBool();
 }
 
 bool OptionsDialog::preserveFileTime()
@@ -202,6 +208,10 @@ QWidget *OptionsDialog::buildGeneralPage()
 		tr("Tab only"), tr("Close main window if only one tab") });
 	addLabeled(box, tr("Close windows with 'Esc':"), m_cmbCloseWithEsc);
 
+	box->addSpacing(4);
+	m_chkVerifyPaths = new QCheckBox(tr("Automatically verify paths in the "
+		"\"Select Files or Folders\" screen"), page);
+	box->addWidget(m_chkVerifyPaths);
 	box->addSpacing(4);
 	m_chkAskClose = new QCheckBox(
 		tr("Ask before closing a window with multiple tabs"), page);
@@ -329,6 +339,7 @@ void OptionsDialog::load()
 	m_chkScrollFirstInline->setChecked(
 		settings.value(kScrollFirstInline, false).toBool());
 	m_cmbCloseWithEsc->setCurrentIndex(closeWithEsc());
+	m_chkVerifyPaths->setChecked(verifyOpenPaths());
 	m_chkAskClose->setChecked(settings.value(kAskClose, false).toBool());
 	m_chkPreserveFileTime->setChecked(preserveFileTime());
 	m_chkShowSelector->setChecked(
@@ -361,6 +372,7 @@ void OptionsDialog::save()
 	settings.setValue(kScrollFirst, m_chkScrollFirst->isChecked());
 	settings.setValue(kScrollFirstInline, m_chkScrollFirstInline->isChecked());
 	settings.setValue(kCloseWithEsc, m_cmbCloseWithEsc->currentIndex());
+	settings.setValue(kVerifyPaths, m_chkVerifyPaths->isChecked());
 	settings.setValue(kAskClose, m_chkAskClose->isChecked());
 	settings.setValue(kPreserveFileTime, m_chkPreserveFileTime->isChecked());
 	settings.setValue(kShowSelector, m_chkShowSelector->isChecked());
@@ -399,6 +411,7 @@ void OptionsDialog::restoreDefaults(int page)
 		m_chkScrollFirst->setChecked(false);
 		m_chkScrollFirstInline->setChecked(false);
 		m_cmbCloseWithEsc->setCurrentIndex(EscTabOrMainWindow);
+		m_chkVerifyPaths->setChecked(true);
 		m_chkAskClose->setChecked(false);
 		m_chkPreserveFileTime->setChecked(false);
 		m_chkShowSelector->setChecked(false);

@@ -1188,6 +1188,46 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Selecione duas (ou três) pastas/arquivos para comparar.</translation>
     </message>
     <message>
+        <source>Both paths are invalid!</source>
+        <translation>Ambos os caminhos são inválidos!</translation>
+    </message>
+    <message>
+        <source>Left (1st) path is invalid!</source>
+        <translation>O caminho da esquerda (1º) é inválido!</translation>
+    </message>
+    <message>
+        <source>Right (2nd) path is invalid!</source>
+        <translation>O caminho da direita (2º) é inválido!</translation>
+    </message>
+    <message>
+        <source>Cannot compare file and folder!</source>
+        <translation>Não foi possível comparar o arquivo e a pasta!</translation>
+    </message>
+    <message>
+        <source>All paths are invalid!</source>
+        <translation>Todos os caminhos são inválidos!</translation>
+    </message>
+    <message>
+        <source>Middle (2nd) and Right (3rd) paths are invalid!</source>
+        <translation>Os caminhos do meio (2º) e da direita (3º) são inválidos!</translation>
+    </message>
+    <message>
+        <source>Left (1st) and Right (3rd) paths are invalid!</source>
+        <translation>Os caminhos da esquerda (1º) e da direita (3º) são inválidos!</translation>
+    </message>
+    <message>
+        <source>Right (3rd) path is invalid!</source>
+        <translation>O caminho da direita (3º) é inválido!</translation>
+    </message>
+    <message>
+        <source>Left (1st) and Middle (2nd) paths are invalid!</source>
+        <translation>Os caminhos da esquerda (1º) e do meio (2º) são inválidos!</translation>
+    </message>
+    <message>
+        <source>Middle (2nd) path is invalid!</source>
+        <translation>O caminho do meio (2º) é inválido!</translation>
+    </message>
+    <message>
         <source>Select Folder</source>
         <translation>Selecionar Pasta</translation>
     </message>
@@ -1261,6 +1301,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>Close windows with &apos;Esc&apos;:</source>
         <translation>Fechar janelas com &apos;Esc&apos;:</translation>
+    </message>
+    <message>
+        <source>Automatically verify paths in the &quot;Select Files or Folders&quot; screen</source>
+        <translation>Verificar automaticamente os caminhos na tela &quot;Selecionar Arquivos ou Pastas&quot;</translation>
     </message>
     <message>
         <source>Preserve file time in file compare</source>
