@@ -39,7 +39,6 @@
 #include "ImageFormats.h"
 #include "MessageBoxes.h"
 #include "OptionsDialog.h"
-#include "Theme.h"
 #include "AboutDialog.h"
 #include "ArchiveCompare.h"
 #include "FolderCompareView.h"
@@ -295,21 +294,6 @@ MainWindow::MainWindow(QWidget *parent)
 					: FolderCompareView::savedShowFilter(filter));
 			}
 		});
-	viewMenu->addSeparator();
-	QMenu *themeMenu = viewMenu->addMenu(tr("&Theme"));
-	auto *themeGroup = new QActionGroup(this);
-	auto addThemeAction = [themeMenu, themeGroup](const QString &text,
-		lm::ThemeMode mode) {
-		QAction *action = themeMenu->addAction(text);
-		action->setCheckable(true);
-		themeGroup->addAction(action);
-		action->setChecked(lm::Theme::instance()->mode() == mode);
-		connect(action, &QAction::triggered,
-			[mode]() { lm::Theme::instance()->setMode(mode); });
-	};
-	addThemeAction(tr("&System"), lm::ThemeMode::System);
-	addThemeAction(tr("&Light"), lm::ThemeMode::Light);
-	addThemeAction(tr("&Dark"), lm::ThemeMode::Dark);
 	viewMenu->addSeparator();
 	QAction *zoomInAction = addMenuAction(viewMenu, tr("Zoom &In"),
 		QKeySequence::ZoomIn, [fileView, imageView]() {

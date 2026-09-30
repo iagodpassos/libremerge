@@ -109,6 +109,12 @@ if(NOT WIN32)
 endif()
 
 if(UNIX AND NOT APPLE)
+  # the desktop's light/dark setting, read from the XDG desktop portal
+  find_package(Qt6 REQUIRED COMPONENTS DBus)
+  target_sources(LibreMerge PRIVATE PortalAppearance.cpp)
+  target_link_libraries(LibreMerge PRIVATE Qt6::DBus)
+  target_compile_definitions(LibreMerge PRIVATE LM_HAVE_PORTAL)
+
   include(GNUInstallDirs)
   set_target_properties(LibreMerge PROPERTIES OUTPUT_NAME libremerge)
   install(TARGETS LibreMerge RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

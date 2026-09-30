@@ -4,6 +4,7 @@
 #include "OptionsDialog.h"
 #include "EngineOptions.h"
 #include "MessageBoxes.h"
+#include "Theme.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -237,7 +238,14 @@ QWidget *OptionsDialog::buildGeneralPage()
 	addLabeled(box, tr("\"Select Files or Folders\" auto completion:"),
 		m_cmbAutoComplete);
 
+	// the theme (LibreMerge's own) sits with the language, closing the page
 	box->addSpacing(8);
+	m_cmbTheme = new QComboBox(page);
+	m_cmbTheme->setObjectName(QStringLiteral("theme"));
+	m_cmbTheme->addItem(tr("System default"), static_cast<int>(lm::ThemeMode::System));
+	m_cmbTheme->addItem(tr("Light"), static_cast<int>(lm::ThemeMode::Light));
+	m_cmbTheme->addItem(tr("Dark"), static_cast<int>(lm::ThemeMode::Dark));
+	addLabeled(box, tr("Theme:"), m_cmbTheme);
 	m_cmbLanguage = new QComboBox(page);
 	m_cmbLanguage->addItem(tr("System default"), QString());
 	m_cmbLanguage->addItem(QStringLiteral("English"), QStringLiteral("en_US"));
@@ -404,6 +412,8 @@ void OptionsDialog::load()
 		settings.value(kShowSelector, false).toBool());
 	m_chkCloseSelector->setChecked(closeSelectorOnCompare());
 	m_cmbAutoComplete->setCurrentIndex(autoCompleteSource());
+	m_cmbTheme->setCurrentIndex(qMax(0, m_cmbTheme->findData(
+		static_cast<int>(lm::Theme::instance()->mode()))));
 	const int langIndex =
 		m_cmbLanguage->findData(settings.value(kLanguage).toString());
 	m_cmbLanguage->setCurrentIndex(qMax(0, langIndex));
@@ -438,6 +448,9 @@ void OptionsDialog::save()
 	settings.setValue(kCloseSelector, m_chkCloseSelector->isChecked());
 	settings.setValue(kAutoComplete, m_cmbAutoComplete->currentIndex());
 	settings.setValue(kLanguage, m_cmbLanguage->currentData().toString());
+	// takes effect at once, unlike the language
+	lm::Theme::instance()->setMode(
+		static_cast<lm::ThemeMode>(m_cmbTheme->currentData().toInt()));
 	settings.setValue(kBackup, m_chkBackup->isChecked());
 
 	if (COptionsMgr *mgr = GetOptionsMgr())
@@ -482,6 +495,7 @@ void OptionsDialog::restoreDefaults(int page)
 		m_chkShowSelector->setChecked(false);
 		m_chkCloseSelector->setChecked(false);
 		m_cmbAutoComplete->setCurrentIndex(AutoCompleteFileSystem);
+		m_cmbTheme->setCurrentIndex(0); // follow the system
 		m_cmbLanguage->setCurrentIndex(0);
 		break;
 	case ComparePage:

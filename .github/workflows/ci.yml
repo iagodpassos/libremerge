@@ -32,7 +32,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ninja-build libpoco-dev libboost-dev \
             libicu-dev re2c lemon qt6-base-dev libgl1-mesa-dev libarchive-dev \
-            qt6-translations-l10n appstream
+            qt6-translations-l10n appstream dbus python3-dbus python3-gi
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
       - name: Build
@@ -41,6 +41,14 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: App selftests (offscreen)
         run: ./packaging/run_selftests.sh build/app/libremerge
+      - name: Desktop portal color scheme
+        # System theme follows GNOME/KDE's dark setting, read and watched
+        # through the portal (current ReadOne and the older Read)
+        run: |
+          for mode in "" --legacy; do
+            QT_QPA_PLATFORM=offscreen dbus-run-session -- python3 \
+              packaging/fake_portal.py $mode -- build/app/libremerge --selftest-portal
+          done
       - name: AppStream metadata
         # the installed tree, as software centers and AppImageHub see it:
         # metainfo, desktop file and icons checked against each other

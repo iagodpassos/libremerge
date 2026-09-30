@@ -839,22 +839,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Mostrar Só It&amp;ens Ausentes à Direita</translation>
     </message>
     <message>
-        <source>&amp;Theme</source>
-        <translation>&amp;Tema</translation>
-    </message>
-    <message>
-        <source>&amp;System</source>
-        <translation>&amp;Sistema</translation>
-    </message>
-    <message>
-        <source>&amp;Light</source>
-        <translation>&amp;Claro</translation>
-    </message>
-    <message>
-        <source>&amp;Dark</source>
-        <translation>&amp;Escuro</translation>
-    </message>
-    <message>
         <source>Zoom &amp;In</source>
         <translation>&amp;Aumentar Zoom</translation>
     </message>
@@ -1378,6 +1362,18 @@ Checando identidade binária...</translation>
     <message>
         <source>&quot;Select Files or Folders&quot; auto completion:</source>
         <translation>Preenchimento automático da tela &quot;Selecionar Arquivos ou Pastas&quot;:</translation>
+    </message>
+    <message>
+        <source>Light</source>
+        <translation>Claro</translation>
+    </message>
+    <message>
+        <source>Dark</source>
+        <translation>Escuro</translation>
+    </message>
+    <message>
+        <source>Theme:</source>
+        <translation>Tema:</translation>
     </message>
     <message>
         <source>Some messages can be hidden by the user. Press Reset to make all messages visible again.</source>

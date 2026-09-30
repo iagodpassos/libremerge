@@ -7,6 +7,8 @@
 namespace lm
 {
 
+class PortalAppearance;
+
 enum class ThemeMode
 {
 	System,
@@ -14,8 +16,9 @@ enum class ThemeMode
 	Dark,
 };
 
-/** Application theme: WinMerge-style light content (the default) or a
-    dark equivalent, either fixed or following the system appearance. */
+/** Application theme: WinMerge-style light or a dark equivalent, either
+    fixed or following the system appearance (the default). Chosen in
+    Options > General. */
 class Theme : public QObject
 {
 	Q_OBJECT
@@ -25,15 +28,27 @@ public:
 	ThemeMode mode() const { return m_mode; }
 	void setMode(ThemeMode mode);
 
-	/** The resolved appearance for content areas. */
+	/** The resolved appearance. */
 	bool dark() const;
+
+	/** Make the whole application follow the resolved appearance, not
+	    only the content areas: on macOS the window appearance is asked
+	    of the system; elsewhere a dark or light palette replaces the
+	    platform's when the two disagree (an AppImage's is always light).
+	    Runs before every changed(); call it once at startup. */
+	void applyToApplication();
 
 signals:
 	void changed();
 
 private:
 	Theme();
+	/** The system's appearance changed: follow it in System mode. */
+	void systemChanged();
+
 	ThemeMode m_mode = ThemeMode::System;
+	bool m_applying = false;
+	PortalAppearance *m_portal = nullptr; // Linux only
 };
 
 /** The difference palette (WinMerge defaults in light mode, a matching

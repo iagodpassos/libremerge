@@ -114,6 +114,7 @@ private:
 	QCheckBox *m_chkShowSelector;
 	QCheckBox *m_chkCloseSelector;
 	QComboBox *m_cmbAutoComplete;
+	QComboBox *m_cmbTheme;
 	QComboBox *m_cmbLanguage;
 	// Compare > General
 	QRadioButton *m_radWhitespace[3];

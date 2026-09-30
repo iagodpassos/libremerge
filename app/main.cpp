@@ -14,6 +14,8 @@
 #include <QMenuBar>
 #include <QLineEdit>
 #include <QSettings>
+#include <QStyleHints>
+#include <QToolTip>
 #include <QTemporaryDir>
 #include <QAbstractItemView>
 #include <QComboBox>
@@ -31,6 +33,7 @@
 #include <QTextBrowser>
 #include <QThread>
 #include <QThreadPool>
+#include <QEventLoop>
 #include <QTimer>
 #include <QTranslator>
 #include "FileCompareView.h"
@@ -49,6 +52,11 @@
 #include "NewComparisonView.h"
 #include "EngineOptions.h"
 #include "OptionsDialog.h"
+#include "Theme.h"
+#ifdef LM_HAVE_PORTAL
+#include "PortalAppearance.h"
+#include <QDBusVariant>
+#endif
 #ifdef Q_OS_MACOS
 #include "MacServices.h"
 #endif
@@ -173,6 +181,8 @@ int main(int argc, char *argv[])
 	// expects Windows' 1 MiB thread stacks and macOS gives 512 KiB, so use
 	// glibc's 8 MiB default like DirScan's compare pool
 	QThreadPool::globalInstance()->setStackSize(8 * 1024 * 1024);
+	// the whole application follows the chosen theme from the first window
+	lm::Theme::instance()->applyToApplication();
 
 	// translations follow the system language unless overridden by the
 	// Options dialog (Appearance/Language) or, for testing, by the
@@ -317,6 +327,12 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestIdenticalOpt(QStringLiteral("selftest-identical"),
 		QStringLiteral("Verify the identical files message, the self-compare and the Message Boxes page (for testing)"));
 	parser.addOption(selftestIdenticalOpt);
+	QCommandLineOption selftestThemeOpt(QStringLiteral("selftest-theme"),
+		QStringLiteral("Switch the theme from the Options dialog and verify the whole application follows (for testing)"));
+	parser.addOption(selftestThemeOpt);
+	QCommandLineOption selftestPortalOpt(QStringLiteral("selftest-portal"),
+		QStringLiteral("Linux: follow the desktop portal's color scheme from dark to light; needs packaging/fake_portal.py (for testing)"));
+	parser.addOption(selftestPortalOpt);
 	QCommandLineOption selftestArchiveMixedOpt(QStringLiteral("selftest-archive-mixed"),
 		QStringLiteral("Compare a folder against an archive, 2- and 3-way (for testing)"));
 	parser.addOption(selftestArchiveMixedOpt);
@@ -658,6 +674,149 @@ int main(int argc, char *argv[])
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 		printf("options dialog: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestThemeOpt))
+	{
+		// the theme lives in Options > General (not in the View menu) and
+		// drives the whole application: on Linux the palette, on macOS the
+		// appearance asked of the system
+		bool ok = true;
+		const auto check = [&ok](const char *what, bool passed) {
+			printf("%s: %s\n", what, passed ? "ok" : "FAILED");
+			ok = ok && passed;
+		};
+		const auto isDark = [](const QPalette &palette) {
+			return palette.color(QPalette::Window).lightness()
+				< palette.color(QPalette::WindowText).lightness();
+		};
+		lm::Theme *theme = lm::Theme::instance();
+		const QColor systemWindow = qApp->palette().color(QPalette::Window);
+		check("starts following the system", theme->mode() == lm::ThemeMode::System);
+		int changes = 0;
+		QObject::connect(theme, &lm::Theme::changed, [&changes]() { ++changes; });
+
+		{
+			MainWindow window;
+			bool themeMenu = false;
+			const std::function<void(QWidget *)> walk = [&](QWidget *w) {
+				for (QAction *action : w->actions())
+					if (QMenu *submenu = action->menu())
+					{
+						const QString title = submenu->title().remove(QLatin1Char('&'));
+						themeMenu = themeMenu || title == QStringLiteral("Theme")
+							|| title == QStringLiteral("Tema");
+						walk(submenu);
+					}
+			};
+			walk(window.menuBar());
+			check("no Theme menu", !themeMenu);
+		}
+
+		OptionsDialog dialog;
+		auto *combo = dialog.pageForTest(OptionsDialog::GeneralPage)
+			->findChild<QComboBox *>(QStringLiteral("theme"));
+		check("theme choice on the General page", combo != nullptr && combo->count() == 3
+			&& combo->currentIndex() == 0);
+		if (combo == nullptr)
+			return 1;
+
+		combo->setCurrentIndex(2); // Dark
+		dialog.saveForTest();
+		QCoreApplication::processEvents();
+		check("dark saved", theme->mode() == lm::ThemeMode::Dark && theme->dark()
+			&& QSettings().value(QStringLiteral("Appearance/Theme")).toString()
+				== QStringLiteral("dark")
+			&& changes == 1);
+#ifdef Q_OS_MACOS
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+		// only the real platform answers the request (dmg validation)
+		if (QGuiApplication::platformName() == QStringLiteral("cocoa"))
+			check("dark appearance requested",
+				qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark);
+#endif
+#else
+		check("dark application palette", isDark(qApp->palette())
+			&& isDark(QToolTip::palette()));
+#endif
+
+		combo->setCurrentIndex(1); // Light
+		dialog.saveForTest();
+		QCoreApplication::processEvents();
+		check("light saved", theme->mode() == lm::ThemeMode::Light && !theme->dark()
+			&& changes == 2);
+#ifdef Q_OS_MACOS
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+		if (QGuiApplication::platformName() == QStringLiteral("cocoa"))
+			check("light appearance requested",
+				qApp->styleHints()->colorScheme() == Qt::ColorScheme::Light);
+#endif
+#else
+		check("light application palette", !isDark(qApp->palette())
+			&& !isDark(QToolTip::palette()));
+#endif
+
+		// Defaults: back to the system, and to the platform's own palette
+		dialog.restoreDefaultsForTest();
+		check("defaults follow the system", combo->currentIndex() == 0);
+		dialog.saveForTest();
+		QCoreApplication::processEvents();
+		check("system restored", theme->mode() == lm::ThemeMode::System
+			&& QSettings().value(QStringLiteral("Appearance/Theme")).toString()
+				== QStringLiteral("system"));
+#ifndef Q_OS_MACOS
+		check("platform palette back",
+			qApp->palette().color(QPalette::Window) == systemWindow
+			&& isDark(qApp->palette()) == theme->dark());
+#else
+		Q_UNUSED(systemWindow);
+#endif
+
+		// saving the same choice again changes nothing
+		const int before = changes;
+		dialog.saveForTest();
+		check("unchanged choice is quiet", changes == before);
+
+#ifdef LM_HAVE_PORTAL
+		// the portal's color-scheme values, bare (ReadOne, SettingChanged)
+		// or wrapped twice (the deprecated Read)
+		using Portal = lm::PortalAppearance;
+		const QVariant twice = QVariant::fromValue(QDBusVariant(
+			QVariant::fromValue(QDBusVariant(QVariant(2u)))));
+		check("portal values",
+			Portal::schemeFromValue(QVariant(1u)) == Portal::PreferDark
+			&& Portal::schemeFromValue(QVariant(0u)) == Portal::NoPreference
+			&& Portal::schemeFromValue(twice) == Portal::PreferLight
+			&& Portal::schemeFromValue(QVariant(7u)) == Portal::Unavailable
+			&& Portal::schemeFromValue(QVariant(QStringLiteral("dark"))) == Portal::Unavailable);
+#endif
+		printf("theme: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestPortalOpt))
+	{
+#ifdef LM_HAVE_PORTAL
+		// the fake portal says "prefer dark", then switches to "prefer
+		// light": System mode follows it, the whole palette included
+		const auto isDark = [](const QPalette &palette) {
+			return palette.color(QPalette::Window).lightness()
+				< palette.color(QPalette::WindowText).lightness();
+		};
+		lm::Theme *theme = lm::Theme::instance();
+		const bool startedDark = theme->dark() && isDark(qApp->palette());
+		printf("started dark: %d\n", startedDark);
+		QEventLoop loop;
+		QObject::connect(theme, &lm::Theme::changed, &loop, &QEventLoop::quit);
+		QTimer::singleShot(15000, &loop, &QEventLoop::quit);
+		loop.exec();
+		const bool nowLight = !theme->dark() && !isDark(qApp->palette());
+		printf("switched to light: %d\n", nowLight);
+		return startedDark && nowLight ? 0 : 1;
+#else
+		printf("no desktop portal on this platform\n");
+		return 0;
+#endif
 	}
 
 	if (parser.isSet(selftestIdenticalOpt))

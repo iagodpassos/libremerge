@@ -6,7 +6,13 @@
 #include <QApplication>
 #include <QPalette>
 #include <QSettings>
+#include <QStyle>
 #include <QStyleHints>
+#include <QToolTip>
+
+#ifdef LM_HAVE_PORTAL
+#include "PortalAppearance.h"
+#endif
 
 namespace lm
 {
@@ -14,7 +20,51 @@ namespace lm
 namespace
 {
 const QString kThemeKey = QStringLiteral("Appearance/Theme");
+
+/** A window darker than its text means a dark palette. */
+bool paletteIsDark(const QPalette &palette)
+{
+	return palette.color(QPalette::Window).lightness()
+		< palette.color(QPalette::WindowText).lightness();
 }
+
+#ifndef Q_OS_MACOS
+/** The application-wide dark palette, in the tones of the content areas
+    (a #1e1e1e editor inside #2a2a2a). */
+QPalette darkPalette()
+{
+	const QColor text(0xdc, 0xdc, 0xdc);
+	const QColor disabled(0x7a, 0x7a, 0x7a);
+	QPalette palette;
+	palette.setColor(QPalette::Window, QColor(0x2d, 0x2d, 0x2d));
+	palette.setColor(QPalette::WindowText, text);
+	palette.setColor(QPalette::Base, QColor(0x1e, 0x1e, 0x1e));
+	palette.setColor(QPalette::AlternateBase, QColor(0x26, 0x26, 0x26));
+	palette.setColor(QPalette::ToolTipBase, QColor(0x3a, 0x3a, 0x3a));
+	palette.setColor(QPalette::ToolTipText, text);
+	palette.setColor(QPalette::PlaceholderText, QColor(0x80, 0x80, 0x80));
+	palette.setColor(QPalette::Text, text);
+	palette.setColor(QPalette::Button, QColor(0x35, 0x35, 0x35));
+	palette.setColor(QPalette::ButtonText, text);
+	palette.setColor(QPalette::BrightText, QColor(0xff, 0x6b, 0x6b));
+	palette.setColor(QPalette::Light, QColor(0x4a, 0x4a, 0x4a));
+	palette.setColor(QPalette::Midlight, QColor(0x3e, 0x3e, 0x3e));
+	palette.setColor(QPalette::Mid, QColor(0x24, 0x24, 0x24));
+	palette.setColor(QPalette::Dark, QColor(0x1a, 0x1a, 0x1a));
+	palette.setColor(QPalette::Shadow, QColor(0x0c, 0x0c, 0x0c));
+	palette.setColor(QPalette::Highlight, QColor(0x26, 0x4f, 0x78));
+	palette.setColor(QPalette::HighlightedText, QColor(0xe6, 0xe6, 0xe6));
+	palette.setColor(QPalette::Link, QColor(0x6c, 0xb4, 0xff));
+	palette.setColor(QPalette::LinkVisited, QColor(0xb4, 0x8c, 0xff));
+	for (const QPalette::ColorRole role : { QPalette::WindowText,
+			QPalette::Text, QPalette::ButtonText, QPalette::HighlightedText })
+		palette.setColor(QPalette::Disabled, role, disabled);
+	palette.setColor(QPalette::Disabled, QPalette::Highlight,
+		QColor(0x3a, 0x3a, 0x3a));
+	return palette;
+}
+#endif
+} // namespace
 
 Theme *Theme::instance()
 {
@@ -31,10 +81,12 @@ Theme::Theme()
 		: ThemeMode::System;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
 	connect(qApp->styleHints(), &QStyleHints::colorSchemeChanged,
-		this, [this]() {
-			if (m_mode == ThemeMode::System)
-				emit changed();
-		});
+		this, &Theme::systemChanged);
+#endif
+#ifdef LM_HAVE_PORTAL
+	m_portal = new PortalAppearance(this);
+	connect(m_portal, &PortalAppearance::schemeChanged,
+		this, &Theme::systemChanged);
 #endif
 }
 
@@ -47,6 +99,16 @@ void Theme::setMode(ThemeMode mode)
 		mode == ThemeMode::Light ? QStringLiteral("light")
 		: mode == ThemeMode::Dark ? QStringLiteral("dark")
 		: QStringLiteral("system"));
+	applyToApplication();
+	emit changed();
+}
+
+void Theme::systemChanged()
+{
+	// our own request to the platform (macOS) echoes back while applying
+	if (m_mode != ThemeMode::System || m_applying)
+		return;
+	applyToApplication();
 	emit changed();
 }
 
@@ -59,15 +121,56 @@ bool Theme::dark() const
 	case ThemeMode::System:
 		break;
 	}
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-	return qApp->styleHints()->colorScheme() == Qt::ColorScheme::Dark;
-#else
-	// Qt < 6.5 has no color-scheme API: a dark platform palette is the
-	// only signal (window darker than its text means a dark theme)
-	const QPalette pal = qApp->palette();
-	return pal.color(QPalette::Window).lightness()
-		< pal.color(QPalette::WindowText).lightness();
+#ifdef LM_HAVE_PORTAL
+	// the desktop's own setting, when a portal publishes it
+	const PortalAppearance::Scheme portal = m_portal->scheme();
+	if (portal != PortalAppearance::Unavailable)
+		return portal == PortalAppearance::PreferDark;
 #endif
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+	const Qt::ColorScheme scheme = qApp->styleHints()->colorScheme();
+	if (scheme != Qt::ColorScheme::Unknown)
+		return scheme == Qt::ColorScheme::Dark;
+#endif
+	// no color-scheme answer: a dark platform palette is the only signal
+	// (applyToApplication puts the platform's back before asking)
+	return paletteIsDark(qApp->palette());
+}
+
+void Theme::applyToApplication()
+{
+	m_applying = true;
+#ifdef Q_OS_MACOS
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+	// the application's appearance (menus, dialogs, title bars and the
+	// native controls) follows a fixed choice instead of the system's
+	QStyleHints *hints = qApp->styleHints();
+	switch (m_mode)
+	{
+	case ThemeMode::Light: hints->setColorScheme(Qt::ColorScheme::Light); break;
+	case ThemeMode::Dark: hints->setColorScheme(Qt::ColorScheme::Dark); break;
+	case ThemeMode::System: hints->unsetColorScheme(); break;
+	}
+#endif
+#else
+	// back to the platform's palette first; replace it only when it does
+	// not match, so a GNOME or KDE theme that agrees stays as it is
+	static const QPalette platformToolTips = QToolTip::palette();
+	QApplication::setPalette(QPalette());
+	const bool wanted = dark();
+	if (wanted == paletteIsDark(qApp->palette()))
+	{
+		QToolTip::setPalette(platformToolTips);
+	}
+	else
+	{
+		const QPalette palette = wanted ? darkPalette()
+			: QApplication::style()->standardPalette();
+		QApplication::setPalette(palette);
+		QToolTip::setPalette(palette);
+	}
+#endif
+	m_applying = false;
 }
 
 const DiffColors &diffColors()
