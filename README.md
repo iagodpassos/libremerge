@@ -20,9 +20,10 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - **Line filters** (regular expressions that mark matching differences as trivial) and **moved block detection**
 - **Find and replace** in the compare panes (⌘F, wrap-around, match case)
 - **Syntax highlighting** for 47 languages, via WinMerge's own parsers
-- **Light and dark themes** (or follow the system), **English and Brazilian Portuguese** interface following the system language
-- Drag & drop files or folders onto the window or the Dock icon; a WinMerge-style "Select Files or Folders" screen with history, read-only flags and swap
+- **Light and dark themes** for the whole window, or follow the system (on Linux, the dark style of GNOME and KDE, picked up as you switch it), chosen under Options > General; **English and Brazilian Portuguese** interface following the system language
+- Drag & drop files or folders onto the window or the Dock icon; a WinMerge-style "Select Files or Folders" screen with history, paths verified as you type, auto completion, read-only flags and swap; a single file opens against a snapshot of itself, to review your own edits
 - Comparison options carried over from WinMerge: ignore whitespace/case/blank lines/EOL/numbers, diff algorithm selection (Myers, minimal, patience, histogram)
+- An **Options dialog laid out like WinMerge's**, with its General settings (close with Esc, preserve file times on save, verify paths, auto completion) and its Message Boxes page, where the "files are identical" notices can be hidden and brought back
 
 | Dark theme | Folder comparison |
 | --- | --- |
@@ -62,12 +63,12 @@ LibreMerge dirA/ dirB/                 # folder compare
 
 ## Build from source (macOS / Linux)
 
-Dependencies: a C++17 compiler, CMake ≥ 3.21, Ninja, Qt 6, POCO, ICU and Boost (headers). On macOS: `brew install cmake ninja qt poco icu4c boost googletest`. On Debian/Ubuntu see the package list in [`.github/workflows`](.github/workflows).
+Dependencies: a C++17 compiler, CMake ≥ 3.21, Ninja, Qt 6, POCO, ICU, Boost (headers), libarchive, re2c and lemon. On macOS: `brew install cmake ninja qt poco icu4c boost googletest re2c lemon libarchive`. On Debian/Ubuntu see the package list in [`.github/workflows`](.github/workflows).
 
 ```sh
 cmake -S . -B build -G Ninja
 cmake --build build
-ctest --test-dir build        # engine test suite (369 tests)
+ctest --test-dir build        # engine test suite (383 tests)
 ./build/app/LibreMerge        # (on macOS: build/app/LibreMerge.app)
 ```
 
@@ -111,7 +112,7 @@ git config --global difftool.libremerge.cmd \
 
 To use it, run `git mergetool` after a conflict: resolve it in the middle pane, save, and close the window. Two notes on the extra files you may see afterwards:
 
-- LibreMerge writes a `.bak` copy next to the file it saves, which is WinMerge's default behavior. Turn it off under Options > General if you prefer.
+- LibreMerge writes a `.bak` copy next to the file it saves, which is WinMerge's default behavior. Turn it off under Options > Backup Files if you prefer.
 - `git mergetool` itself keeps a `.orig` file unless you set `git config --global mergetool.keepBackup false`.
 
 ## Known limitations
