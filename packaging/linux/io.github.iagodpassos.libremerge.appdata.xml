@@ -69,6 +69,9 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.9.7" date="2026-10-01">
+      <url type="details">https://github.com/iagodpassos/libremerge/releases/tag/v0.9.7</url>
+    </release>
     <release version="0.9.6" date="2026-09-27">
       <url type="details">https://github.com/iagodpassos/libremerge/releases/tag/v0.9.6</url>
     </release>
