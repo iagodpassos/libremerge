@@ -279,6 +279,13 @@ bool askOverwriteChangedFile(QWidget *parent, const QString &path)
 		.arg(path));
 }
 
+bool askRefreshFolderCompares(QWidget *parent)
+{
+	return askYesNo(parent, QCoreApplication::translate("MessageBoxes",
+		"Filters updated. Refresh all open folder compares?\n\n"
+		"Select 'No' to refresh later."));
+}
+
 void setMessageSinkForTest(std::function<void(const QString &)> function)
 {
 	sink() = std::move(function);

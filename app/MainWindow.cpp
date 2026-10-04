@@ -1424,10 +1424,16 @@ void MainWindow::showOptions()
 void MainWindow::applyDiffOptions()
 {
 	// a forced Rescan of every merge document, as WinMerge does on OK
-	// whatever was changed: the files are checked for changes made
-	// elsewhere, compared with the new options, and reported when
-	// identical. Folder comparisons keep their results until refreshed
-	// (CDirDoc::RefreshOptions only updates the display), and so do images
+	// whatever was changed. Folder comparisons keep their results until
+	// refreshed (CDirDoc::RefreshOptions only updates the display), and so
+	// do images
+	rescanFileComparisons();
+}
+
+void MainWindow::rescanFileComparisons()
+{
+	// the files are checked for changes made elsewhere, compared with the
+	// options and filters as they are now, and reported when identical
 	for (int i = 0; i < m_tabs->count(); ++i)
 	{
 		QWidget *page = m_tabs->widget(i);
@@ -1443,6 +1449,7 @@ void MainWindow::applyDiffOptions()
 void MainWindow::showLineFilters()
 {
 	QDialog dialog(this);
+	dialog.setObjectName(QStringLiteral("lineFiltersDialog"));
 	dialog.setWindowModality(Qt::WindowModal);
 	dialog.setWindowTitle(tr("Line Filters"));
 	auto *layout = new QVBoxLayout(&dialog);
@@ -1485,11 +1492,6 @@ void MainWindow::showLineFilters()
 	rowButtons->addStretch(1);
 	layout->addLayout(rowButtons);
 
-	auto *hint = new QLabel(tr("Open comparisons pick the new options up on "
-		"Recompare (F5) or when reopened."), &dialog);
-	hint->setWordWrap(true);
-	layout->addWidget(hint);
-
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok
 		| QDialogButtonBox::Cancel, &dialog);
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
@@ -1509,7 +1511,32 @@ void MainWindow::showLineFilters()
 			? QStringLiteral("1\t") : QStringLiteral("0\t"))
 			+ item->text().trimmed());
 	}
+	// CMainFrame::OnToolsFilters: changed filters apply at once to the
+	// kind of comparison in front. A text or table comparison there rescans
+	// every open one; a folder comparison asks first, and a Yes refreshes
+	// all the open folder comparisons. Anything else in front, or filters
+	// left as they were (LineFiltersList::Compare), rescans nothing
+	const bool changed = saved != entries;
+	QWidget *front = m_tabs->currentWidget();
+	bool rescanFiles = false;
+	bool rescanFolders = false;
+	if (changed && (qobject_cast<FileCompareView *>(front) != nullptr
+			|| qobject_cast<TableCompareView *>(front) != nullptr))
+		rescanFiles = true;
+	else if (changed && qobject_cast<FolderCompareView *>(front) != nullptr)
+		rescanFolders = lm::askRefreshFolderCompares(this);
+	// saved whatever the answer, and before the rescans read them
 	QSettings().setValue(QStringLiteral("LineFilters/List"), saved);
+	if (rescanFiles)
+	{
+		rescanFileComparisons();
+	}
+	else if (rescanFolders)
+	{
+		for (int i = 0; i < m_tabs->count(); ++i)
+			if (auto *folder = qobject_cast<FolderCompareView *>(m_tabs->widget(i)))
+				folder->recompare();
+	}
 }
 
 void MainWindow::newComparison()

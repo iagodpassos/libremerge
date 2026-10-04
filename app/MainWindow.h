@@ -99,6 +99,9 @@ private slots:
 
 private:
 	void handleEscape();
+	/** A forced Rescan of every open text and table comparison
+	    (FlushAndRescan(true) on every merge document). */
+	void rescanFileComparisons();
 	/** CMainFrame::OnUser1, posted: check the current comparison once
 	    the stack is clean and no dialog or menu is open. */
 	void scheduleFileCheck();

@@ -1041,10 +1041,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Nenhum</translation>
     </message>
     <message>
-        <source>Open comparisons pick the new options up on Recompare (F5) or when reopened.</source>
-        <translation>Comparações abertas aplicam as novas opções ao Recomparar (F5) ou ao serem reabertas.</translation>
-    </message>
-    <message>
         <source>Line Filters</source>
         <translation>Filtros de Linha</translation>
     </message>
@@ -1176,6 +1172,14 @@ Sobrescrever?</translation>
     <message>
         <source>Selected files are identical (binary match).</source>
         <translation>Os arquivos selecionados são idênticos (correspondência binária).</translation>
+    </message>
+    <message>
+        <source>Filters updated. Refresh all open folder compares?
+
+Select &apos;No&apos; to refresh later.</source>
+        <translation>Filtros atualizados. Atualizar todas as comparações de pastas abertas?
+
+Selecione &apos;Não&apos; para atualizar mais tarde.</translation>
     </message>
     <message>
         <source>Don&apos;t ask this question again.</source>

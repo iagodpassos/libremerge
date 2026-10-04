@@ -65,6 +65,10 @@ bool askReloadChangedFile(QWidget *parent, const QString &path);
 /** CMergeDoc::DoSave's question before writing over a file another
     application changed since it was loaded. */
 bool askOverwriteChangedFile(QWidget *parent, const QString &path);
+/** CMainFrame::OnToolsFilters' question when the filters were changed
+    with a folder comparison in front: refresh the open folder comparisons
+    now, or leave it for later? */
+bool askRefreshFolderCompares(QWidget *parent);
 
 /** Collect the messages instead of showing them (for tests; pass an
     empty function to show them again). */

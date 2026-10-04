@@ -15,6 +15,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QSettings>
 #include <QStyleHints>
 #include <QToolTip>
@@ -345,6 +346,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestCompareOptionsOpt(QStringLiteral("selftest-compare-options"),
 		QStringLiteral("Verify the Compare options page and what its options do to file, table and folder comparisons (for testing)"));
 	parser.addOption(selftestCompareOptionsOpt);
+	QCommandLineOption selftestLineFiltersOpt(QStringLiteral("selftest-line-filters"),
+		QStringLiteral("Change the line filters in their dialog and verify which open comparisons are rescanned (for testing)"));
+	parser.addOption(selftestLineFiltersOpt);
 	QCommandLineOption selftestThemeOpt(QStringLiteral("selftest-theme"),
 		QStringLiteral("Switch the theme from the Options dialog and verify the whole application follows (for testing)"));
 	parser.addOption(selftestThemeOpt);
@@ -2058,6 +2062,270 @@ int main(int argc, char *argv[])
 		lm::setCompareOptionsForTest(0);
 		lm::setMessageSinkForTest([](const QString &) {});
 		printf("compare options: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestLineFiltersOpt))
+	{
+		// Tools > Line Filters applied on OK like WinMerge's OnToolsFilters:
+		// changed filters rescan every text and table comparison when one
+		// of them is in front, ask before refreshing the folder comparisons
+		// when a folder comparison is, and are only saved otherwise
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		QStringList shown;
+		lm::setMessageSinkForTest([&shown](const QString &text) { shown.append(text); });
+		QStringList asked;
+		bool answer = false;
+		lm::setQuestionSinkForTest([&asked, &answer](const QString &text, bool *) {
+			asked.append(text);
+			return answer;
+		});
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 3; ++i)
+				QCoreApplication::processEvents();
+		};
+		const auto waitFor = [](const FolderCompareView *view)
+		{
+			for (int i = 0; view != nullptr && i < 400 && view->isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+		};
+
+		// one line differs everywhere, and a filter can name it
+		const QByteArray leftStamp = "alpha\nstamp: 2026-01-01\nomega\n";
+		const QByteArray rightStamp = "alpha\nstamp: 2026-02-02\nomega\n";
+		const QString leftText = dir.filePath(QStringLiteral("left.txt"));
+		const QString rightText = dir.filePath(QStringLiteral("right.txt"));
+		write(leftText, leftStamp);
+		write(rightText, rightStamp);
+		const QString leftTable = dir.filePath(QStringLiteral("left.csv"));
+		const QString rightTable = dir.filePath(QStringLiteral("right.csv"));
+		write(leftTable, "key,value\nstamp:,2026-01-01\nname,x\n");
+		write(rightTable, "key,value\nstamp:,2026-02-02\nname,x\n");
+		const QString stamp = QStringLiteral("stamp.txt");
+		const QString other = QStringLiteral("other.txt");
+		QStringList folderPairs[2];
+		for (int i = 0; i < 2; ++i)
+		{
+			const QString number = QString::number(i + 1);
+			folderPairs[i] = { dir.filePath(QStringLiteral("L") + number),
+				dir.filePath(QStringLiteral("R") + number) };
+			write(folderPairs[i].at(0) + QLatin1Char('/') + stamp, leftStamp);
+			write(folderPairs[i].at(1) + QLatin1Char('/') + stamp, rightStamp);
+			write(folderPairs[i].at(0) + QLatin1Char('/') + other, "one\n");
+			write(folderPairs[i].at(1) + QLatin1Char('/') + other, "two\n");
+		}
+		const QString textSame = QObject::tr("Text files are identical");
+		const QString textDiff = QObject::tr("Text files are different");
+		const QString binaryDiffer = QCoreApplication::translate("MessageBoxes",
+			"Selected files are identical (with current settings).\n"
+			"But differ at the binary level.");
+		const QString question = QCoreApplication::translate("MessageBoxes",
+			"Filters updated. Refresh all open folder compares?\n\n"
+			"Select 'No' to refresh later.");
+		const QString expression = QStringLiteral("^stamp:");
+		const auto savedFilters = []() {
+			return QSettings().value(QStringLiteral("LineFilters/List")).toStringList();
+		};
+
+		lm::setCompareOptionsForTest(0);
+		MainWindow window;
+		window.openFileComparison({ leftText, rightText });
+		window.openTableComparison(leftTable, rightTable);
+		window.openFolderComparison(folderPairs[0]);
+		window.openFolderComparison(folderPairs[1]);
+		window.openSelector();
+		settle();
+		auto *tabs = window.findChild<QTabWidget *>();
+		auto *file = window.findChild<FileCompareView *>();
+		auto *table = window.findChild<TableCompareView *>();
+		const QList<FolderCompareView *> folders = window.findChildren<FolderCompareView *>();
+		auto *selector = window.findChild<NewComparisonView *>();
+		if (tabs == nullptr || file == nullptr || table == nullptr || folders.size() != 2
+			|| selector == nullptr)
+			return 2;
+		for (const FolderCompareView *folder : folders)
+			waitFor(folder);
+		int fileScans = 0, tableScans = 0;
+		QObject::connect(file, &FileCompareView::rescanned, [&fileScans]() { ++fileScans; });
+		QObject::connect(table, &TableCompareView::rescanned, [&tableScans]() { ++tableScans; });
+		const auto foldersComparing = [&folders]() {
+			int comparing = 0;
+			for (const FolderCompareView *folder : folders)
+				comparing += folder->isComparingForTest() ? 1 : 0;
+			return comparing;
+		};
+		const auto folderResults = [&folders](const QString &name) {
+			QStringList results;
+			for (const FolderCompareView *folder : folders)
+				results.append(folder->rowResultForTest(name));
+			return results;
+		};
+		check(file->diffCount() == 1 && table->diffCount() == 1
+			&& folderResults(stamp) == QStringList{ textDiff, textDiff }
+			&& savedFilters().isEmpty(), "no filters: the line is a difference everywhere");
+
+		// the dialog is window-modal: edit its list and press a button
+		// from inside its event loop
+		using Edit = std::function<void(QDialog *, QListWidget *)>;
+		const auto withDialog = [&window](const Edit &edit,
+			QDialogButtonBox::StandardButton button)
+		{
+			QTimer::singleShot(0, &window, [&window, edit, button]() {
+				auto *dialog = window.findChild<QDialog *>(QStringLiteral("lineFiltersDialog"));
+				auto *list = dialog != nullptr ? dialog->findChild<QListWidget *>() : nullptr;
+				auto *buttons = dialog != nullptr
+					? dialog->findChild<QDialogButtonBox *>() : nullptr;
+				if (list == nullptr || buttons == nullptr)
+				{
+					printf("no Line Filters dialog to answer\n");
+					std::exit(3);
+				}
+				if (edit)
+					edit(dialog, list);
+				buttons->button(button)->click();
+			});
+			QMetaObject::invokeMethod(&window, "showLineFilters");
+		};
+		const auto press = [](QDialog *dialog, const QString &text) {
+			for (QPushButton *button : dialog->findChildren<QPushButton *>())
+				if (button->text() == text)
+				{
+					button->click();
+					return;
+				}
+			printf("  no \"%s\" button\n", qPrintable(text));
+		};
+		// Add, type the expression in the row's editor, Enter
+		const auto adding = [&press](const QString &text) -> Edit {
+			return [&press, text](QDialog *dialog, QListWidget *list) {
+				press(dialog, MainWindow::tr("Add"));
+				QCoreApplication::processEvents();
+				auto *editor = list->viewport()->findChild<QLineEdit *>();
+				if (editor == nullptr)
+				{
+					printf("  no editor on the new row\n");
+					return;
+				}
+				editor->setText(text);
+				QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+				QCoreApplication::sendEvent(editor, &enter);
+				QCoreApplication::processEvents(); // the commit is queued
+				if (!dialog->isVisible())
+					printf("  Enter in the editor closed the dialog\n");
+			};
+		};
+		const auto ticking = [](bool on) -> Edit {
+			return [on](QDialog *, QListWidget *list) {
+				if (list->count() > 0)
+					list->item(0)->setCheckState(on ? Qt::Checked : Qt::Unchecked);
+			};
+		};
+		const Edit removingFirst = [&press](QDialog *dialog, QListWidget *list) {
+			list->setCurrentRow(0);
+			press(dialog, MainWindow::tr("Remove"));
+		};
+		const QString enabled = QStringLiteral("1\t") + expression;
+		const QString disabled = QStringLiteral("0\t") + expression;
+
+		// a text comparison in front
+		tabs->setCurrentWidget(file);
+		settle();
+		shown.clear();
+		withDialog(adding(expression), QDialogButtonBox::Ok);
+		settle();
+		check(savedFilters() == QStringList{ enabled }, "a new filter is saved");
+		check(fileScans == 1 && file->diffCount() == 0 && file->ignoredDiffCount() == 1,
+			"text in front: the text comparison is rescanned at once");
+		check(tableScans == 1 && table->diffCount() == 0,
+			"text in front: the table too, and it takes the filter");
+		check(shown == QStringList{ binaryDiffer, binaryDiffer },
+			"text in front: identical files are reported");
+		check(asked.isEmpty() && foldersComparing() == 0
+			&& folderResults(stamp) == QStringList{ textDiff, textDiff },
+			"text in front: folder comparisons are left alone");
+
+		withDialog({}, QDialogButtonBox::Ok);
+		settle();
+		check(fileScans == 1 && tableScans == 1, "unchanged filters: nothing is rescanned");
+
+		withDialog(ticking(false), QDialogButtonBox::Cancel);
+		settle();
+		check(fileScans == 1 && tableScans == 1 && savedFilters() == QStringList{ enabled },
+			"Cancel: nothing is saved or rescanned");
+
+		// a table is the same kind of document
+		tabs->setCurrentWidget(table);
+		settle();
+		withDialog(ticking(false), QDialogButtonBox::Ok);
+		settle();
+		check(savedFilters() == QStringList{ disabled } && fileScans == 2 && tableScans == 2
+			&& file->diffCount() == 1 && file->ignoredDiffCount() == 0
+			&& table->diffCount() == 1,
+			"table in front: a filter switched off rescans both");
+
+		// a folder comparison in front asks first
+		tabs->setCurrentWidget(folders.at(0));
+		settle();
+		asked.clear();
+		answer = false;
+		withDialog(ticking(true), QDialogButtonBox::Ok);
+		const int startedOnNo = foldersComparing();
+		settle();
+		check(asked == QStringList{ question }, "folder in front: asks before refreshing");
+		check(startedOnNo == 0 && savedFilters() == QStringList{ enabled }
+			&& folderResults(stamp) == QStringList{ textDiff, textDiff },
+			"folder in front, No: saved, refreshed later");
+		check(fileScans == 2 && tableScans == 2 && file->diffCount() == 1,
+			"folder in front: text and table comparisons are left alone");
+
+		asked.clear();
+		answer = true;
+		const QString second = QStringLiteral("^never there$");
+		withDialog(adding(second), QDialogButtonBox::Ok);
+		const int startedOnYes = foldersComparing();
+		for (const FolderCompareView *folder : folders)
+			waitFor(folder);
+		settle();
+		check(asked == QStringList{ question } && startedOnYes == 2,
+			"folder in front, Yes: every folder comparison is refreshed");
+		check(folderResults(stamp) == QStringList{ textSame, textSame }
+			&& folderResults(other) == QStringList{ textDiff, textDiff },
+			"the refreshed folder comparisons take the filters");
+		check(fileScans == 2 && tableScans == 2, "folder in front, Yes: no text rescans");
+
+		// nothing to rescan in front: the filters are only saved
+		tabs->setCurrentWidget(selector);
+		settle();
+		asked.clear();
+		withDialog(removingFirst, QDialogButtonBox::Ok);
+		const int startedElsewhere = foldersComparing();
+		settle();
+		check(savedFilters() == QStringList{ QStringLiteral("1\t") + second }
+			&& asked.isEmpty() && startedElsewhere == 0 && fileScans == 2 && tableScans == 2,
+			"another tab in front: saved, nothing rescanned");
+
+		lm::setMessageSinkForTest([](const QString &) {});
+		lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
+		printf("line filters: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 
