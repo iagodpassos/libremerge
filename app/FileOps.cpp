@@ -50,4 +50,29 @@ void restoreFileTime(const QString &path, const QDateTime &time)
 		file.setFileTime(time, QFileDevice::FileModificationTime);
 }
 
+FileStamp fileStamp(const QString &path)
+{
+	FileStamp stamp;
+	const QFileInfo info(path);
+	if (!path.isEmpty() && info.exists())
+	{
+		stamp.modified = info.lastModified();
+		stamp.size = info.size();
+	}
+	return stamp;
+}
+
+FileChange fileChangedOnDisk(const QString &path, const FileStamp &stamp)
+{
+	// "we assume file existed, so disappearing means removal"
+	const QFileInfo info(path);
+	if (path.isEmpty() || !info.exists())
+		return FileChange::Removed;
+	// any time difference counts: WinMerge's two-second tolerance comes
+	// with OPT_IGNORE_SMALL_FILETIME, off by default and not offered here
+	if (info.lastModified() != stamp.modified || info.size() != stamp.size)
+		return FileChange::Changed;
+	return FileChange::NoChange;
+}
+
 } // namespace lm

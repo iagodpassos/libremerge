@@ -7,6 +7,8 @@
 #include <QWidget>
 #include <vector>
 
+#include "FileOps.h"
+
 class QAction;
 class QCheckBox;
 class QLabel;
@@ -59,6 +61,10 @@ public:
 	QStringList paths() const;
 	/** Top view line of the first pane (for tests). */
 	int firstVisibleViewLine() const;
+	/** The view line the pane's cursor is on, and a way to put it
+	    there (for tests). */
+	int cursorViewLineForTest(int side) const;
+	void setCursorViewLineForTest(int side, int viewLine);
 	/** Select everything in one pane and copy it (for tests). */
 	void selectAllAndCopyForTest(int side);
 	/** Type text at the start of a view line, as an undoable user edit
@@ -137,6 +143,14 @@ public:
 	    followed by rescanned(): WinMerge's OnRefresh, which reports
 	    identical files. */
 	void refreshByUser();
+	/** WinMerge's OnFileReload, past its save prompt: every pane is read
+	    from disk again (an untitled one emptied), the undo history goes
+	    and the cursor returns to the line it was on. Nothing is touched
+	    when a file cannot be read. */
+	bool reload(QString *error);
+	/** The first pane's file that another application changed since it
+	    was loaded or saved here (CheckFileChanged); empty when none. */
+	QString changedPathOnDisk() const;
 	bool saveModified(QString *error);
 	/** Header text override for one pane, like WinMerge's display root
 	    for files opened out of an archive (the real path stays in use
@@ -152,6 +166,9 @@ public:
 	void setSideDescription(int side, const QString &description);
 
 signals:
+	/** A recompare asked for by the user is about to run: WinMerge's
+	    Rescan first checks the files for changes made elsewhere. */
+	void aboutToRescan();
 	void rescanned();
 	void modifiedChanged(bool modified);
 	/** A successful save, with the compared paths and the significant
@@ -193,6 +210,14 @@ private:
 		QString eol = QStringLiteral("\n");
 		bool hadFinalEol = true;
 		bool modified = false;
+		lm::FileStamp stamp; // the file as loaded or last saved here
+	};
+
+	enum class SaveResult
+	{
+		Saved,
+		Declined, ///< the user kept another application's newer file
+		Failed,
 	};
 
 	int mergeTargetFor(int sourceSide) const
@@ -200,6 +225,7 @@ private:
 		return m_paneCount == 3 ? 1 : 1 - sourceSide;
 	}
 
+	static bool canLoad(const QString &path, QString *error);
 	bool loadSide(int side, const QString &path, QString *error);
 	bool runDiff(QString *error);
 	void rebuildAlignment();
@@ -232,7 +258,7 @@ private:
 	void showHeaderMenu(int side);
 	void editCaption(int side);
 	void changeSideFile(int side, const QString &path);
-	bool saveSide(int side, QString *error);
+	SaveResult saveSide(int side, QString *error);
 	void setSideModified(int side, bool modified);
 	void syncScroll(int pane, int value);
 	void syncHScroll(int pane, int value);

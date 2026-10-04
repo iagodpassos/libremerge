@@ -39,6 +39,7 @@ const QString kVerifyPaths = QStringLiteral("General/VerifyOpenPaths");
 const QString kPreserveFileTime = QStringLiteral("General/PreserveFileTime");
 const QString kCloseSelector = QStringLiteral("General/CloseSelectorOnCompare");
 const QString kAutoComplete = QStringLiteral("General/AutoCompleteSource");
+const QString kAutoReload = QStringLiteral("General/AutoReloadModifiedFiles");
 const QString kBackup = QStringLiteral("Backup/FileCompare");
 const QString kLanguage = QStringLiteral("Appearance/Language");
 
@@ -104,6 +105,13 @@ OptionsDialog::AutoCompleteSource OptionsDialog::autoCompleteSource()
 	const int source = QSettings().value(kAutoComplete, AutoCompleteFileSystem).toInt();
 	return source >= AutoCompleteDisabled && source <= AutoCompleteRecentList
 		? static_cast<AutoCompleteSource>(source) : AutoCompleteFileSystem;
+}
+
+OptionsDialog::AutoReload OptionsDialog::autoReloadModifiedFiles()
+{
+	const int mode = QSettings().value(kAutoReload, AutoReloadOnWindowActivated).toInt();
+	return mode >= AutoReloadDisabled && mode <= AutoReloadImmediately
+		? static_cast<AutoReload>(mode) : AutoReloadOnWindowActivated;
 }
 
 OptionsDialog::OptionsDialog(QWidget *parent)
@@ -238,6 +246,11 @@ QWidget *OptionsDialog::buildGeneralPage()
 		tr("From Most Recently Used list") });
 	addLabeled(box, tr("\"Select Files or Folders\" auto completion:"),
 		m_cmbAutoComplete);
+	m_cmbAutoReload = new QComboBox(page);
+	m_cmbAutoReload->setObjectName(QStringLiteral("autoReload"));
+	m_cmbAutoReload->addItems({ tr("Disabled"), tr("Only on window activated"),
+		tr("Immediately") });
+	addLabeled(box, tr("Auto-reload modified files:"), m_cmbAutoReload);
 
 	// the theme (LibreMerge's own) sits with the language, closing the page
 	box->addSpacing(8);
@@ -355,17 +368,55 @@ QWidget *OptionsDialog::buildMessageBoxesPage()
 		item->setData(0, Qt::UserRole, message.key);
 		item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
 		item->setCheckState(0, Qt::Unchecked);
+		// a question keeps one of several answers, picked from a drop-down
+		// like WinMerge's Answer cell; the cell stays empty until ticked
+		QComboBox *answers = nullptr;
+		if (message.answers.size() > 1)
+		{
+			auto *cell = new QWidget(m_messageList);
+			auto *cellLayout = new QHBoxLayout(cell);
+			cellLayout->setContentsMargins(0, 0, 0, 0);
+			answers = new QComboBox(cell);
+			for (const lm::MessageAnswer answer : message.answers)
+				answers->addItem(lm::answerText(answer), static_cast<int>(answer));
+			answers->setCurrentIndex(-1);
+			answers->hide();
+			cellLayout->addWidget(answers);
+			m_messageList->setItemWidget(item, 1, cell);
+		}
+		m_messageAnswers.append(answers);
 	}
 	// a ticked message shows its answer, an unticked one none
-	// (OnLVNItemChanged); these are information boxes: OK
+	// (OnLVNItemChanged)
 	connect(m_messageList, &QTreeWidget::itemChanged, this,
 		[this](QTreeWidgetItem *item, int column) {
 			if (column == 0)
-				item->setText(1, item->checkState(0) == Qt::Checked
-					? tr("OK") : QString());
+				syncMessageAnswer(m_messageList->indexOfTopLevelItem(item));
 		});
 	box->addWidget(m_messageList, 1);
 	return page;
+}
+
+/** The Answer cell follows the tick: empty when unticked, and the first
+    answer ("OK", or a question's "Yes") when ticked with none chosen. */
+void OptionsDialog::syncMessageAnswer(int row)
+{
+	QTreeWidgetItem *item = m_messageList->topLevelItem(row);
+	if (item == nullptr)
+		return;
+	const bool hidden = item->checkState(0) == Qt::Checked;
+	if (QComboBox *answers = m_messageAnswers.value(row))
+	{
+		answers->setVisible(hidden);
+		if (!hidden)
+			answers->setCurrentIndex(-1);
+		else if (answers->currentIndex() < 0)
+			answers->setCurrentIndex(0);
+	}
+	else
+	{
+		item->setText(1, hidden ? lm::answerText(lm::AnswerOk) : QString());
+	}
 }
 
 void OptionsDialog::loadMessageBoxes()
@@ -373,8 +424,13 @@ void OptionsDialog::loadMessageBoxes()
 	for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)
 	{
 		QTreeWidgetItem *item = m_messageList->topLevelItem(i);
-		item->setCheckState(0, lm::messageHidden(item->data(0, Qt::UserRole).toString())
-			? Qt::Checked : Qt::Unchecked);
+		const lm::MessageAnswer answer =
+			lm::rememberedAnswer(item->data(0, Qt::UserRole).toString());
+		QComboBox *answers = m_messageAnswers.value(i);
+		if (answers != nullptr)
+			answers->setCurrentIndex(answers->findData(static_cast<int>(answer)));
+		item->setCheckState(0, answer != lm::NoAnswer ? Qt::Checked : Qt::Unchecked);
+		syncMessageAnswer(i);
 	}
 }
 
@@ -414,6 +470,7 @@ void OptionsDialog::load()
 		settings.value(kShowSelector, false).toBool());
 	m_chkCloseSelector->setChecked(closeSelectorOnCompare());
 	m_cmbAutoComplete->setCurrentIndex(autoCompleteSource());
+	m_cmbAutoReload->setCurrentIndex(autoReloadModifiedFiles());
 	m_cmbTheme->setCurrentIndex(qMax(0, m_cmbTheme->findData(
 		static_cast<int>(lm::Theme::instance()->mode()))));
 	const int langIndex =
@@ -449,6 +506,7 @@ void OptionsDialog::save()
 	settings.setValue(kShowSelector, m_chkShowSelector->isChecked());
 	settings.setValue(kCloseSelector, m_chkCloseSelector->isChecked());
 	settings.setValue(kAutoComplete, m_cmbAutoComplete->currentIndex());
+	settings.setValue(kAutoReload, m_cmbAutoReload->currentIndex());
 	settings.setValue(kLanguage, m_cmbLanguage->currentData().toString());
 	// takes effect at once, unlike the language
 	lm::Theme::instance()->setMode(
@@ -477,8 +535,15 @@ void OptionsDialog::save()
 	for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)
 	{
 		const QTreeWidgetItem *item = m_messageList->topLevelItem(i);
-		lm::setMessageHidden(item->data(0, Qt::UserRole).toString(),
-			item->checkState(0) == Qt::Checked);
+		lm::MessageAnswer answer = lm::NoAnswer;
+		if (item->checkState(0) == Qt::Checked)
+		{
+			const QComboBox *answers = m_messageAnswers.value(i);
+			answer = answers != nullptr
+				? static_cast<lm::MessageAnswer>(answers->currentData().toInt())
+				: lm::AnswerOk;
+		}
+		lm::setRememberedAnswer(item->data(0, Qt::UserRole).toString(), answer);
 	}
 }
 
@@ -497,6 +562,7 @@ void OptionsDialog::restoreDefaults(int page)
 		m_chkShowSelector->setChecked(false);
 		m_chkCloseSelector->setChecked(false);
 		m_cmbAutoComplete->setCurrentIndex(AutoCompleteFileSystem);
+		m_cmbAutoReload->setCurrentIndex(AutoReloadOnWindowActivated);
 		m_cmbTheme->setCurrentIndex(0); // follow the system
 		m_cmbLanguage->setCurrentIndex(0);
 		break;
@@ -576,6 +642,20 @@ void OptionsDialog::setMessageBoxHiddenForTest(int row, bool hidden)
 {
 	if (QTreeWidgetItem *item = m_messageList->topLevelItem(row))
 		item->setCheckState(0, hidden ? Qt::Checked : Qt::Unchecked);
+}
+
+QString OptionsDialog::messageBoxAnswerForTest(int row) const
+{
+	if (const QComboBox *answers = m_messageAnswers.value(row))
+		return answers->currentText();
+	const QTreeWidgetItem *item = m_messageList->topLevelItem(row);
+	return item != nullptr ? item->text(1) : QString();
+}
+
+void OptionsDialog::setMessageBoxAnswerForTest(int row, int answerIndex)
+{
+	if (QComboBox *answers = m_messageAnswers.value(row))
+		answers->setCurrentIndex(answerIndex);
 }
 
 /** Reset acts at once, like CMessageBoxDialog::ResetMessageBoxes. */

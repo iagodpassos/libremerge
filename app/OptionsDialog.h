@@ -56,6 +56,15 @@ public:
 		AutoCompleteRecentList,
 	};
 	static AutoCompleteSource autoCompleteSource();
+	/** WinMerge's OPT_AUTO_RELOAD_MODIFIED_FILES: when a comparison
+	    notices by itself that another application changed its files. */
+	enum AutoReload
+	{
+		AutoReloadDisabled,
+		AutoReloadOnWindowActivated, ///< the default
+		AutoReloadImmediately,
+	};
+	static AutoReload autoReloadModifiedFiles();
 
 	/** The pages, in the order the tree lists them. */
 	enum Page
@@ -81,10 +90,13 @@ public:
 	QWidget *pageForTest(Page page) const;
 	/** Press the current page's Defaults button (for tests). */
 	void restoreDefaultsForTest();
-	/** The Message Boxes list: (message, hidden) pairs, and its Reset
-	    button (for tests). */
+	/** The Message Boxes list: (message, hidden) pairs, the answer a
+	    hidden one shows, and its Reset button (for tests). */
 	QList<QPair<QString, bool>> messageBoxesForTest() const;
 	void setMessageBoxHiddenForTest(int row, bool hidden);
+	QString messageBoxAnswerForTest(int row) const;
+	/** Pick the n-th answer of a hidden question's drop-down. */
+	void setMessageBoxAnswerForTest(int row, int answerIndex);
 	void resetMessageBoxesForTest() { resetMessageBoxes(); }
 	void saveForTest() { save(); }
 
@@ -95,6 +107,7 @@ private:
 	QWidget *buildMessageBoxesPage();
 	void loadMessageBoxes();
 	void resetMessageBoxes();
+	void syncMessageAnswer(int row);
 	QWidget *buildBackupPage();
 	void selectCategory(QTreeWidgetItem *item);
 	void load();
@@ -114,6 +127,7 @@ private:
 	QCheckBox *m_chkShowSelector;
 	QCheckBox *m_chkCloseSelector;
 	QComboBox *m_cmbAutoComplete;
+	QComboBox *m_cmbAutoReload;
 	QComboBox *m_cmbTheme;
 	QComboBox *m_cmbLanguage;
 	// Compare > General
@@ -128,6 +142,9 @@ private:
 	QComboBox *m_cmbCompareMethod;
 	// Message Boxes
 	QTreeWidget *m_messageList;
+	// the Answer drop-down of each question, by row (null for the
+	// information boxes, which only answer OK)
+	QList<QComboBox *> m_messageAnswers;
 	// Backup Files
 	QCheckBox *m_chkBackup;
 };

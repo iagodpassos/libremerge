@@ -15,10 +15,17 @@ namespace
 const QString kGroup = QStringLiteral("MessageBoxes/");
 const QString kFilesSame = QStringLiteral("FilesSame");         // IDS_FILESSAME
 const QString kFileToItself = QStringLiteral("FileToItself");   // IDS_FILE_TO_ITSELF
+const QString kFileChangedRescan = QStringLiteral("FileChangedRescan"); // IDS_FILECHANGED_RESCAN
 
 std::function<void(const QString &)> &sink()
 {
 	static std::function<void(const QString &)> function;
+	return function;
+}
+
+std::function<bool(const QString &, bool *)> &questionSink()
+{
+	static std::function<bool(const QString &, bool *)> function;
 	return function;
 }
 
@@ -30,6 +37,49 @@ QString filesSameText()
 QString fileToItselfText()
 {
 	return QCoreApplication::translate("MessageBoxes", "Same file is opened in both panes.");
+}
+
+QString fileChangedRescanText()
+{
+	return QCoreApplication::translate("MessageBoxes",
+		"Another application updated\n%1\nsince last scan.\n\nReload?");
+}
+
+/** A Yes/No warning box. With a key it carries WinMerge's "Don't ask this
+    question again" (MB_DONT_ASK_AGAIN): ticked, the answer given is kept
+    and comes back without asking. */
+bool askYesNo(QWidget *parent, const QString &text, const QString &key = QString())
+{
+	if (!key.isEmpty())
+	{
+		const lm::MessageAnswer remembered = lm::rememberedAnswer(key);
+		if (remembered == lm::AnswerYes || remembered == lm::AnswerNo)
+			return remembered == lm::AnswerYes;
+	}
+	bool yes = false;
+	bool dontAskAgain = false;
+	if (questionSink())
+	{
+		yes = questionSink()(text, &dontAskAgain);
+	}
+	else
+	{
+		QMessageBox box(QMessageBox::Warning, QStringLiteral("LibreMerge"), text,
+			QMessageBox::Yes | QMessageBox::No, parent);
+		box.setWindowModality(Qt::WindowModal);
+		QCheckBox *dontAsk = nullptr;
+		if (!key.isEmpty())
+		{
+			dontAsk = new QCheckBox(QCoreApplication::translate("MessageBoxes",
+				"Don't ask this question again."), &box);
+			box.setCheckBox(dontAsk);
+		}
+		yes = box.exec() == QMessageBox::Yes;
+		dontAskAgain = dontAsk != nullptr && dontAsk->isChecked();
+	}
+	if (!key.isEmpty() && dontAskAgain)
+		lm::setRememberedAnswer(key, yes ? lm::AnswerYes : lm::AnswerNo);
+	return yes;
 }
 
 enum class Identity { Same, Different, Failed };
@@ -107,29 +157,70 @@ void showHideable(QWidget *parent, const QString &key, const QString &text,
 namespace lm
 {
 
+QString answerText(MessageAnswer answer)
+{
+	switch (answer)
+	{
+	case AnswerOk: return QCoreApplication::translate("MessageBoxes", "OK");
+	case AnswerYes: return QCoreApplication::translate("MessageBoxes", "Yes");
+	case AnswerNo: return QCoreApplication::translate("MessageBoxes", "No");
+	case NoAnswer: break;
+	}
+	return QString();
+}
+
 QList<HideableMessage> hideableMessages()
 {
-	return { { kFilesSame, filesSameText() }, { kFileToItself, fileToItselfText() } };
+	// WinMerge's order (PropMessageBoxes.cpp)
+	return {
+		{ kFilesSame, filesSameText(), { AnswerOk } },
+		{ kFileToItself, fileToItselfText(), { AnswerOk } },
+		{ kFileChangedRescan, fileChangedRescanText(), { AnswerYes, AnswerNo } },
+	};
+}
+
+MessageAnswer rememberedAnswer(const QString &key)
+{
+	const QVariant value = QSettings().value(kGroup + key);
+	if (!value.isValid())
+		return NoAnswer;
+	// 0.9.7 kept a hidden information box as a plain "true"
+	const QString text = value.toString();
+	if (text == QStringLiteral("true"))
+		return AnswerOk;
+	switch (text.toInt())
+	{
+	case AnswerOk: return AnswerOk;
+	case AnswerYes: return AnswerYes;
+	case AnswerNo: return AnswerNo;
+	default: break;
+	}
+	return NoAnswer;
+}
+
+void setRememberedAnswer(const QString &key, MessageAnswer answer)
+{
+	QSettings settings;
+	if (answer != NoAnswer)
+		settings.setValue(kGroup + key, static_cast<int>(answer));
+	else
+		settings.remove(kGroup + key);
 }
 
 bool messageHidden(const QString &key)
 {
-	return QSettings().value(kGroup + key, false).toBool();
+	return rememberedAnswer(key) != NoAnswer;
 }
 
 void setMessageHidden(const QString &key, bool hidden)
 {
-	QSettings settings;
-	if (hidden)
-		settings.setValue(kGroup + key, true);
-	else
-		settings.remove(kGroup + key);
+	setRememberedAnswer(key, hidden ? AnswerOk : NoAnswer);
 }
 
 void resetHiddenMessages()
 {
 	for (const HideableMessage &message : hideableMessages())
-		setMessageHidden(message.key, false);
+		setRememberedAnswer(message.key, NoAnswer);
 }
 
 void showIdenticalMessage(QWidget *parent, const QStringList &paths,
@@ -176,9 +267,26 @@ void showInformation(QWidget *parent, const QString &text)
 	box.exec();
 }
 
+bool askReloadChangedFile(QWidget *parent, const QString &path)
+{
+	return askYesNo(parent, fileChangedRescanText().arg(path), kFileChangedRescan);
+}
+
+bool askOverwriteChangedFile(QWidget *parent, const QString &path)
+{
+	return askYesNo(parent, QCoreApplication::translate("MessageBoxes",
+		"Another application updated\n%1\nsince LibreMerge loaded it.\n\nOverwrite?")
+		.arg(path));
+}
+
 void setMessageSinkForTest(std::function<void(const QString &)> function)
 {
 	sink() = std::move(function);
+}
+
+void setQuestionSinkForTest(std::function<bool(const QString &, bool *)> function)
+{
+	questionSink() = std::move(function);
 }
 
 } // namespace lm

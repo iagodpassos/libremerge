@@ -40,6 +40,7 @@
 #include "LocationPane.h"
 #include "SyntaxHighlighter.h"
 #include "FileOps.h"
+#include "MessageBoxes.h"
 #include "OptionsDialog.h"
 #include "Theme.h"
 
@@ -615,30 +616,41 @@ void FileCompareView::setSideDescription(int side, const QString &description)
 	setSideCaption(side, description);
 }
 
-bool FileCompareView::loadSide(int side, const QString &path, QString *error)
+/** Whether loadSide would take the file: it opens, and it is text. */
+bool FileCompareView::canLoad(const QString &path, QString *error)
 {
 	// refuse binary files up front: silently comparing them as text ends
 	// with a misleading "files are identical" (NUL bytes without a
 	// UTF-16/UTF-32 BOM mean binary, the same heuristic diff uses)
+	QFile probe(path);
+	if (!probe.open(QIODevice::ReadOnly))
 	{
-		QFile probe(path);
-		if (probe.open(QIODevice::ReadOnly))
-		{
-			const QByteArray head = probe.read(8192);
-			const bool utf16or32Bom = head.startsWith("\xFF\xFE")
-				|| head.startsWith("\xFE\xFF")
-				|| head.startsWith(QByteArray("\x00\x00\xFE\xFF", 4));
-			if (!utf16or32Bom && head.contains('\0'))
-			{
-				if (error != nullptr)
-					*error = tr("%1 appears to be a binary file.\n"
-						"LibreMerge compares text files; binary comparison "
-						"is not supported yet.").arg(path);
-				return false;
-			}
-		}
+		if (error != nullptr)
+			*error = tr("cannot open %1").arg(path);
+		return false;
 	}
+	const QByteArray head = probe.read(8192);
+	const bool utf16or32Bom = head.startsWith("\xFF\xFE")
+		|| head.startsWith("\xFE\xFF")
+		|| head.startsWith(QByteArray("\x00\x00\xFE\xFF", 4));
+	if (!utf16or32Bom && head.contains('\0'))
+	{
+		if (error != nullptr)
+			*error = tr("%1 appears to be a binary file.\n"
+				"LibreMerge compares text files; binary comparison "
+				"is not supported yet.").arg(path);
+		return false;
+	}
+	return true;
+}
 
+bool FileCompareView::loadSide(int side, const QString &path, QString *error)
+{
+	if (!canLoad(path, error))
+		return false;
+
+	// taken before the content: a change made while reading shows later
+	const lm::FileStamp stamp = lm::fileStamp(path);
 	UniMemFile file;
 	if (!file.OpenReadOnly(path.toStdString()))
 	{
@@ -650,6 +662,7 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 
 	Side &s = m_sides[side];
 	s.path = path;
+	s.stamp = stamp;
 	s.unicoding = file.GetUnicoding();
 	s.codepage = file.GetCodepage();
 	s.bom = file.HasBom();
@@ -1566,6 +1579,18 @@ int FileCompareView::firstVisibleViewLine() const
 	return m_panes[0]->firstVisibleLine();
 }
 
+int FileCompareView::cursorViewLineForTest(int side) const
+{
+	return m_panes[side]->textCursor().blockNumber();
+}
+
+void FileCompareView::setCursorViewLineForTest(int side, int viewLine)
+{
+	m_activePane = side;
+	m_panes[side]->setTextCursor(QTextCursor(
+		m_panes[side]->document()->findBlockByNumber(viewLine)));
+}
+
 void FileCompareView::selectAllAndCopyForTest(int side)
 {
 	m_panes[side]->selectAll();
@@ -1791,8 +1816,85 @@ void FileCompareView::gotoPrevDiff()
 
 void FileCompareView::refreshByUser()
 {
+	// WinMerge's Rescan starts with CheckFileChanged; a Yes there has
+	// reloaded the files by the time the comparison runs
+	emit aboutToRescan();
 	recompare();
 	emit rescanned();
+}
+
+QString FileCompareView::changedPathOnDisk() const
+{
+	for (int side = 0; side < m_paneCount; ++side)
+		if (lm::fileChangedOnDisk(m_sides[side].path, m_sides[side].stamp)
+			== lm::FileChange::Changed)
+			return m_sides[side].path;
+	return QString();
+}
+
+bool FileCompareView::reload(QString *error)
+{
+	// refuse before touching anything: a pane already replaced could not
+	// be put back (WinMerge closes the comparison at this point instead)
+	for (int side = 0; side < m_paneCount; ++side)
+		if (!m_sides[side].path.isEmpty() && !canLoad(m_sides[side].path, error))
+			return false;
+
+	const bool wasModified = isModified();
+	// MoveOnLoad(nActivePane, pt.y): back to the cursor's line afterwards
+	const int cursorLine = m_panes[m_activePane]->textCursor().blockNumber();
+	bool loaded = true;
+	for (int side = 0; side < m_paneCount && loaded; ++side)
+	{
+		Side &s = m_sides[side];
+		if (!s.path.isEmpty())
+		{
+			loaded = loadSide(side, s.path, error);
+			continue;
+		}
+		// an untitled pane starts over empty, like upstream's InitNew
+		m_syncing = true;
+		m_panes[side]->setPlainText(QString());
+		m_panes[side]->document()->setModified(false);
+		m_syncing = false;
+		s.modified = false;
+		updateHeader(side);
+		updatePaneStatus(side);
+	}
+
+	// a file that went away between the check and the load leaves the
+	// panes loaded so far: compare what is there either way
+	QString diffError;
+	const bool compared = runDiff(&diffError);
+	m_current = -1;
+	applyHighlights();
+	updateStatus();
+	updateHeaderStyles();
+	// like opening, nothing of the reload is undoable
+	resetUndoHistory();
+	if (m_actSave != nullptr)
+		m_actSave->setEnabled(isModified());
+	if (wasModified != isModified())
+		emit modifiedChanged(isModified());
+
+	// deferred one cycle so the reloaded documents are laid out
+	QTimer::singleShot(0, this, [this, cursorLine]() {
+		for (int side = 0; side < m_paneCount; ++side)
+		{
+			QTextDocument *doc = m_panes[side]->document();
+			const QTextBlock block = doc->findBlockByNumber(
+				qBound(0, cursorLine, doc->blockCount() - 1));
+			m_syncing = true;
+			m_panes[side]->setTextCursor(QTextCursor(block));
+			if (block.layout() != nullptr && block.layout()->lineCount() > 0)
+				m_panes[side]->centerCursor();
+			m_syncing = false;
+		}
+	});
+
+	if (loaded && !compared && error != nullptr)
+		*error = diffError;
+	return loaded && compared;
 }
 
 void FileCompareView::recompare()
@@ -2437,9 +2539,10 @@ bool FileCompareView::saveModified(QString *error)
 	{
 		if (!m_sides[side].modified)
 			continue;
-		if (!saveSide(side, error))
+		const SaveResult result = saveSide(side, error);
+		if (result == SaveResult::Failed)
 			return false;
-		savedAny = true;
+		savedAny = savedAny || result == SaveResult::Saved;
 	}
 	if (savedAny)
 	{
@@ -2474,17 +2577,29 @@ bool FileCompareView::saveSideAt(int side, QString *error)
 {
 	if (side < 0 || side >= m_paneCount)
 		return false;
-	if (!saveSide(side, error))
+	const SaveResult result = saveSide(side, error);
+	if (result == SaveResult::Failed)
 		return false;
+	// declining to overwrite is no failure: the caller goes on, as after
+	// WinMerge's DoSave
+	if (result == SaveResult::Declined)
+		return true;
 	if (m_diffStale)
 		recompare();
 	emit fileSaved(paths(), m_diffCount);
 	return true;
 }
 
-bool FileCompareView::saveSide(int side, QString *error)
+FileCompareView::SaveResult FileCompareView::saveSide(int side, QString *error)
 {
 	Side &s = m_sides[side];
+
+	// WinMerge's DoSave: writing over a file another application changed
+	// since it was loaded here asks first; No leaves the file and the
+	// pane's unsaved changes as they are
+	if (lm::fileChangedOnDisk(s.path, s.stamp) == lm::FileChange::Changed
+		&& !lm::askOverwriteChangedFile(this, s.path))
+		return SaveResult::Declined;
 
 	// untitled panes (File > New) ask for a name on first save
 	if (s.path.isEmpty())
@@ -2495,7 +2610,7 @@ bool FileCompareView::saveSide(int side, QString *error)
 		{
 			if (error != nullptr)
 				*error = tr("save canceled");
-			return false;
+			return SaveResult::Failed;
 		}
 		s.path = chosen;
 		s.caption.clear();
@@ -2519,7 +2634,7 @@ bool FileCompareView::saveSide(int side, QString *error)
 			if (error != nullptr)
 				*error = tr("could not create the backup file %1")
 					.arg(backupPath);
-			return false;
+			return SaveResult::Failed;
 		}
 	}
 
@@ -2528,7 +2643,7 @@ bool FileCompareView::saveSide(int side, QString *error)
 	{
 		if (error != nullptr)
 			*error = tr("cannot write %1").arg(s.path);
-		return false;
+		return SaveResult::Failed;
 	}
 	file.SetUnicoding(static_cast<ucr::UNICODESET>(s.unicoding));
 	file.SetCodepage(s.codepage);
@@ -2546,11 +2661,13 @@ bool FileCompareView::saveSide(int side, QString *error)
 	}
 	file.Close();
 	lm::restoreFileTime(s.path, originalTime);
+	// what is on disk now is this pane's content: no change to report
+	s.stamp = lm::fileStamp(s.path);
 	m_syncing = true;
 	m_panes[side]->document()->setModified(false);
 	m_syncing = false;
 	setSideModified(side, false);
-	return true;
+	return SaveResult::Saved;
 }
 
 void FileCompareView::syncScroll(int pane, int value)

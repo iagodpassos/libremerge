@@ -6,6 +6,8 @@
 #include <QWidget>
 #include <vector>
 
+#include "FileOps.h"
+
 class QAction;
 class QLabel;
 class QTableView;
@@ -53,8 +55,19 @@ public:
 	    followed by rescanned(): WinMerge's OnRefresh, which reports
 	    identical files. */
 	void refreshByUser();
+	/** WinMerge's OnFileReload, past its save prompt: both files are
+	    read from disk again, the undo history goes and the current row
+	    is selected again. Nothing is touched when a file cannot be
+	    read. */
+	bool reload(QString *error);
+	/** The first side's file that another application changed since it
+	    was loaded or saved here (CheckFileChanged); empty when none. */
+	QString changedPathOnDisk() const;
 
 signals:
+	/** A recompare asked for by the user is about to run: WinMerge's
+	    Rescan first checks the files for changes made elsewhere. */
+	void aboutToRescan();
 	void rescanned();
 	/** A successful save, with the compared paths and the current
 	    difference count (for folder-comparison row updates). */
@@ -82,6 +95,7 @@ private:
 		QString eol = QStringLiteral("\n");
 		bool hadFinalEol = true;
 		bool modified = false;
+		lm::FileStamp stamp;                  // the file as loaded or last saved
 		QStringList rawLines;                 // file content, one per row
 		std::vector<QStringList> cells;       // parsed per row
 	};

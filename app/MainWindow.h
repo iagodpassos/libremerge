@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
+#include <QElapsedTimer>
+#include <QHash>
 #include <QMainWindow>
 
+#include "FileOps.h"
+
+class QFileSystemWatcher;
 class QTabWidget;
+class QTimer;
 class FileCompareView;
 class FolderCompareView;
 
@@ -57,6 +64,20 @@ public:
 	    (used by tests; same as pressing Next after opening). */
 	void gotoFirstDifference();
 
+	/** WinMerge's File > Reload (OnFileReload) for the current
+	    comparison: unsaved changes are offered for saving, then the
+	    files are read from disk again. */
+	void reloadCurrentComparison();
+	/** The application was brought to the front (OnActivateApp): in the
+	    "Only on window activated" mode the current comparison is checked
+	    for files changed elsewhere. Public for tests. */
+	void applicationActivated();
+	/** The paths the "Immediately" mode watches (for tests). */
+	QStringList watchedPathsForTest() const;
+	/** What the save prompt answers instead of opening: 0 cancels, 1
+	    saves, 2 discards (for tests; an empty function shows it). */
+	static void setSavePromptForTest(std::function<int()> answer);
+
 protected:
 	void dragEnterEvent(QDragEnterEvent *event) override;
 	void dropEvent(QDropEvent *event) override;
@@ -74,8 +95,27 @@ private slots:
 
 private:
 	void handleEscape();
+	/** CMainFrame::OnUser1, posted: check the current comparison once
+	    the stack is clean and no dialog or menu is open. */
+	void scheduleFileCheck();
+	/** CMergeDoc::CheckFileChanged: a file of the comparison changed
+	    elsewhere since it was loaded? Ask, and reload on Yes. A check
+	    made by a Recompare leaves the identical files report to it. */
+	void checkFileChanged(QWidget *page, bool beforeRescan = false);
+	/** OnFileReload: false when the user cancelled or a file could not
+	    be read. */
+	bool reloadComparison(QWidget *page, bool reportIdentical = true);
+	/** PromptAndSaveIfNeeded: offer to save a comparison's unsaved
+	    changes before they are dropped; false when cancelled. */
+	bool promptAndSaveIfNeeded(QWidget *page, bool closing);
+	/** WatchDocuments: follow the "Immediately" mode's file watches to
+	    the open comparisons, and post a check when one of the watched
+	    files is not as the previous call saw it. */
+	void updateFileWatches();
 	/** Report identical files on opening, Recompare and saving. */
 	void watchIdentical(QWidget *page);
+	/** Hook a new comparison up to the file change checks. */
+	void watchFiles(QWidget *page);
 	void reportIfIdentical(QWidget *page, bool opening);
 	void attachFileView(FileCompareView *view);
 	/** Record a successful comparison in File > Recent Files or Folders. */
@@ -84,4 +124,10 @@ private:
 	void reopenComparison(const QStringList &paths);
 
 	QTabWidget *m_tabs;
+	QFileSystemWatcher *m_fileWatcher;
+	QTimer *m_watchTimer;     // gathers a burst of change notifications
+	QTimer *m_fileCheckTimer; // the posted check
+	bool m_checkingFiles = false;
+	QElapsedTimer m_lastFileQuestion; // since the reload question closed
+	QHash<QString, lm::FileStamp> m_watchedStamps; // as the watcher last saw them
 };

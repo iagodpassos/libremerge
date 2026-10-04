@@ -5,6 +5,8 @@
 #include <QStringList>
 #include <QWidget>
 
+#include "FileOps.h"
+
 class QAction;
 class QCheckBox;
 class QComboBox;
@@ -80,6 +82,13 @@ public:
 	    followed by rescanned(): WinMerge's OnRefresh, which reports
 	    identical files. */
 	void refreshByUser();
+	/** WinMerge's OnFileReload, past its save prompt: the images are
+	    read from disk again and the undo history goes. Nothing is
+	    touched when a file cannot be read. */
+	bool reload(QString *error);
+	/** The first pane's file that another application changed since it
+	    was loaded or saved here (CheckFileChanged); empty when none. */
+	QString changedPathOnDisk() const;
 	void zoomIn();
 	void zoomOut();
 	void zoomReset();
@@ -162,6 +171,7 @@ private:
 
 	std::unique_ptr<CImgMergeBuffer> m_buffer;
 	QString m_paths[3];
+	lm::FileStamp m_stamps[3]; // the files as loaded or last saved here
 	int m_paneCount = 2;
 	int m_activePane = 0;
 	double m_zoom = 1.0;

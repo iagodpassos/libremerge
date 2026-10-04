@@ -19,6 +19,7 @@
 
 #include "FileOps.h"
 #include "Icons.h"
+#include "MessageBoxes.h"
 #include "Theme.h"
 
 // engine
@@ -374,6 +375,8 @@ bool TableCompareView::compare(const QString &leftPath,
 
 bool TableCompareView::loadSide(int side, const QString &path, QString *error)
 {
+	// taken before the content: a change made while reading shows later
+	const lm::FileStamp stamp = lm::fileStamp(path);
 	UniMemFile file;
 	if (!file.OpenReadOnly(path.toStdString()))
 	{
@@ -385,6 +388,7 @@ bool TableCompareView::loadSide(int side, const QString &path, QString *error)
 
 	Side &s = m_sides[side];
 	s.path = path;
+	s.stamp = stamp;
 	s.unicoding = file.GetUnicoding();
 	s.codepage = file.GetCodepage();
 	s.bom = file.HasBom();
@@ -807,8 +811,51 @@ void TableCompareView::copyAllFrom(int sourceSide)
 
 void TableCompareView::refreshByUser()
 {
+	// WinMerge's Rescan starts with CheckFileChanged; a Yes there has
+	// reloaded the files by the time the comparison runs
+	emit aboutToRescan();
 	recompare();
 	emit rescanned();
+}
+
+QString TableCompareView::changedPathOnDisk() const
+{
+	for (const Side &s : m_sides)
+		if (lm::fileChangedOnDisk(s.path, s.stamp) == lm::FileChange::Changed)
+			return s.path;
+	return QString();
+}
+
+bool TableCompareView::reload(QString *error)
+{
+	// refuse before touching anything: a side already replaced could not
+	// be put back (WinMerge closes the comparison at this point instead)
+	for (const Side &s : m_sides)
+	{
+		if (!QFile(s.path).open(QIODevice::ReadOnly))
+		{
+			if (error != nullptr)
+				*error = tr("cannot open %1").arg(s.path);
+			return false;
+		}
+	}
+
+	const bool wasModified = isModified();
+	// MoveOnLoad(nActivePane, pt.y): back to the current row afterwards
+	const int activeSide = m_tables[1]->hasFocus() ? 1 : 0;
+	const int currentRow = m_tables[activeSide]->currentIndex().row();
+	const bool compared = compare(m_sides[0].path, m_sides[1].path, error);
+	m_actSave->setEnabled(isModified());
+	if (wasModified != isModified())
+		emit modifiedChanged(isModified());
+	if (compared && currentRow >= 0 && m_models[activeSide]->rowCount() > 0)
+	{
+		const QModelIndex index = m_models[activeSide]->index(
+			qMin(currentRow, m_models[activeSide]->rowCount() - 1), 0);
+		m_tables[activeSide]->setCurrentIndex(index);
+		m_tables[activeSide]->scrollTo(index, QAbstractItemView::PositionAtCenter);
+	}
+	return compared;
 }
 
 void TableCompareView::recompare()
@@ -857,10 +904,18 @@ void TableCompareView::setSideDescription(int side, const QString &description)
 
 bool TableCompareView::saveModified(QString *error)
 {
+	bool savedAny = false;
 	for (int side = 0; side < 2; ++side)
 	{
 		Side &s = m_sides[side];
 		if (!s.modified)
+			continue;
+
+		// WinMerge's DoSave: writing over a file another application
+		// changed since it was loaded here asks first; No leaves the file
+		// and this side's unsaved changes as they are
+		if (lm::fileChangedOnDisk(s.path, s.stamp) == lm::FileChange::Changed
+			&& !lm::askOverwriteChangedFile(this, s.path))
 			continue;
 
 		const QDateTime originalTime = lm::timeToPreserve(s.path);
@@ -898,9 +953,13 @@ bool TableCompareView::saveModified(QString *error)
 		}
 		file.Close();
 		lm::restoreFileTime(s.path, originalTime);
+		// what is on disk now is this side's content: no change to report
+		s.stamp = lm::fileStamp(s.path);
 		setSideModified(side, false);
 		++m_saveSerial[side]; // older snapshots no longer match the disk
+		savedAny = true;
 	}
-	emit fileSaved(paths(), m_diffCount);
+	if (savedAny)
+		emit fileSaved(paths(), m_diffCount);
 	return true;
 }

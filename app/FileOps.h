@@ -19,4 +19,30 @@ QDateTime timeToPreserve(const QString &path);
     timeToPreserve; an invalid time leaves the file alone. */
 void restoreFileTime(const QString &path, const QDateTime &time);
 
+/** A file's modification time and size as a comparison found them when
+    it loaded or last saved the file (WinMerge's DiffFileInfo, kept in
+    m_pRescanFileInfo and m_pSaveFileInfo). */
+struct FileStamp
+{
+	QDateTime modified;
+	qint64 size = -1;
+
+	bool operator==(const FileStamp &other) const
+	{
+		return modified == other.modified && size == other.size;
+	}
+	bool operator!=(const FileStamp &other) const { return !(*this == other); }
+};
+FileStamp fileStamp(const QString &path);
+
+enum class FileChange
+{
+	NoChange,
+	Changed, ///< another time or size than the stamp's
+	Removed, ///< no such file (an untitled pane's empty path included)
+};
+/** WinMerge's IsFileChangedOnDisk: what happened to a file since its
+    stamp was taken. */
+FileChange fileChangedOnDisk(const QString &path, const FileStamp &stamp);
+
 } // namespace lm

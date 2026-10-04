@@ -11,6 +11,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QGroupBox>
+#include <QImageReader>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
@@ -567,6 +568,8 @@ bool ImageCompareView::compare(const QStringList &paths, QString *error)
 	for (int i = 0; i < m_paneCount; ++i)
 	{
 		m_paths[i] = paths.at(i);
+		// taken before the content: a change made while reading shows later
+		m_stamps[i] = lm::fileStamp(paths.at(i));
 		names[i] = paths.at(i).toStdWString();
 		files[i] = names[i].c_str();
 	}
@@ -670,6 +673,8 @@ bool ImageCompareView::savePane(int pane, QString *error)
 			*error = tr("Could not save %1").arg(target);
 		return false;
 	}
+	// what is on disk now is this pane's image: no change to report
+	m_stamps[pane] = lm::fileStamp(target);
 	if (target != m_paths[pane])
 	{
 		m_paths[pane] = target;
@@ -791,16 +796,50 @@ void ImageCompareView::refreshByUser()
 
 void ImageCompareView::recompare()
 {
-	if (!isModified())
-	{
-		// reload from disk (WinMerge's Ctrl+F5 semantics)
-		const std::wstring l = m_paths[0].toStdWString();
-		const std::wstring r = m_paths[1].toStdWString();
-		const wchar_t *files[3] = { l.c_str(), r.c_str(), nullptr };
-		m_buffer->OpenImages(2, files);
-	}
+	// the loaded images are compared again; reading the files anew is
+	// reload(), as WinMerge keeps OnRefresh and OnFileReload apart
 	m_buffer->CompareImages();
 	afterBufferChange();
+}
+
+QString ImageCompareView::changedPathOnDisk() const
+{
+	for (int i = 0; i < m_paneCount; ++i)
+		if (lm::fileChangedOnDisk(m_paths[i], m_stamps[i]) == lm::FileChange::Changed)
+			return m_paths[i];
+	return QString();
+}
+
+bool ImageCompareView::reload(QString *error)
+{
+	// refuse before touching anything: reopening drops the loaded images
+	// (WinMerge reopens regardless and shows what it could read)
+	for (int i = 0; i < m_paneCount; ++i)
+	{
+		if (!QImageReader(m_paths[i]).canRead())
+		{
+			if (error != nullptr)
+				*error = tr("Could not open the files as images.");
+			return false;
+		}
+	}
+
+	cancelSelection();
+	std::wstring names[3];
+	const wchar_t *files[3] = { nullptr, nullptr, nullptr };
+	for (int i = 0; i < m_paneCount; ++i)
+	{
+		m_stamps[i] = lm::fileStamp(m_paths[i]);
+		names[i] = m_paths[i].toStdWString();
+		files[i] = names[i].c_str();
+	}
+	// read-only panes, the diff settings and the active pane all stay
+	const bool opened = m_buffer->OpenImages(m_paneCount, files);
+	m_buffer->CompareImages();
+	afterBufferChange();
+	if (!opened && error != nullptr)
+		*error = tr("Could not open the files as images.");
+	return opened;
 }
 
 void ImageCompareView::zoomIn() { setZoom(m_zoom + 0.1); }

@@ -26,6 +26,7 @@
 #include <QTableView>
 #include <QTabWidget>
 #include <QTreeWidget>
+#include <cstdio>
 #include <cstring>
 #include "DiffTextEdit.h"
 #include "ImagePane.h"
@@ -33,6 +34,7 @@
 #include <QTextBrowser>
 #include <QThread>
 #include <QThreadPool>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QTimer>
 #include <QTranslator>
@@ -175,6 +177,8 @@ int main(int argc, char *argv[])
 			// informational boxes (identical files...) would wait forever
 			// for a click in a headless run
 			lm::setMessageSinkForTest([](const QString &) {});
+			// and so would a question: none is expected, the answer is No
+			lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
 			break;
 		}
 	}
@@ -328,6 +332,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestIdenticalOpt(QStringLiteral("selftest-identical"),
 		QStringLiteral("Verify the identical files message, the self-compare and the Message Boxes page (for testing)"));
 	parser.addOption(selftestIdenticalOpt);
+	QCommandLineOption selftestReloadOpt(QStringLiteral("selftest-reload"),
+		QStringLiteral("Change compared files behind the comparison and verify the reload question, File > Reload and the auto-reload modes (for testing)"));
+	parser.addOption(selftestReloadOpt);
 	QCommandLineOption selftestThemeOpt(QStringLiteral("selftest-theme"),
 		QStringLiteral("Switch the theme from the Options dialog and verify the whole application follows (for testing)"));
 	parser.addOption(selftestThemeOpt);
@@ -849,6 +856,588 @@ int main(int argc, char *argv[])
 #endif
 	}
 
+	if (parser.isSet(selftestReloadOpt))
+	{
+		// WinMerge's file change checks (CheckFileChanged, OnFileReload and
+		// DoSave's overwrite question) under the three auto-reload modes;
+		// the test answers the questions and the save prompt
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 4; ++i)
+				QCoreApplication::processEvents();
+		};
+		// another application's write: new content with a later time, so
+		// the change shows whatever the sizes and the clock's resolution
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			const QDateTime before = QFileInfo(path).lastModified();
+			QFile f(path);
+			f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+			f.write(bytes);
+			if (before.isValid())
+				f.setFileTime(before.addSecs(3), QFileDevice::FileModificationTime);
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			f.open(QIODevice::ReadOnly);
+			return f.readAll();
+		};
+		const auto setMode = [](OptionsDialog::AutoReload mode)
+		{
+			QSettings().setValue(QStringLiteral("General/AutoReloadModifiedFiles"),
+				static_cast<int>(mode));
+		};
+		const auto reloadQuestion = [](const QString &path) {
+			return QCoreApplication::translate("MessageBoxes",
+				"Another application updated\n%1\nsince last scan.\n\nReload?").arg(path);
+		};
+		const auto overwriteQuestion = [](const QString &path) {
+			return QCoreApplication::translate("MessageBoxes",
+				"Another application updated\n%1\nsince LibreMerge loaded it.\n\nOverwrite?")
+				.arg(path);
+		};
+		QStringList asked;
+		bool answerYes = true;
+		bool dontAskAgain = false;
+		lm::setQuestionSinkForTest([&](const QString &text, bool *dontAsk) {
+			asked.append(text);
+			*dontAsk = dontAskAgain;
+			return answerYes;
+		});
+		QStringList shown;
+		lm::setMessageSinkForTest([&shown](const QString &text) { shown.append(text); });
+		int savePrompts = 0;
+		int saveChoice = 2; // 0 cancels, 1 saves, 2 discards
+		MainWindow::setSavePromptForTest([&]() { ++savePrompts; return saveChoice; });
+		lm::setCompareOptionsForTest(0);
+		const QString a = dir.filePath(QStringLiteral("a.txt"));
+		const QString b = dir.filePath(QStringLiteral("b.txt"));
+		const QStringList three = { QStringLiteral("one"), QStringLiteral("two"),
+			QStringLiteral("three") };
+		write(a, "one\ntwo\nthree\n");
+		write(b, "one\ntwo\nthree\n");
+
+		// IsFileChangedOnDisk
+		{
+			const lm::FileStamp stamp = lm::fileStamp(b);
+			bool fine = lm::fileChangedOnDisk(b, stamp) == lm::FileChange::NoChange;
+			{
+				QFile f(b);
+				f.open(QIODevice::Append);
+				f.setFileTime(stamp.modified.addSecs(-90), QFileDevice::FileModificationTime);
+			}
+			fine = fine && lm::fileChangedOnDisk(b, stamp) == lm::FileChange::Changed;
+			{
+				QFile f(b);
+				f.open(QIODevice::Append);
+				f.write("four\n");
+				f.setFileTime(stamp.modified, QFileDevice::FileModificationTime);
+			}
+			fine = fine && lm::fileChangedOnDisk(b, stamp) == lm::FileChange::Changed;
+			QFile::remove(b);
+			fine = fine && lm::fileChangedOnDisk(b, stamp) == lm::FileChange::Removed
+				&& lm::fileChangedOnDisk(QString(), lm::FileStamp()) == lm::FileChange::Removed;
+			check(fine, "file stamps: another time, another size, removal");
+			write(b, "one\ntwo\nthree\n");
+		}
+
+		// the option: WinMerge's default, on the General page
+		{
+			bool fine = OptionsDialog::autoReloadModifiedFiles()
+				== OptionsDialog::AutoReloadOnWindowActivated;
+			OptionsDialog dialog;
+			auto *combo = dialog.pageForTest(OptionsDialog::GeneralPage)
+				->findChild<QComboBox *>(QStringLiteral("autoReload"));
+			fine = fine && combo != nullptr && combo->count() == 3
+				&& combo->currentIndex() == 1;
+			if (combo != nullptr)
+			{
+				combo->setCurrentIndex(2);
+				dialog.saveForTest();
+				fine = fine && OptionsDialog::autoReloadModifiedFiles()
+					== OptionsDialog::AutoReloadImmediately;
+				dialog.selectCategoryForTest(0);
+				dialog.restoreDefaultsForTest();
+				fine = fine && combo->currentIndex() == 1;
+				dialog.saveForTest();
+			}
+			check(fine && OptionsDialog::autoReloadModifiedFiles()
+				== OptionsDialog::AutoReloadOnWindowActivated,
+				"Options > General: auto-reload, on window activated by default");
+		}
+
+		// "Only on window activated"
+		{
+			MainWindow window;
+			window.openFileComparison({ a, b });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			check(asked.isEmpty() && view->diffCount() == 0, "opening asks nothing");
+			write(b, "one\n2\nthree\nfour\n");
+			window.applicationActivated();
+			settle();
+			check(asked == QStringList{ reloadQuestion(b) }
+				&& view->realLinesForTest(1).size() == 4 && view->diffCount() > 0
+				&& !view->isModified(), "window activated: asked, and reloaded on Yes");
+			asked.clear();
+			window.applicationActivated();
+			settle();
+			check(asked.isEmpty(), "nothing left to ask after the reload");
+
+			// No keeps the comparison and asks again at the next trigger
+			answerYes = false;
+			write(b, "one\n2\n");
+			window.applicationActivated();
+			settle();
+			window.applicationActivated();
+			settle();
+			check(asked.size() >= 2 && view->realLinesForTest(1).size() == 4,
+				"No: nothing reloaded, asked again the next time");
+			answerYes = true;
+
+			// a file that went away is no change to ask about
+			QFile::remove(b);
+			asked.clear();
+			window.applicationActivated();
+			settle();
+			check(asked.isEmpty(), "a removed file asks nothing");
+			write(b, "one\ntwo\nthree\n");
+		}
+
+		// "Disabled" only silences the application coming to the front: a
+		// tab becoming current and Recompare still check (OnMDIActivate,
+		// Rescan)
+		setMode(OptionsDialog::AutoReloadDisabled);
+		{
+			MainWindow window;
+			window.openFileComparison({ a, b });
+			window.openFileComparison({ b, a });
+			settle();
+			auto *tabs = window.findChild<QTabWidget *>();
+			auto *view = qobject_cast<FileCompareView *>(tabs->widget(0));
+			if (view == nullptr)
+				return 2;
+			asked.clear();
+			answerYes = false;
+			write(a, "one\ntwo\n");
+			tabs->setCurrentIndex(1);
+			settle();
+			asked.clear(); // the second tab compares the same files
+			window.applicationActivated();
+			settle();
+			const bool silent = asked.isEmpty();
+			tabs->setCurrentIndex(0);
+			settle();
+			const bool onTab = asked == QStringList{ reloadQuestion(a) };
+			asked.clear();
+			view->refreshByUser();
+			settle();
+			check(silent && onTab && asked == QStringList{ reloadQuestion(a) },
+				"disabled: silent on activation, asks on tab switch and Recompare");
+			answerYes = true;
+			write(a, "one\ntwo\nthree\n");
+		}
+
+		// "Immediately": the files are watched
+		setMode(OptionsDialog::AutoReloadImmediately);
+		{
+			MainWindow window;
+			window.openFileComparison({ a, b });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			auto *tabs = window.findChild<QTabWidget *>();
+			if (view == nullptr)
+				return 2;
+			const QStringList watched = window.watchedPathsForTest();
+			check(watched.contains(a) && watched.contains(b)
+				&& watched.contains(dir.path()), "immediately: files and folder watched");
+			const auto waitForQuestion = [&asked]()
+			{
+				QElapsedTimer timer;
+				timer.start();
+				while (asked.isEmpty() && timer.elapsed() < 15000)
+					QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+			};
+			asked.clear();
+			write(b, "one\ntwo\nthree\nwatched\n");
+			waitForQuestion();
+			settle();
+			check(asked == QStringList{ reloadQuestion(b) }
+				&& view->realLinesForTest(1).size() == 4, "immediately: a change asks by itself");
+
+			// an editor that writes a new file over the old one
+			asked.clear();
+			const QString fresh = dir.filePath(QStringLiteral("b.new"));
+			write(fresh, "replaced\n");
+			std::rename(QFile::encodeName(fresh).constData(), QFile::encodeName(b).constData());
+			waitForQuestion();
+			settle();
+			check(asked == QStringList{ reloadQuestion(b) }
+				&& view->realLinesForTest(1) == QStringList{ QStringLiteral("replaced") }
+				&& window.watchedPathsForTest().contains(b),
+				"immediately: a replaced file asks too, and stays watched");
+
+			// a neighbor in the same folder is none of the comparison's
+			// business, even while a declined change is still pending
+			answerYes = false;
+			asked.clear();
+			write(b, "declined\n");
+			waitForQuestion();
+			settle();
+			const bool declined = asked.size() == 1;
+			asked.clear();
+			write(dir.filePath(QStringLiteral("neighbor.txt")), "noise\n");
+			QElapsedTimer quiet;
+			quiet.start();
+			while (quiet.elapsed() < 2000)
+				QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+			check(declined && asked.isEmpty(),
+				"immediately: a neighbor in the folder asks nothing");
+			answerYes = true;
+
+			emit tabs->tabCloseRequested(0);
+			settle();
+			check(tabs->count() == 0 && window.watchedPathsForTest().isEmpty(),
+				"closing the comparison drops its watches");
+			write(b, "one\ntwo\nthree\n");
+		}
+		setMode(OptionsDialog::AutoReloadOnWindowActivated);
+		{
+			MainWindow window;
+			window.openFileComparison({ a, b });
+			settle();
+			check(window.watchedPathsForTest().isEmpty(), "the other modes watch nothing");
+		}
+
+		// unsaved changes are offered for saving before a reload
+		// (PromptAndSaveIfNeeded)
+		write(b, "one\n2\nthree\n");
+		{
+			MainWindow window;
+			window.openFileComparison({ a, b });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			view->typeAtForTest(0, 0, QStringLiteral("edited "));
+			write(b, "one\n2\nthree\nfour\n");
+			asked.clear();
+			savePrompts = 0;
+			saveChoice = 0;
+			window.applicationActivated();
+			settle();
+			check(asked.size() == 1 && savePrompts == 1 && view->isModified()
+				&& view->realLinesForTest(1).size() == 3,
+				"unsaved changes: Cancel reloads nothing");
+			saveChoice = 1;
+			window.applicationActivated();
+			settle();
+			check(savePrompts == 2 && !view->isModified()
+				&& read(a).startsWith("edited one")
+				&& view->realLinesForTest(0).value(0) == QStringLiteral("edited one")
+				&& view->realLinesForTest(1).size() == 4,
+				"unsaved changes: Save writes them, then reloads");
+			view->typeAtForTest(0, 0, QStringLiteral("dropped "));
+			write(b, "one\n2\n");
+			saveChoice = 2;
+			window.applicationActivated();
+			settle();
+			check(!view->isModified()
+				&& view->realLinesForTest(0).value(0) == QStringLiteral("edited one")
+				&& view->realLinesForTest(1).size() == 2,
+				"unsaved changes: Discard drops them and reloads");
+			write(a, "one\ntwo\nthree\n");
+		}
+
+		// DoSave: writing over a file changed elsewhere asks first
+		write(b, "one\n2\nthree\n");
+		{
+			MainWindow window;
+			window.openFileComparison({ a, b });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			view->typeAtForTest(1, 0, QStringLiteral("mine "));
+			write(b, "theirs\n");
+			asked.clear();
+			answerYes = false;
+			QString error;
+			const bool carriedOn = view->saveModified(&error);
+			check(carriedOn && asked == QStringList{ overwriteQuestion(b) }
+				&& read(b) == "theirs\n" && view->isModified(),
+				"saving over a changed file: No leaves the file and the edits");
+			answerYes = true;
+			view->saveModified(&error);
+			check(asked.size() == 2 && read(b).startsWith("mine one") && !view->isModified(),
+				"saving over a changed file: Yes overwrites");
+			asked.clear();
+			view->typeAtForTest(1, 0, QStringLiteral("again "));
+			view->saveModified(&error);
+			settle();
+			check(asked.isEmpty() && read(b).startsWith("again mine one"),
+				"the next save asks nothing");
+		}
+
+		// "Don't ask this question again" keeps the answer
+		write(b, "one\ntwo\nthree\n");
+		{
+			MainWindow window;
+			window.openFileComparison({ a, b });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			const QString key = QStringLiteral("FileChangedRescan");
+			asked.clear();
+			dontAskAgain = true;
+			write(b, "one\n");
+			window.applicationActivated();
+			settle();
+			dontAskAgain = false;
+			const bool kept = lm::rememberedAnswer(key) == lm::AnswerYes;
+			write(b, "one\ntwo\n");
+			window.applicationActivated();
+			settle();
+			check(kept && asked.size() == 1 && view->realLinesForTest(1).size() == 2,
+				"don't ask again: Yes reloads silently from then on");
+
+			// Options > Message Boxes lists the question with its answer,
+			// which the drop-down turns into No
+			OptionsDialog dialog;
+			const auto rows = dialog.messageBoxesForTest();
+			bool fine = rows.size() == 3 && rows.at(2).second
+				&& dialog.messageBoxAnswerForTest(2) == lm::answerText(lm::AnswerYes)
+				&& dialog.messageBoxAnswerForTest(0).isEmpty();
+			dialog.setMessageBoxAnswerForTest(2, 1);
+			dialog.setMessageBoxHiddenForTest(0, true);
+			fine = fine && dialog.messageBoxAnswerForTest(0) == lm::answerText(lm::AnswerOk);
+			dialog.setMessageBoxHiddenForTest(0, false);
+			dialog.saveForTest();
+			fine = fine && lm::rememberedAnswer(key) == lm::AnswerNo;
+			write(b, "one\ntwo\nthree\nfour\n");
+			window.applicationActivated();
+			settle();
+			check(fine && asked.size() == 1 && view->realLinesForTest(1).size() == 2,
+				"Message Boxes: the kept answer, switched to No");
+			dialog.resetMessageBoxesForTest();
+			window.applicationActivated();
+			settle();
+			check(lm::rememberedAnswer(key) == lm::NoAnswer && asked.size() == 2
+				&& dialog.messageBoxAnswerForTest(2).isEmpty()
+				&& view->realLinesForTest(1).size() == 4, "Reset asks again");
+		}
+
+		// File > Reload (OnFileReload)
+		write(a, "l1\nl2\nl3\nl4\nl5\nl6\n");
+		write(b, "l1\nl2\nl3\nl4\nl5\nL6\n");
+		{
+			MainWindow window;
+			window.openFileComparison({ a, b }, { true, false });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			view->typeAtForTest(1, 0, QStringLiteral("typed "));
+			view->setCursorViewLineForTest(1, 4);
+			write(b, "l1\nl2\nl3\nl4\nl5\nL6\nl7\n");
+			asked.clear();
+			savePrompts = 0;
+			saveChoice = 2;
+			window.reloadCurrentComparison();
+			settle();
+			check(asked.isEmpty() && savePrompts == 1 && !view->isModified()
+				&& view->realLinesForTest(1).size() == 7
+				&& view->realLinesForTest(1).value(0) == QStringLiteral("l1")
+				&& view->cursorViewLineForTest(1) == 4 && view->isSideReadOnly(0)
+				&& !view->isSideReadOnly(1),
+				"Reload: save prompt, fresh content, same line, read-only kept");
+			view->undoActive();
+			check(view->realLinesForTest(1).size() == 7 && !view->isModified(),
+				"nothing to undo after a reload");
+
+			// a file that cannot be read: nothing is touched
+			QFile::remove(b);
+			QString error;
+			const bool reloaded = view->reload(&error);
+			check(!reloaded && error.contains(b) && view->realLinesForTest(1).size() == 7,
+				"a missing file refuses the reload and keeps the panes");
+			write(b, "one\ntwo\nthree\n");
+		}
+		{
+			MainWindow window;
+			window.openBlankComparison();
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			view->typeAtForTest(0, 0, QStringLiteral("scratch"));
+			saveChoice = 2;
+			window.reloadCurrentComparison();
+			settle();
+			check(!view->isModified()
+				&& view->realLinesForTest(0) == QStringList{ QString() },
+				"Reload empties an untitled pane");
+		}
+
+		// like opening, a reload reports identical files; Recompare's check
+		// leaves the report to the Recompare
+		write(a, "same\n");
+		write(b, "other\n");
+		{
+			const QString binaryMatch = QCoreApplication::translate("MessageBoxes",
+				"Selected files are identical (binary match).");
+			MainWindow window;
+			window.openFileComparison({ a, b });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			shown.clear();
+			asked.clear();
+			write(b, "same\n");
+			window.applicationActivated();
+			settle();
+			settle();
+			check(asked.size() == 1 && shown == QStringList{ binaryMatch },
+				"a reload that leaves the files identical says so");
+			write(b, "other again\n");
+			window.applicationActivated();
+			settle();
+			shown.clear();
+			write(b, "same\n");
+			view->refreshByUser();
+			settle();
+			settle();
+			check(shown == QStringList{ binaryMatch } && view->diffCount() == 0,
+				"Recompare: reloaded on Yes, one report");
+		}
+
+		// tables: the same checks, and the save prompt on closing
+		const QString t1 = dir.filePath(QStringLiteral("t1.csv"));
+		const QString t2 = dir.filePath(QStringLiteral("t2.csv"));
+		write(t1, "k,v\n1,a\n2,b\n");
+		write(t2, "k,v\n1,a\n2,b\n");
+		{
+			MainWindow window;
+			window.openFileComparison({ t1, t2 });
+			settle();
+			auto *table = window.findChild<TableCompareView *>();
+			auto *tabs = window.findChild<QTabWidget *>();
+			if (table == nullptr)
+				return 2;
+			asked.clear();
+			write(t2, "k,v\n1,a\n2,c\n3,d\n");
+			window.applicationActivated();
+			settle();
+			check(asked == QStringList{ reloadQuestion(t2) } && table->diffCount() > 0,
+				"table: asked and reloaded");
+			asked.clear();
+			answerYes = false;
+			write(t2, "k,v\n1,a\n");
+			table->refreshByUser();
+			settle();
+			const bool recompareAsks = asked == QStringList{ reloadQuestion(t2) };
+			// the right side now holds what the file no longer has
+			table->gotoFirstDiff();
+			table->copyCurrentDiff(0);
+			asked.clear();
+			QString error;
+			table->saveModified(&error);
+			check(recompareAsks && asked == QStringList{ overwriteQuestion(t2) }
+				&& read(t2) == "k,v\n1,a\n" && table->isModified(),
+				"table: Recompare checks, saving over a changed file asks");
+			savePrompts = 0;
+			saveChoice = 0;
+			emit tabs->tabCloseRequested(0);
+			settle();
+			const bool keptOpen = tabs->count() == 1 && savePrompts == 1;
+			saveChoice = 2;
+			window.reloadCurrentComparison();
+			settle();
+			check(keptOpen && savePrompts == 2 && !table->isModified()
+				&& table->paths() == QStringList({ t1, t2 }),
+				"table: closing and reloading offer to save first");
+			answerYes = true;
+		}
+
+		// images: checked on activation, not by Recompare (OnRefresh)
+		const QString p1 = dir.filePath(QStringLiteral("l.png"));
+		const QString p2 = dir.filePath(QStringLiteral("r.png"));
+		const QString p3 = dir.filePath(QStringLiteral("m.png"));
+		QImage picture(8, 8, QImage::Format_RGB32);
+		picture.fill(Qt::blue);
+		picture.save(p1);
+		picture.save(p2);
+		picture.save(p3);
+		const auto repaint = [&](const QString &path, Qt::GlobalColor color)
+		{
+			const QDateTime before = QFileInfo(path).lastModified();
+			picture.fill(color);
+			picture.save(path);
+			QFile f(path);
+			f.open(QIODevice::Append);
+			f.setFileTime(before.addSecs(3), QFileDevice::FileModificationTime);
+		};
+		{
+			MainWindow window;
+			window.openFileComparison({ p1, p2 });
+			settle();
+			auto *image = window.findChild<ImageCompareView *>();
+			if (image == nullptr)
+				return 2;
+			const bool identical = image->diffCount() == 0;
+			repaint(p2, Qt::red);
+			asked.clear();
+			image->refreshByUser();
+			settle();
+			const bool refreshSilent = asked.isEmpty() && image->diffCount() == 0;
+			window.applicationActivated();
+			settle();
+			check(identical && refreshSilent && asked == QStringList{ reloadQuestion(p2) }
+				&& image->diffCount() > 0, "image: Recompare keeps the loaded images, activation reloads");
+			image->copyAllToRight();
+			savePrompts = 0;
+			saveChoice = 2;
+			window.reloadCurrentComparison();
+			settle();
+			check(savePrompts == 1 && !image->isModified() && image->diffCount() > 0,
+				"image: Reload offers to save, then reads the files again");
+		}
+		{
+			// Recompare used to reopen the first two files only
+			MainWindow window;
+			window.openFileComparison({ p1, p3, p2 });
+			settle();
+			auto *image = window.findChild<ImageCompareView *>();
+			if (image == nullptr)
+				return 2;
+			image->refreshByUser();
+			window.reloadCurrentComparison();
+			settle();
+			check(image->paneCount() == 3 && image->paths().size() == 3
+				&& image->diffCount() > 0, "image: three panes stay three");
+		}
+
+		MainWindow::setSavePromptForTest({});
+		lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
+		lm::setMessageSinkForTest([](const QString &) {});
+		printf("reload: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
 	if (parser.isSet(selftestIdenticalOpt))
 	{
 		// WinMerge's ShowIdenticalMessage, DoSelfCompare and Message
@@ -1007,7 +1596,7 @@ int main(int argc, char *argv[])
 			const bool saved = lm::messageHidden(QStringLiteral("FilesSame"));
 			shown.clear();
 			dialog.resetMessageBoxesForTest();
-			check(rows.size() == 2 && !rows.at(0).second && saved
+			check(rows.size() == 3 && !rows.at(0).second && saved
 				&& !lm::messageHidden(QStringLiteral("FilesSame"))
 				&& !dialog.messageBoxesForTest().at(0).second,
 				"Message Boxes page: hide, save and reset");

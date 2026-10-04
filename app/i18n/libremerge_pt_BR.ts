@@ -747,6 +747,10 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>&amp;Salvar</translation>
     </message>
     <message>
+        <source>Reloa&amp;d</source>
+        <translation>Re&amp;carregar</translation>
+    </message>
+    <message>
         <source>&amp;Close Tab</source>
         <translation>&amp;Fechar Aba</translation>
     </message>
@@ -1053,6 +1057,20 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>&amp;Opções...</translation>
     </message>
     <message>
+        <source>Could not reload:
+%1</source>
+        <translation>Não foi possível recarregar:
+%1</translation>
+    </message>
+    <message>
+        <source>This comparison has unsaved changes. Save before reloading?</source>
+        <translation>Esta comparação tem alterações não salvas. Salvar antes de recarregar?</translation>
+    </message>
+    <message>
+        <source>This comparison has unsaved changes. Save the checked files before reloading?</source>
+        <translation>Esta comparação tem alterações não salvas. Salvar os arquivos marcados antes de recarregar?</translation>
+    </message>
+    <message>
         <source>cannot copy %1</source>
         <translation>não foi possível copiar %1</translation>
     </message>
@@ -1132,8 +1150,36 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>O mesmo arquivo está aberto em ambos os painéis.</translation>
     </message>
     <message>
+        <source>Another application updated
+%1
+since last scan.
+
+Reload?</source>
+        <translation>Outro aplicativo atualizou
+%1
+desde o último escaneamento.
+
+Recarregar?</translation>
+    </message>
+    <message>
+        <source>Another application updated
+%1
+since LibreMerge loaded it.
+
+Overwrite?</source>
+        <translation>Outro aplicativo atualizou
+%1
+desde que o LibreMerge o carregou.
+
+Sobrescrever?</translation>
+    </message>
+    <message>
         <source>Selected files are identical (binary match).</source>
         <translation>Os arquivos selecionados são idênticos (correspondência binária).</translation>
+    </message>
+    <message>
+        <source>Don&apos;t ask this question again.</source>
+        <translation>Não fazer essa pergunta novamente.</translation>
     </message>
     <message>
         <source>Selected files are identical (with current settings).
@@ -1150,6 +1196,18 @@ Mas a comparação binária falhou.</translation>
     <message>
         <source>Don&apos;t display this message again.</source>
         <translation>Não exibir essa mensagem novamente.</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Yes</source>
+        <translation>Sim</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Não</translation>
     </message>
     <message>
         <source>Selected files are identical (with current settings).
@@ -1364,6 +1422,18 @@ Checando identidade binária...</translation>
         <translation>Preenchimento automático da tela &quot;Selecionar Arquivos ou Pastas&quot;:</translation>
     </message>
     <message>
+        <source>Only on window activated</source>
+        <translation>Apenas na janela ativada</translation>
+    </message>
+    <message>
+        <source>Immediately</source>
+        <translation>Imediatamente</translation>
+    </message>
+    <message>
+        <source>Auto-reload modified files:</source>
+        <translation>Recarregar automaticamente os arquivos modificados:</translation>
+    </message>
+    <message>
         <source>Light</source>
         <translation>Claro</translation>
     </message>
@@ -1394,10 +1464,6 @@ Checando identidade binária...</translation>
     <message>
         <source>Answer</source>
         <translation>Resposta</translation>
-    </message>
-    <message>
-        <source>OK</source>
-        <translation>OK</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

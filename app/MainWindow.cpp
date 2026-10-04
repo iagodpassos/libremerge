@@ -16,6 +16,7 @@
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -82,6 +83,25 @@ void disableMenuRoleHeuristics(QWidget *menuContainer)
 	}
 }
 
+/** The files a file, table or image comparison shows (none for the
+    other pages). */
+QStringList comparedPaths(QWidget *page)
+{
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+		return file->paths();
+	if (auto *table = qobject_cast<TableCompareView *>(page))
+		return table->paths();
+	if (auto *image = qobject_cast<ImageCompareView *>(page))
+		return image->paths();
+	return {};
+}
+
+std::function<int()> &savePromptForTest()
+{
+	static std::function<int()> answer;
+	return answer;
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
@@ -97,6 +117,46 @@ MainWindow::MainWindow(QWidget *parent)
 	m_tabs->setDocumentMode(true);
 	connect(m_tabs, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
 	setCentralWidget(m_tabs);
+
+	// WinMerge's checks for files another application changed
+	// (CMainFrame::OnUser1). A comparison that becomes the current tab is
+	// always checked (OnMDIActivate); OPT_AUTO_RELOAD_MODIFIED_FILES adds
+	// the application coming to the front, or every change as the
+	// watcher reports it
+	m_fileCheckTimer = new QTimer(this);
+	m_fileCheckTimer->setSingleShot(true);
+	connect(m_fileCheckTimer, &QTimer::timeout, this, [this]() {
+		// never on top of another dialog or an open menu: wait for it
+		if (m_checkingFiles || QApplication::activeModalWidget() != nullptr
+			|| QApplication::activePopupWidget() != nullptr)
+		{
+			m_fileCheckTimer->start(250);
+			return;
+		}
+		checkFileChanged(m_tabs->currentWidget());
+	});
+	connect(m_tabs, &QTabWidget::currentChanged, this,
+		[this]() { scheduleFileCheck(); });
+	connect(qApp, &QGuiApplication::applicationStateChanged, this,
+		[this](Qt::ApplicationState state) {
+			// the question itself coming and going can look like the
+			// application being left and returned to; counting that
+			// would ask again in a loop after a No
+			const bool ownDialog = m_checkingFiles
+				|| (m_lastFileQuestion.isValid() && m_lastFileQuestion.elapsed() < 1000);
+			if (state == Qt::ApplicationActive && !ownDialog)
+				applicationActivated();
+		});
+	m_fileWatcher = new QFileSystemWatcher(this);
+	m_watchTimer = new QTimer(this);
+	m_watchTimer->setSingleShot(true);
+	m_watchTimer->setInterval(300); // one save comes as several notifications
+	connect(m_fileWatcher, &QFileSystemWatcher::fileChanged, m_watchTimer,
+		qOverload<>(&QTimer::start));
+	connect(m_fileWatcher, &QFileSystemWatcher::directoryChanged, m_watchTimer,
+		qOverload<>(&QTimer::start));
+	connect(m_watchTimer, &QTimer::timeout, this,
+		[this]() { updateFileWatches(); });
 
 	// shortcuts live here (window scope) and route to the current tab
 	auto fileView = [this]() {
@@ -181,6 +241,15 @@ MainWindow::MainWindow(QWidget *parent)
 			else if (auto *image = imageView())
 				image->saveModified(&error);
 		});
+	// WinMerge's File > Reload (Ctrl+F5). With the Command key that is
+	// macOS's VoiceOver switch, so Reload takes the platform's own Cmd+R
+#ifdef Q_OS_MACOS
+	const QKeySequence reloadShortcut(Qt::CTRL | Qt::Key_R);
+#else
+	const QKeySequence reloadShortcut(Qt::CTRL | Qt::Key_F5);
+#endif
+	addMenuAction(fileMenu, tr("Reloa&d"), reloadShortcut,
+		[this]() { reloadCurrentComparison(); });
 	addMenuAction(fileMenu, tr("&Close Tab"), QKeySequence::Close,
 		[this]() { closeTab(m_tabs->currentIndex()); });
 	fileMenu->addSeparator();
@@ -690,6 +759,7 @@ void MainWindow::openTableComparison(const QString &leftPath,
 	if (OptionsDialog::scrollToFirstDiff())
 		QTimer::singleShot(0, view, [view]() { view->gotoFirstDiff(); });
 	watchIdentical(view);
+	watchFiles(view);
 }
 
 void MainWindow::openImageComparison(const QStringList &paths,
@@ -730,6 +800,7 @@ void MainWindow::openImageComparison(const QStringList &paths,
 	if (OptionsDialog::scrollToFirstDiff())
 		QTimer::singleShot(0, view, [view]() { view->gotoFirstDiff(); });
 	watchIdentical(view);
+	watchFiles(view);
 }
 
 void MainWindow::openBlankComparison()
@@ -773,6 +844,7 @@ void MainWindow::attachFileView(FileCompareView *view)
 		});
 	}
 	watchIdentical(view);
+	watchFiles(view);
 }
 
 /** WinMerge's identical files message: on opening (OpenDocs), on
@@ -835,6 +907,285 @@ void MainWindow::reportIfIdentical(QWidget *page, bool opening)
 		return;
 	lm::showIdenticalMessage(this, paths,
 		std::none_of(paths.cbegin(), paths.cend(), empty) && !modified);
+}
+
+/** Recompare checks the files first, like WinMerge's Rescan for text and
+    tables (its image Refresh does not), and the watches of the
+    "Immediately" mode follow the comparison's paths. */
+void MainWindow::watchFiles(QWidget *page)
+{
+	const auto pathsChanged = [this]() { updateFileWatches(); };
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+	{
+		connect(file, &FileCompareView::aboutToRescan, this,
+			[this, file]() { checkFileChanged(file, true); });
+		connect(file, &FileCompareView::pathsChanged, this, pathsChanged);
+	}
+	else if (auto *table = qobject_cast<TableCompareView *>(page))
+	{
+		connect(table, &TableCompareView::aboutToRescan, this,
+			[this, table]() { checkFileChanged(table, true); });
+		connect(table, &TableCompareView::pathsChanged, this, pathsChanged);
+	}
+	else if (auto *image = qobject_cast<ImageCompareView *>(page))
+	{
+		connect(image, &ImageCompareView::pathsChanged, this, pathsChanged);
+	}
+	updateFileWatches();
+}
+
+void MainWindow::applicationActivated()
+{
+	if (OptionsDialog::autoReloadModifiedFiles()
+		== OptionsDialog::AutoReloadOnWindowActivated)
+		scheduleFileCheck();
+}
+
+void MainWindow::scheduleFileCheck()
+{
+	if (!m_fileCheckTimer->isActive())
+		m_fileCheckTimer->start(0);
+}
+
+void MainWindow::checkFileChanged(QWidget *page, bool beforeRescan)
+{
+	if (m_checkingFiles)
+		return;
+	QString path;
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+		path = file->changedPathOnDisk();
+	else if (auto *table = qobject_cast<TableCompareView *>(page))
+		path = table->changedPathOnDisk();
+	else if (auto *image = qobject_cast<ImageCompareView *>(page))
+		path = image->changedPathOnDisk();
+	if (path.isEmpty())
+		return;
+	// one question at a time: the triggers keep coming while it is open.
+	// Like WinMerge's, it names the first changed file and a Yes reloads
+	// the whole comparison; a No asks again at the next trigger
+	m_checkingFiles = true;
+	const QPointer<QWidget> guard(page);
+	if (lm::askReloadChangedFile(this, path) && guard)
+		reloadComparison(guard, !beforeRescan);
+	m_checkingFiles = false;
+	// the answer covers every trigger that came in meanwhile
+	m_fileCheckTimer->stop();
+	m_lastFileQuestion.start();
+}
+
+void MainWindow::reloadCurrentComparison()
+{
+	reloadComparison(m_tabs->currentWidget());
+}
+
+bool MainWindow::reloadComparison(QWidget *page, bool reportIdentical)
+{
+	auto *file = qobject_cast<FileCompareView *>(page);
+	auto *table = qobject_cast<TableCompareView *>(page);
+	auto *image = qobject_cast<ImageCompareView *>(page);
+	if (file == nullptr && table == nullptr && image == nullptr)
+		return false;
+	if (!promptAndSaveIfNeeded(page, false))
+		return false;
+	QString error;
+	const bool reloaded = file != nullptr ? file->reload(&error)
+		: table != nullptr ? table->reload(&error) : image->reload(&error);
+	if (!reloaded)
+	{
+		lm::warning(this, tr("LibreMerge"), tr("Could not reload:\n%1").arg(error));
+		return false;
+	}
+	// like opening (OpenDocs), a reload tells when the files are identical
+	if (reportIdentical)
+	{
+		QTimer::singleShot(0, this, [this, guard = QPointer<QWidget>(page)]() {
+			if (guard)
+				reportIfIdentical(guard, true);
+		});
+	}
+	return true;
+}
+
+bool MainWindow::promptAndSaveIfNeeded(QWidget *page, bool closing)
+{
+	auto *view = qobject_cast<FileCompareView *>(page);
+	auto *table = qobject_cast<TableCompareView *>(page);
+	auto *image = qobject_cast<ImageCompareView *>(page);
+	const bool modified = (view != nullptr && view->isModified())
+		|| (table != nullptr && table->isModified())
+		|| (image != nullptr && image->isModified());
+	if (!modified)
+		return true;
+
+	enum { Cancel, Save, Discard };
+	if (view == nullptr)
+	{
+		// tables and images are saved as a whole
+		int choice = Cancel;
+		if (savePromptForTest())
+		{
+			choice = savePromptForTest()();
+		}
+		else
+		{
+			const auto answer = lm::question(this, tr("Save Changes"),
+				closing
+					? tr("This comparison has unsaved changes. Save before closing?")
+					: tr("This comparison has unsaved changes. Save before reloading?"),
+				QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+			choice = answer == QMessageBox::Save ? Save
+				: answer == QMessageBox::Discard ? Discard : Cancel;
+		}
+		if (choice == Cancel)
+			return false;
+		if (choice == Save)
+		{
+			QString error;
+			const bool saved = table != nullptr ? table->saveModified(&error)
+				: image->saveModified(&error);
+			if (!saved)
+			{
+				lm::warning(this, tr("LibreMerge"),
+					tr("Could not save:\n%1").arg(error));
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// like WinMerge's Save Modified Files dialog: list each modified side
+	// and let the user pick what gets saved
+	const QList<int> sides = view->modifiedSideIndexes();
+	QList<int> sidesToSave;
+	if (savePromptForTest())
+	{
+		const int choice = savePromptForTest()();
+		if (choice == Cancel)
+			return false;
+		if (choice == Save)
+			sidesToSave = sides;
+	}
+	else
+	{
+		QDialog dialog(this);
+		dialog.setWindowModality(Qt::WindowModal);
+		dialog.setWindowTitle(tr("Save Changes"));
+		auto *layout = new QVBoxLayout(&dialog);
+		auto *label = new QLabel(closing
+			? tr("This comparison has unsaved changes. Save the checked "
+				"files before closing?")
+			: tr("This comparison has unsaved changes. Save the checked "
+				"files before reloading?"), &dialog);
+		label->setWordWrap(true);
+		layout->addWidget(label);
+		QList<QCheckBox *> boxes;
+		for (const int side : sides)
+		{
+			auto *box = new QCheckBox(view->sideLabel(side), &dialog);
+			box->setChecked(true);
+			layout->addWidget(box);
+			boxes.append(box);
+		}
+		auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save
+			| QDialogButtonBox::Discard | QDialogButtonBox::Cancel, &dialog);
+		connect(buttons, &QDialogButtonBox::clicked, &dialog,
+			[&dialog, buttons](QAbstractButton *button) {
+				switch (buttons->standardButton(button))
+				{
+				case QDialogButtonBox::Save: dialog.done(Save); break;
+				case QDialogButtonBox::Discard: dialog.done(Discard); break;
+				default: dialog.reject(); break;
+				}
+			});
+		layout->addWidget(buttons);
+
+		const int choice = dialog.exec();
+		if (choice == Cancel)
+			return false;
+		if (choice == Save)
+			for (int k = 0; k < sides.size(); ++k)
+				if (boxes.at(k)->isChecked())
+					sidesToSave.append(sides.at(k));
+	}
+	for (const int side : sidesToSave)
+	{
+		QString error;
+		if (!view->saveSideAt(side, &error))
+		{
+			lm::warning(this, tr("LibreMerge"),
+				tr("Could not save:\n%1").arg(error));
+			return false;
+		}
+	}
+	return true;
+}
+
+void MainWindow::updateFileWatches()
+{
+	// only the "Immediately" mode watches; a file is watched through its
+	// folder too, which tells when it comes back after being replaced or
+	// deleted (WinMerge's DirWatcher listens on the folder). A file that
+	// was replaced lost its own watch: this puts it back
+	QStringList files;
+	QStringList wanted;
+	if (OptionsDialog::autoReloadModifiedFiles() == OptionsDialog::AutoReloadImmediately)
+	{
+		for (int i = 0; i < m_tabs->count(); ++i)
+		{
+			const QStringList paths = comparedPaths(m_tabs->widget(i));
+			for (const QString &path : paths)
+			{
+				if (path.isEmpty() || files.contains(path))
+					continue;
+				files.append(path);
+				const QFileInfo info(path);
+				if (info.exists())
+					wanted.append(path);
+				const QString folder = info.absolutePath();
+				if (QFileInfo(folder).isDir() && !wanted.contains(folder))
+					wanted.append(folder);
+			}
+		}
+	}
+	const QStringList watched = m_fileWatcher->files() + m_fileWatcher->directories();
+	QStringList stale;
+	for (const QString &path : watched)
+		if (!wanted.contains(path))
+			stale.append(path);
+	if (!stale.isEmpty())
+		m_fileWatcher->removePaths(stale);
+	QStringList added;
+	for (const QString &path : std::as_const(wanted))
+		if (!watched.contains(path))
+			added.append(path);
+	if (!added.isEmpty())
+		m_fileWatcher->addPaths(added);
+
+	// only a change to a compared file asks: the folder watch reports its
+	// neighbors too, which WinMerge's DirWatcher drops by name. A file new
+	// to the watch has nothing to compare against yet
+	bool changed = false;
+	QHash<QString, lm::FileStamp> seen;
+	for (const QString &path : std::as_const(files))
+	{
+		const lm::FileStamp stamp = lm::fileStamp(path);
+		const auto known = m_watchedStamps.constFind(path);
+		changed = changed || (known != m_watchedStamps.constEnd() && *known != stamp);
+		seen.insert(path, stamp);
+	}
+	m_watchedStamps = seen;
+	if (changed)
+		scheduleFileCheck();
+}
+
+QStringList MainWindow::watchedPathsForTest() const
+{
+	return m_fileWatcher->files() + m_fileWatcher->directories();
+}
+
+void MainWindow::setSavePromptForTest(std::function<int()> answer)
+{
+	savePromptForTest() = std::move(answer);
 }
 
 /** WinMerge's DoSelfCompare: one file against a snapshot of itself taken
@@ -1047,6 +1398,8 @@ void MainWindow::showOptions()
 	// the WinMerge-style categorized options dialog (General, Compare)
 	OptionsDialog dialog(this);
 	dialog.exec();
+	// the auto-reload mode decides what is watched
+	updateFileWatches();
 }
 
 /** WinMerge's line filters: regular expressions whose matching lines
@@ -1383,79 +1736,9 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 void MainWindow::closeTab(int index)
 {
 	QWidget *page = m_tabs->widget(index);
-	if (auto *image = qobject_cast<ImageCompareView *>(page);
-		image != nullptr && image->isModified())
-	{
-		const auto choice = lm::question(this, tr("Save Changes"),
-			tr("This comparison has unsaved changes. Save before closing?"),
-			QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-		if (choice == QMessageBox::Cancel)
-			return;
-		if (choice == QMessageBox::Save)
-		{
-			QString error;
-			if (!image->saveModified(&error))
-			{
-				lm::warning(this, tr("LibreMerge"),
-					tr("Could not save:\n%1").arg(error));
-				return;
-			}
-		}
-	}
-	if (auto *view = qobject_cast<FileCompareView *>(page); view != nullptr && view->isModified())
-	{
-		// like WinMerge's closing dialog: list each modified side and
-		// let the user pick what gets saved
-		QDialog dialog(this);
-		dialog.setWindowModality(Qt::WindowModal);
-		dialog.setWindowTitle(tr("Save Changes"));
-		auto *layout = new QVBoxLayout(&dialog);
-		auto *label = new QLabel(
-			tr("This comparison has unsaved changes. Save the checked "
-			   "files before closing?"), &dialog);
-		label->setWordWrap(true);
-		layout->addWidget(label);
-		QList<QCheckBox *> boxes;
-		const QList<int> sides = view->modifiedSideIndexes();
-		for (const int side : sides)
-		{
-			auto *box = new QCheckBox(view->sideLabel(side), &dialog);
-			box->setChecked(true);
-			layout->addWidget(box);
-			boxes.append(box);
-		}
-		auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save
-			| QDialogButtonBox::Discard | QDialogButtonBox::Cancel, &dialog);
-		connect(buttons, &QDialogButtonBox::clicked, &dialog,
-			[&dialog, buttons](QAbstractButton *button) {
-				switch (buttons->standardButton(button))
-				{
-				case QDialogButtonBox::Save: dialog.done(1); break;
-				case QDialogButtonBox::Discard: dialog.done(2); break;
-				default: dialog.reject(); break;
-				}
-			});
-		layout->addWidget(buttons);
-
-		const int choice = dialog.exec();
-		if (choice == 0)
-			return; // cancelled
-		if (choice == 1)
-		{
-			for (int k = 0; k < sides.size(); ++k)
-			{
-				if (!boxes.at(k)->isChecked())
-					continue;
-				QString error;
-				if (!view->saveSideAt(sides.at(k), &error))
-				{
-					lm::warning(this, tr("LibreMerge"),
-						tr("Could not save:\n%1").arg(error));
-					return;
-				}
-			}
-		}
-	}
+	if (!promptAndSaveIfNeeded(page, true))
+		return;
 	m_tabs->removeTab(index);
 	delete page;
+	updateFileWatches();
 }
