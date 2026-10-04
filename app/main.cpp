@@ -61,6 +61,8 @@
 #include "MainWindow.h"
 #include "NewComparisonView.h"
 #include "EngineOptions.h"
+#include "ComparisonResultFilterDialog.h"
+#include "DisplayFilterBar.h"
 #include "FileFilterCombo.h"
 #include "FileFilterMenu.h"
 #include "FileFilters.h"
@@ -377,6 +379,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFilterMenuOpt(QStringLiteral("selftest-filter-menu"),
 		QStringLiteral("Verify the file filter helper menu, its Filter Condition dialog and that folder comparisons go by the conditions it makes (for testing)"));
 	parser.addOption(selftestFilterMenuOpt);
+	QCommandLineOption selftestDisplayFilterOpt(QStringLiteral("selftest-display-filter"),
+		QStringLiteral("Verify the folder window's display filter: its bar, what it hides in the tree and in the flat list, the columns' header menu and the Filter by Comparison Result dialog (for testing)"));
+	parser.addOption(selftestDisplayFilterOpt);
 	QCommandLineOption selftestThemeOpt(QStringLiteral("selftest-theme"),
 		QStringLiteral("Switch the theme from the Options dialog and verify the whole application follows (for testing)"));
 	parser.addOption(selftestThemeOpt);
@@ -3891,6 +3896,816 @@ int main(int argc, char *argv[])
 		}
 
 		printf("filter menu: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestDisplayFilterOpt))
+	{
+		// WinMerge's display filter of the folder window: the filter bar,
+		// what its filter hides in the tree and in the flat list without
+		// comparing again, the header menu's "Filter by This Column", the
+		// Filter by Comparison Result dialog, and the engine's items kept
+		// in step with copies, deletes and saves
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 3; ++i)
+				QCoreApplication::processEvents();
+			// a closed bar is deleted later
+			QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+		};
+		const auto waitFor = [](const FolderCompareView *view)
+		{
+			for (int i = 0; view != nullptr && i < 400 && view->isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+		};
+		using Menu = FileFilterMenu;
+		const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+		const QString language = qEnvironmentVariable("LIBREMERGE_LANGUAGE", QStringLiteral("en"));
+		const auto shoot = [&shots, &language](QWidget *widget, const char *name)
+		{
+			if (!shots.isEmpty())
+				widget->grab().save(QStringLiteral("%1/df-%2-%3.png").arg(shots, language,
+					QLatin1String(name)));
+		};
+
+		// --- two folders: files alike and not, in folders with and without
+		// folders of their own ---
+		const QString left = dir.filePath(QStringLiteral("left"));
+		const QString right = dir.filePath(QStringLiteral("right"));
+		const auto both = [&](const char *relative, const QByteArray &l, const QByteArray &r)
+		{
+			write(left + QLatin1Char('/') + QLatin1String(relative), l);
+			write(right + QLatin1Char('/') + QLatin1String(relative), r);
+		};
+		both("same.txt", "same\n", "same\n");
+		both("diff.txt", "one\n", "two\n");
+		both("big.txt", QByteArray(2000, 'a'), QByteArray(2000, 'b'));
+		both("note.md", "note\n", "note\n");
+		write(left + QStringLiteral("/onlyL.txt"), "left\n");
+		write(right + QStringLiteral("/onlyR.txt"), "right\n");
+		both("sub/subsame.txt", "s\n", "s\n");
+		both("sub/subdiff.md", "1\n", "2\n");
+		both("sub/deep/deepsame.txt", "d\n", "d\n");
+		both("build/out.txt", "o\n", "o\n");
+		both("lib/liba.txt", "a\n", "a\n");
+		both("lib/inner/innerb.txt", "b\n", "b\n");
+		const QStringList files{ QStringLiteral("same.txt"), QStringLiteral("diff.txt"),
+			QStringLiteral("big.txt"), QStringLiteral("note.md"), QStringLiteral("onlyL.txt"),
+			QStringLiteral("onlyR.txt"), QStringLiteral("subsame.txt"),
+			QStringLiteral("subdiff.md"), QStringLiteral("deepsame.txt"),
+			QStringLiteral("out.txt"), QStringLiteral("liba.txt"), QStringLiteral("innerb.txt") };
+		const QStringList folders{ QStringLiteral("sub"), QStringLiteral("deep"),
+			QStringLiteral("build"), QStringLiteral("lib"), QStringLiteral("inner") };
+		const QStringList every = files + folders;
+		const auto shownOf = [](const FolderCompareView &view, const QStringList &names) {
+			QStringList shown;
+			for (const QString &name : names)
+				if (view.rowShownForTest(name))
+					shown.append(name);
+			return shown;
+		};
+		const auto without = [](QStringList names, const QStringList &dropped) {
+			for (const QString &name : dropped)
+				names.removeAll(name);
+			return names;
+		};
+		const auto say = [](const char *what, const QStringList &names) {
+			printf("  %s: %s\n", what, qPrintable(names.join(QLatin1Char(' '))));
+		};
+		// type a filter in the bar and press Apply
+		const auto apply = [&settle](FolderCompareView &view, const QString &text)
+		{
+			view.showDisplayFilterBar();
+			DisplayFilterBar *bar = view.displayFilterBarForTest();
+			bar->field()->setEditText(text);
+			emit bar->field()->lineEdit()->textEdited(text); // as typed
+			bar->findChild<QPushButton *>(QStringLiteral("displayFilterApply"))->click();
+			settle();
+		};
+		const auto treeAction = [](FolderCompareView &view) -> QAction * {
+			for (QAction *action : view.findChildren<QAction *>())
+				if (action->text() == FolderCompareView::tr("Tree View"))
+					return action;
+			return nullptr;
+		};
+		const QString historyKey = lm::displayFilterHistoryKey();
+		const auto tinted = [](const FileFilterCombo *field, const char *light, const char *dark) {
+			const QString style = field->lineEdit()->styleSheet();
+			return style.contains(QLatin1String(light)) || style.contains(QLatin1String(dark));
+		};
+
+		{
+			FolderCompareView view;
+			view.resize(900, 520);
+			view.start(QStringList{ left, right });
+			waitFor(&view);
+			settle();
+			check(shownOf(view, every) == every && !view.displayFilterBarShown()
+				&& view.displayFilter().isEmpty() && view.hiddenRowsForTest() == 0,
+				"start: every item listed, no bar and no filter");
+
+			// --- the bar ---
+			view.toggleDisplayFilterBar();
+			DisplayFilterBar *bar = view.displayFilterBarForTest();
+			if (bar == nullptr)
+				return 1;
+			auto *applyButton = bar->findChild<QPushButton *>(QStringLiteral("displayFilterApply"));
+			auto *closeButton = bar->findChild<QPushButton *>(QStringLiteral("displayFilterClose"));
+			auto *menuButton = bar->findChild<QToolButton *>(QStringLiteral("displayFilterMaskMenu"));
+			if (applyButton == nullptr || closeButton == nullptr || menuButton == nullptr)
+				return 1;
+			check(view.displayFilterBarShown()
+				&& applyButton->text() == DisplayFilterBar::tr("&Apply")
+				&& closeButton->text() == DisplayFilterBar::tr("&Close")
+				&& menuButton->text() == QStringLiteral("=")
+				&& bar->field()->mask().isEmpty() && bar->field()->count() == 0
+				&& bar->field()->lineEdit()->placeholderText() == DisplayFilterBar::tr("e.g. %1")
+					.arg(QStringLiteral("*.txt|fe:Size > 100KB")),
+				"bar: the field, \"=\", Apply and Close, as upstream's");
+			view.toggleDisplayFilterBar();
+			settle();
+			check(!view.displayFilterBarShown()
+				&& view.findChild<DisplayFilterBar *>() == nullptr,
+				"bar: the View menu item shows it and closes it");
+			view.showDisplayFilterBar();
+			DisplayFilterBar *first = view.displayFilterBarForTest();
+			view.showDisplayFilterBar();
+			check(first != nullptr && view.displayFilterBarForTest() == first,
+				"bar: the shortcut shows it and never closes it");
+
+			// --- Apply: a mask ---
+			apply(view, QStringLiteral("*.txt"));
+			bar = view.displayFilterBarForTest();
+			FileFilterCombo *field = bar->field();
+			say("*.txt shows", shownOf(view, every));
+			check(view.displayFilter() == QStringLiteral("*.txt")
+				&& shownOf(view, every) == without(every, { QStringLiteral("note.md"),
+					QStringLiteral("subdiff.md") })
+				&& view.hiddenRowsForTest() == 2 && !view.isComparingForTest(),
+				"Apply: a mask hides the other items, with nothing compared again");
+			check(field->isApplied() && tinted(field, "#ffffdc", "#3c3c28")
+				&& field->mask() == QStringLiteral("*.txt")
+				&& lm::fileFilterHistory(historyKey) == QStringList{ QStringLiteral("*.txt") }
+				&& lm::fileFilterHistory().isEmpty(),
+				"Apply: the field marks its filter as applied and keeps a history of its own");
+
+			// what the user does to the text takes the mark away; a text
+			// put there from code does not
+			QKeyEvent letter(QEvent::KeyPress, Qt::Key_X, Qt::NoModifier, QStringLiteral("x"));
+			QCoreApplication::sendEvent(field->lineEdit(), &letter);
+			const bool typingClears = !field->isApplied() && !tinted(field, "#ffffdc", "#3c3c28");
+			apply(view, QStringLiteral("*.txt"));
+			field = view.displayFilterBarForTest()->field();
+			const bool appliedAgain = field->isApplied();
+			emit field->activated(0);
+			const bool pickingClears = !field->isApplied();
+			apply(view, QStringLiteral("*.txt"));
+			view.showDisplayFilterBar();
+			field = view.displayFilterBarForTest()->field();
+			check(typingClears && appliedAgain && pickingClears && field->isApplied()
+				&& view.displayFilter() == QStringLiteral("*.txt"),
+				"field: typing or picking from the list clears the mark, the shortcut does not");
+
+			// --- Enter applies, Esc closes; the filter stays in use ---
+			field->setEditText(QStringLiteral("*.md"));
+			QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+			QCoreApplication::sendEvent(field->lineEdit(), &enter);
+			settle();
+			const QStringList markdown = shownOf(view, every);
+			say("*.md shows", markdown);
+			QKeyEvent escape(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+			QCoreApplication::sendEvent(view.displayFilterBarForTest()->field()->lineEdit(), &escape);
+			settle();
+			check(markdown == QStringList{ QStringLiteral("note.md"), QStringLiteral("subdiff.md") }
+					+ folders
+				&& !view.displayFilterBarShown() && view.displayFilter() == QStringLiteral("*.md")
+				&& shownOf(view, every) == markdown,
+				"keys: Enter applies; Esc closes the bar and the filter stays in use");
+
+			// --- a filter expression; one that does not parse ---
+			apply(view, QStringLiteral("fe:Size >= 1KB"));
+			const QStringList large = shownOf(view, every);
+			say("fe:Size >= 1KB shows", large);
+			apply(view, QStringLiteral("fe:Size >="));
+			field = view.displayFilterBarForTest()->field();
+			say("a broken expression shows", shownOf(view, every));
+			printf("  its error: %s\n", qPrintable(field->errors().join(QStringLiteral(" / "))));
+			check(large == QStringList{ QStringLiteral("big.txt") } + folders
+				&& !field->errors().isEmpty() && !field->isApplied()
+				&& tinted(field, "#ffc8c8", "#502828")
+				&& view.displayFilter() == QStringLiteral("fe:Size >="),
+				"Apply: a filter expression; one that does not parse is marked, not applied");
+
+			// --- an empty field takes the filter away ---
+			apply(view, QString());
+			field = view.displayFilterBarForTest()->field();
+			check(view.displayFilter().isEmpty() && shownOf(view, every) == every
+				&& view.hiddenRowsForTest() == 0 && !field->isApplied()
+				&& lm::fileFilterHistory(historyKey) == QStringList{ QStringLiteral("fe:Size >="),
+					QStringLiteral("fe:Size >= 1KB"), QStringLiteral("*.md"),
+					QStringLiteral("*.txt") },
+				"Apply: an empty field shows everything again and leaves the history alone");
+
+			// --- what the field shows when the bar comes up ---
+			view.toggleDisplayFilterBar(); // closes
+			settle();
+			view.toggleDisplayFilterBar(); // the menu item: the list's latest entry
+			const QString fromMenu = view.displayFilterBarForTest()->field()->mask();
+			apply(view, QStringLiteral("*.md"));
+			view.displayFilterBarForTest()->field()->setEditText(QStringLiteral("junk"));
+			view.showDisplayFilterBar(); // the shortcut: the filter in use
+			check(fromMenu == QStringLiteral("fe:Size >=")
+				&& view.displayFilterBarForTest()->field()->mask() == QStringLiteral("*.md"),
+				"field: the list's latest entry from the menu, the filter in use from the shortcut");
+
+			// --- the "=" menu changes the field; Apply is still to be pressed ---
+			bar = view.displayFilterBarForTest();
+			field = bar->field();
+			field->setEditText(QStringLiteral("*.txt"));
+			bar->menuForTest()->pickForTest(Menu::SizeFirst);
+			const QString made = field->mask();
+			const bool notYet = view.displayFilter() == QStringLiteral("*.md") && !field->isApplied();
+			bar->findChild<QPushButton *>(QStringLiteral("displayFilterApply"))->click();
+			settle();
+			const QStringList smallTexts = shownOf(view, every);
+			say("*.txt|fe:Size < 1KB shows", smallTexts);
+			check(made == QStringLiteral("*.txt|fe:Size < 1KB") && notYet
+				&& view.displayFilter() == made
+				&& smallTexts == without(every, { QStringLiteral("big.txt"),
+					QStringLiteral("note.md"), QStringLiteral("subdiff.md") }),
+				"\"=\": its menu puts a condition in the field, for Apply to take");
+			shoot(&view, "bar");
+
+			// --- the filter is the window's: a new comparison keeps it ---
+			view.recompare();
+			waitFor(&view);
+			settle();
+			check(view.displayFilter() == made && shownOf(view, every) == smallTexts,
+				"Refresh: the filter stays for the comparison that follows");
+
+			// --- the applied filter's tint follows the theme, as does the
+			// list it filters ---
+			{
+				const lm::ThemeMode mode = lm::Theme::instance()->mode();
+				const QLineEdit *edit = view.displayFilterBarForTest()->field()->lineEdit();
+				lm::Theme::instance()->setMode(lm::ThemeMode::Light);
+				settle();
+				const bool light = edit->styleSheet().contains(QStringLiteral("#ffffdc"));
+				lm::Theme::instance()->setMode(lm::ThemeMode::Dark);
+				settle();
+				const bool dark = edit->styleSheet().contains(QStringLiteral("#3c3c28"))
+					&& shownOf(view, every) == smallTexts;
+				lm::Theme::instance()->setMode(mode);
+				settle();
+				check(light && dark, "theme: the field's tint and the filtered list follow it");
+			}
+
+			// --- the tree and the flat list go by different rules for a
+			// folder the filter leaves out ---
+			QAction *tree = treeAction(view);
+			if (tree == nullptr)
+				return 1;
+			apply(view, QStringLiteral("!build\\"));
+			const QStringList buildInTree = shownOf(view, every);
+			tree->setChecked(false);
+			settle();
+			const QStringList buildInList = shownOf(view, every);
+			apply(view, QStringLiteral("!lib\\"));
+			const QStringList libInList = shownOf(view, every);
+			say("!build\\ in the tree shows", buildInTree);
+			say("!build\\ in the list shows", buildInList);
+			say("!lib\\ in the list shows", libInList);
+			check(buildInTree == every
+				&& buildInList == without(every, { QStringLiteral("build"), QStringLiteral("out.txt") })
+				&& libInList == every,
+				"folders: left out in the tree only when empty-handed, in the list unless they hold a folder");
+			apply(view, QStringLiteral("*.*|de:Name contains \"deep\""));
+			const QStringList deepInList = shownOf(view, every);
+			tree->setChecked(true);
+			settle();
+			const QStringList deepInTree = shownOf(view, every);
+			say("de:Name contains \"deep\" in the list shows", deepInList);
+			say("de:Name contains \"deep\" in the tree shows", deepInTree);
+			check(deepInList == without(every, { QStringLiteral("out.txt"),
+					QStringLiteral("liba.txt"), QStringLiteral("innerb.txt"),
+					QStringLiteral("build"), QStringLiteral("lib"), QStringLiteral("inner") })
+				&& deepInTree == every,
+				"folders: a folder condition, by the list's rule and by the tree's");
+
+			// --- with the View menu's filters ---
+			apply(view, QStringLiteral("*.txt"));
+			view.setShowFilterForTest(FolderCompareView::ShowIdentical, false);
+			const QStringList notIdentical = shownOf(view, every);
+			view.setShowFilterForTest(FolderCompareView::ShowIdentical, true);
+			say("*.txt without the identical shows", notIdentical);
+			check(notIdentical == QStringList{ QStringLiteral("diff.txt"), QStringLiteral("big.txt"),
+					QStringLiteral("onlyL.txt"), QStringLiteral("onlyR.txt"), QStringLiteral("sub") }
+				&& shownOf(view, every) == without(every, { QStringLiteral("note.md"),
+					QStringLiteral("subdiff.md") }),
+				"View filters: both they and the display filter must let an item through");
+
+			// a row the filter hides leaves the selection: a copy or a
+			// delete does not reach what is not on show
+			apply(view, QString());
+			auto *list = view.findChild<QTreeWidget *>();
+			if (list == nullptr)
+				return 1;
+			const auto selectedNames = [list]() {
+				QStringList names;
+				for (QTreeWidgetItemIterator it(list); *it != nullptr; ++it)
+					if ((*it)->isSelected())
+						names.append((*it)->text(0));
+				names.sort();
+				return names;
+			};
+			for (QTreeWidgetItemIterator it(list); *it != nullptr; ++it)
+				if ((*it)->text(0) == QStringLiteral("note.md")
+					|| (*it)->text(0) == QStringLiteral("same.txt")
+					|| (*it)->text(0) == QStringLiteral("subdiff.md"))
+					(*it)->setSelected(true);
+			const QStringList picked = selectedNames();
+			apply(view, QStringLiteral("*.txt"));
+			check(picked == QStringList{ QStringLiteral("note.md"), QStringLiteral("same.txt"),
+					QStringLiteral("subdiff.md") }
+				&& selectedNames() == QStringList{ QStringLiteral("same.txt") },
+				"selection: a hidden row is no longer selected");
+		}
+
+		// --- skipped items: shown when the View menu says so, and then by
+		// the display filter alone ---
+		{
+			lm::setFileFilterMask(QStringLiteral("*.txt"));
+			FolderCompareView view;
+			view.start(QStringList{ left, right });
+			waitFor(&view);
+			settle();
+			const QStringList byDefault = shownOf(view, files);
+			view.setShowFilterForTest(FolderCompareView::ShowSkipped, true);
+			const QStringList withSkipped = shownOf(view, files);
+			apply(view, QStringLiteral("*.md"));
+			const QStringList markdown = shownOf(view, files);
+			apply(view, QStringLiteral("*.txt"));
+			const QStringList texts = shownOf(view, files);
+			say("skipped and *.md shows", markdown);
+			check(byDefault == without(files, { QStringLiteral("note.md"), QStringLiteral("subdiff.md") })
+				&& withSkipped == files
+				&& markdown == QStringList{ QStringLiteral("note.md"), QStringLiteral("subdiff.md") }
+				&& texts == byDefault,
+				"skipped items: the display filter has the say once they are shown");
+			lm::setFileFilterMask(QStringLiteral("*.*"));
+		}
+
+		// --- "Filter by This Column" ---
+		{
+			FolderCompareView view;
+			view.resize(900, 520);
+			view.start(QStringList{ left, right });
+			waitFor(&view);
+			settle();
+			QStringList columns;
+			for (int column = 0; column < 7; ++column)
+				columns.append(view.columnRegistryName(column));
+			check(columns == QStringList{ QStringLiteral("Name"), QStringLiteral("Path"),
+					QStringLiteral("Status"), QStringLiteral("Lsize"), QStringLiteral("Rsize"),
+					QStringLiteral("Lmtime"), QStringLiteral("Rmtime") },
+				"columns: upstream's names for the ones this list has");
+			const auto t = [](const char *text) {
+				return QCoreApplication::translate("FileFilterMenu", text);
+			};
+			// answer the Filter Condition dialog an item opens
+			const auto answer = [&view](const QString &value)
+			{
+				QTimer::singleShot(0, &view, [&view, value]() {
+					auto *dialog = view.findChild<FilterConditionDialog *>();
+					if (dialog == nullptr)
+					{
+						printf("no Filter Condition dialog to answer\n");
+						std::exit(3);
+					}
+					dialog->findChild<QComboBox *>(QStringLiteral("conditionValue1"))
+						->setEditText(value);
+					dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
+				});
+			};
+
+			// Name: one item that asks; the bar comes up with the filter,
+			// applied
+			{
+				QMenu popup;
+				const bool offered = view.buildHeaderMenu(&popup, 0);
+				QStringList labels;
+				for (const QAction *action : popup.actions())
+					labels.append(action->isSeparator() ? QStringLiteral("-") : action->text());
+				answer(QStringLiteral("same"));
+				if (offered && !popup.actions().isEmpty())
+					popup.actions().constLast()->trigger();
+				settle();
+				DisplayFilterBar *bar = view.displayFilterBarForTest();
+				say("Name contains \"same\" shows", shownOf(view, every));
+				check(offered && labels == QStringList{ t("&Filter by This Column...") }
+					&& view.displayFilter() == QStringLiteral("fe:Name contains \"same\"")
+					&& bar != nullptr && bar->field()->mask() == view.displayFilter()
+					&& bar->field()->isApplied()
+					&& shownOf(view, every) == QStringList{ QStringLiteral("same.txt"),
+						QStringLiteral("subsame.txt"), QStringLiteral("deepsame.txt") } + folders,
+					"Name: asks for a condition, shows the bar and applies the filter");
+			}
+			// Folder: the condition joins what the bar's field holds
+			{
+				view.displayFilterBarForTest()->field()->setEditText(QStringLiteral("*.txt"));
+				QMenu popup;
+				const bool offered = view.buildHeaderMenu(&popup, 1);
+				answer(QStringLiteral("sub"));
+				if (offered && !popup.actions().isEmpty())
+					popup.actions().constLast()->trigger();
+				settle();
+				say("*.txt in a folder named sub shows", shownOf(view, files));
+				check(view.displayFilter() == QStringLiteral("*.txt|fe:Folder contains \"sub\"")
+					&& shownOf(view, files) == QStringList{ QStringLiteral("subsame.txt"),
+						QStringLiteral("deepsame.txt") },
+					"Folder: the condition joins the filter in the bar's field");
+			}
+			// Comparison result: its own dialog
+			const auto byResult = [&](const QStringList &boxes, bool exclude, bool emptyFirst)
+			{
+				if (DisplayFilterBar *bar = view.displayFilterBarForTest())
+					bar->field()->setEditText(QString());
+				QMenu popup;
+				if (!view.buildHeaderMenu(&popup, 2) || popup.actions().isEmpty())
+					return QStringLiteral("(no menu)");
+				QString state;
+				QTimer::singleShot(0, &view, [&]() {
+					auto *dialog = view.findChild<ComparisonResultFilterDialog *>();
+					if (dialog == nullptr)
+					{
+						printf("no Filter by Comparison Result dialog to answer\n");
+						std::exit(3);
+					}
+					QStringList visible;
+					for (const QCheckBox *box : dialog->findChildren<QCheckBox *>())
+						if (box->isVisibleTo(dialog))
+							visible.append(box->text());
+					state = QString::number(visible.size());
+					QPushButton *okButton = dialog->findChild<QDialogButtonBox *>()
+						->button(QDialogButtonBox::Ok);
+					if (emptyFirst)
+					{
+						// nothing ticked: OK does nothing
+						okButton->click();
+						state += dialog->isVisible() ? QStringLiteral(" stays") : QStringLiteral(" gone");
+					}
+					if (exclude)
+						dialog->findChild<QRadioButton *>(QStringLiteral("resultExclude"))
+							->setChecked(true);
+					for (const QString &box : boxes)
+						dialog->findChild<QCheckBox *>(box)->setChecked(true);
+					shoot(dialog, "result-2way");
+					okButton->click();
+				});
+				popup.actions().constLast()->trigger();
+				settle();
+				return state;
+			};
+			{
+				const QString state = byResult({ QStringLiteral("resultDifferent"),
+					QStringLiteral("resultLeftOnly") }, false, true);
+				const QString included = view.displayFilter();
+				const QStringList includedFiles = shownOf(view, files);
+				byResult({ QStringLiteral("resultIdentical") }, true, false);
+				say("not identical shows", shownOf(view, files));
+				check(state == QStringLiteral("5 stays")
+					&& included == QStringLiteral("fe:(Different) or (LeftExists and not RightExists)")
+					&& includedFiles == QStringList{ QStringLiteral("diff.txt"),
+						QStringLiteral("big.txt"), QStringLiteral("onlyL.txt"),
+						QStringLiteral("subdiff.md") }
+					&& view.displayFilter() == QStringLiteral("fe:not (Identical)")
+					&& shownOf(view, files) == QStringList{ QStringLiteral("diff.txt"),
+						QStringLiteral("big.txt"), QStringLiteral("onlyL.txt"),
+						QStringLiteral("onlyR.txt"), QStringLiteral("subdiff.md") },
+					"Comparison result: the results to keep or to leave out, as one condition");
+			}
+			// sizes and dates: a submenu, about the column's own side
+			{
+				view.displayFilterBarForTest()->field()->setEditText(QString());
+				QMenu popup;
+				const bool offered = view.buildHeaderMenu(&popup, 3);
+				auto *sizes = popup.findChild<FileFilterMenu *>();
+				int leaves = 0;
+				for (const QAction *action : sizes != nullptr ? sizes->actions() : QList<QAction *>())
+					leaves += action->isSeparator() || action->menu() != nullptr ? 0 : 1;
+				const QString title = sizes != nullptr ? sizes->title() : QString();
+				if (sizes != nullptr)
+					sizes->pickForTest(Menu::SizeFirst + 1);
+				settle();
+				const QString leftSize = view.displayFilter();
+				const QStringList leftLarge = shownOf(view, files);
+
+				view.displayFilterBarForTest()->field()->setEditText(QString());
+				QMenu rightPopup;
+				view.buildHeaderMenu(&rightPopup, 4);
+				if (auto *rightSizes = rightPopup.findChild<FileFilterMenu *>())
+					rightSizes->pickForTest(Menu::SizeFirst);
+				settle();
+				const QString rightSize = view.displayFilter();
+				say("RightSize < 1KB shows", shownOf(view, files));
+				check(offered && title == t("&Filter by This Column") && leaves == 15
+					&& popup.actions().size() == 1
+					&& leftSize == QStringLiteral("fe:LeftSize >= 1KB")
+					&& leftLarge == QStringList{ QStringLiteral("big.txt") }
+					&& rightSize == QStringLiteral("fe:RightSize < 1KB")
+					&& shownOf(view, files) == without(files, { QStringLiteral("big.txt"),
+						QStringLiteral("onlyL.txt") }),
+					"sizes: a submenu of conditions on the column's side");
+
+				view.displayFilterBarForTest()->field()->setEditText(QString());
+				QMenu datePopup;
+				view.buildHeaderMenu(&datePopup, 6);
+				auto *dates = datePopup.findChild<FileFilterMenu *>();
+				QStringList groups;
+				for (const QAction *action : dates != nullptr ? dates->actions() : QList<QAction *>())
+					groups.append(action->text());
+				if (dates != nullptr)
+					dates->pickForTest(Menu::DateFirst + 3);
+				settle();
+				say("RightDate today shows", shownOf(view, files));
+				check(groups == QStringList{ t("&Hour"), t("&Day"), t("&Week"), t("&Month"),
+						t("&Year"), t("&Custom Range...") }
+					&& view.displayFilter() == QStringLiteral("fe:RightDate >= today()")
+					&& shownOf(view, files) == without(files, { QStringLiteral("onlyL.txt") }),
+					"dates: the same, with upstream's ranges");
+			}
+			// with the bar closed, the condition joins the filter in use
+			{
+				apply(view, QStringLiteral("*.txt"));
+				view.toggleDisplayFilterBar();
+				settle();
+				QMenu popup;
+				view.buildHeaderMenu(&popup, 3);
+				if (auto *sizes = popup.findChild<FileFilterMenu *>())
+					sizes->pickForTest(Menu::SizeFirst + 1);
+				settle();
+				check(view.displayFilter() == QStringLiteral("*.txt|fe:LeftSize >= 1KB")
+					&& view.displayFilterBarShown()
+					&& shownOf(view, files) == QStringList{ QStringLiteral("big.txt") },
+					"bar closed: the condition joins the filter in use, and the bar comes back");
+			}
+		}
+
+		// --- the engine's items follow a copy, a delete and a save ---
+		{
+			FolderCompareView view;
+			view.start(QStringList{ left, right });
+			waitFor(&view);
+			settle();
+			const QString leftOnly = QStringLiteral("fe:LeftExists and not RightExists");
+			apply(view, leftOnly);
+			const QStringList before = shownOf(view, files);
+			view.copyRowForTest(QStringLiteral("onlyL.txt"), 0, 1);
+			view.applyDisplayFilter();
+			settle();
+			const QStringList afterCopy = shownOf(view, files);
+			apply(view, QStringLiteral("fe:Identical"));
+			const bool copyIsIdentical = view.rowShownForTest(QStringLiteral("onlyL.txt"));
+			view.deleteRowForTest(QStringLiteral("same.txt"), { 1 });
+			apply(view, leftOnly);
+			const QStringList afterDelete = shownOf(view, files);
+			// a save that left both files alike, and larger
+			write(left + QStringLiteral("/diff.txt"), QByteArray(3000, 'z'));
+			write(right + QStringLiteral("/diff.txt"), QByteArray(3000, 'z'));
+			view.updateSavedItem({ left + QStringLiteral("/diff.txt"),
+				right + QStringLiteral("/diff.txt") }, 0);
+			apply(view, QStringLiteral("fe:Identical and Size >= 1KB"));
+			say("after the save, identical and large", shownOf(view, files));
+			check(before == QStringList{ QStringLiteral("onlyL.txt") } && afterCopy.isEmpty()
+				&& copyIsIdentical && afterDelete == QStringList{ QStringLiteral("same.txt") }
+				&& shownOf(view, files) == QStringList{ QStringLiteral("diff.txt") },
+				"operations: a copy, a delete and a save change what the filter finds");
+
+			// what was done to the rows is still there when the list is
+			// built again, as a change of theme or of tree mode does
+			view.deleteRowForTest(QStringLiteral("note.md"), { 0, 1 });
+			apply(view, QString());
+			const auto states = [&view]() {
+				return QList<int>{ view.rowCategoryForTest(QStringLiteral("onlyL.txt")),
+					view.rowCategoryForTest(QStringLiteral("same.txt")),
+					view.rowCategoryForTest(QStringLiteral("diff.txt")),
+					view.rowCategoryForTest(QStringLiteral("note.md")) };
+			};
+			const QList<int> done = states();
+			if (QAction *tree = treeAction(view))
+			{
+				tree->setChecked(false);
+				settle();
+				tree->setChecked(true);
+				settle();
+			}
+			check(done == QList<int>{ lm::FolderCompareItem::Identical,
+					lm::FolderCompareItem::LeftOnly, lm::FolderCompareItem::Identical, -1 }
+				&& states() == done,
+				"operations: the rows keep what was done to them when the list is built again");
+		}
+		{
+			// a folder copied to the other side: in the flat list a folder
+			// the filter leaves out takes what is in it along
+			write(left + QStringLiteral("/solo/inside.txt"), "i\n");
+			FolderCompareView view;
+			view.start(QStringList{ left, right });
+			waitFor(&view);
+			settle();
+			if (QAction *tree = treeAction(view))
+				tree->setChecked(false);
+			const QStringList solo{ QStringLiteral("solo"), QStringLiteral("inside.txt") };
+			apply(view, QStringLiteral("de:LeftExists and not RightExists"));
+			const QStringList before = shownOf(view, solo);
+			view.copyRowForTest(QStringLiteral("solo"), 0, 1);
+			view.applyDisplayFilter();
+			settle();
+			check(before == solo && shownOf(view, solo).isEmpty()
+				&& QFileInfo::exists(right + QStringLiteral("/solo/inside.txt")),
+				"operations: a copied folder is on both sides for the filter too");
+			if (QAction *tree = treeAction(view))
+				tree->setChecked(true);
+		}
+
+		// --- three folders ---
+		{
+			const QString roots[3] = { dir.filePath(QStringLiteral("a")),
+				dir.filePath(QStringLiteral("b")), dir.filePath(QStringLiteral("c")) };
+			const auto three = [&](const char *name, const char *l, const char *m, const char *r)
+			{
+				const char *texts[3] = { l, m, r };
+				for (int i = 0; i < 3; ++i)
+					if (texts[i] != nullptr)
+						write(roots[i] + QLatin1Char('/') + QLatin1String(name), texts[i]);
+			};
+			three("same3.txt", "x\n", "x\n", "x\n");
+			three("ldiff.txt", "L\n", "x\n", "x\n");
+			three("mdiff.txt", "x\n", "M\n", "x\n");
+			three("rdiff.txt", "x\n", "x\n", "R\n");
+			three("alldiff.txt", "1\n", "2\n", "3\n");
+			three("onlyA.txt", "a\n", nullptr, nullptr);
+			three("onlyB.txt", nullptr, "b\n", nullptr);
+			three("onlyC.txt", nullptr, nullptr, "c\n");
+			three("noA.txt", nullptr, "n\n", "n\n");
+			three("noB.txt", "n\n", nullptr, "n\n");
+			three("noC.txt", "n\n", "n\n", nullptr);
+			const QStringList names{ QStringLiteral("same3.txt"), QStringLiteral("ldiff.txt"),
+				QStringLiteral("mdiff.txt"), QStringLiteral("rdiff.txt"),
+				QStringLiteral("alldiff.txt"), QStringLiteral("onlyA.txt"),
+				QStringLiteral("onlyB.txt"), QStringLiteral("onlyC.txt"), QStringLiteral("noA.txt"),
+				QStringLiteral("noB.txt"), QStringLiteral("noC.txt") };
+			FolderCompareView view;
+			view.resize(1000, 520);
+			view.start(QStringList{ roots[0], roots[1], roots[2] });
+			waitFor(&view);
+			settle();
+			QStringList columns;
+			for (int column = 3; column < 9; ++column)
+				columns.append(view.columnRegistryName(column));
+
+			int boxesShown = 0;
+			const auto byResult = [&](const char *box)
+			{
+				if (DisplayFilterBar *bar = view.displayFilterBarForTest())
+					bar->field()->setEditText(QString());
+				QMenu popup;
+				if (!view.buildHeaderMenu(&popup, 2) || popup.actions().isEmpty())
+					return QStringList{ QStringLiteral("(no menu)") };
+				QTimer::singleShot(0, &view, [&view, &boxesShown, &shoot, box]() {
+					auto *dialog = view.findChild<ComparisonResultFilterDialog *>();
+					if (dialog == nullptr)
+					{
+						printf("no Filter by Comparison Result dialog to answer\n");
+						std::exit(3);
+					}
+					boxesShown = 0;
+					for (const QCheckBox *candidate : dialog->findChildren<QCheckBox *>())
+						boxesShown += candidate->isVisibleTo(dialog) ? 1 : 0;
+					dialog->findChild<QCheckBox *>(QLatin1String(box))->setChecked(true);
+					shoot(dialog, "result-3way");
+					dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
+				});
+				popup.actions().constLast()->trigger();
+				settle();
+				return shownOf(view, names);
+			};
+			const auto one = [](const char *name) { return QStringList{ QLatin1String(name) }; };
+			const QStringList identical = byResult("resultIdentical");
+			const QStringList different = byResult("resultDifferent");
+			say("three folders, identical", identical);
+			say("three folders, different", different);
+			check(columns == QStringList{ QStringLiteral("Lsize"), QStringLiteral("Msize"),
+					QStringLiteral("Rsize"), QStringLiteral("Lmtime"), QStringLiteral("Mmtime"),
+					QStringLiteral("Rmtime") }
+				&& boxesShown == 12 && identical == one("same3.txt")
+				&& different == QStringList{ QStringLiteral("ldiff.txt"),
+					QStringLiteral("mdiff.txt"), QStringLiteral("rdiff.txt"),
+					QStringLiteral("alldiff.txt") },
+				"three folders: the middle columns, and every result in the dialog");
+			check(byResult("resultLeftOnly") == one("onlyA.txt")
+				&& byResult("resultMiddleOnly") == one("onlyB.txt")
+				&& byResult("resultRightOnly") == one("onlyC.txt")
+				&& byResult("resultLeftOnlyMissing") == one("noA.txt")
+				&& byResult("resultMiddleOnlyMissing") == one("noB.txt")
+				&& byResult("resultRightOnlyMissing") == one("noC.txt"),
+				"three folders: on one side only, missing on one side only");
+			const QStringList leftDiffers = byResult("resultLeftOnlyDifferent");
+			const QStringList middleDiffers = byResult("resultMiddleOnlyDifferent");
+			const QStringList rightDiffers = byResult("resultRightOnlyDifferent");
+			const QString rightCondition = view.displayFilter();
+			// what upstream's dialog writes for the right side
+			apply(view, QStringLiteral(
+				"fe:not DifferentLeftMiddle and DifferentMiddleRight and not DifferentLeftRight"));
+			const QStringList upstreams = shownOf(view, names);
+			say("only the left differs", leftDiffers);
+			say("only the middle differs", middleDiffers);
+			say("only the right differs", rightDiffers);
+			say("upstream's condition for it finds", upstreams);
+			// (the engine marks the odd side out the same way whether its
+			// file differs, is the only one or is the one missing: upstream's
+			// conditions for the left and the middle find all three)
+			check(leftDiffers == QStringList{ QStringLiteral("ldiff.txt"),
+					QStringLiteral("onlyA.txt"), QStringLiteral("noA.txt") }
+				&& middleDiffers == QStringList{ QStringLiteral("mdiff.txt"),
+					QStringLiteral("onlyB.txt"), QStringLiteral("noB.txt") }
+				&& rightDiffers == QStringList{ QStringLiteral("rdiff.txt"),
+					QStringLiteral("onlyC.txt"), QStringLiteral("noC.txt") }
+				&& rightCondition == QStringLiteral(
+					"fe:DifferentLeftMiddle and DifferentMiddleRight")
+				&& upstreams.isEmpty(),
+				"three folders: one side alone different, the right one included");
+		}
+
+		// --- the View menu's item ---
+		{
+			MainWindow window;
+			window.resize(1100, 640);
+			auto *action = window.findChild<QAction *>(QStringLiteral("displayFilterBarAction"));
+			if (action == nullptr)
+				return 1;
+			const bool idle = !action->isEnabled();
+			window.openFolderComparison(left, right);
+			settle();
+			auto *folder = window.findChild<FolderCompareView *>();
+			waitFor(folder);
+			settle();
+			if (folder == nullptr)
+				return 1;
+			const bool usable = action->isEnabled() && !action->isChecked();
+			action->trigger();
+			settle();
+			const bool shownAndTicked = folder->displayFilterBarShown() && action->isChecked();
+			apply(*folder, QStringLiteral("*.txt"));
+			window.show();
+			settle();
+			shoot(&window, "window");
+			action->trigger();
+			settle();
+			const bool closed = !folder->displayFilterBarShown() && !action->isChecked()
+				&& folder->displayFilter() == QStringLiteral("*.txt");
+			// with the shortcut's keys down the command only ever shows the
+			// bar, the filter in use in its field
+			const Qt::KeyboardModifiers chord = Qt::ControlModifier | Qt::ShiftModifier;
+			window.displayFilterBarCommand(chord);
+			const DisplayFilterBar *byKeys = folder->displayFilterBarForTest();
+			window.displayFilterBarCommand(chord);
+			const bool keysOnlyShow = byKeys != nullptr
+				&& folder->displayFilterBarForTest() == byKeys
+				&& byKeys->filterText() == QStringLiteral("*.txt");
+			window.displayFilterBarCommand(Qt::NoModifier);
+			settle();
+			const bool menuCloses = !folder->displayFilterBarShown();
+			window.openBlankComparison();
+			settle();
+			check(action->text() == MainWindow::tr("Displa&y Filter Bar")
+				&& action->shortcut() == QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_L)
+				&& action->isCheckable() && idle && usable && shownAndTicked && closed
+				&& !action->isEnabled(),
+				"View menu: Display Filter Bar, for the folder comparison in front");
+			check(keysOnlyShow && menuCloses,
+				"View menu: the shortcut only shows the bar, the item shows and closes it");
+		}
+
+		printf("display filter: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

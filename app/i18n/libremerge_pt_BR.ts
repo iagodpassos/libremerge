@@ -41,6 +41,88 @@
     </message>
 </context>
 <context>
+    <name>ComparisonResultFilterDialog</name>
+    <message>
+        <source>Filter by Comparison Result</source>
+        <translation>Filtrar por Resultado da Comparação</translation>
+    </message>
+    <message>
+        <source>&amp;Include</source>
+        <translation>&amp;Incluir</translation>
+    </message>
+    <message>
+        <source>&amp;Exclude</source>
+        <translation>&amp;Excluir</translation>
+    </message>
+    <message>
+        <source>Comparison Results</source>
+        <translation>Resultados da Comparação</translation>
+    </message>
+    <message>
+        <source>Identical</source>
+        <translation>Idênticos(as)</translation>
+    </message>
+    <message>
+        <source>Different</source>
+        <translation>Diferentes</translation>
+    </message>
+    <message>
+        <source>Left only</source>
+        <translation>Apenas à esquerda</translation>
+    </message>
+    <message>
+        <source>Right only</source>
+        <translation>Apenas à direita</translation>
+    </message>
+    <message>
+        <source>Skipped</source>
+        <translation>Pulado</translation>
+    </message>
+    <message>
+        <source>Middle only</source>
+        <translation>Apenas no meio</translation>
+    </message>
+    <message>
+        <source>Left only (different)</source>
+        <translation>Apenas à esquerda (diferente)</translation>
+    </message>
+    <message>
+        <source>Middle only (different)</source>
+        <translation>Apenas no meio (diferente)</translation>
+    </message>
+    <message>
+        <source>Right only (different)</source>
+        <translation>Apenas à direita (diferente)</translation>
+    </message>
+    <message>
+        <source>Left only (missing)</source>
+        <translation>Apenas à esquerda (faltando)</translation>
+    </message>
+    <message>
+        <source>Middle only (missing)</source>
+        <translation>Apenas no meio (faltando)</translation>
+    </message>
+    <message>
+        <source>Right only (missing)</source>
+        <translation>Apenas à direita (faltando)</translation>
+    </message>
+</context>
+<context>
+    <name>DisplayFilterBar</name>
+    <message>
+        <source>e.g. %1</source>
+        <translation>p.ex. %1</translation>
+    </message>
+    <message>
+        <source>&amp;Apply</source>
+        <translation>&amp;Aplicar</translation>
+    </message>
+    <message>
+        <source>&amp;Close</source>
+        <translation>&amp;Fechar</translation>
+    </message>
+</context>
+<context>
     <name>FileCompareView</name>
     <message>
         <source>First Difference</source>
@@ -492,6 +574,14 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>&amp;Custom Range...</source>
         <translation>&amp;Intervalo Personalizado...</translation>
+    </message>
+    <message>
+        <source>&amp;Filter by This Column...</source>
+        <translation>&amp;Filtrar por Esta Coluna...</translation>
+    </message>
+    <message>
+        <source>&amp;Filter by This Column</source>
+        <translation>&amp;Filtrar por Esta Coluna</translation>
     </message>
     <message>
         <source>Custom Range...</source>
@@ -1987,6 +2077,10 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>Original File</source>
         <translation>Arquivo Original</translation>
+    </message>
+    <message>
+        <source>Displa&amp;y Filter Bar</source>
+        <translation>E&amp;xibir Barra de Filtros</translation>
     </message>
 </context>
 <context>

@@ -6,8 +6,11 @@
 #include <QDateTime>
 #include <QList>
 #include <QString>
+#include <QStringList>
 
+class CDiffContext;
 class CompareStats;
+class DIFFITEM;
 class FileFilterHelper;
 
 namespace lm
@@ -62,6 +65,13 @@ struct FolderCompareItem
 	ThreeWayInfo threeWay = NoInfo;
 	FileType fileType = UnknownType;
 	bool isDir = false;
+	/** The folder item this one is in: its place in the result's list,
+	    -1 at the top of the compared folders. */
+	int parent = -1;
+	/** Deleted on every side since the comparison: no longer listed. */
+	bool removed = false;
+	/** The engine's own item, alive as long as the result's context. */
+	DIFFITEM *engineItem = nullptr;
 };
 
 struct FolderCompareResult
@@ -74,6 +84,10 @@ struct FolderCompareResult
 	bool aborted = false;
 	bool ok = false;
 	QString error;
+	/** The engine's comparison, kept for what asks about its items once it
+	    has run: the display filter (CDirDoc keeps its CDiffContext for the
+	    life of the folder window the same way). */
+	std::shared_ptr<CDiffContext> context;
 };
 
 /**
@@ -124,5 +138,50 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 FolderCompareResult compareFolders(const QStringList &dirs,
 	bool recursive, const std::shared_ptr<FolderCompareJob> &job,
 	const std::shared_ptr<FileFilterHelper> &filter, int compareMethod = -1);
+
+/**
+ * WinMerge's display filter (DirViewFilterSettings::displayFilterHelper):
+ * the mask or filter expression of the folder window's filter bar. It
+ * hides items of a comparison that already ran, asking the engine about
+ * each of them, and compares nothing again. Like upstream's, it knows no
+ * preset filter files: "pf:" names nothing here.
+ */
+class FolderDisplayFilter
+{
+public:
+	FolderDisplayFilter();
+	~FolderDisplayFilter();
+
+	/** Take a mask or expression (SetMaskOrExpression); an empty one
+	    filters nothing. */
+	void setMask(const QString &mask);
+	QString mask() const;
+	bool isEmpty() const;
+	/** What is wrong with the mask, a line per error; none when it is
+	    valid. */
+	QStringList errors() const;
+
+	/** The comparison whose items includes() is asked about
+	    (SetDiffContext, which upstream calls on every redisplay). */
+	void bind(const FolderCompareResult &result);
+	/** Whether an item of that comparison passes: includeDir for a folder,
+	    includeFile for a file. */
+	bool includes(const FolderCompareItem &item) const;
+
+private:
+	std::unique_ptr<FileFilterHelper> m_helper;
+	std::shared_ptr<CDiffContext> m_context;
+};
+
+/**
+ * A copy, a delete or a save changed an item on disk: bring the engine's
+ * item in line with what its row shows from then on, so that the display
+ * filter goes by it (UpdateDiffAfterOperation, CDirDoc::UpdateChangedItem).
+ * exists tells the sides the item is on now and category its new result;
+ * differences is the number a save left, -1 when it is not known.
+ */
+void updateEngineItem(const FolderCompareResult &result,
+	const FolderCompareItem &item, const bool exists[3],
+	FolderCompareItem::Category category, int differences = -1);
 
 } // namespace lm

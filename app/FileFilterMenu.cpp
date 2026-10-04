@@ -5,6 +5,7 @@
 #include <QActionGroup>
 #include <QCoreApplication>
 
+#include "ComparisonResultFilterDialog.h"
 #include "FileFilterHelper.h"
 #include "FilterConditionDialog.h"
 
@@ -177,12 +178,106 @@ QString condition(const char *pattern, const QString &first, const QString &seco
 } // namespace
 
 FileFilterMenu::FileFilterMenu(QWidget *parent)
+	: FileFilterMenu(MainMenu, parent)
+{
+}
+
+FileFilterMenu::FileFilterMenu(Contents contents, QWidget *parent)
 	: QMenu(parent)
 {
-	build();
+	if (contents == MainMenu)
+		build();
 	connect(this, &QMenu::triggered, this, &FileFilterMenu::picked);
 	connect(this, &QMenu::aboutToShow, this, &FileFilterMenu::showState);
 	showState();
+}
+
+FileFilterMenu *FileFilterMenu::appendColumnFilter(QMenu *popup, const QString &column,
+	bool threeWay)
+{
+	// what filters by a column: an item that asks for the condition, or a
+	// submenu (IDR_POPUP_FILTERMENU_SIZE, IDR_POPUP_FILTERMENU_DATE).
+	// Upstream's table goes on with columns this folder list does not
+	// have: extension, binary, difference counts, creation time,
+	// attributes, encoding, line ends, unpacker and prediffer
+	enum Kind { AskItem, SizeMenu, DateMenu };
+	struct Mapping
+	{
+		const char *suffix;
+		Kind kind;
+		int command;
+	};
+	static const Mapping mappings[] = {
+		{ "Name", AskItem, FileName },
+		{ "Path", AskItem, RelativeFolder },
+		{ "Status", AskItem, ComparisonResult },
+		{ "StatusAbbr", AskItem, ComparisonResult },
+		{ "mtime", DateMenu, 0 },
+		{ "size", SizeMenu, 0 },
+		{ "sizeShort", SizeMenu, 0 },
+	};
+	const auto lookUp = [](const QString &name) -> const Mapping * {
+		for (const Mapping &mapping : mappings)
+			if (name == QLatin1String(mapping.suffix))
+				return &mapping;
+		return nullptr;
+	};
+
+	// the whole name first, about any side; then the name behind the
+	// letter of a side
+	int side = 0;
+	const Mapping *mapping = lookUp(column);
+	if (mapping == nullptr && !column.isEmpty())
+	{
+		const QChar first = column.at(0);
+		if (first == QLatin1Char('L') || first == QLatin1Char('M')
+			|| first == QLatin1Char('R'))
+		{
+			side = first == QLatin1Char('L') ? 1 : first == QLatin1Char('M') ? 2 : 3;
+			mapping = lookUp(column.mid(1));
+		}
+	}
+	if (mapping == nullptr)
+		return nullptr;
+
+	auto *menu = new FileFilterMenu(ColumnMenu, popup);
+	menu->m_targetSide = side;
+	menu->m_threeWay = threeWay;
+	if (!popup->isEmpty())
+		popup->addSeparator();
+	if (mapping->kind == AskItem)
+	{
+		const int command = mapping->command;
+		QAction *action = popup->addAction(
+			text(QT_TRANSLATE_NOOP("FileFilterMenu", "&Filter by This Column...")));
+		connect(action, &QAction::triggered, menu, [menu, command]() { menu->pick(command); });
+		return menu;
+	}
+	menu->setTitle(text(QT_TRANSLATE_NOOP("FileFilterMenu", "&Filter by This Column")));
+	if (mapping->kind == SizeMenu)
+	{
+		for (int i = 0; i < 14; ++i)
+			addItem(menu, text(kSizeTexts[i]), SizeFirst + i);
+		addItem(menu, text(QT_TRANSLATE_NOOP("FileFilterMenu", "Custom Range...")), SizeRange);
+	}
+	else
+	{
+		addDateItems(menu, DateFirst, DateRange);
+	}
+	popup->addMenu(menu);
+	return menu;
+}
+
+QWidget *FileFilterMenu::dialogParent() const
+{
+	return m_dialogParent != nullptr ? m_dialogParent : parentWidget();
+}
+
+void FileFilterMenu::pick(int command)
+{
+	const std::optional<QString> result = apply(command, m_source ? m_source() : QString());
+	if (result.has_value())
+		emit maskChosen(*result);
 }
 
 void FileFilterMenu::build()
@@ -416,9 +511,7 @@ void FileFilterMenu::picked(QAction *action)
 		m_recursive = !m_recursive;
 	else
 	{
-		const std::optional<QString> result = apply(command, m_source ? m_source() : QString());
-		if (result.has_value())
-			emit maskChosen(*result);
+		pick(command);
 		return;
 	}
 	showState();
@@ -450,7 +543,7 @@ std::optional<QString> FileFilterMenu::askCondition(const QString &masks, const 
 	const QString &transform, bool recursive)
 {
 	FilterConditionDialog dialog(difference, difference ? m_targetDiffSide : m_targetSide,
-		field, QString(), defaultOperator, transform, recursive, parentWidget());
+		field, QString(), defaultOperator, transform, recursive, dialogParent());
 	if (dialog.exec() != QDialog::Accepted)
 		return std::nullopt;
 	return (masks.isEmpty() ? masks : masks + QLatin1Char('|')) + prefix + dialog.expression();
@@ -529,6 +622,19 @@ std::optional<QString> FileFilterMenu::apply(int command, const QString &masks)
 	case DiffDateRange:
 		return askCondition(masks, fe, true, QStringLiteral("Date"), equals,
 			QStringLiteral("abs(%1 - %2)"));
+	case FileName:
+		return askCondition(masks, fe, false, QStringLiteral("Name"),
+			QStringLiteral("%1 contains %2"), same);
+	case RelativeFolder:
+		return askCondition(masks, fe, false, QStringLiteral("Folder"),
+			QStringLiteral("%1 contains %2"), same);
+	case ComparisonResult:
+	{
+		ComparisonResultFilterDialog dialog(m_threeWay, dialogParent());
+		if (dialog.exec() != QDialog::Accepted)
+			return std::nullopt;
+		return withGroup(fe, dialog.expression());
+	}
 	case DiffAttrEqual:
 	case DiffAttrNotEqual:
 		if (m_targetDiffSide == 3)

@@ -8,9 +8,11 @@
 
 #include "FolderCompareDriver.h"
 #include "EngineOptions.h"
+#include "FileFilters.h"
 #include "ImageFormats.h"
 
 #include <climits>
+#include <QHash>
 #include <QSettings>
 #include <Poco/Semaphore.h>
 
@@ -145,7 +147,10 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	paths.SetSize(sides);
 	for (int i = 0; i < sides; ++i)
 		paths.SetPath(i, dirs.at(i).toStdString(), false);
-	CDiffContext ctxt(paths, method);
+	// the context outlives this call, in the result: the display filter
+	// asks about its items later
+	const auto context = std::make_shared<CDiffContext>(paths, method);
+	CDiffContext &ctxt = *context;
 
 	ctxt.m_pCompareStats = job->stats();
 	ctxt.m_bRecursive = recursive;
@@ -218,12 +223,19 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	semaphore.set();
 	DirScan_CompareItems(&myStruct, nullptr);
 
+	// the list goes folder first, then what is in it: a folder's place is
+	// known by the time its items come
+	QHash<const DIFFITEM *, int> placeOf;
 	DIFFITEM *pos = ctxt.GetFirstDiffPosition();
 	while (pos != nullptr)
 	{
+		DIFFITEM *const current = pos;
 		const DIFFITEM &di = ctxt.GetNextDiffPosition(pos);
 
 		FolderCompareItem item;
+		item.engineItem = current;
+		item.parent = placeOf.value(di.GetParentLink(), -1);
+		placeOf.insert(current, static_cast<int>(result.items.size()));
 		int side = 0;
 		while (side < sides - 1 && !di.diffcode.exists(side))
 			++side;
@@ -275,11 +287,103 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	ctxt.SetAbortable(nullptr);
 	filter->SetDiffContext(nullptr); // the filter may outlive this context
 	ctxt.m_piFilterGlobal = nullptr;
+	ctxt.m_pImgfileFilter = nullptr; // a local of this call
 	ctxt.m_pCompareStats = nullptr;
+	result.context = context;
 
 	result.aborted = job->abortRequested();
 	result.ok = true;
 	return result;
+}
+
+FolderDisplayFilter::FolderDisplayFilter()
+	: m_helper(std::make_unique<FileFilterHelper>())
+{
+}
+
+FolderDisplayFilter::~FolderDisplayFilter() = default;
+
+void FolderDisplayFilter::setMask(const QString &mask)
+{
+	m_helper->SetMaskOrExpression(mask.toStdString());
+	// the parsed expressions are new ones: they need the context again
+	m_helper->SetDiffContext(m_context.get());
+}
+
+QString FolderDisplayFilter::mask() const
+{
+	return QString::fromStdString(m_helper->GetMaskOrExpression());
+}
+
+bool FolderDisplayFilter::isEmpty() const
+{
+	return m_helper->IsEmpty();
+}
+
+QStringList FolderDisplayFilter::errors() const
+{
+	QStringList errors;
+	for (const FileFilterErrorInfo *error : m_helper->GetErrorList())
+		errors.append(formatFilterError(*error));
+	return errors;
+}
+
+void FolderDisplayFilter::bind(const FolderCompareResult &result)
+{
+	// held here too: the expressions keep a plain pointer to it
+	m_context = result.context;
+	m_helper->SetDiffContext(m_context.get());
+}
+
+bool FolderDisplayFilter::includes(const FolderCompareItem &item) const
+{
+	if (item.engineItem == nullptr || m_context == nullptr)
+		return true;
+	const DIFFITEM &di = *item.engineItem;
+	return di.diffcode.isDirectory() ? m_helper->includeDir(di)
+		: m_helper->includeFile(di);
+}
+
+void updateEngineItem(const FolderCompareResult &result,
+	const FolderCompareItem &item, const bool exists[3],
+	FolderCompareItem::Category category, int differences)
+{
+	CDiffContext *ctxt = result.context.get();
+	DIFFITEM *di = item.engineItem;
+	if (ctxt == nullptr || di == nullptr)
+		return;
+
+	const int sides = ctxt->GetCompareDirs();
+	for (int i = 0; i < sides; ++i)
+	{
+		// the side flags, then size, date and attributes read again from
+		// the disk (cleared for a side the item is no longer on)
+		if (exists[i])
+			di->diffcode.setSideFlag(i);
+		else
+			di->diffcode.unsetSideFlag(i);
+		ctxt->UpdateStatusFromDisk(di, i);
+	}
+
+	// the result: identical after a 2-way copy or a save that left no
+	// difference, different after one that did, otherwise not compared
+	// (SetDiffCompare(di, DIFFCODE::NOCMP))
+	unsigned code = DIFFCODE::NOCMP;
+	if (category == FolderCompareItem::Identical)
+		code = DIFFCODE::SAME;
+	else if (category == FolderCompareItem::Different)
+		code = DIFFCODE::DIFF;
+	ctxt->SetDiffStatusCode(di, code, DIFFCODE::COMPAREFLAGS);
+
+	if (differences >= 0)
+		di->nsdiffs = differences;
+	else if (code == DIFFCODE::SAME)
+		ctxt->SetDiffCounts(di, 0, 0);
+	else
+	{
+		di->nsdiffs = CDiffContext::DIFFS_UNKNOWN_QUICKCOMPARE;
+		di->nidiffs = CDiffContext::DIFFS_UNKNOWN_QUICKCOMPARE;
+	}
 }
 
 } // namespace lm

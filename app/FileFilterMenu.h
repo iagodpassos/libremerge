@@ -17,6 +17,9 @@
  *
  * Its "Additional Properties..." items are not here: they list the
  * Windows property system's properties.
+ *
+ * The folder list's header menu ends with a cut of it, "Filter by This
+ * Column" (appendColumnFilter): the conditions on what the column shows.
  */
 class FileFilterMenu : public QMenu
 {
@@ -84,9 +87,30 @@ public:
 		ConditionDiffLeftMiddle,
 		ConditionDiffMiddleRight,
 		ConditionDiffAll,
+		// the folder list's columns ("Filter by This Column...")
+		FileName,
+		RelativeFolder,
+		ComparisonResult,
 	};
 
 	explicit FileFilterMenu(QWidget *parent = nullptr);
+
+	/**
+	 * CFileFilterHelperMenu::AppendColumnFilterMenu: put "Filter by This
+	 * Column" at the end of the folder list's header menu, behind a
+	 * separator when the menu has other items. column is the column's name
+	 * in upstream's registry ("Name", "Path", "Status", "Lsize",
+	 * "Rmtime"...); a letter in front of it is the side the conditions are
+	 * about. It is one item that asks for the condition, or a submenu of
+	 * ready-made ones. Returns the menu that makes the masks, owned by the
+	 * popup, or null for a column that has no filter.
+	 */
+	static FileFilterMenu *appendColumnFilter(QMenu *popup, const QString &column,
+		bool threeWay);
+
+	/** The window the dialogs of the items belong to, the menu's parent
+	    unless told otherwise. */
+	void setDialogParent(QWidget *parent) { m_dialogParent = parent; }
 
 	/** Where the mask to change is read from when an item is picked. */
 	void setMaskSource(std::function<QString()> source) { m_source = std::move(source); }
@@ -107,7 +131,11 @@ signals:
 	void reopenRequested();
 
 private:
+	enum Contents { MainMenu, ColumnMenu };
+	FileFilterMenu(Contents contents, QWidget *parent);
 	void build();
+	void pick(int command);
+	QWidget *dialogParent() const;
 	void showState();
 	void picked(QAction *action);
 	QString sidePrefix() const;
@@ -118,6 +146,8 @@ private:
 		const QString &transform, bool recursive = false);
 
 	std::function<QString()> m_source;
+	QWidget *m_dialogParent = nullptr;
+	bool m_threeWay = false;  ///< a column filter's comparison has three sides
 	int m_targetSide = 0;     ///< 0 any, 1 left, 2 middle, 3 right
 	int m_targetDiffSide = 0; ///< 0 left and right, 1 left and middle, 2 middle and right, 3 all
 	bool m_recursive = false;

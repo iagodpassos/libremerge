@@ -60,8 +60,12 @@ QStringList fileFilterErrors(FileFilterHelper *helper, const QString &mask);
 QString formatFilterError(const FileFilterErrorInfo &error);
 
 /** The mask fields' shared history (WinMerge's "Files\Ext"), the latest
-    first. */
-QStringList fileFilterHistory();
-void rememberFileFilter(const QString &mask);
+    first. The folder window's filter bar keeps one of its own
+    ("Files\DisplayExt"). */
+QString fileFilterHistoryKey();
+QString displayFilterHistoryKey();
+QStringList fileFilterHistory(const QString &key = fileFilterHistoryKey());
+void rememberFileFilter(const QString &mask,
+	const QString &key = fileFilterHistoryKey());
 
 } // namespace lm

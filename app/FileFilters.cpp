@@ -244,12 +244,22 @@ QStringList fileFilterErrors(FileFilterHelper *helper, const QString &mask)
 	return errors;
 }
 
-QStringList fileFilterHistory()
+QString fileFilterHistoryKey()
 {
-	return QSettings().value(kHistoryKey).toStringList();
+	return kHistoryKey;
 }
 
-void rememberFileFilter(const QString &mask)
+QString displayFilterHistoryKey()
+{
+	return QStringLiteral("Files/DisplayExt");
+}
+
+QStringList fileFilterHistory(const QString &key)
+{
+	return QSettings().value(key).toStringList();
+}
+
+void rememberFileFilter(const QString &mask, const QString &key)
 {
 	// CSuperComboBox::SaveState: what the field holds goes first, then
 	// the rest of the list without it
@@ -257,13 +267,13 @@ void rememberFileFilter(const QString &mask)
 	QStringList history;
 	if (!current.isEmpty())
 		history.append(current);
-	for (const QString &entry : fileFilterHistory())
+	for (const QString &entry : fileFilterHistory(key))
 	{
 		const QString trimmed = entry.trimmed();
 		if (history.size() < kHistoryMax && !trimmed.isEmpty() && !history.contains(trimmed))
 			history.append(trimmed);
 	}
-	QSettings().setValue(kHistoryKey, history);
+	QSettings().setValue(key, history);
 }
 
 } // namespace lm

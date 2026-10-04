@@ -9,6 +9,7 @@
 #include <QWidget>
 #include "FolderCompareDriver.h"
 
+class DisplayFilterBar;
 class QAction;
 class QLabel;
 class QMenu;
@@ -18,6 +19,7 @@ class QTimer;
 class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
+class QVBoxLayout;
 
 /**
  * Two-way folder comparison view: runs the engine comparison on a worker
@@ -25,7 +27,9 @@ class QTreeWidgetItem;
  * result as a hierarchical tree (folders as expandable nodes) or a flat
  * list. It goes by the global file filter as it is when the comparison
  * starts (lm::cloneFileFilter), shown on its status bar, and supports
- * multi-selection copy between sides and delete-to-trash.
+ * multi-selection copy between sides and delete-to-trash. A display
+ * filter, typed in the filter bar or made from a column's header menu,
+ * hides items of the result without comparing again.
  * Double-clicking a file that exists on both sides asks the main window
  * to open a file comparison.
  */
@@ -95,6 +99,31 @@ public:
 	/** Delete one row's sides without the confirmation (for tests). */
 	void deleteRowForTest(const QString &name, const QList<int> &sides);
 
+	// --- WinMerge's display filter: the filter bar (CDirFilterBar) and
+	// the filter itself (DirViewFilterSettings::displayFilterHelper), both
+	// this window's own ---
+
+	/** What Ctrl+Shift+L does (CDirView::OnViewDisplayFilterBar): show
+	    the bar, the filter in use in its field, and put the keyboard
+	    there. */
+	void showDisplayFilterBar();
+	/** What the View menu item does (CDirFrame::OnViewDisplayFilterBar):
+	    show the bar, or close it. The filter stays in use either way. */
+	void toggleDisplayFilterBar();
+	bool displayFilterBarShown() const { return m_filterBar != nullptr; }
+	/** The bar's Apply (CDirView::OnViewDisplayFilterBarApply): the
+	    field's filter is the one the list is shown by from then on. */
+	void applyDisplayFilter();
+	/** The filter the list is shown by, empty when there is none. */
+	QString displayFilter() const { return m_displayFilter.mask(); }
+	DisplayFilterBar *displayFilterBarForTest() const { return m_filterBar; }
+	/** A column's name in upstream's registry ("Name", "Path", "Status",
+	    "Lsize", "Rmtime"...), which says what filters by it. */
+	QString columnRegistryName(int column) const;
+	/** The header menu of a column as a right click on it builds it;
+	    false when the column has nothing to offer (for tests too). */
+	bool buildHeaderMenu(QMenu *menu, int column);
+
 	/** Keep extracted-archive temp trees alive for this view's
 	    lifetime (WinMerge's CTempPathContext). */
 	void adoptTempDirs(std::vector<std::unique_ptr<QTemporaryDir>> dirs)
@@ -151,7 +180,12 @@ private:
 	void updateRowFromDisk(QTreeWidgetItem *row);
 	void applyShowFilters();
 	bool rowShowable(QTreeWidgetItem *row, bool treeMode,
-		bool anyChildShown) const;
+		bool insideShown) const;
+	const lm::FolderCompareItem *resultItem(const QTreeWidgetItem *row) const;
+	lm::FolderCompareItem *resultItem(const QTreeWidgetItem *row);
+	void ensureFilterBar();
+	void hideFilterBar();
+	void closeDisplayFilterBar();
 	void updateActions();
 	QString sidePath(QTreeWidgetItem *row, int side) const;
 	QString intendedSidePath(QTreeWidgetItem *row, int side) const;
@@ -163,6 +197,9 @@ private:
 	int m_hiddenRows = 0; // result items the View filters leave out
 	std::vector<std::unique_ptr<QTemporaryDir>> m_tempDirs;
 	lm::FolderCompareResult m_result;
+	lm::FolderDisplayFilter m_displayFilter;
+	DisplayFilterBar *m_filterBar = nullptr; // exists while it is shown
+	QVBoxLayout *m_layout;
 	QTreeWidget *m_tree;
 	QLabel *m_status;
 	// WinMerge's file filter pane: the filter of the last run

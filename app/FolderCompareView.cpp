@@ -2,7 +2,9 @@
 #include "pch.h"
 
 #include "FolderCompareView.h"
+#include "DisplayFilterBar.h"
 #include "EngineOptions.h"
+#include "FileFilterMenu.h"
 #include "FileFilters.h"
 #include "FileOps.h"
 #include "Icons.h"
@@ -12,6 +14,7 @@
 #include <QActionGroup>
 #include <QDir>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QKeyEvent>
@@ -57,6 +60,8 @@ enum ItemRole
 	RoleFileType,   ///< lm::FolderCompareItem::FileType as int; kept
 	                ///  across row updates, like WinMerge's type flags
 	RoleThreeWay,   ///< lm::FolderCompareItem::ThreeWayInfo as int
+	RoleItemIndex,  ///< the item's place in the result's list, where its
+	                ///  folder and the engine's own item are
 };
 
 
@@ -259,6 +264,7 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 		m_show[filter] = savedShowFilter(static_cast<ShowFilter>(filter));
 
 	auto *layout = new QVBoxLayout(this);
+	m_layout = layout;
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(0);
 
@@ -320,6 +326,16 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 		buildContextMenu(&menu);
 		menu.exec(m_tree->viewport()->mapToGlobal(pos));
 	});
+	// a right click on a column's header: what filters by that column
+	// (CDirView::HeaderContextMenu)
+	m_tree->header()->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(m_tree->header(), &QHeaderView::customContextMenuRequested, this,
+		[this](const QPoint &pos) {
+			const int column = m_tree->header()->logicalIndexAt(pos);
+			QMenu menu(this);
+			if (column >= 0 && buildHeaderMenu(&menu, column))
+				menu.exec(m_tree->header()->viewport()->mapToGlobal(pos));
+		});
 	layout->addWidget(m_tree, 1);
 
 	auto *statusRow = new QHBoxLayout;
@@ -499,6 +515,9 @@ void FolderCompareView::start(const QStringList &dirs)
 	m_actDeleteBoth->setVisible(twoWay);
 	setupColumns();
 	m_result = lm::FolderCompareResult();
+	// the display filter stays, for the comparison to come; it lets go of
+	// the one that is gone
+	m_displayFilter.bind(m_result);
 	m_tree->clear();
 	m_hiddenRows = 0;
 	updateActions();
@@ -779,54 +798,108 @@ bool FolderCompareView::rowShownForTest(const QString &name) const
 void FolderCompareView::applyShowFilters()
 {
 	const bool treeMode = m_actTreeMode->isChecked();
-	// children first: a folder that fails its own filter still shows
-	// when something inside it does
-	std::function<bool(QTreeWidgetItem *)> apply = [&](QTreeWidgetItem *row) {
-		bool anyChildShown = false;
-		for (int i = 0; i < row->childCount(); ++i)
-			anyChildShown = apply(row->child(i)) || anyChildShown;
-		const bool shown = rowShowable(row, treeMode, anyChildShown);
-		row->setHidden(!shown);
-		return shown;
-	};
-	for (int i = 0; i < m_tree->topLevelItemCount(); ++i)
-		apply(m_tree->topLevelItem(i));
+	// the display filter asks the engine about the items of this
+	// comparison (Redisplay hands it the context every time)
+	m_displayFilter.bind(m_result);
+	if (treeMode)
+	{
+		// children first: a folder that fails its own filter still shows
+		// when something inside it does
+		std::function<bool(QTreeWidgetItem *)> apply = [&](QTreeWidgetItem *row) {
+			bool anyChildShown = false;
+			for (int i = 0; i < row->childCount(); ++i)
+				anyChildShown = apply(row->child(i)) || anyChildShown;
+			const bool shown = rowShowable(row, true, anyChildShown);
+			row->setHidden(!shown);
+			return shown;
+		};
+		for (int i = 0; i < m_tree->topLevelItemCount(); ++i)
+			apply(m_tree->topLevelItem(i));
+	}
+	else
+	{
+		// the flat list has no folder above a row to hide it with, but
+		// upstream goes down the item tree here too and into a folder only
+		// when the folder is showable (RedisplayChildren): an item needs
+		// every folder above it to be. A folder the display filter leaves
+		// out is still showable when a folder inside it is (IsShowable)
+		const int count = static_cast<int>(m_result.items.size());
+		std::vector<QTreeWidgetItem *> rows(count, nullptr);
+		for (QTreeWidgetItemIterator it(m_tree); *it != nullptr; ++it)
+		{
+			const QVariant place = (*it)->data(0, RoleItemIndex);
+			if (place.isValid() && place.toInt() >= 0 && place.toInt() < count)
+				rows[place.toInt()] = *it;
+		}
+		// a folder comes before what is in it: from the last item to the
+		// first, each folder finds its own already looked at
+		std::vector<char> showable(count, 1);
+		std::vector<char> folderInside(count, 0);
+		for (int i = count - 1; i >= 0; --i)
+		{
+			QTreeWidgetItem *row = rows[i];
+			if (row == nullptr)
+				continue; // gone from every side since the comparison
+			showable[i] = rowShowable(row, false, folderInside[i] != 0) ? 1 : 0;
+			const int parent = m_result.items.at(i).parent;
+			if (showable[i] && parent >= 0 && !row->data(0, RoleIsFile).toBool())
+				folderInside[parent] = 1;
+		}
+		for (int i = 0; i < count; ++i)
+		{
+			const int parent = m_result.items.at(i).parent;
+			if (parent >= 0 && !showable[parent])
+				showable[i] = 0;
+			if (rows[i] != nullptr)
+				rows[i]->setHidden(!showable[i]);
+		}
+	}
 
-	// result items left out, directly or under a hidden folder
+	// result items left out, directly or under a hidden folder. They leave
+	// the selection too: upstream builds its list again without them, and a
+	// copy or a delete must not reach what is not on show
 	m_hiddenRows = 0;
 	for (QTreeWidgetItemIterator it(m_tree); *it != nullptr; ++it)
 	{
-		if (!(*it)->data(0, RoleCategory).isValid())
-			continue; // folder node synthesized for the tree
-		for (QTreeWidgetItem *row = *it; row != nullptr; row = row->parent())
-		{
-			if (row->isHidden())
-			{
-				++m_hiddenRows;
-				break;
-			}
-		}
+		bool hidden = false;
+		for (QTreeWidgetItem *row = *it; row != nullptr && !hidden; row = row->parent())
+			hidden = row->isHidden();
+		if (!hidden)
+			continue;
+		(*it)->setSelected(false);
+		if ((*it)->data(0, RoleCategory).isValid()) // not a node made for the tree
+			++m_hiddenRows;
 	}
 	if (!m_job)
 		updateStatusLine();
 }
 
-/** IsShowable (DirActions.cpp) over a row's data. Folders filter by
-    result only in tree mode: in the flat list a folder's files carry
-    their own results. */
+/** IsShowable (DirActions.cpp) over a row's data, with the display
+    filter asked last and only for a row the View filters let through.
+    Folders filter by result only in tree mode: in the flat list a
+    folder's files carry their own results. insideShown tells that
+    something inside a folder is showable: any of its items in the tree,
+    a folder among them in the flat list. */
 bool FolderCompareView::rowShowable(QTreeWidgetItem *row, bool treeMode,
-	bool anyChildShown) const
+	bool insideShown) const
 {
 	using Item = lm::FolderCompareItem;
 	const QVariant categoryData = row->data(0, RoleCategory);
 	if (!categoryData.isValid())
-		return anyChildShown; // folder node synthesized for the tree
+		return insideShown; // folder node synthesized for the tree
 	const auto category = static_cast<Item::Category>(categoryData.toInt());
 	const bool isDir = !row->data(0, RoleIsFile).toBool();
+	const auto passesDisplayFilter = [this, row]() {
+		if (m_displayFilter.isEmpty())
+			return true;
+		const lm::FolderCompareItem *item = resultItem(row);
+		return item == nullptr || m_displayFilter.includes(*item);
+	};
 
-	// skipped is a super-flag: shown whenever skipped items are
+	// skipped is a super-flag: shown whenever skipped items are, and then
+	// by the display filter alone
 	if (category == Item::Skipped)
-		return m_show[ShowSkipped];
+		return m_show[ShowSkipped] && passesDisplayFilter();
 
 	// side filters
 	switch (category)
@@ -840,7 +913,7 @@ bool FolderCompareView::rowShowable(QTreeWidgetItem *row, bool treeMode,
 	default: break;
 	}
 	if (isDir && !treeMode)
-		return true;
+		return passesDisplayFilter() || insideShown;
 
 	// file type filter
 	if (!isDir && !m_show[ShowBinaries] && static_cast<Item::FileType>(
@@ -848,8 +921,8 @@ bool FolderCompareView::rowShowable(QTreeWidgetItem *row, bool treeMode,
 		return false;
 
 	// result filters; an identical folder hides with its contents
-	if (category == Item::Identical)
-		return m_show[ShowIdentical];
+	if (category == Item::Identical && !m_show[ShowIdentical])
+		return false;
 	bool shown = true;
 	if (category == Item::Different || category == Item::MissingLeft
 		|| category == Item::MissingMiddle || category == Item::MissingRight)
@@ -862,7 +935,136 @@ bool FolderCompareView::rowShowable(QTreeWidgetItem *row, bool treeMode,
 		case Item::NoInfo: shown = m_show[ShowDifferent]; break;
 		}
 	}
-	return shown || (isDir && anyChildShown);
+	if (isDir)
+		return (shown && passesDisplayFilter()) || insideShown;
+	return shown && passesDisplayFilter();
+}
+
+const lm::FolderCompareItem *FolderCompareView::resultItem(
+	const QTreeWidgetItem *row) const
+{
+	const QVariant place = row->data(0, RoleItemIndex);
+	if (!place.isValid() || place.toInt() < 0 || place.toInt() >= m_result.items.size())
+		return nullptr;
+	return &m_result.items.at(place.toInt());
+}
+
+lm::FolderCompareItem *FolderCompareView::resultItem(const QTreeWidgetItem *row)
+{
+	const QVariant place = row->data(0, RoleItemIndex);
+	if (!place.isValid() || place.toInt() < 0 || place.toInt() >= m_result.items.size())
+		return nullptr;
+	return &m_result.items[place.toInt()];
+}
+
+// --- WinMerge's display filter bar ---
+
+void FolderCompareView::ensureFilterBar()
+{
+	if (m_filterBar != nullptr)
+		return;
+	m_filterBar = new DisplayFilterBar(this);
+	// under the toolbar, above the list
+	m_layout->insertWidget(1, m_filterBar);
+	connect(m_filterBar, &DisplayFilterBar::applyRequested, this,
+		&FolderCompareView::applyDisplayFilter);
+	connect(m_filterBar, &DisplayFilterBar::closeRequested, this,
+		&FolderCompareView::closeDisplayFilterBar);
+}
+
+/** CDirFrame::HideFilterBar: the bar goes away; the filter it applied
+    stays in use. */
+void FolderCompareView::hideFilterBar()
+{
+	if (m_filterBar == nullptr)
+		return;
+	m_filterBar->hide();
+	m_filterBar->deleteLater(); // it may be the one asking
+	m_filterBar = nullptr;
+}
+
+/** CDirFrame::OnDisplayFilterBarClose. */
+void FolderCompareView::closeDisplayFilterBar()
+{
+	hideFilterBar();
+	m_tree->setFocus();
+}
+
+void FolderCompareView::showDisplayFilterBar()
+{
+	ensureFilterBar();
+	if (!m_displayFilter.isEmpty())
+		m_filterBar->setFilterText(m_displayFilter.mask());
+	m_filterBar->focusField();
+}
+
+void FolderCompareView::toggleDisplayFilterBar()
+{
+	if (m_filterBar == nullptr)
+		ensureFilterBar();
+	else
+		hideFilterBar();
+}
+
+void FolderCompareView::applyDisplayFilter()
+{
+	if (m_filterBar == nullptr)
+		return;
+	QGuiApplication::setOverrideCursor(Qt::WaitCursor);
+	// the text as it is typed: saving it reads the list again, which puts
+	// its latest entry in the field
+	const QString text = m_filterBar->filterText();
+	m_filterBar->saveFilterText();
+	m_displayFilter.setMask(text);
+	if (!m_displayFilter.mask().isEmpty() && m_displayFilter.errors().isEmpty())
+		m_filterBar->setFilterApplied(true);
+	applyShowFilters();
+	m_tree->setFocus();
+	QGuiApplication::restoreOverrideCursor();
+}
+
+QString FolderCompareView::columnRegistryName(int column) const
+{
+	switch (column)
+	{
+	case ColName: return QStringLiteral("Name");
+	case ColFolder: return QStringLiteral("Path");
+	case ColResult: return QStringLiteral("Status");
+	default: break;
+	}
+	for (int side = 0; side < m_sides; ++side)
+	{
+		const QChar letter = QLatin1Char(m_sides == 3 ? "LMR"[side] : "LR"[side]);
+		if (column == colSize(side))
+			return letter + QStringLiteral("size");
+		if (column == colDate(side))
+			return letter + QStringLiteral("mtime");
+	}
+	return QString();
+}
+
+/** CDirView::HeaderContextMenu. Upstream's menu starts with "Customize
+    Columns...", which this list does not have: "Filter by This Column"
+    is all of it. */
+bool FolderCompareView::buildHeaderMenu(QMenu *menu, int column)
+{
+	FileFilterMenu *filter = FileFilterMenu::appendColumnFilter(menu,
+		columnRegistryName(column), m_sides >= 3);
+	if (filter == nullptr)
+		return false;
+	filter->setDialogParent(this);
+	// CDirView::OnFilterMenuCommand: the condition joins what the bar's
+	// field holds when the bar is open, the filter in use otherwise; the
+	// bar then shows the result, which is applied at once
+	filter->setMaskSource([this]() {
+		return m_filterBar != nullptr ? m_filterBar->filterText() : m_displayFilter.mask();
+	});
+	connect(filter, &FileFilterMenu::maskChosen, this, [this](const QString &mask) {
+		m_displayFilter.setMask(mask);
+		showDisplayFilterBar();
+		applyDisplayFilter();
+	});
+	return true;
 }
 
 /** A file comparison opened from here saved its files: bring the row in
@@ -897,6 +1099,23 @@ void FolderCompareView::updateSavedItem(const QStringList &paths,
 			? lm::FolderCompareItem::Identical
 			: lm::FolderCompareItem::Different;
 		setRowCategory(row, newCategory, lm::FolderCompareItem::NoInfo, false);
+		// the result's item too, which the list is rebuilt from (a theme
+		// or a tree mode change), and the engine's, which the display
+		// filter goes by
+		if (lm::FolderCompareItem *item = resultItem(row))
+		{
+			bool exists[3] = {};
+			for (int i = 0; i < m_sides; ++i)
+			{
+				const QFileInfo info(paths.at(i));
+				exists[i] = info.exists();
+				item->size[i] = exists[i] ? info.size() : -1;
+				item->mtime[i] = exists[i] ? info.lastModified() : QDateTime();
+			}
+			item->category = newCategory;
+			item->threeWay = lm::FolderCompareItem::NoInfo;
+			lm::updateEngineItem(m_result, *item, exists, newCategory, significantDiffs);
+		}
 		if (oldCategory != newCategory)
 		{
 			adjustCategoryCounters(oldCategory, newCategory);
@@ -917,8 +1136,19 @@ void FolderCompareView::rebuildRows()
 
 	m_tree->setSortingEnabled(false);
 	QHash<QString, QTreeWidgetItem *> folderNodes;
-	for (const lm::FolderCompareItem &item : m_result.items)
+	for (int place = 0; place < m_result.items.size(); ++place)
 	{
+		// what a delete took from every side is gone, and what was in it
+		// (a folder comes before its items)
+		const lm::FolderCompareItem &listed = m_result.items.at(place);
+		if (listed.removed
+			|| (listed.parent >= 0 && m_result.items.at(listed.parent).removed))
+		{
+			if (!listed.removed)
+				m_result.items[place].removed = true;
+			continue;
+		}
+		const lm::FolderCompareItem &item = m_result.items.at(place);
 		QTreeWidgetItem *row = nullptr;
 		if (treeMode)
 		{
@@ -940,6 +1170,7 @@ void FolderCompareView::rebuildRows()
 			row = new QTreeWidgetItem(m_tree);
 		}
 		fillRow(row, item);
+		row->setData(0, RoleItemIndex, place);
 	}
 	m_tree->setSortingEnabled(true);
 	m_tree->sortByColumn(treeMode ? ColName : ColFolder, Qt::AscendingOrder);
@@ -1068,8 +1299,28 @@ void FolderCompareView::updateRowFromDisk(QTreeWidgetItem *row)
 	}
 	row->setData(0, RoleBothSides, allSides);
 
+	// the result's item too, which the list is rebuilt from (a theme or a
+	// tree mode change), and the engine's, which the display filter goes by
+	lm::FolderCompareItem *item = resultItem(row);
+	if (item != nullptr)
+	{
+		for (int i = 0; i < m_sides; ++i)
+		{
+			item->path[i] = exists[i] ? paths[i] : QString();
+			item->size[i] = exists[i] && !isDir ? infos[i].size() : -1;
+			item->mtime[i] = exists[i] ? infos[i].lastModified() : QDateTime();
+		}
+		item->threeWay = lm::FolderCompareItem::NoInfo;
+	}
+
 	if (existCount == 0)
 	{
+		if (item != nullptr)
+		{
+			item->removed = true;
+			lm::updateEngineItem(m_result, *item, exists,
+				lm::FolderCompareItem::NotCompared);
+		}
 		adjustCategoryCounters(oldCategory, lm::FolderCompareItem::NotCompared);
 		++m_rowsRemoved;
 		updateStatusLine();
@@ -1104,6 +1355,11 @@ void FolderCompareView::updateRowFromDisk(QTreeWidgetItem *row)
 		category = lm::FolderCompareItem::NotCompared;
 	}
 	setRowCategory(row, category, lm::FolderCompareItem::NoInfo, isDir);
+	if (item != nullptr)
+	{
+		item->category = category;
+		lm::updateEngineItem(m_result, *item, exists, category);
+	}
 	adjustCategoryCounters(oldCategory, category);
 	updateStatusLine();
 }

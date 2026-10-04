@@ -378,6 +378,28 @@ MainWindow::MainWindow(QWidget *parent)
 			}
 		});
 	viewMenu->addSeparator();
+	// WinMerge's display filter bar of the folder window (see
+	// displayFilterBarCommand for the two things the item does)
+	QAction *filterBarAction = viewMenu->addAction(tr("Displa&y Filter Bar"));
+	filterBarAction->setObjectName(QStringLiteral("displayFilterBarAction"));
+	filterBarAction->setCheckable(true);
+	filterBarAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_L));
+	const auto syncFilterBarAction = [folderView, filterBarAction]() {
+		FolderCompareView *folder = folderView();
+		filterBarAction->setEnabled(folder != nullptr);
+		filterBarAction->setChecked(folder != nullptr && folder->displayFilterBarShown());
+	};
+	connect(filterBarAction, &QAction::triggered, this, [this, syncFilterBarAction]() {
+		displayFilterBarCommand(QGuiApplication::queryKeyboardModifiers());
+		// the tick follows the bar, not the click
+		syncFilterBarAction();
+	});
+	connect(viewMenu, &QMenu::aboutToShow, this, syncFilterBarAction);
+	// the shortcut works only while the action is enabled: it follows the
+	// tab in front, not just the menu being opened
+	connect(m_tabs, &QTabWidget::currentChanged, this, syncFilterBarAction);
+	syncFilterBarAction();
+	viewMenu->addSeparator();
 	QAction *zoomInAction = addMenuAction(viewMenu, tr("Zoom &In"),
 		QKeySequence::ZoomIn, [fileView, imageView]() {
 			if (auto *view = fileView()) view->zoomIn();
@@ -1254,6 +1276,17 @@ void MainWindow::openSelfComparison(const QString &path)
 	entries.removeAll(path);
 	entries.prepend(path);
 	settings.setValue(key, entries);
+}
+
+void MainWindow::displayFilterBarCommand(Qt::KeyboardModifiers held)
+{
+	auto *folder = qobject_cast<FolderCompareView *>(m_tabs->currentWidget());
+	if (folder == nullptr)
+		return;
+	if (held.testFlag(Qt::ControlModifier) && held.testFlag(Qt::ShiftModifier))
+		folder->showDisplayFilterBar();
+	else
+		folder->toggleDisplayFilterBar();
 }
 
 void MainWindow::wireFolderRowSync(FolderCompareView *folder)

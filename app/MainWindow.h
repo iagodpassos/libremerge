@@ -78,6 +78,15 @@ public:
 	void applicationActivated();
 	/** The paths the "Immediately" mode watches (for tests). */
 	QStringList watchedPathsForTest() const;
+	/** View > Display Filter Bar, for the folder comparison in front.
+	    Upstream keeps two commands behind this one item: picking it shows
+	    the bar or closes it (CDirFrame::OnViewDisplayFilterBar), while its
+	    accelerator only ever shows the bar and puts the keyboard in its
+	    field (CDirView::OnViewDisplayFilterBar). A shortcut reaches a
+	    QAction the way a click does, so the keys held down tell the two
+	    apart: held is what the keyboard had down when the command came.
+	    Public for tests. */
+	void displayFilterBarCommand(Qt::KeyboardModifiers held);
 	/** What the save prompt answers instead of opening: 0 cancels, 1
 	    saves, 2 discards (for tests; an empty function shows it). */
 	static void setSavePromptForTest(std::function<int()> answer);
