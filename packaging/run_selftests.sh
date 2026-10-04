@@ -72,6 +72,7 @@ run_one selftest-reload
 run_one selftest-compare-options
 run_one selftest-filters
 run_one selftest-file-filters
+run_one selftest-filter-menu
 run_one selftest-theme
 run_one selftest-menu-roles
 LIBREMERGE_LANGUAGE=pt_BR run_one selftest-qt-i18n

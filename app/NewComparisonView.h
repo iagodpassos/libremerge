@@ -5,11 +5,13 @@
 #include <QWidget>
 
 class FileFilterCombo;
+class FileFilterMenu;
 class QComboBox;
 class QCheckBox;
 class QLabel;
 class QPushButton;
 class QTimer;
+class QToolButton;
 
 /**
  * The "Select Files or Folders" page, mirroring WinMerge's opening
@@ -82,7 +84,8 @@ private:
 	Slot m_slots[3];
 	QLabel *m_filterTitle = nullptr;
 	FileFilterCombo *m_filterCombo = nullptr;
-	QPushButton *m_selectFilterButton = nullptr;
+	QToolButton *m_selectFilterButton = nullptr;
+	FileFilterMenu *m_filterMenu = nullptr;
 	QLabel *m_hint;
 	QPushButton *m_compareButton = nullptr;
 	QTimer *m_verifyTimer = nullptr; // coalesces typing into one check

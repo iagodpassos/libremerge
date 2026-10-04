@@ -10,6 +10,7 @@
 
 class FileFilterCombo;
 class FileFilterHelper;
+class FileFilterMenu;
 class QCheckBox;
 class QFileSystemWatcher;
 class QPushButton;
@@ -20,10 +21,9 @@ class QTreeWidgetItem;
 /**
  * WinMerge's Tools > Filters dialog (CFiltersPropertySheet) with its File
  * Filters, Line Filters and Substitution Filters pages (FileFiltersDlg,
- * LineFiltersDlg and SubstitutionFiltersDlg), control for control but for
- * the File Filters page's "=" button, whose menu of ready-made conditions
- * is not here yet. The dialog edits copies of the filters: once it is
- * accepted the caller compares them with the ones in use and saves them
+ * LineFiltersDlg and SubstitutionFiltersDlg), control for control. The
+ * dialog edits copies of the filters: once it is accepted the caller
+ * compares them with the ones in use and saves them
  * (CMainFrame::OnToolsFilters).
  */
 class FiltersDialog : public QDialog
@@ -98,6 +98,7 @@ private:
 	// File Filters
 	std::shared_ptr<FileFilterHelper> m_fileFilter;
 	FileFilterCombo *m_maskCombo = nullptr;
+	FileFilterMenu *m_maskMenu = nullptr;
 	QTreeWidget *m_presetList = nullptr;
 	QPushButton *m_btnEditPreset = nullptr;
 	QPushButton *m_btnDeletePreset = nullptr;

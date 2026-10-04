@@ -300,6 +300,513 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     </message>
 </context>
 <context>
+    <name>FileFilterMenu</name>
+    <message>
+        <source>Less than 1KB</source>
+        <translation>Menos de 1KB</translation>
+    </message>
+    <message>
+        <source>1KB or more</source>
+        <translation>1KB ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 10KB</source>
+        <translation>Menos de 10KB</translation>
+    </message>
+    <message>
+        <source>10KB or more</source>
+        <translation>10KB ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 100KB</source>
+        <translation>Menos de 100KB</translation>
+    </message>
+    <message>
+        <source>100KB or more</source>
+        <translation>100KB ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 1MB</source>
+        <translation>Menos de 1MB</translation>
+    </message>
+    <message>
+        <source>1MB or more</source>
+        <translation>1MB ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 10MB</source>
+        <translation>Menos de 10MB</translation>
+    </message>
+    <message>
+        <source>10MB or more</source>
+        <translation>10MB ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 100MB</source>
+        <translation>Menos de 100MB</translation>
+    </message>
+    <message>
+        <source>100MB or more</source>
+        <translation>100MB ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 1GB</source>
+        <translation>Menos de 1GB</translation>
+    </message>
+    <message>
+        <source>1GB or more</source>
+        <translation>1GB ou mais</translation>
+    </message>
+    <message>
+        <source>&amp;Hour</source>
+        <translation>&amp;Hora</translation>
+    </message>
+    <message>
+        <source>More than 1 hour ago</source>
+        <translation>Mais de 1 hora atrás</translation>
+    </message>
+    <message>
+        <source>Within 1 hour</source>
+        <translation>Dentro de 1 hora</translation>
+    </message>
+    <message>
+        <source>&amp;Day</source>
+        <translation>&amp;Dia</translation>
+    </message>
+    <message>
+        <source>Before today</source>
+        <translation>Antes de hoje</translation>
+    </message>
+    <message>
+        <source>Today</source>
+        <translation>Hoje</translation>
+    </message>
+    <message>
+        <source>Before yesterday</source>
+        <translation>Antes de ontem</translation>
+    </message>
+    <message>
+        <source>Yesterday</source>
+        <translation>Ontem</translation>
+    </message>
+    <message>
+        <source>Since yesterday</source>
+        <translation>Desde ontem</translation>
+    </message>
+    <message>
+        <source>&amp;Week</source>
+        <translation>&amp;Semana</translation>
+    </message>
+    <message>
+        <source>Before this week</source>
+        <translation>Antes desta semana</translation>
+    </message>
+    <message>
+        <source>This week</source>
+        <translation>Esta semana</translation>
+    </message>
+    <message>
+        <source>Before last week</source>
+        <translation>Antes da semana passada</translation>
+    </message>
+    <message>
+        <source>Last week</source>
+        <translation>Semana passada</translation>
+    </message>
+    <message>
+        <source>Since last week</source>
+        <translation>Desde a semana passada</translation>
+    </message>
+    <message>
+        <source>&amp;Month</source>
+        <translation>&amp;Mês</translation>
+    </message>
+    <message>
+        <source>Before this month</source>
+        <translation>Antes deste mês</translation>
+    </message>
+    <message>
+        <source>This month</source>
+        <translation>Este mês</translation>
+    </message>
+    <message>
+        <source>Before last month</source>
+        <translation>Antes do mês passado</translation>
+    </message>
+    <message>
+        <source>Last month</source>
+        <translation>Mês passado</translation>
+    </message>
+    <message>
+        <source>Since last month</source>
+        <translation>Desde o mês passado</translation>
+    </message>
+    <message>
+        <source>&amp;Year</source>
+        <translation>&amp;Ano</translation>
+    </message>
+    <message>
+        <source>Before this year</source>
+        <translation>Antes deste ano</translation>
+    </message>
+    <message>
+        <source>This year</source>
+        <translation>Este ano</translation>
+    </message>
+    <message>
+        <source>Before last year</source>
+        <translation>Antes do ano passado</translation>
+    </message>
+    <message>
+        <source>Last year</source>
+        <translation>Ano passado</translation>
+    </message>
+    <message>
+        <source>Since last year</source>
+        <translation>Desde o ano passado</translation>
+    </message>
+    <message>
+        <source>Equal</source>
+        <translation>Igual</translation>
+    </message>
+    <message>
+        <source>Not Equal</source>
+        <translation>Não Igual</translation>
+    </message>
+    <message>
+        <source>Less Than</source>
+        <translation>Menos Que</translation>
+    </message>
+    <message>
+        <source>Less Than or Equal to</source>
+        <translation>Menos Que ou Igual a</translation>
+    </message>
+    <message>
+        <source>Greater Than</source>
+        <translation>Maior Que</translation>
+    </message>
+    <message>
+        <source>Greater Than or Equal to</source>
+        <translation>Maior Que ou Igual a</translation>
+    </message>
+    <message>
+        <source>&amp;Custom Range...</source>
+        <translation>&amp;Intervalo Personalizado...</translation>
+    </message>
+    <message>
+        <source>Custom Range...</source>
+        <translation>Intervalo Personalizado...</translation>
+    </message>
+    <message>
+        <source>&amp;Clear All</source>
+        <translation>&amp;Limpar Tudo</translation>
+    </message>
+    <message>
+        <source>Remove Last Filter &amp;Group</source>
+        <translation>Remover Último &amp;Grupo de Filtros</translation>
+    </message>
+    <message>
+        <source>R&amp;eset to Default (*.*)</source>
+        <translation>R&amp;estaurar os Padrões (*.*)</translation>
+    </message>
+    <message>
+        <source>Add E&amp;xclude File</source>
+        <translation>Adicionar Arquivo para E&amp;xcluir</translation>
+    </message>
+    <message>
+        <source>&amp;System Files</source>
+        <translation>Arquivos de &amp;Sistema</translation>
+    </message>
+    <message>
+        <source>&amp;Editor Backup Files</source>
+        <translation>Arquivos de Backup do &amp;Editor</translation>
+    </message>
+    <message>
+        <source>&amp;Compiled Binary Files</source>
+        <translation>Arquivos Binários &amp;Compilados</translation>
+    </message>
+    <message>
+        <source>&amp;Log Files</source>
+        <translation>Arquivos de &amp;Registro</translation>
+    </message>
+    <message>
+        <source>&amp;Temporary or Cache Files</source>
+        <translation>Arquivos &amp;Temporários ou de Cache</translation>
+    </message>
+    <message>
+        <source>Add Excl&amp;ude Folder</source>
+        <translation>Adicionar Pasta para Excl&amp;uir</translation>
+    </message>
+    <message>
+        <source>&amp;Version Control</source>
+        <translation>Controle de &amp;Versão</translation>
+    </message>
+    <message>
+        <source>&amp;Build Artifacts</source>
+        <translation>Artefatos de &amp;Compilação</translation>
+    </message>
+    <message>
+        <source>&amp;IDE</source>
+        <translation>&amp;IDE</translation>
+    </message>
+    <message>
+        <source>Add &amp;File Condition</source>
+        <translation>Adicionar Condição de &amp;Arquivo</translation>
+    </message>
+    <message>
+        <source>File &amp;Size</source>
+        <translation>&amp;Tamanho de Arquivo</translation>
+    </message>
+    <message>
+        <source>&amp;Last Modified</source>
+        <translation>Ú&amp;ltima Modificação</translation>
+    </message>
+    <message>
+        <source>&amp;Attributes</source>
+        <translation>&amp;Atributos</translation>
+    </message>
+    <message>
+        <source>Read-only files</source>
+        <translation>Arquivos somente leitura</translation>
+    </message>
+    <message>
+        <source>Not read-only files</source>
+        <translation>Arquivos não somente leitura</translation>
+    </message>
+    <message>
+        <source>Hidden files</source>
+        <translation>Arquivos ocultados</translation>
+    </message>
+    <message>
+        <source>Not hidden files</source>
+        <translation>Arquivos não ocultados</translation>
+    </message>
+    <message>
+        <source>System files</source>
+        <translation>Arquivos de sistema</translation>
+    </message>
+    <message>
+        <source>Not system files</source>
+        <translation>Arquivos não de sistema</translation>
+    </message>
+    <message>
+        <source>File &amp;Content</source>
+        <translation>&amp;Conteúdo do Arquivo</translation>
+    </message>
+    <message>
+        <source>Contains string...</source>
+        <translation>Contém string...</translation>
+    </message>
+    <message>
+        <source>Does not contain string...</source>
+        <translation>Não contém string...</translation>
+    </message>
+    <message>
+        <source>First line contains string...</source>
+        <translation>Primeira linha contém string...</translation>
+    </message>
+    <message>
+        <source>First line does not contain string...</source>
+        <translation>Primeira linha não contém string...</translation>
+    </message>
+    <message>
+        <source>First 10 lines contain string...</source>
+        <translation>Primeiras 10 linhas contêm string...</translation>
+    </message>
+    <message>
+        <source>First 10 lines do not contain string...</source>
+        <translation>Primeiras 10 linhas não contêm string...</translation>
+    </message>
+    <message>
+        <source>Last 10 lines contain string...</source>
+        <translation>Últimas 10 linhas contêm string...</translation>
+    </message>
+    <message>
+        <source>Last 10 lines do not contain string...</source>
+        <translation>Últimas 10 linhas não contêm string...</translation>
+    </message>
+    <message>
+        <source>Last line contains string...</source>
+        <translation>Última linha contém string...</translation>
+    </message>
+    <message>
+        <source>Last line does not contain string...</source>
+        <translation>Última linha não contém string...</translation>
+    </message>
+    <message>
+        <source>&amp;Line Count</source>
+        <translation>Contagem de &amp;Linhas</translation>
+    </message>
+    <message>
+        <source>Less than 10</source>
+        <translation>Menos de 10</translation>
+    </message>
+    <message>
+        <source>10 or more</source>
+        <translation>10 ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 100</source>
+        <translation>Menos de 100</translation>
+    </message>
+    <message>
+        <source>100 or more</source>
+        <translation>100 ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 1000</source>
+        <translation>Menos de 1000</translation>
+    </message>
+    <message>
+        <source>1000 or more</source>
+        <translation>1000 ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 10000</source>
+        <translation>Menos de 10000</translation>
+    </message>
+    <message>
+        <source>10000 or more</source>
+        <translation>10000 ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 100000</source>
+        <translation>Menos de 100000</translation>
+    </message>
+    <message>
+        <source>100000 or more</source>
+        <translation>100000 ou mais</translation>
+    </message>
+    <message>
+        <source>Add F&amp;older Condition</source>
+        <translation>Adicionar C&amp;ondição de Pasta</translation>
+    </message>
+    <message>
+        <source>&amp;Files</source>
+        <translation>&amp;Arquivos</translation>
+    </message>
+    <message>
+        <source>0 files</source>
+        <translation>0 arquivos</translation>
+    </message>
+    <message>
+        <source>1 file or more</source>
+        <translation>1 arquivo ou mais</translation>
+    </message>
+    <message>
+        <source>&amp;Items</source>
+        <translation>&amp;Itens</translation>
+    </message>
+    <message>
+        <source>0 items</source>
+        <translation>0 itens</translation>
+    </message>
+    <message>
+        <source>1 item or more</source>
+        <translation>1 item ou mais</translation>
+    </message>
+    <message>
+        <source>&amp;Total Size</source>
+        <translation>&amp;Tamanho Total</translation>
+    </message>
+    <message>
+        <source>&amp;Recursive</source>
+        <translation>&amp;Recursivo</translation>
+    </message>
+    <message>
+        <source>Target: &amp;Any (Left/Middle/Right)</source>
+        <translation>A&amp;lvo: Qualquer (Esquerda/Meio/Direita)</translation>
+    </message>
+    <message>
+        <source>Target: &amp;Left</source>
+        <translation>Alvo: &amp;Esquerda</translation>
+    </message>
+    <message>
+        <source>Target: &amp;Middle</source>
+        <translation>Alvo: &amp;Meio</translation>
+    </message>
+    <message>
+        <source>Target: &amp;Right</source>
+        <translation>Alvo: &amp;Direita</translation>
+    </message>
+    <message>
+        <source>Add &amp;Difference Condition</source>
+        <translation>Adicionar Condição de D&amp;iferença</translation>
+    </message>
+    <message>
+        <source>Less than 10B</source>
+        <translation>Menos de 10B</translation>
+    </message>
+    <message>
+        <source>10B or more</source>
+        <translation>10B ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 100B</source>
+        <translation>Menos de 100B</translation>
+    </message>
+    <message>
+        <source>100B or more</source>
+        <translation>100B ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 1 second</source>
+        <translation>Menos de 1 segundo</translation>
+    </message>
+    <message>
+        <source>1 second or more</source>
+        <translation>1 segundo ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 1 minute</source>
+        <translation>Menos de 1 minuto</translation>
+    </message>
+    <message>
+        <source>1 minute or more</source>
+        <translation>1 minuto ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 1 hour</source>
+        <translation>Menos de 1 hora</translation>
+    </message>
+    <message>
+        <source>1 hour or more</source>
+        <translation>1 hora ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 1 day</source>
+        <translation>Menos de 1 dia</translation>
+    </message>
+    <message>
+        <source>1 day or more</source>
+        <translation>1 dia ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 1 week</source>
+        <translation>Menos de 1 semana</translation>
+    </message>
+    <message>
+        <source>1 week or more</source>
+        <translation>1 semana ou mais</translation>
+    </message>
+    <message>
+        <source>Target: &amp;Left and Right</source>
+        <translation>Alvo: &amp;Esquerda e Direita</translation>
+    </message>
+    <message>
+        <source>Target: Left and &amp;Middle</source>
+        <translation>Alvo: Esquerda e &amp;Meio</translation>
+    </message>
+    <message>
+        <source>Target: Middle and &amp;Right</source>
+        <translation>Alvo: Meio e &amp;Direita</translation>
+    </message>
+    <message>
+        <source>Target: &amp;All</source>
+        <translation>&amp;Alvo: Todos</translation>
+    </message>
+</context>
+<context>
     <name>FileFilters</name>
     <message>
         <source>No error</source>
@@ -364,6 +871,97 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>at position</source>
         <translation>na posição</translation>
+    </message>
+</context>
+<context>
+    <name>FilterConditionDialog</name>
+    <message>
+        <source>Filter Condition</source>
+        <translation>Condição do Filtro</translation>
+    </message>
+    <message>
+        <source>Left-hand side:</source>
+        <translation>Lado esquerdo:</translation>
+    </message>
+    <message>
+        <source>Operator:</source>
+        <translation>Operador:</translation>
+    </message>
+    <message>
+        <source>Right-hand side:</source>
+        <translation>Lado direito:</translation>
+    </message>
+    <message>
+        <source>Match case</source>
+        <translation>Corresponder maiúsculas/minúsculas</translation>
+    </message>
+    <message>
+        <source>Expression:</source>
+        <translation>Expressão:</translation>
+    </message>
+    <message>
+        <source>Equals</source>
+        <translation>Igual a</translation>
+    </message>
+    <message>
+        <source>Does not equal</source>
+        <translation>Não é igual a</translation>
+    </message>
+    <message>
+        <source>Less than</source>
+        <translation>Menor que</translation>
+    </message>
+    <message>
+        <source>Less than or equal to</source>
+        <translation>Menor que ou igual a</translation>
+    </message>
+    <message>
+        <source>Greater than or equal to</source>
+        <translation>Maior que ou igual a</translation>
+    </message>
+    <message>
+        <source>Greater than</source>
+        <translation>Maior que</translation>
+    </message>
+    <message>
+        <source>Between</source>
+        <translation>Entre</translation>
+    </message>
+    <message>
+        <source>Not Between</source>
+        <translation>Não Entre</translation>
+    </message>
+    <message>
+        <source>Contains</source>
+        <translation>Contém</translation>
+    </message>
+    <message>
+        <source>Not Contains</source>
+        <translation>Não Contém</translation>
+    </message>
+    <message>
+        <source>Contains (regex)</source>
+        <translation>Contém (regex)</translation>
+    </message>
+    <message>
+        <source>Not Contains (regex)</source>
+        <translation>Não Contém (regex)</translation>
+    </message>
+    <message>
+        <source>Match (wildcard)</source>
+        <translation>Correspondência (curinga)</translation>
+    </message>
+    <message>
+        <source>Not match (wildcard)</source>
+        <translation>Sem correspondência (curinga)</translation>
+    </message>
+    <message>
+        <source>Match (regex)</source>
+        <translation>Correspondência (regex)</translation>
+    </message>
+    <message>
+        <source>Not match (regex)</source>
+        <translation>Sem correspondência (regex)</translation>
     </message>
 </context>
 <context>

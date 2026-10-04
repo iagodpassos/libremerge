@@ -9,6 +9,7 @@
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QCheckBox>
+#include <QDateTimeEdit>
 #include <QDialogButtonBox>
 #include <QRadioButton>
 #include <QKeyEvent>
@@ -61,7 +62,9 @@
 #include "NewComparisonView.h"
 #include "EngineOptions.h"
 #include "FileFilterCombo.h"
+#include "FileFilterMenu.h"
 #include "FileFilters.h"
+#include "FilterConditionDialog.h"
 #include "FiltersDialog.h"
 #include "ItemCheckStyle.h"
 #include "OptionsDialog.h"
@@ -371,6 +374,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFileFiltersOpt(QStringLiteral("selftest-file-filters"),
 		QStringLiteral("Verify the shipped preset filters, the File Filters page, the global file filter in folder comparisons, its status bar pane and the selection screen's filter field (for testing)"));
 	parser.addOption(selftestFileFiltersOpt);
+	QCommandLineOption selftestFilterMenuOpt(QStringLiteral("selftest-filter-menu"),
+		QStringLiteral("Verify the file filter helper menu, its Filter Condition dialog and that folder comparisons go by the conditions it makes (for testing)"));
+	parser.addOption(selftestFilterMenuOpt);
 	QCommandLineOption selftestThemeOpt(QStringLiteral("selftest-theme"),
 		QStringLiteral("Switch the theme from the Options dialog and verify the whole application follows (for testing)"));
 	parser.addOption(selftestThemeOpt);
@@ -713,7 +719,33 @@ int main(int argc, char *argv[])
 			if (!dialog.grab().save(target))
 				return 2;
 		}
-		return 0;
+		// the "=" button's menu, with one of its submenus, and the Filter
+		// Condition dialog as "Custom Range..." of a file size opens it
+		const auto named = [&path, dot](const char *suffix) {
+			QString target = path;
+			target.insert(dot < 0 ? target.size() : dot, QLatin1String(suffix));
+			return target;
+		};
+		if (auto *menu = dialog.findChild<FileFilterMenu *>())
+		{
+			menu->ensurePolished();
+			menu->adjustSize();
+			if (!menu->grab().save(named("-menu")))
+				return 2;
+			if (QAction *item = menu->actionForTest(FileFilterMenu::SizeFirst))
+				if (auto *submenu = qobject_cast<QMenu *>(item->parent()))
+				{
+					submenu->ensurePolished();
+					submenu->adjustSize();
+					if (!submenu->grab().save(named("-submenu")))
+						return 2;
+				}
+		}
+		FilterConditionDialog condition(false, 0, QStringLiteral("Size"), QString(),
+			QStringLiteral("isWithin(%1, %2, %3)"), QStringLiteral("%1"), false);
+		condition.show();
+		QCoreApplication::processEvents();
+		return condition.grab().save(named("-condition")) ? 0 : 2;
 	}
 
 	if (parser.isSet(selftestOptionsOpt))
@@ -3286,7 +3318,7 @@ int main(int argc, char *argv[])
 			auto *selector = window.findChild<NewComparisonView *>();
 			FileFilterCombo *field = selector != nullptr ? selector->filterFieldForTest() : nullptr;
 			auto *select = selector != nullptr
-				? selector->findChild<QPushButton *>(QStringLiteral("selectFilter")) : nullptr;
+				? selector->findChild<QToolButton *>(QStringLiteral("selectFilter")) : nullptr;
 			if (field == nullptr || select == nullptr)
 				return 2;
 			QStringList titles;
@@ -3380,6 +3412,485 @@ int main(int argc, char *argv[])
 		FiltersDialog::setFileChooserForTest([](bool, const QString &) { return QString(); });
 		FiltersDialog::setEditorForTest([](const QString &) {});
 		printf("file filters: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestFilterMenuOpt))
+	{
+		// WinMerge's file filter helper menu (the "=" button, the arrow of
+		// "Select..."): its items, the masks and conditions they make, the
+		// Filter Condition dialog, and that the engine takes what they make
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 3; ++i)
+				QCoreApplication::processEvents();
+		};
+		using Menu = FileFilterMenu;
+		QWidget host;
+		Menu menu(&host);
+		QStringList chosen;
+		int reopened = 0;
+		QObject::connect(&menu, &Menu::maskChosen, [&chosen](const QString &mask) {
+			chosen.append(mask);
+		});
+		QObject::connect(&menu, &Menu::reopenRequested, [&reopened]() { ++reopened; });
+		const auto made = [&menu](int command, const QString &masks = QStringLiteral("*.*")) {
+			return menu.apply(command, masks).value_or(QStringLiteral("(nothing)"));
+		};
+		const auto label = [](const QAction *action) {
+			return action->isSeparator() ? QStringLiteral("-") : action->text();
+		};
+
+		// --- the items ---
+		{
+			QStringList top;
+			for (const QAction *action : menu.actions())
+				top.append(label(action));
+			const auto t = [](const char *text) {
+				return QCoreApplication::translate("FileFilterMenu", text);
+			};
+			check(top == QStringList{ t("&Clear All"), t("Remove Last Filter &Group"),
+					t("R&eset to Default (*.*)"), t("Add E&xclude File"), t("Add Excl&ude Folder"),
+					QStringLiteral("-"), t("Add &File Condition"), t("Add F&older Condition"),
+					t("Target: &Any (Left/Middle/Right)"), t("Target: &Left"),
+					t("Target: &Middle"), t("Target: &Right"), QStringLiteral("-"),
+					t("Add &Difference Condition"), t("Target: &Left and Right"),
+					t("Target: Left and &Middle"), t("Target: Middle and &Right"),
+					t("Target: &All") },
+				"menu: upstream's items, in its order");
+			int leaves = 0;
+			for (const QAction *action : menu.findChildren<QAction *>())
+				if (action->menu() == nullptr && !action->isSeparator()
+					&& action->data().isValid())
+					++leaves;
+			const int submenus = static_cast<int>(menu.findChildren<QMenu *>().size());
+			printf("  %d items in %d submenus\n", leaves, submenus);
+			// upstream has 162, two of them "Additional Properties..."
+			check(leaves == 160 && submenus == 27, "menu: every item but the Windows properties");
+		}
+
+		// --- what the items make of a mask ---
+		check(made(Menu::MaskClear).isEmpty() && made(Menu::MaskAll, QStringLiteral("a;b")) == QStringLiteral("*.*")
+			&& made(Menu::MaskRemoveLast, QStringLiteral("a|b|c")) == QStringLiteral("a|b")
+			&& made(Menu::MaskRemoveLast, QStringLiteral("a")).isEmpty(),
+			"mask: clear, reset, remove the last group");
+		check(made(Menu::FileBackup, QStringLiteral("*.cpp"))
+				== QStringLiteral("*.cpp;!*.bak;!*.old;!*.orig;!*.swp;!*.swo;!*.tmp;!*.temp;!*.save;!*.backup;!*.*~")
+			&& made(Menu::FolderVcs, QString()) == QStringLiteral("!.git\\;!.svn\\;!.hg\\")
+			&& made(Menu::FileLog) == QStringLiteral("*.*;!*.log;!*.out;!*.err;!*.trace"),
+			"mask: ready-made exclusions join the group in use");
+		check(made(Menu::SizeFirst) == QStringLiteral("*.*|fe:Size < 1KB")
+			&& made(Menu::SizeLast, QString()) == QStringLiteral("fe:Size >= 1GB")
+			&& made(Menu::DateFirst + 3) == QStringLiteral("*.*|fe:Date >= today()")
+			&& made(Menu::DateLast) == QStringLiteral(
+				"*.*|fe:Date >= startOfYear(startOfYear(now()) - 1day)")
+			&& made(Menu::AttrFirst + 2) == QStringLiteral("*.*|fe:AttrStr contains \"H\"")
+			&& made(Menu::LinesFirst) == QStringLiteral("*.*|fe:lineCount(Content) < 10"),
+			"file conditions: a group of their own");
+		check(made(Menu::FolderDateFirst) == QStringLiteral("*.*|de:Date < now() - 1hour")
+			&& made(Menu::FolderFilesFirst) == QStringLiteral("*.*|de:Files == 0")
+			&& made(Menu::FolderItemsLast) == QStringLiteral("*.*|de:Items >= 1")
+			&& made(Menu::FolderTotalSizeFirst) == QStringLiteral("*.*|de:TotalSize < 1KB"),
+			"folder conditions");
+		check(made(Menu::DiffSizeFirst + 1) == QStringLiteral("*.*|fe:LeftSize != RightSize")
+			&& made(Menu::DiffSizeLast) == QStringLiteral("*.*|fe:abs(LeftSize - RightSize) >= 1KB")
+			&& made(Menu::DiffDateFirst + 6) == QStringLiteral(
+				"*.*|fe:abs(LeftDate - RightDate) < 1second")
+			&& made(Menu::DiffAttrEqual) == QStringLiteral("*.*|fe:LeftAttrStr = RightAttrStr"),
+			"difference conditions");
+
+		// --- the targets and Recursive: ticked, and the menu comes back ---
+		menu.pickForTest(Menu::ConditionLeft);
+		const bool leftTicked = menu.actionForTest(Menu::ConditionLeft)->isChecked()
+			&& !menu.actionForTest(Menu::ConditionAny)->isChecked();
+		const QString leftSize = made(Menu::SizeFirst);
+		const QString leftFolder = made(Menu::FolderFilesFirst);
+		menu.pickForTest(Menu::FolderStatsRecursive);
+		const QString recursive = made(Menu::FolderTotalSizeFirst);
+		menu.pickForTest(Menu::FolderStatsRecursive);
+		menu.pickForTest(Menu::ConditionAny);
+		check(leftTicked && reopened == 4 && chosen.isEmpty()
+			&& leftSize == QStringLiteral("*.*|fe:LeftSize < 1KB")
+			&& leftFolder == QStringLiteral("*.*|de:LeftFiles == 0")
+			&& recursive == QStringLiteral("*.*|de:LeftRecursiveTotalSize < 1KB")
+			&& made(Menu::FolderTotalSizeFirst) == QStringLiteral("*.*|de:TotalSize < 1KB"),
+			"targets: the side goes into the condition, Recursive into the folder's");
+		menu.pickForTest(Menu::ConditionDiffLeftMiddle);
+		const QString leftMiddle = made(Menu::DiffSizeFirst);
+		const bool comparisonsShown = menu.actionForTest(Menu::DiffSizeLess)->isVisible()
+			&& menu.actionForTest(Menu::DiffDateRange)->isVisible();
+		menu.pickForTest(Menu::ConditionDiffAll);
+		const bool onlyEquality = menu.actionForTest(Menu::DiffSizeFirst)->isVisible()
+			&& menu.actionForTest(Menu::DiffSizeFirst + 1)->isVisible()
+			&& !menu.actionForTest(Menu::DiffSizeLess)->isVisible()
+			&& !menu.actionForTest(Menu::DiffSizeRange)->isVisible()
+			&& !menu.actionForTest(Menu::DiffDateLess)->isVisible()
+			&& !menu.actionForTest(Menu::DiffDateLast)->isVisible()
+			&& menu.actionForTest(Menu::DiffAttrNotEqual)->isVisible();
+		const QString allSides = made(Menu::DiffSizeFirst) + QStringLiteral(" / ")
+			+ made(Menu::DiffDateFirst + 1) + QStringLiteral(" / ") + made(Menu::DiffAttrNotEqual);
+		menu.pickForTest(Menu::ConditionDiffLeftRight);
+		check(leftMiddle == QStringLiteral("*.*|fe:LeftSize = MiddleSize") && comparisonsShown
+			&& onlyEquality && allSides == QStringLiteral("*.*|fe:allequal(Size) / "
+				"*.*|fe:not allequal(Date) / *.*|fe:not allequal(AttrStr)"),
+			"difference targets: a pair of sides, or all of them alike");
+
+		// --- every item that needs no dialog makes something the engine parses ---
+		{
+			auto helper = lm::cloneFileFilter();
+			QStringList bad;
+			int parsed = 0;
+			for (int side = 0; side < 4; ++side)
+			{
+				menu.pickForTest(Menu::ConditionAny + side);
+				menu.pickForTest(Menu::ConditionDiffLeftRight + side);
+				for (const QAction *action : menu.findChildren<QAction *>())
+				{
+					if (action->menu() != nullptr || action->isSeparator()
+						|| !action->data().isValid() || !action->isVisible())
+						continue;
+					const int command = action->data().toInt();
+					const bool asks = command == Menu::SizeRange || command == Menu::DateRange
+						|| command == Menu::LinesRange || command == Menu::FolderDateRange
+						|| command == Menu::FolderFilesRange || command == Menu::FolderItemsRange
+						|| command == Menu::FolderTotalSizeRange || command == Menu::DiffSizeRange
+						|| command == Menu::DiffDateRange
+						|| (command >= Menu::ContentFirst && command <= Menu::ContentLast);
+					const bool state = command == Menu::FolderStatsRecursive
+						|| (command >= Menu::ConditionAny && command <= Menu::ConditionRight)
+						|| (command >= Menu::ConditionDiffLeftRight
+							&& command <= Menu::ConditionDiffAll);
+					if (asks || state)
+						continue;
+					const QString mask = made(command);
+					++parsed;
+					const QStringList errors = lm::fileFilterErrors(helper.get(), mask);
+					if (!errors.isEmpty())
+						bad.append(mask + QStringLiteral(" -> ") + errors.join(QStringLiteral("; ")));
+				}
+			}
+			menu.pickForTest(Menu::ConditionAny);
+			menu.pickForTest(Menu::ConditionDiffLeftRight);
+			printf("  %d masks parsed\n", parsed);
+			for (const QString &line : bad)
+				printf("  does not parse: %s\n", qPrintable(line));
+			check(bad.isEmpty() && parsed > 500, "engine: every ready-made condition parses");
+		}
+
+		// --- the Filter Condition dialog ---
+		chosen.clear();
+		const auto asking = [&host](std::function<void(FilterConditionDialog *)> body, bool accept)
+		{
+			QTimer::singleShot(0, &host, [&host, body, accept]() {
+				auto *dialog = host.findChild<FilterConditionDialog *>();
+				if (dialog == nullptr)
+				{
+					printf("no Filter Condition dialog\n");
+					std::exit(3);
+				}
+				if (body)
+					body(dialog);
+				if (accept)
+					dialog->accept();
+				else
+					dialog->reject();
+			});
+		};
+		const auto part = [](FilterConditionDialog *dialog, const char *name) {
+			return dialog->findChild<QWidget *>(QLatin1String(name));
+		};
+		const auto combo = [&part](FilterConditionDialog *dialog, const char *name) {
+			return qobject_cast<QComboBox *>(part(dialog, name));
+		};
+		const auto shownText = [&part](FilterConditionDialog *dialog, const char *name) {
+			const auto *text = qobject_cast<QLabel *>(part(dialog, name));
+			return text != nullptr ? text->text() : QString();
+		};
+		const auto pickOperator = [&combo](FilterConditionDialog *dialog, const QString &pattern) {
+			QComboBox *operators = combo(dialog, "conditionOperator");
+			operators->setCurrentIndex(operators->findData(pattern));
+		};
+		QString seen;
+
+		asking([&](FilterConditionDialog *dialog) {
+			QComboBox *operators = combo(dialog, "conditionOperator");
+			QStringList names;
+			for (int i = 0; i < operators->count(); ++i)
+				names.append(operators->itemText(i));
+			seen = shownText(dialog, "conditionLhs") + QStringLiteral(" | ")
+				+ operators->currentText() + QStringLiteral(" | ")
+				+ QString::number(names.size()) + QStringLiteral(" | ")
+				+ shownText(dialog, "conditionExpression") + QStringLiteral(" | second ")
+				+ (combo(dialog, "conditionValue2")->isVisibleTo(dialog) ? "shown" : "hidden")
+				+ QStringLiteral(" | case ")
+				+ (part(dialog, "conditionMatchCase")->isVisibleTo(dialog) ? "shown" : "hidden");
+			pickOperator(dialog, QStringLiteral("isWithin(%1, %2, %3)"));
+			seen += QStringLiteral(" | second ")
+				+ (combo(dialog, "conditionValue2")->isVisibleTo(dialog) ? "shown" : "hidden");
+			combo(dialog, "conditionValue1")->setEditText(QStringLiteral("1KB"));
+			combo(dialog, "conditionValue2")->setEditText(QStringLiteral("1MB"));
+		}, true);
+		menu.pickForTest(Menu::SizeRange);
+		printf("  size range: %s\n", qPrintable(seen));
+		check(seen == QStringLiteral("Size | ") + FilterConditionDialog::tr("Equals")
+				+ QStringLiteral(" | 8 | Size = 0B | second hidden | case hidden | second shown")
+			&& chosen == QStringList{ QStringLiteral("fe:isWithin(Size, 1KB, 1MB)") },
+			"condition: a size, its operators, a range between two values");
+
+		chosen.clear();
+		asking([&](FilterConditionDialog *dialog) {
+			seen = shownText(dialog, "conditionLhs") + QStringLiteral(" | ")
+				+ combo(dialog, "conditionOperator")->currentData().toString()
+				+ QStringLiteral(" | ") + QString::number(combo(dialog, "conditionOperator")->count())
+				+ QStringLiteral(" | case ")
+				+ (part(dialog, "conditionMatchCase")->isVisibleTo(dialog) ? "shown" : "hidden");
+			combo(dialog, "conditionValue1")->setEditText(QStringLiteral("say \"hi\""));
+			qobject_cast<QCheckBox *>(part(dialog, "conditionMatchCase"))->setChecked(true);
+		}, true);
+		menu.pickForTest(Menu::ContentFirst + 3);
+		check(seen == QStringLiteral("sublines(Content, 0, 1) | %1 not contains %2 | 4 | case shown")
+			&& chosen == QStringList{ QStringLiteral(
+				"fe:@cs sublines(Content, 0, 1) not contains \"say \"\"hi\"\"\"") },
+			"condition: text in the content, quoted, case sensitive on request");
+
+		chosen.clear();
+		asking([&](FilterConditionDialog *dialog) {
+			seen = shownText(dialog, "conditionLhs") + QStringLiteral(" | ")
+				+ combo(dialog, "conditionOperator")->currentData().toString();
+			combo(dialog, "conditionValue1")->setEditText(QStringLiteral("100"));
+		}, true);
+		menu.pickForTest(Menu::LinesRange);
+		check(seen == QStringLiteral("lineCount(Content) | %1 > %2")
+			&& chosen == QStringList{ QStringLiteral("fe:lineCount(Content) > 100") },
+			"condition: a line count");
+
+		chosen.clear();
+		asking([&](FilterConditionDialog *dialog) {
+			auto *date = qobject_cast<QDateTimeEdit *>(part(dialog, "conditionDate1"));
+			seen = QStringLiteral("date ") + (date->isVisibleTo(dialog) ? "shown" : "hidden")
+				+ QStringLiteral(" | value ")
+				+ (combo(dialog, "conditionValue1")->isVisibleTo(dialog) ? "shown" : "hidden");
+			date->setDate(QDate(2026, 1, 15));
+			pickOperator(dialog, QStringLiteral("%1 >= %2"));
+		}, true);
+		menu.pickForTest(Menu::DateRange);
+		check(seen == QStringLiteral("date shown | value hidden")
+			&& chosen == QStringList{ QStringLiteral("fe:DateStr >= \"2026-01-15\"") },
+			"condition: a date, picked");
+
+		chosen.clear();
+		menu.pickForTest(Menu::FolderStatsRecursive);
+		asking([&](FilterConditionDialog *dialog) {
+			combo(dialog, "conditionValue1")->setEditText(QStringLiteral("10"));
+			pickOperator(dialog, QStringLiteral("%1 < %2"));
+		}, true);
+		menu.pickForTest(Menu::FolderFilesRange);
+		menu.pickForTest(Menu::FolderStatsRecursive);
+		check(chosen == QStringList{ QStringLiteral("de:RecursiveFiles < 10") },
+			"condition: a folder's files, subfolders included");
+
+		chosen.clear();
+		asking([&](FilterConditionDialog *dialog) {
+			QComboBox *values = combo(dialog, "conditionValue1");
+			seen = shownText(dialog, "conditionLhs") + QStringLiteral(" | ")
+				+ QString::number(combo(dialog, "conditionOperator")->count())
+				+ QStringLiteral(" | ") + values->currentText() + QStringLiteral(" | ")
+				+ values->itemText(values->count() - 1);
+			pickOperator(dialog, QStringLiteral("%1 < %2"));
+			values->setEditText(QStringLiteral("1hour"));
+		}, true);
+		menu.pickForTest(Menu::DiffDateRange);
+		check(seen == QStringLiteral("abs(LeftDate - RightDate) | 8 | 0second | 1week")
+			&& chosen == QStringList{ QStringLiteral("fe:abs(LeftDate - RightDate) < 1hour") },
+			"condition: the time between two dates");
+
+		chosen.clear();
+		asking({}, false);
+		menu.pickForTest(Menu::SizeRange);
+		check(chosen.isEmpty(), "condition: Cancel adds nothing");
+		{
+			auto helper = lm::cloneFileFilter();
+			const QStringList conditions = { QStringLiteral("*.*|fe:isWithin(Size, 1KB, 1MB)"),
+				QStringLiteral("*.*|fe:@cs sublines(Content, 0, 1) not contains \"say \"\"hi\"\"\""),
+				QStringLiteral("*.*|fe:lineCount(Content) > 100"),
+				QStringLiteral("*.*|fe:DateStr >= \"2026-01-15\""),
+				QStringLiteral("*.*|de:RecursiveFiles < 10"),
+				QStringLiteral("*.*|fe:abs(LeftDate - RightDate) < 1hour") };
+			QStringList bad;
+			for (const QString &mask : conditions)
+				if (!lm::fileFilterErrors(helper.get(), mask).isEmpty())
+					bad.append(mask);
+			for (const QString &mask : bad)
+				printf("  does not parse: %s\n", qPrintable(mask));
+			check(bad.isEmpty(), "engine: what the dialog builds parses");
+		}
+
+		// --- the engine goes by what the menu makes ---
+		const QString left = dir.filePath(QStringLiteral("L"));
+		const QString right = dir.filePath(QStringLiteral("R"));
+		const QDateTime longAgo(QDate(2020, 5, 1), QTime(12, 0));
+		const auto put = [](const QString &path, const QByteArray &bytes,
+			const QDateTime &when = QDateTime())
+		{
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+			f.write(bytes);
+			f.flush();
+			if (when.isValid())
+				f.setFileTime(when, QFileDevice::FileModificationTime);
+		};
+		for (const QString &root : { left, right })
+		{
+			const bool isLeft = root == left;
+			put(root + QStringLiteral("/small.txt"), isLeft ? "left\n" : "right\n");
+			put(root + QStringLiteral("/big.txt"), QByteArray(5000, isLeft ? 'l' : 'r'));
+			put(root + QStringLiteral("/old.txt"), isLeft ? "left\n" : "right\n", longAgo);
+			put(root + QStringLiteral("/.hidden"), isLeft ? "left\n" : "right\n");
+			put(root + QStringLiteral("/locked.txt"), isLeft ? "left\n" : "right\n");
+			QFile::setPermissions(root + QStringLiteral("/locked.txt"),
+				QFileDevice::ReadOwner | QFileDevice::ReadGroup | QFileDevice::ReadOther);
+			put(root + QStringLiteral("/needle.txt"),
+				isLeft ? "a needle here\nleft\n" : "a needle here\nright\n");
+			put(root + QStringLiteral("/long.txt"),
+				QByteArray(isLeft ? "left line\n" : "right line\n").repeated(40));
+			// the same size on both sides, another length on the right
+			put(root + QStringLiteral("/grown.txt"), isLeft ? "12345\n" : "123456789\n");
+			// the right one last touched long ago
+			put(root + QStringLiteral("/stale.txt"), isLeft ? "left\n" : "right\n",
+				isLeft ? QDateTime() : longAgo);
+			put(root + QStringLiteral("/full/one.txt"), isLeft ? "left\n" : "right\n");
+			put(root + QStringLiteral("/heavy/load.txt"), QByteArray(5000, isLeft ? 'l' : 'r'));
+			QDir().mkpath(root + QStringLiteral("/empty"));
+		}
+		using Item = lm::FolderCompareItem;
+		const QStringList names = { QStringLiteral("small.txt"), QStringLiteral("big.txt"),
+			QStringLiteral("old.txt"), QStringLiteral(".hidden"), QStringLiteral("locked.txt"),
+			QStringLiteral("needle.txt"), QStringLiteral("long.txt"), QStringLiteral("grown.txt"),
+			QStringLiteral("stale.txt"), QStringLiteral("full"), QStringLiteral("heavy"),
+			QStringLiteral("empty") };
+		const auto kept = [&](const QString &maskText) {
+			lm::setFileFilterMask(maskText);
+			FolderCompareView view;
+			view.start(QStringList{ left, right });
+			for (int i = 0; i < 400 && view.isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+			QStringList compared;
+			for (const QString &name : names)
+			{
+				const int category = view.rowCategoryForTest(name);
+				if (category >= 0 && category != Item::Skipped)
+					compared.append(name);
+			}
+			printf("  %s keeps: %s\n", qPrintable(maskText),
+				qPrintable(compared.join(QLatin1Char(' '))));
+			return compared;
+		};
+		const auto without = [&names](const QStringList &dropped) {
+			QStringList rest = names;
+			for (const QString &name : dropped)
+				rest.removeAll(name);
+			return rest;
+		};
+		check(kept(QStringLiteral("*.*")) == names, "engine: everything by default");
+		check(kept(made(Menu::SizeFirst)) == without({ QStringLiteral("big.txt") }),
+			"engine: File Size, less than 1KB");
+		check(kept(made(Menu::DateFirst + 3))
+				== without({ QStringLiteral("old.txt") }),
+			"engine: Last Modified, today");
+		check(kept(made(Menu::AttrFirst + 3)) == without({ QStringLiteral(".hidden") })
+			&& kept(made(Menu::AttrFirst + 1)) == without({ QStringLiteral("locked.txt") }),
+			"engine: Attributes, not hidden and not read-only");
+		check(kept(QStringLiteral("*.*|fe:Content contains \"needle\""))
+				== QStringList{ QStringLiteral("needle.txt"), QStringLiteral("full"),
+					QStringLiteral("heavy"), QStringLiteral("empty") },
+			"engine: File Content, contains");
+		check(kept(made(Menu::LinesFirst + 1))
+				== QStringList{ QStringLiteral("long.txt"), QStringLiteral("full"),
+					QStringLiteral("heavy"), QStringLiteral("empty") },
+			"engine: Line Count, 10 or more");
+		check(kept(made(Menu::FolderFilesLast)) == without({ QStringLiteral("empty") }),
+			"engine: a folder's Files, 1 file or more");
+		check(kept(made(Menu::FolderTotalSizeFirst + 1))
+				== without({ QStringLiteral("full"), QStringLiteral("empty") }),
+			"engine: a folder's Total Size, 1KB or more");
+		// (the two sides' texts differ in length by a byte; big.txt alone is
+		// the same size on both, grown.txt alone differs by more)
+		check(kept(made(Menu::DiffSizeFirst + 1)) == without({ QStringLiteral("big.txt") })
+			&& kept(made(Menu::DiffSizeFirst + 7))
+				== QStringList{ QStringLiteral("long.txt"), QStringLiteral("full"),
+					QStringLiteral("heavy"), QStringLiteral("empty") },
+			"engine: difference in File Size, not equal, and by 10 bytes or more");
+		check(kept(made(Menu::DiffDateFirst + 13))
+				== QStringList{ QStringLiteral("stale.txt"), QStringLiteral("full"),
+					QStringLiteral("heavy"), QStringLiteral("empty") },
+			"engine: difference in Last Modified, 1 day or more");
+		check(kept(made(Menu::FolderBuild, made(Menu::FolderVcs))) == names
+			&& kept(QStringLiteral("*.*;!full\\;!heavy\\"))
+				== without({ QStringLiteral("full"), QStringLiteral("heavy") }),
+			"engine: ready-made folder exclusions");
+		lm::setFileFilterMask(QStringLiteral("*.*"));
+		for (const QString &root : { left, right })
+			QFile::setPermissions(root + QStringLiteral("/locked.txt"),
+				QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+
+		// --- where the menu lives ---
+		{
+			FiltersDialog dialog;
+			dialog.showPage(FiltersDialog::FileFiltersPage);
+			auto *maskButton = dialog.findChild<QToolButton *>(QStringLiteral("fileFilterMaskMenu"));
+			auto *pageMenu = dialog.findChild<FileFilterMenu *>();
+			auto *mask = dialog.findChild<FileFilterCombo *>(QStringLiteral("fileFilterMask"));
+			if (maskButton == nullptr || pageMenu == nullptr || mask == nullptr)
+				return 1;
+			mask->setEditText(QStringLiteral("*.cpp"));
+			pageMenu->pickForTest(Menu::FileBackup);
+			const QString afterNames = mask->mask();
+			pageMenu->pickForTest(Menu::SizeFirst);
+			const QString afterCondition = mask->mask();
+			pageMenu->pickForTest(Menu::MaskRemoveLast);
+			const QString afterRemove = mask->mask();
+			pageMenu->pickForTest(Menu::MaskAll);
+			check(maskButton->text() == QStringLiteral("=")
+				&& afterNames.startsWith(QStringLiteral("*.cpp;!*.bak;"))
+				&& afterCondition == afterNames + QStringLiteral("|fe:Size < 1KB")
+				&& afterRemove == afterNames && mask->mask() == QStringLiteral("*.*")
+				&& mask->errors().isEmpty(),
+				"File Filters page: the \"=\" button's menu changes the mask");
+
+			MainWindow window;
+			window.openSelector({ left, right });
+			settle();
+			auto *selector = window.findChild<NewComparisonView *>();
+			auto *select = selector != nullptr
+				? selector->findChild<QToolButton *>(QStringLiteral("selectFilter")) : nullptr;
+			auto *selectMenu = selector != nullptr
+				? selector->findChild<FileFilterMenu *>() : nullptr;
+			if (select == nullptr || selectMenu == nullptr)
+				return 1;
+			selector->verifyPathsForTest();
+			FileFilterCombo *field = selector->filterFieldForTest();
+			field->setEditText(QStringLiteral("*.h"));
+			selectMenu->pickForTest(Menu::FolderVcs);
+			check(select->menu() == selectMenu
+				&& select->popupMode() == QToolButton::MenuButtonPopup
+				&& field->mask() == QStringLiteral("*.h;!.git\\;!.svn\\;!.hg\\"),
+				"selection screen: the arrow of Select... opens the same menu");
+		}
+
+		printf("filter menu: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

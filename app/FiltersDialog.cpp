@@ -23,6 +23,7 @@
 #include <QShortcut>
 #include <QStyledItemDelegate>
 #include <QTabWidget>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -31,6 +32,7 @@
 #include "FileFilter.h"
 #include "FileFilterCombo.h"
 #include "FileFilterHelper.h"
+#include "FileFilterMenu.h"
 #include "FileFilterMgr.h"
 #include "FileFilters.h"
 #include "ItemCheckStyle.h"
@@ -250,7 +252,27 @@ QWidget *FiltersDialog::buildFileFiltersPage()
 	m_maskCombo->setChecker([this](const QString &text) {
 		return lm::fileFilterErrors(m_fileFilter.get(), text);
 	});
-	box->addWidget(m_maskCombo);
+	// the "=" button: ready-made changes to the mask (CFileFilterHelperMenu)
+	auto *maskRow = new QHBoxLayout;
+	maskRow->addWidget(m_maskCombo, 1);
+	auto *menuButton = new QToolButton(page);
+	menuButton->setObjectName(QStringLiteral("fileFilterMaskMenu"));
+	menuButton->setText(QStringLiteral("="));
+	maskRow->addWidget(menuButton);
+	box->addLayout(maskRow);
+	m_maskMenu = new FileFilterMenu(this);
+	m_maskMenu->setMaskSource([this]() { return m_maskCombo->mask(); });
+	const auto showMaskMenu = [this, menuButton]() {
+		m_maskMenu->popup(menuButton->mapToGlobal(QPoint(0, menuButton->height())));
+	};
+	connect(menuButton, &QToolButton::clicked, this, showMaskMenu);
+	connect(m_maskMenu, &FileFilterMenu::reopenRequested, this, showMaskMenu,
+		Qt::QueuedConnection);
+	connect(m_maskMenu, &FileFilterMenu::maskChosen, this, [this](const QString &mask) {
+		m_maskCombo->setMask(mask, false);
+		if (checkPresets(presetFiltersFromLastGroup(mask)))
+			presetsToMask();
+	});
 
 	box->addWidget(new QLabel(tr("Preset Filters"), page));
 	m_presetList = makeList(page);

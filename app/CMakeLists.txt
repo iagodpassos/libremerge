@@ -22,6 +22,8 @@ qt_add_executable(LibreMerge
   OptionsDialog.cpp
   FiltersDialog.cpp
   FileFilterCombo.cpp
+  FileFilterMenu.cpp
+  FilterConditionDialog.cpp
   FileFilters.cpp
   DiffTextEdit.cpp
   Icons.cpp

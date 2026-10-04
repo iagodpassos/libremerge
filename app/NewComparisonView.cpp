@@ -2,6 +2,7 @@
 #include "NewComparisonView.h"
 #include "ArchiveCompare.h"
 #include "FileFilterCombo.h"
+#include "FileFilterMenu.h"
 #include "FileFilters.h"
 #include "OptionsDialog.h"
 
@@ -164,7 +165,8 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	}
 
 	// WinMerge's "Folder: Filter" group: the file filter a folder
-	// comparison goes by, typed here or picked in Tools > Filters. Its
+	// comparison goes by, typed here, put together from the button's
+	// menu or picked in Tools > Filters. Its
 	// "Include subfolders" box is not here: folders compare with their
 	// subfolders
 	m_filterTitle = new QLabel(tr("Folder: Filter"), content);
@@ -183,9 +185,21 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	// the filter in use, put on top of the list when it is not there
 	m_filterCombo->setMask(lm::fileFilterMask(), true);
 	filterRow->addWidget(m_filterCombo, 1);
-	m_selectFilterButton = new QPushButton(tr("Select..."), content);
+	// a split button, as upstream's: the button opens Tools > Filters, its
+	// arrow the menu of ready-made changes to the field's mask
+	m_selectFilterButton = new QToolButton(content);
+	m_selectFilterButton->setText(tr("Select..."));
 	m_selectFilterButton->setObjectName(QStringLiteral("selectFilter"));
-	connect(m_selectFilterButton, &QPushButton::clicked, this, [this]() {
+	m_selectFilterButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+	m_selectFilterButton->setPopupMode(QToolButton::MenuButtonPopup);
+	m_filterMenu = new FileFilterMenu(this);
+	m_filterMenu->setMaskSource([this]() { return m_filterCombo->mask(); });
+	m_selectFilterButton->setMenu(m_filterMenu);
+	connect(m_filterMenu, &FileFilterMenu::maskChosen, this,
+		[this](const QString &mask) { m_filterCombo->setMask(mask, false); });
+	connect(m_filterMenu, &FileFilterMenu::reopenRequested, m_selectFilterButton,
+		&QToolButton::showMenu, Qt::QueuedConnection);
+	connect(m_selectFilterButton, &QToolButton::clicked, this, [this]() {
 		const QString before = m_filterCombo->mask().trimmed();
 		QMetaObject::invokeMethod(window(), "showFilters");
 		// what the dialog left in use takes the field over

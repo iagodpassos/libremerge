@@ -21,6 +21,8 @@
 #include "DiffWrapper.h"
 #include "DirScan.h"
 #include "FileFilterHelper.h"
+#include "OptionsDef.h"
+#include "OptionsMgr.h"
 #include "IAbortable.h"
 #include "PathContext.h"
 #include "paths.h"
@@ -162,9 +164,9 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	// and the line filters
 	ctxt.m_nQuickCompareLimit = 4 * 1024 * 1024;
 	ctxt.m_nBinaryCompareLimit = 64 * 1024 * 1024;
-	// OPT_CP_DETECT outside the CJK locales: valid UTF-8 reads as UTF-8,
-	// HTML/XML/.rc files by their declared charset
-	ctxt.m_iGuessEncodingType = (50001 << 16) | 1;
+	// OPT_CP_DETECT (see installEngineOptions): valid UTF-8 reads as
+	// UTF-8, HTML/XML/.rc files by their declared charset
+	ctxt.m_iGuessEncodingType = GetOptionsMgr()->GetInt(OPT_CP_DETECT);
 	// off, the same text in another encoding is a difference
 	ctxt.m_bIgnoreCodepage = ignoreCodepageDifferences();
 	ctxt.m_pFilterList = currentLineFilters();

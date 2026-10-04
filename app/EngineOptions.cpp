@@ -234,6 +234,12 @@ void installEngineOptions()
 	options.InitOption(OPT_CMP_INDENT_HEURISTIC, true); // upstream default
 	options.InitOption(OPT_CMP_MOVED_BLOCKS, false);    // upstream default
 	options.InitOption(OPT_CMP_METHOD, static_cast<int>(CMP_CONTENT));
+	// how a file's encoding is guessed, WinMerge's default outside the CJK
+	// locales: valid UTF-8 reads as UTF-8, HTML/XML/.rc files by their
+	// declared charset. Not an option here (it is not saved), but the
+	// engine asks for it by name: a folder comparison's context, and the
+	// filter expressions that read a file's content
+	options.InitOption(OPT_CP_DETECT, (50001 << 16) | 1, false);
 	loadFilters(&options);
 
 	// "Ignore comment differences" asks this registry for a parser of the
