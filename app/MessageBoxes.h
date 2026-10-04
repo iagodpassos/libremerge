@@ -59,6 +59,11 @@ void showIdenticalMessage(QWidget *parent, const QStringList &paths,
 void showInformation(QWidget *parent, const QString &text);
 /** The same with the warning icon (MB_OK | MB_ICONEXCLAMATION). */
 void showWarning(QWidget *parent, const QString &text);
+/** The same with the error icon (MB_ICONSTOP, MB_ICONERROR). */
+void showError(QWidget *parent, const QString &text);
+/** A Yes/No warning box (MB_ICONWARNING | MB_YESNO): true for Yes. In
+    tests the question sink answers. */
+bool askWarning(QWidget *parent, const QString &text);
 
 /** CMergeDoc::CheckFileChanged's question: another application changed a
     compared file since it was loaded, reload it? "Don't ask this question

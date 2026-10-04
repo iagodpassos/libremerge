@@ -280,6 +280,24 @@ void showWarning(QWidget *parent, const QString &text)
 	box.exec();
 }
 
+void showError(QWidget *parent, const QString &text)
+{
+	if (sink())
+	{
+		sink()(text);
+		return;
+	}
+	QMessageBox box(QMessageBox::Critical, QStringLiteral("LibreMerge"), text,
+		QMessageBox::Ok, parent);
+	box.setWindowModality(Qt::WindowModal);
+	box.exec();
+}
+
+bool askWarning(QWidget *parent, const QString &text)
+{
+	return askYesNo(parent, text);
+}
+
 bool askReloadChangedFile(QWidget *parent, const QString &path)
 {
 	return askYesNo(parent, fileChangedRescanText().arg(path), kFileChangedRescan);

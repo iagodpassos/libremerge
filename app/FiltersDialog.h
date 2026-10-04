@@ -1,22 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <QDialog>
 
 #include "LineFiltersList.h"
 #include "SubstitutionFiltersList.h"
 
+class FileFilterCombo;
+class FileFilterHelper;
 class QCheckBox;
+class QFileSystemWatcher;
 class QPushButton;
 class QTabWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
 
 /**
- * WinMerge's Tools > Filters dialog (CFiltersPropertySheet) with its Line
- * Filters and Substitution Filters pages (LineFiltersDlg and
- * SubstitutionFiltersDlg), control for control; its File Filters page is
- * not here yet. The dialog edits copies of the filters: once it is
+ * WinMerge's Tools > Filters dialog (CFiltersPropertySheet) with its File
+ * Filters, Line Filters and Substitution Filters pages (FileFiltersDlg,
+ * LineFiltersDlg and SubstitutionFiltersDlg), control for control but for
+ * the File Filters page's "=" button, whose menu of ready-made conditions
+ * is not here yet. The dialog edits copies of the filters: once it is
  * accepted the caller compares them with the ones in use and saves them
  * (CMainFrame::OnToolsFilters).
  */
@@ -24,17 +30,20 @@ class FiltersDialog : public QDialog
 {
 	Q_OBJECT
 public:
-	/** The pages, numbered as WinMerge's sheet has them (0 is its File
-	    Filters page): the number kept as "FilterStartPage". */
+	/** The pages, in the sheet's order: the number kept as
+	    "FilterStartPage". */
 	enum Page
 	{
+		FileFiltersPage = 0,
 		LineFiltersPage = 1,
 		SubstitutionFiltersPage = 2,
 	};
 
 	explicit FiltersDialog(QWidget *parent = nullptr);
+	~FiltersDialog() override;
 
 	/** The filters as the dialog was accepted with. */
+	const FileFilterHelper &fileFilter() const { return *m_fileFilter; }
 	bool lineFiltersEnabled() const { return m_lineFiltersEnabled; }
 	const LineFiltersList &lineFilters() const { return m_lineFilters; }
 	const SubstitutionFiltersList &substitutionFilters() const
@@ -50,7 +59,30 @@ public:
 	void showPage(int page);
 	int currentPage() const;
 
+	/** Stand-ins for the file dialogs of New and Install, and for the
+	    editor Edit and New open (for tests; an empty function is the real
+	    thing). The chooser gets whether it is a save dialog and the
+	    folder it starts in, and returns the path picked, or nothing. */
+	static void setFileChooserForTest(
+		std::function<QString(bool save, const QString &folder)> chooser);
+	static void setEditorForTest(std::function<void(const QString &path)> editor);
+
 private:
+	QWidget *buildFileFiltersPage();
+	void fillPresetList();
+	QTreeWidgetItem *presetRow(const QString &path) const;
+	void showPresetErrors();
+	bool checkPresets(const QStringList &names);
+	void presetsToMask();
+	void selectPreset(const QString &path);
+	void updateFileButtons();
+	void testFileFilter();
+	void installFileFilter();
+	void newFileFilter();
+	void editSelectedFileFilter();
+	void deleteSelectedFileFilter();
+	void editFileFilter(const QString &path);
+	void applyFileFilters();
 	QWidget *buildLineFiltersPage();
 	QWidget *buildSubstitutionFiltersPage();
 	QTreeWidgetItem *addLineFilterRow(const QString &filter, bool enabled);
@@ -63,6 +95,14 @@ private:
 	bool applySubstitutionFilters();
 
 	QTabWidget *m_tabs = nullptr;
+	// File Filters
+	std::shared_ptr<FileFilterHelper> m_fileFilter;
+	FileFilterCombo *m_maskCombo = nullptr;
+	QTreeWidget *m_presetList = nullptr;
+	QPushButton *m_btnEditPreset = nullptr;
+	QPushButton *m_btnDeletePreset = nullptr;
+	QFileSystemWatcher *m_presetWatcher = nullptr;
+	bool m_checkingPresets = false;
 	// Line Filters
 	QCheckBox *m_chkLineFilters = nullptr;
 	QTreeWidget *m_lineList = nullptr;

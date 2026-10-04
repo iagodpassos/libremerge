@@ -4,19 +4,35 @@
 
 #include <stdexcept>
 #include <QCheckBox>
+#include <QDesktopServices>
 #include <QDialogButtonBox>
+#include <QDir>
+#include <QFile>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QFileSystemWatcher>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLineEdit>
+#include <QPlainTextEdit>
+#include <QProcess>
 #include <QPushButton>
 #include <QSettings>
 #include <QShortcut>
 #include <QStyledItemDelegate>
 #include <QTabWidget>
 #include <QTreeWidget>
+#include <QUrl>
 #include <QVBoxLayout>
 
 #include "EngineOptions.h"
+#include "FileFilter.h"
+#include "FileFilterCombo.h"
+#include "FileFilterHelper.h"
+#include "FileFilterMgr.h"
+#include "FileFilters.h"
 #include "ItemCheckStyle.h"
 #include "MessageBoxes.h"
 
@@ -24,6 +40,82 @@ namespace
 {
 
 const QString kStartPageKey = QStringLiteral("Settings/FilterStartPage");
+/** The file a new filter starts from, in the shipped filters' folder. */
+const QString kFilterTemplate = QStringLiteral("FileFilter.tmpl");
+
+std::function<QString(bool, const QString &)> &fileChooser()
+{
+	static std::function<QString(bool, const QString &)> chooser;
+	return chooser;
+}
+
+std::function<void(const QString &)> &editorStandIn()
+{
+	static std::function<void(const QString &)> editor;
+	return editor;
+}
+
+/** The parts of a mask's last filter group ("a;b|c;d" ends in "c;d"). */
+QStringList lastGroupParts(const QString &mask, std::vector<String> *groups)
+{
+	*groups = FileFilterHelper::SplitFilterGroups(mask.toStdString());
+	QStringList parts;
+	for (const QString &part : QString::fromStdString(groups->back()).split(QLatin1Char(';')))
+		parts.append(part.trimmed());
+	return parts;
+}
+
+/** FileFiltersDlg's GetPresetFiltersFromLastGroup: the presets a mask
+    names there, "pf:<name>". */
+QStringList presetFiltersFromLastGroup(const QString &mask)
+{
+	std::vector<String> groups;
+	QStringList presets;
+	for (const QString &part : lastGroupParts(mask, &groups))
+		if (part.startsWith(QStringLiteral("pf:")))
+			presets.append(part.mid(3));
+	return presets;
+}
+
+/** RemovePresetFiltersFromLastGroup: the mask without them. */
+QString removePresetFiltersFromLastGroup(const QString &mask)
+{
+	std::vector<String> groups;
+	QStringList kept;
+	for (const QString &part : lastGroupParts(mask, &groups))
+		if (!part.startsWith(QStringLiteral("pf:")))
+			kept.append(part);
+	groups.back() = kept.join(QLatin1Char(';')).toStdString();
+	return QString::fromStdString(FileFilterHelper::JoinFilterGroups(groups));
+}
+
+/** AddPresetFiltersToLastGroup: the mask plus the ticked presets. */
+QString addPresetFiltersToLastGroup(const QString &mask, const QTreeWidget *list)
+{
+	std::vector<String> groups = FileFilterHelper::SplitFilterGroups(mask.toStdString());
+	QString last = QString::fromStdString(groups.back());
+	for (int i = 0; i < list->topLevelItemCount(); ++i)
+	{
+		const QTreeWidgetItem *item = list->topLevelItem(i);
+		if (item->checkState(0) != Qt::Checked)
+			continue;
+		if (!last.isEmpty())
+			last += QLatin1Char(';');
+		last += QStringLiteral("pf:") + item->text(0);
+	}
+	groups.back() = last.toStdString();
+	return QString::fromStdString(FileFilterHelper::JoinFilterGroups(groups));
+}
+
+QString chooseFilterFile(QWidget *parent, bool save, const QString &folder,
+	const QString &title)
+{
+	if (fileChooser())
+		return fileChooser()(save, folder);
+	const QString types = FiltersDialog::tr("File Filters (*.flt);;All Files (*)");
+	return save ? QFileDialog::getSaveFileName(parent, title, folder, types)
+		: QFileDialog::getOpenFileName(parent, title, folder, types);
+}
 
 /** The substitution list's columns, as SubstitutionFiltersDlg::InitList
     inserts them. */
@@ -94,12 +186,16 @@ FiltersDialog::FiltersDialog(QWidget *parent)
 	setObjectName(QStringLiteral("filtersDialog"));
 	setWindowModality(Qt::WindowModal);
 	setWindowTitle(tr("Filters"));
+	// a copy of each to edit; the preset files are read again first, in
+	// case they were edited meanwhile
+	m_fileFilter = lm::cloneFileFilter();
 	m_lineFiltersEnabled = lm::lineFiltersEnabled();
 	lm::copyLineFilters(&m_lineFilters);
 	lm::copySubstitutionFilters(&m_substitutionFilters);
 
 	auto *layout = new QVBoxLayout(this);
 	m_tabs = new QTabWidget(this);
+	m_tabs->addTab(buildFileFiltersPage(), tr("File Filters"));
 	m_tabs->addTab(buildLineFiltersPage(), tr("Line Filters"));
 	m_tabs->addTab(buildSubstitutionFiltersPage(), tr("Substitution Filters"));
 	layout->addWidget(m_tabs, 1);
@@ -109,20 +205,417 @@ FiltersDialog::FiltersDialog(QWidget *parent)
 	connect(buttons, &QDialogButtonBox::accepted, this, &FiltersDialog::accept);
 	connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 	layout->addWidget(buttons);
-	resize(780, 440);
+	resize(820, 460);
 
 	// opens on the page it was last accepted on
 	showPage(QSettings().value(kStartPageKey, 0).toInt());
 }
 
+FiltersDialog::~FiltersDialog() = default;
+
 void FiltersDialog::showPage(int page)
 {
-	m_tabs->setCurrentIndex(page == SubstitutionFiltersPage ? 1 : 0);
+	m_tabs->setCurrentIndex(page >= 0 && page < m_tabs->count() ? page : 0);
 }
 
 int FiltersDialog::currentPage() const
 {
-	return m_tabs->currentIndex() == 1 ? SubstitutionFiltersPage : LineFiltersPage;
+	return m_tabs->currentIndex();
+}
+
+void FiltersDialog::setFileChooserForTest(
+	std::function<QString(bool save, const QString &folder)> chooser)
+{
+	fileChooser() = std::move(chooser);
+}
+
+void FiltersDialog::setEditorForTest(std::function<void(const QString &path)> editor)
+{
+	editorStandIn() = std::move(editor);
+}
+
+QWidget *FiltersDialog::buildFileFiltersPage()
+{
+	auto *page = new QWidget(this);
+	page->setObjectName(QStringLiteral("fileFiltersPage"));
+	auto *box = new QVBoxLayout(page);
+
+	box->addWidget(new QLabel(tr("Mask / Filter Expression"), page));
+	m_maskCombo = new FileFilterCombo(page);
+	m_maskCombo->setObjectName(QStringLiteral("fileFilterMask"));
+	m_maskCombo->loadHistory();
+	m_maskCombo->lineEdit()->setPlaceholderText(
+		tr("e.g. %1").arg(QStringLiteral("*.txt|fe:Size > 100KB")));
+	// what is typed is parsed by the dialog's own copy of the filter
+	m_maskCombo->setChecker([this](const QString &text) {
+		return lm::fileFilterErrors(m_fileFilter.get(), text);
+	});
+	box->addWidget(m_maskCombo);
+
+	box->addWidget(new QLabel(tr("Preset Filters"), page));
+	m_presetList = makeList(page);
+	m_presetList->setObjectName(QStringLiteral("presetFilters"));
+	m_presetList->setHeaderLabels({ tr("Name"), tr("Description"), tr("Location") });
+	m_presetList->setEditTriggers(QAbstractItemView::NoEditTriggers);
+	m_presetList->header()->resizeSection(0, 170);
+	m_presetList->header()->resizeSection(1, 320);
+	box->addWidget(m_presetList, 1);
+
+	auto *row = new QHBoxLayout;
+	QPushButton *testButton = makeButton(tr("Test..."), "testFileFilter", page);
+	QPushButton *installButton = makeButton(tr("Install..."), "installFileFilter", page);
+	QPushButton *newButton = makeButton(tr("New..."), "newFileFilter", page);
+	m_btnEditPreset = makeButton(tr("Edit..."), "editFileFilter", page);
+	m_btnDeletePreset = makeButton(tr("Delete..."), "deleteFileFilter", page);
+	row->addWidget(testButton);
+	row->addStretch(1);
+	row->addWidget(installButton);
+	row->addWidget(newButton);
+	row->addWidget(m_btnEditPreset);
+	row->addWidget(m_btnDeletePreset);
+	box->addLayout(row);
+
+	// a preset saved in its editor is read again, and shows its errors
+	m_presetWatcher = new QFileSystemWatcher(this);
+	const auto presetEdited = [this]() {
+		m_fileFilter->ReloadUpdatedFilters();
+		showPresetErrors();
+	};
+	connect(m_presetWatcher, &QFileSystemWatcher::fileChanged, this, presetEdited);
+	connect(m_presetWatcher, &QFileSystemWatcher::directoryChanged, this, presetEdited);
+
+	fillPresetList();
+	m_maskCombo->setMask(QString::fromStdString(m_fileFilter->GetMaskOrExpression()), false);
+	checkPresets(presetFiltersFromLastGroup(m_maskCombo->mask()));
+
+	// ticking a preset writes it into the mask, and a mask typed with
+	// presets in it ticks them once the field is left
+	connect(m_presetList, &QTreeWidget::itemChanged, this,
+		[this](QTreeWidgetItem *, int column) {
+			if (column == 0 && !m_checkingPresets)
+				presetsToMask();
+		});
+	connect(m_maskCombo, &FileFilterCombo::focusLeft, this, [this]() {
+		if (checkPresets(presetFiltersFromLastGroup(m_maskCombo->mask())))
+			presetsToMask();
+	});
+	connect(m_presetList, &QTreeWidget::itemSelectionChanged, this,
+		&FiltersDialog::updateFileButtons);
+	connect(m_presetList, &QTreeWidget::itemDoubleClicked, this,
+		[this]() { editSelectedFileFilter(); });
+	connect(testButton, &QPushButton::clicked, this, &FiltersDialog::testFileFilter);
+	connect(installButton, &QPushButton::clicked, this, &FiltersDialog::installFileFilter);
+	connect(newButton, &QPushButton::clicked, this, &FiltersDialog::newFileFilter);
+	connect(m_btnEditPreset, &QPushButton::clicked, this,
+		&FiltersDialog::editSelectedFileFilter);
+	connect(m_btnDeletePreset, &QPushButton::clicked, this,
+		&FiltersDialog::deleteSelectedFileFilter);
+	updateFileButtons();
+	return page;
+}
+
+void FiltersDialog::fillPresetList()
+{
+	m_checkingPresets = true;
+	m_presetList->clear();
+	for (const FileFilterInfo &info : m_fileFilter->GetFileFilters())
+	{
+		auto *item = new QTreeWidgetItem(m_presetList);
+		item->setFlags((item->flags() | Qt::ItemIsUserCheckable)
+			& ~(Qt::ItemIsEditable | Qt::ItemIsDropEnabled));
+		item->setText(0, QString::fromStdString(info.name));
+		item->setText(1, QString::fromStdString(info.description));
+		item->setText(2, QString::fromStdString(info.fullpath));
+		item->setCheckState(0, Qt::Unchecked);
+	}
+	m_checkingPresets = false;
+	showPresetErrors();
+}
+
+QTreeWidgetItem *FiltersDialog::presetRow(const QString &path) const
+{
+	for (int i = 0; i < m_presetList->topLevelItemCount(); ++i)
+		if (m_presetList->topLevelItem(i)->text(2) == path)
+			return m_presetList->topLevelItem(i);
+	return nullptr;
+}
+
+/** A preset whose file has errors shows in red, the errors as its tool
+    tip (OnCustomDrawFiltersList, OnInfoTip). */
+void FiltersDialog::showPresetErrors()
+{
+	m_checkingPresets = true;
+	const bool dark = palette().color(QPalette::Base).lightness() < 128;
+	const QBrush tint(dark ? QColor(80, 40, 40) : QColor(255, 200, 200));
+	for (int i = 0; i < m_presetList->topLevelItemCount(); ++i)
+	{
+		QTreeWidgetItem *item = m_presetList->topLevelItem(i);
+		QStringList lines;
+		if (const FileFilter *filter
+				= m_fileFilter->GetManager()->GetFilterByPath(item->text(2).toStdString()))
+			for (const FileFilterErrorInfo &error : filter->errors)
+				lines.append(lm::formatFilterError(error));
+		for (int column = 0; column < m_presetList->columnCount(); ++column)
+		{
+			item->setBackground(column, lines.isEmpty() ? QBrush() : tint);
+			// without errors a cut-off text shows whole (the list's info tips)
+			item->setToolTip(column, lines.isEmpty() ? item->text(column)
+				: lines.join(QLatin1Char('\n')));
+		}
+	}
+	m_checkingPresets = false;
+}
+
+/** Tick exactly the named presets; true when a tick changed. */
+bool FiltersDialog::checkPresets(const QStringList &names)
+{
+	bool changed = false;
+	m_checkingPresets = true;
+	for (int i = 0; i < m_presetList->topLevelItemCount(); ++i)
+	{
+		QTreeWidgetItem *item = m_presetList->topLevelItem(i);
+		const bool wanted = names.contains(item->text(0));
+		if ((item->checkState(0) == Qt::Checked) != wanted)
+		{
+			item->setCheckState(0, checkState(wanted));
+			changed = true;
+		}
+	}
+	m_checkingPresets = false;
+	return changed;
+}
+
+/** The mask's last group names the ticked presets, in the list's order. */
+void FiltersDialog::presetsToMask()
+{
+	m_maskCombo->setMask(addPresetFiltersToLastGroup(
+		removePresetFiltersFromLastGroup(m_maskCombo->mask()), m_presetList), false);
+}
+
+void FiltersDialog::selectPreset(const QString &path)
+{
+	if (QTreeWidgetItem *item = presetRow(path))
+	{
+		item->setCheckState(0, Qt::Checked);
+		m_presetList->scrollToItem(item);
+	}
+}
+
+void FiltersDialog::updateFileButtons()
+{
+	const bool selected = selectedRow(m_presetList) != nullptr;
+	m_btnEditPreset->setEnabled(selected);
+	m_btnDeletePreset->setEnabled(selected);
+}
+
+/** WinMerge's Test Filter dialog (CTestFilterDlg): does a name pass the
+    mask as it stands, ticked presets included? */
+void FiltersDialog::testFileFilter()
+{
+	// the presets may just have been edited
+	m_fileFilter->ReloadUpdatedFilters();
+	showPresetErrors();
+	m_fileFilter->SetMaskOrExpression(addPresetFiltersToLastGroup(
+		removePresetFiltersFromLastGroup(m_maskCombo->mask()), m_presetList).toStdString());
+
+	QDialog dialog(this);
+	dialog.setObjectName(QStringLiteral("testFilterDialog"));
+	dialog.setWindowModality(Qt::WindowModal);
+	dialog.setWindowTitle(tr("Test Filter"));
+	auto *grid = new QGridLayout(&dialog);
+	grid->addWidget(new QLabel(tr("Testing filter:"), &dialog), 0, 0);
+	auto *name = new QLabel(QString::fromStdString(m_fileFilter->GetMaskOrExpression()),
+		&dialog);
+	name->setObjectName(QStringLiteral("testFilterName"));
+	name->setTextInteractionFlags(Qt::TextSelectableByMouse);
+	grid->addWidget(name, 0, 1);
+	grid->addWidget(new QLabel(tr("Enter text to test:"), &dialog), 1, 0);
+	auto *text = new QLineEdit(&dialog);
+	text->setObjectName(QStringLiteral("testFilterText"));
+	grid->addWidget(text, 1, 1);
+	auto *isFolder = new QCheckBox(tr("Folder Name"), &dialog);
+	isFolder->setObjectName(QStringLiteral("testFilterIsFolder"));
+	grid->addWidget(isFolder, 2, 0, 1, 2);
+	grid->addWidget(new QLabel(tr("Result:"), &dialog), 3, 0, 1, 2);
+	auto *results = new QPlainTextEdit(&dialog);
+	results->setObjectName(QStringLiteral("testFilterResults"));
+	results->setReadOnly(true);
+	results->setLineWrapMode(QPlainTextEdit::NoWrap);
+	grid->addWidget(results, 4, 0, 1, 2);
+	grid->setColumnStretch(1, 1);
+	auto *buttons = new QHBoxLayout;
+	buttons->addStretch(1);
+	auto *testButton = new QPushButton(tr("Test"), &dialog);
+	testButton->setObjectName(QStringLiteral("testFilterRun"));
+	testButton->setDefault(true);
+	buttons->addWidget(testButton);
+	auto *closeButton = new QPushButton(tr("Close"), &dialog);
+	closeButton->setAutoDefault(false);
+	buttons->addWidget(closeButton);
+	grid->addLayout(buttons, 5, 0, 1, 2);
+
+	connect(testButton, &QPushButton::clicked, &dialog, [this, text, isFolder, results]() {
+		// the filters match names written with backslashes
+		const String name = QString(text->text()).replace(QLatin1Char('/'),
+			QLatin1Char('\\')).toStdString();
+		const bool passed = isFolder->isChecked() ? m_fileFilter->includeDir(name)
+			: m_fileFilter->includeFile(name);
+		// (the two words are not translated upstream either)
+		results->appendPlainText(text->text() + QStringLiteral(": ")
+			+ (passed ? QStringLiteral("passed") : QStringLiteral("failed")));
+	});
+	connect(closeButton, &QPushButton::clicked, &dialog, &QDialog::reject);
+	text->setFocus();
+	dialog.resize(520, 340);
+	dialog.exec();
+}
+
+/** Copy a filter file from anywhere into the user's filter folder. */
+void FiltersDialog::installFileFilter()
+{
+	const QString source = chooseFilterFile(this, false, QString(),
+		tr("Locate Filter File to Install"));
+	if (source.isEmpty())
+		return;
+	const QString folder = lm::userFiltersDir();
+	QDir().mkpath(folder);
+	const QString target = QDir(folder).filePath(QFileInfo(source).fileName());
+	const QString failed = tr("Installing filter file failed.\n\n"
+		"Could not copy new filter to folder.");
+	if (!QFile::copy(source, target))
+	{
+		// one of that name is there already: ask, then write over it
+		if (!QFileInfo::exists(target))
+			lm::showError(this, failed);
+		else if (lm::askWarning(this, tr("Filter file exists. Overwrite?"))
+			&& (!QFile::remove(target) || !QFile::copy(source, target)))
+			lm::showError(this, failed);
+		return;
+	}
+	const String path = QDir::toNativeSeparators(target).toStdString();
+	lm::globalFileFilter()->GetManager()->AddFilter(path);
+	m_fileFilter->GetManager()->AddFilter(path);
+	fillPresetList();
+	checkPresets(presetFiltersFromLastGroup(m_maskCombo->mask()));
+	selectPreset(QString::fromStdString(path));
+	updateFileButtons();
+}
+
+/** A new filter file from the template, in the user's filter folder,
+    opened for editing. */
+void FiltersDialog::newFileFilter()
+{
+	const QString templatePath = QDir(lm::sharedFiltersDir()).filePath(kFilterTemplate);
+	if (!QFileInfo(templatePath).isFile())
+	{
+		lm::showError(this, tr("Cannot find filter template!\n\n"
+			"Copy %1 to LibreMerge/Filters Folder:\n%2.")
+			.arg(kFilterTemplate, QDir::toNativeSeparators(templatePath)));
+		return;
+	}
+	const QString folder = lm::userFiltersDir();
+	QDir().mkpath(folder);
+	QString chosen = chooseFilterFile(this, true, folder,
+		tr("Select Filename for New Filter"));
+	if (chosen.isEmpty())
+		return;
+	// the extension is the filters' own, whatever was typed
+	const QFileInfo info(chosen);
+	const QString extension = QString::fromStdString(FileFilterExt);
+	if (info.suffix().isEmpty())
+		chosen += extension;
+	else if (info.suffix().compare(extension.mid(1), Qt::CaseInsensitive) != 0)
+		chosen = QDir(info.path()).filePath(info.completeBaseName() + extension);
+
+	QFile source(templatePath);
+	QFile target(chosen);
+	if (!source.open(QIODevice::ReadOnly)
+		|| !target.open(QIODevice::WriteOnly | QIODevice::Truncate))
+	{
+		lm::showError(this, tr("Cannot copy filter template:\n%1\n\n"
+			"Make sure the folder exists and is writable.")
+			.arg(QDir::toNativeSeparators(templatePath)));
+		return;
+	}
+	QByteArray lines = source.readAll();
+	lines.replace("${name}", QFileInfo(chosen).completeBaseName().toUtf8());
+	target.write(lines);
+	target.close();
+
+	editFileFilter(chosen);
+	const String path = QDir::toNativeSeparators(chosen).toStdString();
+	if (m_fileFilter->GetManager()->AddFilter(path) != FILTER_OK)
+		return;
+	// both lists are read again, the new filter where it belongs in them
+	lm::loadFilterFiles(lm::globalFileFilter());
+	lm::loadFilterFiles(m_fileFilter.get());
+	fillPresetList();
+	checkPresets(presetFiltersFromLastGroup(m_maskCombo->mask()));
+	selectPreset(QString::fromStdString(path));
+	updateFileButtons();
+}
+
+void FiltersDialog::editSelectedFileFilter()
+{
+	if (const QTreeWidgetItem *item = selectedRow(m_presetList))
+		editFileFilter(item->text(2));
+}
+
+/** Open a filter file in an editor; WinMerge is not blocked meanwhile
+    either, and the file is read again once it is saved. */
+void FiltersDialog::editFileFilter(const QString &path)
+{
+	m_presetWatcher->addPath(path);
+	m_presetWatcher->addPath(QFileInfo(path).absolutePath());
+	if (editorStandIn())
+	{
+		editorStandIn()(path);
+		return;
+	}
+#ifdef Q_OS_MACOS
+	// the default text editor: a .flt file has no application of its own
+	QProcess::startDetached(QStringLiteral("/usr/bin/open"), { QStringLiteral("-t"), path });
+#else
+	QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+#endif
+}
+
+void FiltersDialog::deleteSelectedFileFilter()
+{
+	const QTreeWidgetItem *item = selectedRow(m_presetList);
+	if (item == nullptr)
+		return;
+	const QString path = item->text(2);
+	if (lm::askWarning(this, tr("Are you sure you want to delete\n\n%1 ?").arg(path)))
+	{
+		if (QFile::remove(path))
+		{
+			m_presetWatcher->removePath(path);
+			lm::globalFileFilter()->GetManager()->RemoveFilter(path.toStdString());
+			m_fileFilter->GetManager()->RemoveFilter(path.toStdString());
+			fillPresetList();
+			// the mask keeps the presets still listed, and forgets this one
+			checkPresets(presetFiltersFromLastGroup(m_maskCombo->mask()));
+			presetsToMask();
+		}
+		else
+		{
+			lm::showError(this, tr("Failed to delete filter:\n%1\n\n"
+				"File may be read-only.").arg(path));
+		}
+	}
+	updateFileButtons();
+}
+
+/** FileFiltersDlg::OnOK: the mask as typed, "*.*" when there is none. */
+void FiltersDialog::applyFileFilters()
+{
+	QString mask = m_maskCombo->mask();
+	if (mask.trimmed().isEmpty())
+		mask = QStringLiteral("*.*");
+	m_fileFilter->SetMaskOrExpression(mask.toStdString());
+	m_maskCombo->setEditText(mask);
+	m_maskCombo->saveHistory();
 }
 
 QWidget *FiltersDialog::buildLineFiltersPage()
@@ -380,6 +873,7 @@ void FiltersDialog::accept()
 	const int page = currentPage();
 	if (!applyLineFilters() || !applySubstitutionFilters())
 		return;
+	applyFileFilters();
 	QSettings().setValue(kStartPageKey, page);
 	QDialog::accept();
 }

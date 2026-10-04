@@ -16,7 +16,9 @@
 #include <QMenuBar>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPlainTextEdit>
 #include <QPointer>
+#include <QToolButton>
 #include <QSettings>
 #include <QStyleHints>
 #include <QToolTip>
@@ -58,6 +60,8 @@
 #include "MainWindow.h"
 #include "NewComparisonView.h"
 #include "EngineOptions.h"
+#include "FileFilterCombo.h"
+#include "FileFilters.h"
 #include "FiltersDialog.h"
 #include "ItemCheckStyle.h"
 #include "OptionsDialog.h"
@@ -75,8 +79,9 @@
 #include "IAbortable.h"
 #include "image_compare_hook.h"
 #include "ImgMergeBuffer.hpp"
-// engine (option names, for the selftests)
+// engine (option names and the file filter, for the selftests)
 #include "OptionsDef.h"
+#include "FileFilterHelper.h"
 
 namespace
 {
@@ -189,6 +194,9 @@ int main(int argc, char *argv[])
 			lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
 			// likewise the save prompt: unsaved changes are discarded
 			MainWindow::setSavePromptForTest([]() { return 2; });
+			// and no file dialog or editor opens from the Filters dialog
+			FiltersDialog::setFileChooserForTest([](bool, const QString &) { return QString(); });
+			FiltersDialog::setEditorForTest([](const QString &) {});
 			break;
 		}
 	}
@@ -220,6 +228,7 @@ int main(int argc, char *argv[])
 		app.installTranslator(&appTranslator);
 
 	lm::installEngineOptions();
+	lm::installFileFilters();
 	lm::SetImageCompareHook(&compareImageFiles);
 
 	QCommandLineParser parser;
@@ -337,6 +346,10 @@ int main(int argc, char *argv[])
 		QStringLiteral("Render every Filters page to <file>-<n>.png, with a sample row each, and exit (for testing)"),
 		QStringLiteral("file"));
 	parser.addOption(screenshotFiltersOpt);
+	QCommandLineOption screenshotSelectorOpt(QStringLiteral("screenshot-selector"),
+		QStringLiteral("Render the \"Select Files or Folders\" screen, over the paths given, to <file> and exit (for testing)"),
+		QStringLiteral("file"));
+	parser.addOption(screenshotSelectorOpt);
 	QCommandLineOption selftestOptionsOpt(QStringLiteral("selftest-options"),
 		QStringLiteral("Verify the Options dialog's page tree, titles and per-page defaults (for testing)"));
 	parser.addOption(selftestOptionsOpt);
@@ -355,6 +368,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFiltersOpt(QStringLiteral("selftest-filters"),
 		QStringLiteral("Verify the Filters dialog's pages, where the line and substitution filters are kept, what they do to comparisons and what OK rescans (for testing)"));
 	parser.addOption(selftestFiltersOpt);
+	QCommandLineOption selftestFileFiltersOpt(QStringLiteral("selftest-file-filters"),
+		QStringLiteral("Verify the shipped preset filters, the File Filters page, the global file filter in folder comparisons, its status bar pane and the selection screen's filter field (for testing)"));
+	parser.addOption(selftestFileFiltersOpt);
 	QCommandLineOption selftestThemeOpt(QStringLiteral("selftest-theme"),
 		QStringLiteral("Switch the theme from the Options dialog and verify the whole application follows (for testing)"));
 	parser.addOption(selftestThemeOpt);
@@ -643,10 +659,24 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
+	if (parser.isSet(screenshotSelectorOpt))
+	{
+		// the selection screen as the given paths leave it
+		MainWindow window;
+		window.resize(1100, 700);
+		window.show();
+		window.openSelector(parser.positionalArguments());
+		if (auto *selector = window.findChild<NewComparisonView *>())
+			selector->verifyPathsForTest();
+		QCoreApplication::processEvents();
+		return window.grab().save(parser.value(screenshotSelectorOpt)) ? 0 : 2;
+	}
+
 	if (parser.isSet(screenshotFiltersOpt))
 	{
-		// both pages over the saved filters plus one sample row each, added
-		// with the pages' own buttons; nothing is saved
+		// the three pages over the saved filters, the line and substitution
+		// ones with a sample row each, added with the pages' own buttons;
+		// nothing is saved
 		FiltersDialog dialog;
 		dialog.show();
 		QCoreApplication::processEvents();
@@ -672,7 +702,7 @@ int main(int argc, char *argv[])
 		pair->setCheckState(3, Qt::Checked);
 		const QString path = parser.value(screenshotFiltersOpt);
 		const int dot = path.lastIndexOf(QLatin1Char('.'));
-		const int pages[] = { FiltersDialog::LineFiltersPage,
+		const int pages[] = { FiltersDialog::FileFiltersPage, FiltersDialog::LineFiltersPage,
 			FiltersDialog::SubstitutionFiltersPage };
 		for (int page : pages)
 		{
@@ -2247,7 +2277,6 @@ int main(int argc, char *argv[])
 				return found != nullptr ? found->text() : QString();
 			};
 			check(dialog.windowTitle() == FiltersDialog::tr("Filters")
-				&& dialog.currentPage() == FiltersDialog::LineFiltersPage
 				&& enable->text() == FiltersDialog::tr("Enable Line Filters")
 				&& !enable->isChecked()
 				&& labels == QStringList{
@@ -2733,6 +2762,624 @@ int main(int argc, char *argv[])
 		lm::setMessageSinkForTest([](const QString &) {});
 		lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
 		printf("filters: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestFileFiltersOpt))
+	{
+		// WinMerge's file filter: the preset filters shipped with the
+		// application, the File Filters page (FileFiltersDlg), the one
+		// global filter folder comparisons go by, its status bar pane and
+		// the "Folder: Filter" field of the selection screen
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		QStringList shown;
+		lm::setMessageSinkForTest([&shown](const QString &text) { shown.append(text); });
+		QStringList asked;
+		bool answer = false;
+		lm::setQuestionSinkForTest([&asked, &answer](const QString &text, bool *) {
+			asked.append(text);
+			return answer;
+		});
+		QStringList edited;
+		FiltersDialog::setEditorForTest([&edited](const QString &path) { edited.append(path); });
+		QString chosen; // what the file dialogs answer
+		QStringList chooserCalls;
+		FiltersDialog::setFileChooserForTest([&](bool save, const QString &folder) {
+			chooserCalls.append((save ? QStringLiteral("save ") : QStringLiteral("open ")) + folder);
+			return chosen;
+		});
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 3; ++i)
+				QCoreApplication::processEvents();
+		};
+		const auto waitFor = [](const FolderCompareView *view)
+		{
+			for (int i = 0; view != nullptr && i < 400 && view->isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto button = [](QWidget *scope, const char *name) {
+			return scope->findChild<QPushButton *>(QLatin1String(name));
+		};
+		const auto click = [&button](QWidget *scope, const char *name)
+		{
+			if (QPushButton *found = button(scope, name))
+				found->click();
+			else
+				printf("  no button %s\n", name);
+		};
+		const auto usable = [&button](QWidget *scope, const char *name) {
+			const QPushButton *found = button(scope, name);
+			return found != nullptr && found->isEnabled();
+		};
+		const auto leaveField = [](FileFilterCombo *combo)
+		{
+			QFocusEvent out(QEvent::FocusOut);
+			QCoreApplication::sendEvent(combo->lineEdit(), &out);
+		};
+		const auto type = [&leaveField](FileFilterCombo *combo, const QString &text)
+		{
+			combo->setEditText(text);
+			leaveField(combo);
+		};
+		const QString sourceControl = QStringLiteral("Exclude Source Control");
+		const QString settingsKey = QStringLiteral("Settings/FileFilterCurrent");
+
+		// --- what ships with the application ---
+		{
+			const QDir shipped(lm::sharedFiltersDir());
+			const std::vector<FileFilterInfo> presets = lm::globalFileFilter()->GetFileFilters();
+			QStringList names;
+			for (const FileFilterInfo &preset : presets)
+				names.append(QString::fromStdString(preset.name));
+			printf("  shipped filters in %s: %d\n", qPrintable(shipped.path()),
+				static_cast<int>(presets.size()));
+			check(shipped.exists() && presets.size() == 12 && names.contains(sourceControl)
+				&& names.contains(QStringLiteral("Visual C++ loose"))
+				&& shipped.exists(QStringLiteral("FileFilter.tmpl")),
+				"shipped: WinMerge's twelve preset filters and the template");
+			check(lm::fileFilterMask() == QStringLiteral("*.*")
+				&& !lm::userFiltersDir().isEmpty()
+				&& lm::userFiltersDir().endsWith(QStringLiteral("/Filters")),
+				"the filter is *.* by default, the user's folder apart");
+		}
+
+		// from here on: filter folders of the test's own. Two presets and
+		// the template stand for the shipped ones
+		const QString sharedDir = dir.filePath(QStringLiteral("shared"));
+		const QString userDir = dir.filePath(QStringLiteral("user"));
+		QDir().mkpath(sharedDir);
+		{
+			const QDir shipped(lm::sharedFiltersDir());
+			for (const char *name : { "SourceControl.flt", "Merge_GnuC_loose.flt",
+					"FileFilter.tmpl" })
+				QFile::copy(shipped.filePath(QLatin1String(name)),
+					QDir(sharedDir).filePath(QLatin1String(name)));
+		}
+		lm::setFiltersDirsForTest(sharedDir, userDir);
+
+		// --- the mask the folder comparison's own field kept until 0.9.7 ---
+		{
+			QSettings().setValue(QStringLiteral("FolderCompare/Filter"),
+				QStringLiteral("*.cpp;*.h"));
+			lm::installFileFilters();
+			const QSettings settings;
+			check(lm::fileFilterMask() == QStringLiteral("*.cpp;*.h")
+				&& !settings.contains(QStringLiteral("FolderCompare/Filter"))
+				&& settings.value(settingsKey).toString() == QStringLiteral("*.cpp;*.h"),
+				"the old field's mask becomes the file filter");
+			lm::setFileFilterMask(QString());
+			check(lm::fileFilterMask() == QStringLiteral("*.*")
+				&& settings.value(settingsKey).toString() == QStringLiteral("*.*"),
+				"no mask is *.*");
+		}
+
+		// --- the File Filters page ---
+		{
+			QSettings().remove(QStringLiteral("Settings/FilterStartPage"));
+			FiltersDialog dialog;
+			auto *page = dialog.findChild<QWidget *>(QStringLiteral("fileFiltersPage"));
+			auto *mask = dialog.findChild<FileFilterCombo *>(QStringLiteral("fileFilterMask"));
+			auto *list = dialog.findChild<QTreeWidget *>(QStringLiteral("presetFilters"));
+			if (page == nullptr || mask == nullptr || list == nullptr)
+				return 1;
+			QStringList labels;
+			for (const QLabel *label : page->findChildren<QLabel *>())
+				labels.append(label->text());
+			QStringList headers;
+			for (int column = 0; column < list->columnCount(); ++column)
+				headers.append(list->headerItem()->text(column));
+			const auto text = [&](const char *name) {
+				const QPushButton *found = button(&dialog, name);
+				return found != nullptr ? found->text() : QString();
+			};
+			check(dialog.currentPage() == FiltersDialog::FileFiltersPage
+				&& labels == QStringList{ FiltersDialog::tr("Mask / Filter Expression"),
+					FiltersDialog::tr("Preset Filters") }
+				&& mask->lineEdit()->placeholderText() == FiltersDialog::tr("e.g. %1")
+					.arg(QStringLiteral("*.txt|fe:Size > 100KB"))
+				&& headers == QStringList{ FiltersDialog::tr("Name"),
+					FiltersDialog::tr("Description"), FiltersDialog::tr("Location") }
+				&& text("testFileFilter") == FiltersDialog::tr("Test...")
+				&& text("installFileFilter") == FiltersDialog::tr("Install...")
+				&& text("newFileFilter") == FiltersDialog::tr("New...")
+				&& text("editFileFilter") == FiltersDialog::tr("Edit...")
+				&& text("deleteFileFilter") == FiltersDialog::tr("Delete..."),
+				"page: the first one, with WinMerge's controls and texts");
+
+			const auto row = [list](const QString &name) -> QTreeWidgetItem * {
+				for (int i = 0; i < list->topLevelItemCount(); ++i)
+					if (list->topLevelItem(i)->text(0) == name)
+						return list->topLevelItem(i);
+				return nullptr;
+			};
+			const auto ticked = [list]() {
+				QStringList names;
+				for (int i = 0; i < list->topLevelItemCount(); ++i)
+					if (list->topLevelItem(i)->checkState(0) == Qt::Checked)
+						names.append(list->topLevelItem(i)->text(0));
+				return names;
+			};
+			QTreeWidgetItem *preset = row(sourceControl);
+			check(list->topLevelItemCount() == 2 && preset != nullptr
+				&& preset->text(1) == QStringLiteral("Exclude Source Control files and directories")
+				&& preset->text(2) == QDir(sharedDir).filePath(QStringLiteral("SourceControl.flt"))
+				&& ticked().isEmpty() && mask->mask() == QStringLiteral("*.*")
+				&& usable(&dialog, "testFileFilter") && usable(&dialog, "installFileFilter")
+				&& usable(&dialog, "newFileFilter") && !usable(&dialog, "editFileFilter")
+				&& !usable(&dialog, "deleteFileFilter"),
+				"page: the preset filters listed, the filter in use in the field");
+			if (preset == nullptr)
+				return 1;
+
+			// a tick writes the preset into the mask, and back
+			preset->setCheckState(0, Qt::Checked);
+			const QString withPreset = mask->mask();
+			preset->setCheckState(0, Qt::Unchecked);
+			check(withPreset == QStringLiteral("*.*;pf:") + sourceControl
+				&& mask->mask() == QStringLiteral("*.*"),
+				"page: ticking a preset names it in the mask");
+			// a mask typed with a preset ticks it once the field is left
+			type(mask, QStringLiteral("*.c;pf:") + sourceControl);
+			const QStringList tickedByMask = ticked();
+			type(mask, QStringLiteral("*.c"));
+			check(tickedByMask == QStringList{ sourceControl } && ticked().isEmpty(),
+				"page: a preset named in the mask is ticked");
+
+			// what does not parse turns the field red and says why
+			type(mask, QStringLiteral("*.*|fe:Size >"));
+			const QStringList syntaxErrors = mask->errors();
+			const bool red = !mask->lineEdit()->styleSheet().isEmpty()
+				&& !mask->lineEdit()->toolTip().isEmpty();
+			type(mask, QStringLiteral("pf:No such filter"));
+			const QStringList nameErrors = mask->errors();
+			type(mask, QStringLiteral("*.*|fe:Size > 100KB"));
+			printf("  errors: %s | %s\n", qPrintable(syntaxErrors.join(QStringLiteral(" / "))),
+				qPrintable(nameErrors.join(QStringLiteral(" / "))));
+			check(syntaxErrors.size() == 1 && red && nameErrors.size() == 1
+				&& nameErrors.first().startsWith(QCoreApplication::translate("FileFilters",
+					"Filter name not found"))
+				&& nameErrors.first().endsWith(QStringLiteral(": No such filter"))
+				&& mask->errors().isEmpty() && mask->lineEdit()->styleSheet().isEmpty(),
+				"page: a mask that does not parse is marked, with the reason");
+
+			// Test...: names against the mask as it stands
+			const auto tested = [&](const QString &maskText, const QString &name, bool folder) {
+				type(mask, maskText);
+				QString result;
+				QTimer::singleShot(0, &dialog, [&]() {
+					auto *test = dialog.findChild<QDialog *>(QStringLiteral("testFilterDialog"));
+					if (test == nullptr)
+					{
+						printf("no Test Filter dialog\n");
+						std::exit(3);
+					}
+					test->findChild<QLineEdit *>(QStringLiteral("testFilterText"))->setText(name);
+					test->findChild<QCheckBox *>(QStringLiteral("testFilterIsFolder"))
+						->setChecked(folder);
+					click(test, "testFilterRun");
+					result = test->findChild<QLabel *>(QStringLiteral("testFilterName"))->text()
+						+ QStringLiteral(" -> ") + test->findChild<QPlainTextEdit *>(
+							QStringLiteral("testFilterResults"))->toPlainText();
+					test->reject();
+				});
+				click(&dialog, "testFileFilter");
+				return result;
+			};
+			check(tested(QStringLiteral("*.cpp"), QStringLiteral("a.cpp"), false)
+					== QStringLiteral("*.cpp -> a.cpp: passed")
+				&& tested(QStringLiteral("*.cpp"), QStringLiteral("a.txt"), false)
+					== QStringLiteral("*.cpp -> a.txt: failed")
+				&& tested(QStringLiteral("*.*;!build/"), QStringLiteral("src/build"), true)
+					== QStringLiteral("*.*;!build/ -> src/build: failed")
+				&& tested(QStringLiteral("*.*;!build/"), QStringLiteral("src/lib"), true)
+					== QStringLiteral("*.*;!build/ -> src/lib: passed"),
+				"Test: names pass or fail the mask");
+			preset->setCheckState(0, Qt::Checked);
+			const QString presetTest = tested(mask->mask(), QStringLiteral(".git"), true);
+			preset->setCheckState(0, Qt::Unchecked);
+			check(presetTest == QStringLiteral("*.*;!build/;pf:") + sourceControl
+					+ QStringLiteral(" -> .git: failed"),
+				"Test: the ticked presets count, each named once");
+			type(mask, QStringLiteral("*.*"));
+			preset = nullptr; // New, Install and Delete make the rows anew
+
+			// New...: a filter from the template, in the user's folder
+			chosen = QDir(userDir).filePath(QStringLiteral("mine.txt"));
+			click(&dialog, "newFileFilter");
+			const QString minePath = QDir(userDir).filePath(QStringLiteral("mine.flt"));
+			QFile mineFile(minePath);
+			mineFile.open(QIODevice::ReadOnly);
+			const QByteArray mineText = mineFile.readAll();
+			mineFile.close();
+			QTreeWidgetItem *mine = row(QStringLiteral("mine"));
+			check(chooserCalls == QStringList{ QStringLiteral("save ") + userDir }
+				&& mineText.contains("name: mine\n") && !mineText.contains("${name}")
+				&& edited == QStringList{ minePath } && mine != nullptr
+				&& list->topLevelItemCount() == 3 && mine->text(2) == minePath
+				&& ticked() == QStringList{ QStringLiteral("mine") }
+				&& mask->mask() == QStringLiteral("*.*;pf:mine")
+				&& !lm::globalFileFilter()->GetFileFilterPath("mine").empty(),
+				"New: the template becomes a filter, opened, listed and ticked");
+
+			// Edit...: the editor, and what it saved is read again
+			list->setCurrentItem(mine);
+			const bool canEdit = usable(&dialog, "editFileFilter")
+				&& usable(&dialog, "deleteFileFilter");
+			edited.clear();
+			click(&dialog, "editFileFilter");
+			write(minePath, "name: mine\ndesc: broken\ndef: include\nf: (\n");
+			for (int i = 0; i < 200 && row(QStringLiteral("mine")) != nullptr
+				&& row(QStringLiteral("mine"))->background(0).style() == Qt::NoBrush; ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+			mine = row(QStringLiteral("mine"));
+			printf("  the edited preset: %s\n",
+				mine != nullptr ? qPrintable(mine->toolTip(0)) : "(gone)");
+			check(canEdit && edited == QStringList{ minePath } && mine != nullptr
+				&& mine->background(0).style() != Qt::NoBrush
+				&& mine->toolTip(0).startsWith(QCoreApplication::translate("FileFilters",
+					"Invalid regular expression"))
+				&& row(sourceControl) != nullptr
+				&& row(sourceControl)->toolTip(0) == sourceControl
+				&& row(sourceControl)->background(0).style() == Qt::NoBrush,
+				"Edit: the editor opens, a saved error marks the preset");
+
+			// Install...: a filter file from elsewhere
+			const QString elsewhere = dir.filePath(QStringLiteral("downloads/theirs.flt"));
+			write(elsewhere, "name: Theirs\ndesc: from elsewhere\ndef: include\nf: \\.tmp$\n");
+			chosen = elsewhere;
+			chooserCalls.clear();
+			click(&dialog, "installFileFilter");
+			const QString theirsPath = QDir(userDir).filePath(QStringLiteral("theirs.flt"));
+			check(chooserCalls.size() == 1 && chooserCalls.first().startsWith(QStringLiteral("open"))
+				&& QFile::exists(theirsPath) && row(QStringLiteral("Theirs")) != nullptr
+				&& row(QStringLiteral("Theirs"))->checkState(0) == Qt::Checked
+				&& mask->mask() == QStringLiteral("*.*;pf:mine;pf:Theirs")
+				&& !lm::globalFileFilter()->GetFileFilterPath("Theirs").empty(),
+				"Install: the file is copied to the user's folder, listed and ticked");
+			write(elsewhere, "name: Theirs\ndesc: a newer one\ndef: include\nf: \\.tmp$\n");
+			asked.clear();
+			answer = false;
+			click(&dialog, "installFileFilter");
+			QFile kept(theirsPath);
+			kept.open(QIODevice::ReadOnly);
+			const bool keptOld = kept.readAll().contains("from elsewhere");
+			kept.close();
+			answer = true;
+			click(&dialog, "installFileFilter");
+			kept.open(QIODevice::ReadOnly);
+			const bool tookNew = kept.readAll().contains("a newer one");
+			kept.close();
+			check(asked == QStringList{ FiltersDialog::tr("Filter file exists. Overwrite?"),
+					FiltersDialog::tr("Filter file exists. Overwrite?") }
+				&& keptOld && tookNew, "Install: one already there is replaced only on a Yes");
+
+			// Delete...
+			list->setCurrentItem(row(QStringLiteral("mine")));
+			asked.clear();
+			answer = false;
+			click(&dialog, "deleteFileFilter");
+			const bool keptOnNo = QFile::exists(minePath) && row(QStringLiteral("mine")) != nullptr;
+			answer = true;
+			click(&dialog, "deleteFileFilter");
+			check(asked.size() == 2 && asked.first() == FiltersDialog::tr(
+					"Are you sure you want to delete\n\n%1 ?").arg(minePath)
+				&& keptOnNo && !QFile::exists(minePath) && row(QStringLiteral("mine")) == nullptr
+				&& list->topLevelItemCount() == 3
+				&& mask->mask() == QStringLiteral("*.*;pf:Theirs")
+				&& ticked() == QStringList{ QStringLiteral("Theirs") }
+				&& lm::globalFileFilter()->GetFileFilterPath("mine").empty()
+				&& !usable(&dialog, "deleteFileFilter"),
+				"Delete: on a Yes the file goes, with its row and its place in the mask");
+
+			// OK: the mask as it stands, into the history; nothing is "*.*"
+			dialog.accept();
+			check(dialog.result() == QDialog::Accepted
+				&& QString::fromStdString(dialog.fileFilter().GetMaskOrExpression())
+					== QStringLiteral("*.*;pf:Theirs")
+				&& lm::fileFilterHistory().value(0) == QStringLiteral("*.*;pf:Theirs")
+				&& lm::fileFilterMask() == QStringLiteral("*.*"),
+				"OK: the dialog hands the filter over, the caller puts it in use");
+			FiltersDialog empty;
+			empty.findChild<FileFilterCombo *>(QStringLiteral("fileFilterMask"))
+				->setEditText(QStringLiteral("  "));
+			empty.accept();
+			check(QString::fromStdString(empty.fileFilter().GetMaskOrExpression())
+					== QStringLiteral("*.*"), "OK: an empty mask is *.*");
+			QFile::remove(theirsPath);
+			lm::loadFilterFiles(lm::globalFileFilter());
+		}
+
+		// --- folder comparisons go by the filter ---
+		const QString left = dir.filePath(QStringLiteral("L"));
+		const QString right = dir.filePath(QStringLiteral("R"));
+		for (const QString &root : { left, right })
+		{
+			const QByteArray side = root == left ? "left\n" : "right\n";
+			write(root + QStringLiteral("/a.cpp"), side);
+			write(root + QStringLiteral("/b.txt"), side);
+			write(root + QStringLiteral("/sub/c.cpp"), side);
+			write(root + QStringLiteral("/.git/config"), side);
+			write(root + QStringLiteral("/build/out.o"), side);
+			write(root + QStringLiteral("/long.dat"), QByteArray(40, root == left ? 'l' : 'r'));
+		}
+		using Item = lm::FolderCompareItem;
+		const auto skippedWith = [&](const QString &maskText) {
+			lm::setFileFilterMask(maskText);
+			FolderCompareView view;
+			view.start(QStringList{ left, right });
+			waitFor(&view);
+			QStringList skipped;
+			for (const char *name : { "a.cpp", "b.txt", "c.cpp", "sub", ".git", "build",
+					"long.dat" })
+				if (view.rowCategoryForTest(QLatin1String(name)) == Item::Skipped)
+					skipped.append(QLatin1String(name));
+			if (view.fileFilter() != lm::fileFilterMask())
+				skipped.append(QStringLiteral("(pane: ") + view.fileFilter() + QLatin1Char(')'));
+			printf("  %s skips: %s\n", qPrintable(maskText),
+				skipped.isEmpty() ? "nothing" : qPrintable(skipped.join(QStringLiteral(", "))));
+			return skipped;
+		};
+		check(skippedWith(QStringLiteral("*.*")).isEmpty(), "folder: *.* compares everything");
+		check(skippedWith(QStringLiteral("*.cpp"))
+				== QStringList{ QStringLiteral("b.txt"), QStringLiteral("long.dat") },
+			"folder: a mask leaves the other files out");
+		check(skippedWith(QStringLiteral("*.*;!build/")) == QStringList{ QStringLiteral("build") }
+			&& skippedWith(QStringLiteral("*.*;!build\\")) == QStringList{ QStringLiteral("build") },
+			"folder: a folder mask, with either slash");
+		check(skippedWith(QStringLiteral("pf:") + sourceControl)
+				== QStringList{ QStringLiteral(".git") },
+			"folder: a preset filter leaves the version control folder out");
+		check(skippedWith(QStringLiteral("*.*|fe:Size < 20"))
+				== QStringList{ QStringLiteral("long.dat") },
+			"folder: a filter expression is evaluated");
+		lm::setFileFilterMask(QStringLiteral("*.*"));
+
+		// --- the status bar pane and OK in the dialog ---
+		{
+			MainWindow window;
+			window.openFileComparison({ left + QStringLiteral("/a.cpp"),
+				right + QStringLiteral("/a.cpp") });
+			window.openFolderComparison(QStringList{ left, right });
+			settle();
+			auto *tabs = window.findChild<QTabWidget *>();
+			auto *file = window.findChild<FileCompareView *>();
+			auto *folder = window.findChild<FolderCompareView *>();
+			if (tabs == nullptr || file == nullptr || folder == nullptr)
+				return 2;
+			waitFor(folder);
+			auto *pane = folder->findChild<QToolButton *>(QStringLiteral("fileFilterPane"));
+			check(pane != nullptr && pane->text() == QStringLiteral("*.*")
+				&& folder->fileFilter() == QStringLiteral("*.*"),
+				"pane: the folder comparison shows its file filter");
+			if (pane == nullptr)
+				return 1;
+			int fileScans = 0;
+			QObject::connect(file, &FileCompareView::rescanned, [&fileScans]() { ++fileScans; });
+
+			// the dialog is window-modal: edit it and press a button from
+			// inside its event loop
+			const auto answering = [&window](const QString &maskText,
+				QDialogButtonBox::StandardButton pressed)
+			{
+				QTimer::singleShot(0, &window, [&window, maskText, pressed]() {
+					auto *dialog = window.findChild<FiltersDialog *>();
+					auto *buttons = dialog != nullptr
+						? dialog->findChild<QDialogButtonBox *>() : nullptr;
+					if (buttons == nullptr)
+					{
+						printf("no Filters dialog to answer\n");
+						std::exit(3);
+					}
+					dialog->showPage(FiltersDialog::FileFiltersPage);
+					dialog->findChild<FileFilterCombo *>(QStringLiteral("fileFilterMask"))
+						->setEditText(maskText);
+					buttons->button(pressed)->click();
+				});
+			};
+
+			// a click on the pane opens the dialog; a folder comparison in
+			// front asks before refreshing
+			tabs->setCurrentWidget(folder);
+			settle();
+			asked.clear();
+			answer = false;
+			answering(QStringLiteral("*.cpp"), QDialogButtonBox::Ok);
+			pane->click();
+			const bool startedOnNo = folder->isComparingForTest();
+			settle();
+			const QString question = QCoreApplication::translate("MessageBoxes",
+				"Filters updated. Refresh all open folder compares?\n\n"
+				"Select 'No' to refresh later.");
+			check(asked == QStringList{ question } && !startedOnNo
+				&& lm::fileFilterMask() == QStringLiteral("*.cpp")
+				&& QSettings().value(settingsKey).toString() == QStringLiteral("*.cpp")
+				&& folder->fileFilter() == QStringLiteral("*.*"),
+				"pane click, a new mask, No: saved, the comparison refreshed later");
+
+			asked.clear();
+			answer = true;
+			answering(QStringLiteral("*.txt"), QDialogButtonBox::Ok);
+			pane->click();
+			const bool startedOnYes = folder->isComparingForTest();
+			waitFor(folder);
+			settle();
+			check(asked == QStringList{ question } && startedOnYes
+				&& folder->fileFilter() == QStringLiteral("*.txt") && pane->text() == QStringLiteral("*.txt")
+				&& folder->rowCategoryForTest(QStringLiteral("a.cpp")) == Item::Skipped
+				&& folder->rowCategoryForTest(QStringLiteral("b.txt")) == Item::Different,
+				"a new mask, Yes: the folder comparison is refreshed with it");
+
+			asked.clear();
+			answering(QStringLiteral("*.txt"), QDialogButtonBox::Ok);
+			pane->click();
+			const bool startedUnchanged = folder->isComparingForTest();
+			settle();
+			answering(QStringLiteral("*.h"), QDialogButtonBox::Cancel);
+			pane->click();
+			settle();
+			check(asked.isEmpty() && !startedUnchanged
+				&& lm::fileFilterMask() == QStringLiteral("*.txt"),
+				"the same mask, or Cancel: nothing asked, nothing changed");
+
+			// a text comparison in front: the mask is saved, nothing rescans
+			tabs->setCurrentWidget(file);
+			settle();
+			answering(QStringLiteral("*.*"), QDialogButtonBox::Ok);
+			QMetaObject::invokeMethod(&window, "showFilters");
+			const bool startedFromText = folder->isComparingForTest();
+			settle();
+			check(asked.isEmpty() && !startedFromText && fileScans == 0
+				&& lm::fileFilterMask() == QStringLiteral("*.*")
+				&& folder->fileFilter() == QStringLiteral("*.txt"),
+				"text in front: a new mask is only saved");
+		}
+
+		// --- the selection screen's "Folder: Filter" field ---
+		{
+			QSettings().setValue(QStringLiteral("General/VerifyOpenPaths"), true);
+			lm::setFileFilterMask(QStringLiteral("*.cpp;*.h"));
+			MainWindow window;
+			window.openSelector({});
+			settle();
+			auto *selector = window.findChild<NewComparisonView *>();
+			FileFilterCombo *field = selector != nullptr ? selector->filterFieldForTest() : nullptr;
+			auto *select = selector != nullptr
+				? selector->findChild<QPushButton *>(QStringLiteral("selectFilter")) : nullptr;
+			if (field == nullptr || select == nullptr)
+				return 2;
+			QStringList titles;
+			for (const QLabel *label : selector->findChildren<QLabel *>())
+				titles.append(label->text());
+			check(titles.contains(NewComparisonView::tr("Folder: Filter"))
+				&& select->text() == NewComparisonView::tr("Select...")
+				&& field->mask() == QStringLiteral("*.cpp;*.h")
+				&& field->itemText(0) == QStringLiteral("*.cpp;*.h"),
+				"selection: the field shows the filter in use");
+
+			// shown while it may be a folder comparison, usable once it is
+			const auto state = [&](const QStringList &paths) {
+				MainWindow other;
+				other.show();
+				other.openSelector(paths);
+				auto *screen = other.findChild<NewComparisonView *>();
+				screen->verifyPathsForTest();
+				FileFilterCombo *combo = screen->filterFieldForTest();
+				return QStringLiteral("%1%2").arg(combo->isVisibleTo(screen) ? "shown" : "hidden",
+					combo->isEnabled() ? "+usable" : "");
+			};
+			const QString aFile = left + QStringLiteral("/a.cpp");
+			check(state({}) == QStringLiteral("shown")
+				&& state({ aFile, right + QStringLiteral("/a.cpp") }) == QStringLiteral("hidden")
+				&& state({ left, right }) == QStringLiteral("shown+usable")
+				&& state({ left }) == QStringLiteral("shown+usable"),
+				"selection: the field follows the kind of the paths");
+			QSettings().setValue(QStringLiteral("General/VerifyOpenPaths"), false);
+			check(state({ aFile, right + QStringLiteral("/a.cpp") })
+					== QStringLiteral("shown+usable"),
+				"selection: always there when the paths are not verified");
+			QSettings().setValue(QStringLiteral("General/VerifyOpenPaths"), true);
+
+			// what does not parse is marked, with the presets at hand
+			type(field, QStringLiteral("pf:No such filter"));
+			const int unknownPreset = static_cast<int>(field->errors().size());
+			type(field, QStringLiteral("pf:") + sourceControl);
+			check(unknownPreset == 1 && field->errors().isEmpty(),
+				"selection: the field checks what is typed");
+
+			// Select...: usable with a folder among the paths; the dialog,
+			// and its filter back in the field
+			const bool selectNeedsFolder = !select->isEnabled();
+			selector->addPaths({ left, right });
+			selector->verifyPathsForTest();
+			const bool selectUsable = select->isEnabled();
+			QTimer::singleShot(0, &window, [&window]() {
+				auto *dialog = window.findChild<FiltersDialog *>();
+				if (dialog == nullptr)
+				{
+					printf("no Filters dialog to answer\n");
+					std::exit(3);
+				}
+				dialog->showPage(FiltersDialog::FileFiltersPage);
+				dialog->findChild<FileFilterCombo *>(QStringLiteral("fileFilterMask"))
+					->setEditText(QStringLiteral("*.md"));
+				dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
+			});
+			select->click();
+			settle();
+			check(selectNeedsFolder && selectUsable && field->mask() == QStringLiteral("*.md")
+				&& lm::fileFilterMask() == QStringLiteral("*.md"),
+				"selection: Select... opens Filters and takes its filter");
+
+			// Compare: the field's filter is in use from then on
+			field->setEditText(QStringLiteral(" *.txt "));
+			QPushButton *compare = nullptr;
+			for (QPushButton *candidate : selector->findChildren<QPushButton *>())
+				if (candidate->text() == NewComparisonView::tr("Compare"))
+					compare = candidate;
+			if (compare == nullptr)
+				return 2;
+			compare->click();
+			settle();
+			auto *folder = window.findChild<FolderCompareView *>();
+			waitFor(folder);
+			settle();
+			check(folder != nullptr && lm::fileFilterMask() == QStringLiteral("*.txt")
+				&& QSettings().value(settingsKey).toString() == QStringLiteral("*.txt")
+				&& lm::fileFilterHistory().value(0) == QStringLiteral("*.txt")
+				&& folder->fileFilter() == QStringLiteral("*.txt")
+				&& folder->rowCategoryForTest(QStringLiteral("a.cpp")) == Item::Skipped,
+				"selection: Compare puts the field's filter in use");
+		}
+
+		lm::setFileFilterMask(QStringLiteral("*.*"));
+		lm::setFiltersDirsForTest(QString(), QString());
+		lm::setMessageSinkForTest([](const QString &) {});
+		lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
+		FiltersDialog::setFileChooserForTest([](bool, const QString &) { return QString(); });
+		FiltersDialog::setEditorForTest([](const QString &) {});
+		printf("file filters: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

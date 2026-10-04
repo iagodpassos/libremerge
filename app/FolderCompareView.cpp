@@ -3,6 +3,7 @@
 
 #include "FolderCompareView.h"
 #include "EngineOptions.h"
+#include "FileFilters.h"
 #include "FileOps.h"
 #include "Icons.h"
 #include "Theme.h"
@@ -14,9 +15,7 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QKeyEvent>
-#include <QStyleFactory>
 #include <QLabel>
-#include <QLineEdit>
 #include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
@@ -60,7 +59,6 @@ enum ItemRole
 	RoleThreeWay,   ///< lm::FolderCompareItem::ThreeWayInfo as int
 };
 
-const QString kFilterSettingsKey = QStringLiteral("FolderCompare/Filter");
 
 /** Saved keys and defaults of the View menu filters: WinMerge's OPT_SHOW_*
     (OptionsDef.h, OptionsInit.cpp), in ShowFilter order. */
@@ -267,23 +265,10 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	auto *toolbar = new QToolBar(this);
 	toolbar->setIconSize(QSize(16, 16));
 	toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
-	toolbar->addWidget(new QLabel(tr(" Filter: "), this));
-	m_filterEdit = new QLineEdit(this);
-	// the macOS style paints this field natively (white, own focus ring)
-	// no matter what stylesheet it carries; Fusion honors our theming
-	static QStyle *fusion = QStyleFactory::create(QStringLiteral("Fusion"));
-	if (fusion != nullptr)
-		m_filterEdit->setStyle(fusion);
-	m_filterEdit->setAttribute(Qt::WA_MacShowFocusRect, false);
-	m_filterEdit->setPlaceholderText(tr("*.* \xE2\x80\x94 masks (*.cpp;*.h), f:/d: regexes or expressions"));
-	m_filterEdit->setMaximumWidth(340);
-	m_filterEdit->setText(QSettings().value(kFilterSettingsKey, QStringLiteral("*.*")).toString());
-	toolbar->addWidget(m_filterEdit);
 	// F5 arrives via the main window's Merge menu
 	QAction *applyAction = toolbar->addAction(lm::icon(lm::Icon::Refresh), tr("Recompare"));
 	applyAction->setToolTip(tr("Recompare (F5)"));
 	connect(applyAction, &QAction::triggered, this, &FolderCompareView::recompare);
-	connect(m_filterEdit, &QLineEdit::returnPressed, this, &FolderCompareView::recompare);
 	toolbar->addSeparator();
 	m_actTreeMode = toolbar->addAction(lm::icon(lm::Icon::TreeView), tr("Tree View"));
 	m_actTreeMode->setCheckable(true);
@@ -341,6 +326,15 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	statusRow->setContentsMargins(6, 3, 6, 3);
 	m_status = new QLabel(this);
 	statusRow->addWidget(m_status, 1);
+	// WinMerge's file filter status pane: the filter this comparison ran
+	// with, a click away from Tools > Filters (DirView::OnStatusBarClick)
+	m_filterButton = new QToolButton(this);
+	m_filterButton->setObjectName(QStringLiteral("fileFilterPane"));
+	m_filterButton->setMinimumWidth(140);
+	m_filterButton->setMaximumWidth(260);
+	connect(m_filterButton, &QToolButton::clicked, this,
+		&FolderCompareView::filtersRequested);
+	statusRow->addWidget(m_filterButton);
 	// WinMerge's compare method status pane (DirView::OnStatusBarClick):
 	// picking a method saves it and rescans this comparison
 	m_methodButton = new QToolButton(this);
@@ -434,13 +428,6 @@ void FolderCompareView::applyTheme()
 	setPalette(pal);
 	setAutoFillBackground(true); // gaps between widgets follow the theme
 	m_tree->setPalette(pal);
-	// direct stylesheet: the toolbar-level selector loses to the native
-	// macOS focus frame
-	m_filterEdit->setStyleSheet(dark
-		? QStringLiteral("QLineEdit { background: #1e1e1e; color: #d4d4d4;"
-			" border: 1px solid #4a4a4a; border-radius: 4px; padding: 2px 6px; }")
-		: QStringLiteral("QLineEdit { background: white; color: black;"
-			" border: 1px solid #b6b6b6; border-radius: 4px; padding: 2px 6px; }"));
 	m_status->setStyleSheet(dark
 		? QStringLiteral("QLabel { background: #2c2c2c; color: #b8b8b8; }")
 		: QStringLiteral("QLabel { background: #ececec; color: #303030; }"));
@@ -457,6 +444,13 @@ void FolderCompareView::applyTheme()
 			" border: 1px solid #c4c4c4; border-radius: 3px;"
 			" padding: 1px 20px 1px 6px; }"
 			" QToolButton:hover { background: #dedede; }")) + methodArrow);
+	m_filterButton->setStyleSheet(dark
+		? QStringLiteral("QToolButton { background: #2c2c2c; color: #b8b8b8;"
+			" border: 1px solid #4a4a4a; border-radius: 3px; padding: 1px 6px; }"
+			" QToolButton:hover { background: #3a3a3a; }")
+		: QStringLiteral("QToolButton { background: #ececec; color: #303030;"
+			" border: 1px solid #c4c4c4; border-radius: 3px; padding: 1px 6px; }"
+			" QToolButton:hover { background: #dedede; }"));
 	// header row of the tree follows the view palette on all platforms
 	m_tree->header()->setPalette(pal);
 	lm::applyToolbarTheme(this);
@@ -509,9 +503,13 @@ void FolderCompareView::start(const QStringList &dirs)
 	m_hiddenRows = 0;
 	updateActions();
 
-	const QString filterMask = m_filterEdit->text().trimmed();
-	QSettings().setValue(kFilterSettingsKey,
-		filterMask.isEmpty() ? QStringLiteral("*.*") : filterMask);
+	// the global file filter as it is now, its preset files read again if
+	// they changed (CDirDoc::InitDiffContext), shown on the status bar
+	const std::shared_ptr<FileFilterHelper> filter = lm::cloneFileFilter();
+	m_fileFilter = lm::fileFilterMask();
+	m_filterButton->setText(m_filterButton->fontMetrics().elidedText(
+		m_fileFilter, Qt::ElideRight, 230));
+	m_filterButton->setToolTip(m_fileFilter);
 
 	m_compareMethod = lm::currentCompareMethod();
 	m_methodButton->setText(lm::compareMethodName(m_compareMethod));
@@ -527,8 +525,8 @@ void FolderCompareView::start(const QStringList &dirs)
 
 	auto job = m_job;
 	const int method = m_compareMethod;
-	m_watcher.setFuture(QtConcurrent::run([dirs, job, filterMask, method]() {
-		return lm::compareFolders(dirs, true, job, filterMask, method);
+	m_watcher.setFuture(QtConcurrent::run([dirs, job, filter, method]() {
+		return lm::compareFolders(dirs, true, job, filter, method);
 	}));
 }
 

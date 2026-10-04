@@ -300,10 +300,85 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     </message>
 </context>
 <context>
+    <name>FileFilters</name>
+    <message>
+        <source>No error</source>
+        <translation>Sem erro</translation>
+    </message>
+    <message>
+        <source>Filter expression is empty</source>
+        <translation>A expressão de filtro está vazia</translation>
+    </message>
+    <message>
+        <source>Unknown character in filter expression</source>
+        <translation>Caracter desconhecido na expressão de filtro</translation>
+    </message>
+    <message>
+        <source>Unterminated string literal</source>
+        <translation>Literal de string não terminado</translation>
+    </message>
+    <message>
+        <source>Syntax error in filter expression</source>
+        <translation>Erro de sintaxe na expressão de filtro</translation>
+    </message>
+    <message>
+        <source>Failed to parse filter expression</source>
+        <translation>Falha ao analisar a expressão de filtro</translation>
+    </message>
+    <message>
+        <source>Invalid literal value</source>
+        <translation>Valor de literal inválido</translation>
+    </message>
+    <message>
+        <source>Invalid number of arguments</source>
+        <translation>Número de argumentos inválido</translation>
+    </message>
+    <message>
+        <source>Invalid regular expression</source>
+        <translation>Expressão regular inválida</translation>
+    </message>
+    <message>
+        <source>Undefined identifier</source>
+        <translation>Identificador indefinido</translation>
+    </message>
+    <message>
+        <source>Filter name not found</source>
+        <translation>Nome de filtro não encontrado</translation>
+    </message>
+    <message>
+        <source>Division by zero in filter expression</source>
+        <translation>Divisão por zero na expressão de filtro</translation>
+    </message>
+    <message>
+        <source>Invalid property name</source>
+        <translation>Nome de propriedade inválido</translation>
+    </message>
+    <message>
+        <source>Invalid directive</source>
+        <translation>Diretiva inválida</translation>
+    </message>
+    <message>
+        <source>Unknown error</source>
+        <translation>Erro desconhecido</translation>
+    </message>
+    <message>
+        <source>at position</source>
+        <translation>na posição</translation>
+    </message>
+</context>
+<context>
     <name>FiltersDialog</name>
+    <message>
+        <source>File Filters (*.flt);;All Files (*)</source>
+        <translation>Filtros de Arquivo (*.flt);;Todos os Arquivos (*)</translation>
+    </message>
     <message>
         <source>Filters</source>
         <translation>Filtros</translation>
+    </message>
+    <message>
+        <source>File Filters</source>
+        <translation>Filtros de Arquivo</translation>
     </message>
     <message>
         <source>Line Filters</source>
@@ -312,6 +387,136 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>Substitution Filters</source>
         <translation>Filtros de Substituição</translation>
+    </message>
+    <message>
+        <source>Mask / Filter Expression</source>
+        <translation>Expressão de Máscara / Filtro</translation>
+    </message>
+    <message>
+        <source>e.g. %1</source>
+        <translation>p.ex. %1</translation>
+    </message>
+    <message>
+        <source>Preset Filters</source>
+        <translation>Filtros Predefinidos</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Nome</translation>
+    </message>
+    <message>
+        <source>Description</source>
+        <translation>Descrição</translation>
+    </message>
+    <message>
+        <source>Location</source>
+        <translation>Localização</translation>
+    </message>
+    <message>
+        <source>Test...</source>
+        <translation>Testar...</translation>
+    </message>
+    <message>
+        <source>Install...</source>
+        <translation>Instalar...</translation>
+    </message>
+    <message>
+        <source>New...</source>
+        <translation>Novo...</translation>
+    </message>
+    <message>
+        <source>Edit...</source>
+        <translation>Editar...</translation>
+    </message>
+    <message>
+        <source>Delete...</source>
+        <translation>Excluir...</translation>
+    </message>
+    <message>
+        <source>Test Filter</source>
+        <translation>Testar Filtro</translation>
+    </message>
+    <message>
+        <source>Testing filter:</source>
+        <translation>Testando o filtro:</translation>
+    </message>
+    <message>
+        <source>Enter text to test:</source>
+        <translation>Inserir texto para testar:</translation>
+    </message>
+    <message>
+        <source>Folder Name</source>
+        <translation>Nome da Pasta</translation>
+    </message>
+    <message>
+        <source>Result:</source>
+        <translation>Resultado:</translation>
+    </message>
+    <message>
+        <source>Test</source>
+        <translation>Testar</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Fechar</translation>
+    </message>
+    <message>
+        <source>Locate Filter File to Install</source>
+        <translation>Localizar Arquivo de Filtros para Instalar</translation>
+    </message>
+    <message>
+        <source>Installing filter file failed.
+
+Could not copy new filter to folder.</source>
+        <translation>A instalação do arquivo de filtros falhou.
+
+Não foi possível copiar o novo filtro para a pasta.</translation>
+    </message>
+    <message>
+        <source>Filter file exists. Overwrite?</source>
+        <translation>O arquivo de filtros existe. Sobrescrever?</translation>
+    </message>
+    <message>
+        <source>Cannot find filter template!
+
+Copy %1 to LibreMerge/Filters Folder:
+%2.</source>
+        <translation>Não foi possível encontrar o modelo de filtro!
+
+Copie %1 para a Pasta LibreMerge/Filters:
+%2.</translation>
+    </message>
+    <message>
+        <source>Select Filename for New Filter</source>
+        <translation>Selecione o Nome de Arquivo para o Novo Filtro</translation>
+    </message>
+    <message>
+        <source>Cannot copy filter template:
+%1
+
+Make sure the folder exists and is writable.</source>
+        <translation>Não foi possível copiar o modelo de filtro:
+%1
+
+Certifique-se de que a pasta existe e é gravável.</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to delete
+
+%1 ?</source>
+        <translation>Tem certeza de que quer excluir
+
+%1 ?</translation>
+    </message>
+    <message>
+        <source>Failed to delete filter:
+%1
+
+File may be read-only.</source>
+        <translation>Não foi possível excluir o filtro:
+%1
+
+O arquivo pode ser somente leitura.</translation>
     </message>
     <message>
         <source>Enable Line Filters</source>
@@ -376,14 +581,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
 </context>
 <context>
     <name>FolderCompareView</name>
-    <message>
-        <source> Filter: </source>
-        <translation> Filtro: </translation>
-    </message>
-    <message>
-        <source>*.* — masks (*.cpp;*.h), f:/d: regexes or expressions</source>
-        <translation>*.* — máscaras (*.cpp;*.h), regex f:/d: ou expressões</translation>
-    </message>
     <message>
         <source>Recompare</source>
         <translation>Recomparar</translation>
@@ -1326,6 +1523,14 @@ Checando identidade binária...</translation>
         <translation>Pasta...</translation>
     </message>
     <message>
+        <source>Folder: Filter</source>
+        <translation>Pasta: Filtro</translation>
+    </message>
+    <message>
+        <source>Select...</source>
+        <translation>Selecionar...</translation>
+    </message>
+    <message>
         <source>Compare</source>
         <translation>Comparar</translation>
     </message>
@@ -1376,6 +1581,10 @@ Checando identidade binária...</translation>
     <message>
         <source>Middle (2nd) path is invalid!</source>
         <translation>O caminho do meio (2º) é inválido!</translation>
+    </message>
+    <message>
+        <source>[F] </source>
+        <translation>[F] </translation>
     </message>
     <message>
         <source>Select Folder</source>

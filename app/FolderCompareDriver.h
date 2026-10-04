@@ -8,6 +8,7 @@
 #include <QString>
 
 class CompareStats;
+class FileFilterHelper;
 
 namespace lm
 {
@@ -116,5 +117,12 @@ FolderCompareResult compareFolders(const QString &leftDir, const QString &rightD
 FolderCompareResult compareFolders(const QStringList &dirs,
 	bool recursive, const std::shared_ptr<FolderCompareJob> &job = {},
 	const QString &filterMask = QStringLiteral("*.*"), int compareMethod = -1);
+
+/** Same, by a file filter made beforehand: a copy of the global one
+    with its preset files, taken on the GUI thread (lm::cloneFileFilter).
+    A null one compares everything. */
+FolderCompareResult compareFolders(const QStringList &dirs,
+	bool recursive, const std::shared_ptr<FolderCompareJob> &job,
+	const std::shared_ptr<FileFilterHelper> &filter, int compareMethod = -1);
 
 } // namespace lm

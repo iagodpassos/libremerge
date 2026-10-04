@@ -21,6 +21,8 @@ qt_add_executable(LibreMerge
   ImagePane.cpp
   OptionsDialog.cpp
   FiltersDialog.cpp
+  FileFilterCombo.cpp
+  FileFilters.cpp
   DiffTextEdit.cpp
   Icons.cpp
   ItemCheckStyle.cpp
@@ -87,6 +89,24 @@ if(APPLE)
     PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/pt.lproj")
 endif()
 
+# WinMerge's preset file filters and the template of a new one, shipped as
+# files (the engine reads them from a folder): the bundle's
+# Resources/Filters on macOS, share/libremerge/Filters elsewhere, and next
+# to a build's binary so that it runs uninstalled
+file(GLOB LM_FILTER_FILES CONFIGURE_DEPENDS
+  ${CMAKE_SOURCE_DIR}/Filters/*.flt
+  ${CMAKE_SOURCE_DIR}/Filters/FileFilter.tmpl)
+if(APPLE)
+  target_sources(LibreMerge PRIVATE ${LM_FILTER_FILES})
+  set_source_files_properties(${LM_FILTER_FILES}
+    PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/Filters")
+else()
+  add_custom_command(TARGET LibreMerge POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:LibreMerge>/Filters
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LM_FILTER_FILES}
+      $<TARGET_FILE_DIR:LibreMerge>/Filters)
+endif()
+
 set_target_properties(LibreMerge PROPERTIES
   MACOSX_BUNDLE TRUE
   MACOSX_BUNDLE_GUI_IDENTIFIER org.libremerge.LibreMerge
@@ -125,6 +145,8 @@ if(UNIX AND NOT APPLE)
   install(FILES
     ${CMAKE_SOURCE_DIR}/packaging/linux/io.github.iagodpassos.libremerge.appdata.xml
     DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+  install(FILES ${LM_FILTER_FILES}
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/libremerge/Filters)
   foreach(_size 16 32 64 128 256 512)
     install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/icons/libremerge-${_size}.png
       DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${_size}x${_size}/apps

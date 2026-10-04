@@ -11,7 +11,6 @@
 
 class QAction;
 class QLabel;
-class QLineEdit;
 class QMenu;
 class QProgressBar;
 class QPushButton;
@@ -24,7 +23,8 @@ class QTreeWidgetItem;
  * Two-way folder comparison view: runs the engine comparison on a worker
  * thread with live progress and cancellation, then shows the recursive
  * result as a hierarchical tree (folders as expandable nodes) or a flat
- * list. Supports file filters (engine mask/regex/expression syntax),
+ * list. It goes by the global file filter as it is when the comparison
+ * starts (lm::cloneFileFilter), shown on its status bar, and supports
  * multi-selection copy between sides and delete-to-trash.
  * Double-clicking a file that exists on both sides asks the main window
  * to open a file comparison.
@@ -56,6 +56,9 @@ public:
 	QString rowResultForTest(const QString &name) const;
 	/** The compare method shown on the status bar (for tests). */
 	QString compareMethodTextForTest() const;
+	/** The file filter this comparison ran with, as the status bar shows
+	    it. */
+	QString fileFilter() const { return m_fileFilter; }
 
 	/** WinMerge's View menu filters (DirViewFilterSettings): which rows
 	    the list shows. Each view keeps its own set, loaded from the saved
@@ -104,6 +107,8 @@ public slots:
 
 signals:
 	void openFileComparisonRequested(const QString &leftPath, const QString &rightPath);
+	/** The file filter pane was clicked: open Tools > Filters. */
+	void filtersRequested();
 	/** 3-way activation: the item exists on all three sides. */
 	void openFileComparison3Requested(const QStringList &paths);
 
@@ -158,9 +163,11 @@ private:
 	int m_hiddenRows = 0; // result items the View filters leave out
 	std::vector<std::unique_ptr<QTemporaryDir>> m_tempDirs;
 	lm::FolderCompareResult m_result;
-	QLineEdit *m_filterEdit;
 	QTreeWidget *m_tree;
 	QLabel *m_status;
+	// WinMerge's file filter pane: the filter of the last run
+	QToolButton *m_filterButton;
+	QString m_fileFilter;
 	// WinMerge's compare method pane: the method of the last run, a
 	// click away from another one (saved, then recompared)
 	QToolButton *m_methodButton;

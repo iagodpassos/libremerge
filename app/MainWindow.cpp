@@ -34,6 +34,7 @@
 #include <QTimer>
 
 #include "EngineOptions.h"
+#include "FileFilters.h"
 #include "FiltersDialog.h"
 #include "FileCompareView.h"
 #include "TableCompareView.h"
@@ -1286,6 +1287,7 @@ void MainWindow::openFolderComparison(const QStringList &dirs)
 			return;
 		}
 	auto *view = new FolderCompareView(this);
+	connect(view, &FolderCompareView::filtersRequested, this, &MainWindow::showFilters);
 	connect(view, &FolderCompareView::openFileComparisonRequested, this,
 		[this, view](const QString &l, const QString &r) {
 			openFileComparison(l, r);
@@ -1363,6 +1365,7 @@ void MainWindow::openArchiveComparison(const QStringList &sources)
 	progress.close();
 
 	auto *view = new FolderCompareView(this);
+	connect(view, &FolderCompareView::filtersRequested, this, &MainWindow::showFilters);
 	// pane headers show the path inside the archive, WinMerge's display
 	// roots, instead of the extraction temp path; folder sides keep their
 	// real paths
@@ -1443,15 +1446,19 @@ void MainWindow::rescanFileComparisons()
 	}
 }
 
-/** WinMerge's Tools > Filters (CMainFrame::OnToolsFilters): the line and
-    substitution filters, saved on OK and applied at once to the kind of
-    comparison in front. */
+/** WinMerge's Tools > Filters (CMainFrame::OnToolsFilters): the file, line
+    and substitution filters, saved on OK and applied at once to the kind
+    of comparison in front. */
 void MainWindow::showFilters()
 {
+	const QString fileFilterBefore = lm::fileFilterMask();
 	FiltersDialog dialog(this);
 	if (dialog.exec() != QDialog::Accepted)
 		return;
 
+	// the file filter is in use from here on (FileFiltersDlg::OnOK)
+	lm::adoptFileFilter(dialog.fileFilter());
+	const bool fileFilterChanged = lm::fileFilterMask() != fileFilterBefore;
 	LineFiltersList lineFilters;
 	lm::copyLineFilters(&lineFilters);
 	SubstitutionFiltersList substitutionFilters;
@@ -1461,17 +1468,19 @@ void MainWindow::showFilters()
 	const bool substitutionFiltersChanged =
 		!dialog.substitutionFilters().Compare(&substitutionFilters);
 
-	// a text or table comparison in front rescans every open one when
-	// either kind of filter changed; a folder comparison in front asks
-	// first, and only for changed line filters, and a Yes refreshes all
-	// the open folder comparisons. Anything else in front rescans nothing
+	// a text or table comparison in front rescans every open one when the
+	// line or the substitution filters changed; a folder comparison in
+	// front asks first, when the line filters or the file filter changed,
+	// and a Yes refreshes all the open folder comparisons. Anything else
+	// in front rescans nothing
 	QWidget *front = m_tabs->currentWidget();
 	bool rescanFiles = false;
 	bool rescanFolders = false;
 	if (qobject_cast<FileCompareView *>(front) != nullptr
 		|| qobject_cast<TableCompareView *>(front) != nullptr)
 		rescanFiles = lineFiltersChanged || substitutionFiltersChanged;
-	else if (qobject_cast<FolderCompareView *>(front) != nullptr && lineFiltersChanged)
+	else if (qobject_cast<FolderCompareView *>(front) != nullptr
+		&& (lineFiltersChanged || fileFilterChanged))
 		rescanFolders = lm::askRefreshFolderCompares(this);
 
 	// saved whatever the answer, and before the rescans read them

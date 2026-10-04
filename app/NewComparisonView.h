@@ -4,6 +4,7 @@
 #include <QStringList>
 #include <QWidget>
 
+class FileFilterCombo;
 class QComboBox;
 class QCheckBox;
 class QLabel;
@@ -13,7 +14,9 @@ class QTimer;
 /**
  * The "Select Files or Folders" page, mirroring WinMerge's opening
  * screen: three path slots with history, read-only toggles, swap and
- * browse buttons. Accepts files/folders dropped anywhere on it.
+ * browse buttons, and the "Folder: Filter" field that sets the file
+ * filter of folder comparisons. Accepts files/folders dropped anywhere
+ * on it.
  */
 class NewComparisonView : public QWidget
 {
@@ -37,6 +40,8 @@ public:
 
 	/** Run the path check now, and read what it showed (for tests). */
 	void verifyPathsForTest() { verifyPaths(); }
+	/** The "Folder: Filter" field (for tests). */
+	FileFilterCombo *filterFieldForTest() const { return m_filterCombo; }
 	QString hintForTest() const;
 	bool compareEnabledForTest() const;
 
@@ -68,10 +73,16 @@ private:
 	/** WinMerge's "Automatically verify paths" check of the fields. */
 	void verifyPaths();
 	void rememberPaths(const QStringList &paths);
+	/** WinMerge's filter group follows the paths' kind. */
+	void showFilterGroup(bool visible, bool enabled);
+	void applyFileFilter();
 	/** Drop one path from the history and from every field's dropdown. */
 	void forgetPath(const QString &path);
 
 	Slot m_slots[3];
+	QLabel *m_filterTitle = nullptr;
+	FileFilterCombo *m_filterCombo = nullptr;
+	QPushButton *m_selectFilterButton = nullptr;
 	QLabel *m_hint;
 	QPushButton *m_compareButton = nullptr;
 	QTimer *m_verifyTimer = nullptr; // coalesces typing into one check

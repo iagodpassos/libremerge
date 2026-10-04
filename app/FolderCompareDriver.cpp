@@ -119,6 +119,18 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	bool recursive, const std::shared_ptr<FolderCompareJob> &jobIn,
 	const QString &filterMask, int compareMethod)
 {
+	// a filter of its own for the mask: no preset files to name
+	auto filter = std::make_shared<FileFilterHelper>();
+	const QString mask = filterMask.trimmed().isEmpty()
+		? QStringLiteral("*.*") : filterMask.trimmed();
+	filter->SetMaskOrExpression(mask.toStdString());
+	return compareFolders(dirs, recursive, jobIn, filter, compareMethod);
+}
+
+FolderCompareResult compareFolders(const QStringList &dirs,
+	bool recursive, const std::shared_ptr<FolderCompareJob> &jobIn,
+	const std::shared_ptr<FileFilterHelper> &filterIn, int compareMethod)
+{
 	const int sides = dirs.size();
 	const int method = compareMethod >= 0 ? compareMethod : currentCompareMethod();
 	FolderCompareResult result;
@@ -158,11 +170,16 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	ctxt.m_pFilterList = currentLineFilters();
 	ctxt.m_pSubstitutionList = currentSubstitutionFilters();
 
-	FileFilterHelper filter;
-	const QString mask = filterMask.trimmed().isEmpty()
-		? QStringLiteral("*.*") : filterMask.trimmed();
-	filter.SetMaskOrExpression(mask.toStdString());
-	ctxt.m_piFilterGlobal = &filter;
+	// the file filter, with the comparison to evaluate its expressions in
+	// (CDirDoc::InitDiffContext)
+	std::shared_ptr<FileFilterHelper> filter = filterIn;
+	if (!filter)
+	{
+		filter = std::make_shared<FileFilterHelper>();
+		filter->SetMaskOrExpression(_T("*.*"));
+	}
+	ctxt.m_piFilterGlobal = filter.get();
+	ctxt.m_piFilterGlobal->SetDiffContext(&ctxt);
 
 	// image compare in folder compare (WinMerge option, off by default):
 	// matching pairs compare by pixels through the registered hook, with
@@ -254,6 +271,7 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 
 	// context holds pointers to objects owned here/by the job; detach them
 	ctxt.SetAbortable(nullptr);
+	filter->SetDiffContext(nullptr); // the filter may outlive this context
 	ctxt.m_piFilterGlobal = nullptr;
 	ctxt.m_pCompareStats = nullptr;
 

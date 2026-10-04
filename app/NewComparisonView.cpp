@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "NewComparisonView.h"
 #include "ArchiveCompare.h"
+#include "FileFilterCombo.h"
+#include "FileFilters.h"
 #include "OptionsDialog.h"
 
 #include <QAbstractItemView>
@@ -161,6 +163,39 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 		layout->addSpacing(8);
 	}
 
+	// WinMerge's "Folder: Filter" group: the file filter a folder
+	// comparison goes by, typed here or picked in Tools > Filters. Its
+	// "Include subfolders" box is not here: folders compare with their
+	// subfolders
+	m_filterTitle = new QLabel(tr("Folder: Filter"), content);
+	QFont filterBold = m_filterTitle->font();
+	filterBold.setBold(true);
+	m_filterTitle->setFont(filterBold);
+	layout->addWidget(m_filterTitle);
+	auto *filterRow = new QHBoxLayout;
+	m_filterCombo = new FileFilterCombo(content);
+	m_filterCombo->setObjectName(QStringLiteral("folderFilter"));
+	m_filterCombo->loadHistory();
+	// parsed with the preset filters at hand, like the filter in use
+	m_filterCombo->setChecker([](const QString &text) {
+		return lm::fileFilterErrors(lm::cloneFileFilter().get(), text);
+	});
+	// the filter in use, put on top of the list when it is not there
+	m_filterCombo->setMask(lm::fileFilterMask(), true);
+	filterRow->addWidget(m_filterCombo, 1);
+	m_selectFilterButton = new QPushButton(tr("Select..."), content);
+	m_selectFilterButton->setObjectName(QStringLiteral("selectFilter"));
+	connect(m_selectFilterButton, &QPushButton::clicked, this, [this]() {
+		const QString before = m_filterCombo->mask().trimmed();
+		QMetaObject::invokeMethod(window(), "showFilters");
+		// what the dialog left in use takes the field over
+		const QString now = lm::fileFilterMask();
+		if (before != now)
+			m_filterCombo->setMask(now, false);
+	});
+	filterRow->addWidget(m_selectFilterButton);
+	layout->addLayout(filterRow);
+
 	layout->addStretch(1);
 
 	auto *buttons = new QGridLayout;
@@ -230,6 +265,7 @@ void NewComparisonView::verifyPaths()
 	if (!OptionsDialog::verifyOpenPaths())
 	{
 		m_compareButton->setEnabled(true);
+		showFilterGroup(true, true);
 		return;
 	}
 
@@ -249,6 +285,16 @@ void NewComparisonView::verifyPaths()
 		anyExists = anyExists || kind[i] != Missing;
 	}
 	m_compareButton->setEnabled(anyExists);
+	// the filter group (OnUpdateStatus): shown for a folder comparison,
+	// or while no path says it is a file comparison; usable once a folder
+	// or an archive is among the paths
+	bool fileCompare = false, folderCompare = false;
+	for (int i = 0; i < 3; ++i)
+	{
+		fileCompare = fileCompare || kind[i] == File;
+		folderCompare = folderCompare || folderLike[i];
+	}
+	showFilterGroup(folderCompare || !fileCompare, folderCompare);
 	if (paths[0].isEmpty() && paths[1].isEmpty() && paths[2].isEmpty())
 	{
 		setHint(prompt, false);
@@ -290,6 +336,32 @@ void NewComparisonView::verifyPaths()
 		&& !(folderLike[0] && folderLike[1] && folderLike[2]))
 		message = tr("Cannot compare file and folder!");
 	setHint(message.isEmpty() ? prompt : message, !message.isEmpty());
+}
+
+void NewComparisonView::showFilterGroup(bool visible, bool enabled)
+{
+	for (QWidget *widget : { static_cast<QWidget *>(m_filterTitle),
+			static_cast<QWidget *>(m_filterCombo),
+			static_cast<QWidget *>(m_selectFilterButton) })
+	{
+		widget->setVisible(visible);
+		widget->setEnabled(enabled);
+	}
+}
+
+/** COpenView::OnOK: the field's filter is the file filter from now on,
+    "*.*" when the field is empty, and joins the field's history. */
+void NewComparisonView::applyFileFilter()
+{
+	QString filter = m_filterCombo->mask().trimmed();
+	const QString prefix = tr("[F] ");
+	if (filter.startsWith(prefix))
+		filter.remove(0, prefix.length());
+	if (filter.isEmpty())
+		filter = QStringLiteral("*.*");
+	lm::setFileFilterMask(filter);
+	m_filterCombo->setMask(filter, false);
+	m_filterCombo->saveHistory();
 }
 
 QString NewComparisonView::hintForTest() const
@@ -503,7 +575,10 @@ void NewComparisonView::compare()
 	{
 		const QFileInfo info(paths.first());
 		if (info.isFile())
+		{
+			applyFileFilter();
 			emit compareRequested(paths, readOnly, false);
+		}
 		else if (!info.exists())
 			setHint(tr("Path does not exist: %1").arg(paths.first()), true);
 		return;
@@ -538,5 +613,6 @@ void NewComparisonView::compare()
 		return;
 	}
 	rememberPaths(paths);
+	applyFileFilter();
 	emit compareRequested(paths, readOnly, folders);
 }
