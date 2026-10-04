@@ -13,6 +13,7 @@ set(TEST_SOURCES
   ExistenceCompare/ExistenceCompare_test.cpp
   FileFilter/FileFilterHelper_test.cpp
   FilterEngine/FilterExpression_test.cpp
+  FiltersList/FiltersList_test.cpp
   FullQuickCompare/FullQuickCompare_test.cpp
   MoveDetection/RenameMoveDetection_test.cpp
   OptionsMgr/VariantValue_test.cpp

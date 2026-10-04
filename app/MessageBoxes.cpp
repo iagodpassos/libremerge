@@ -267,6 +267,19 @@ void showInformation(QWidget *parent, const QString &text)
 	box.exec();
 }
 
+void showWarning(QWidget *parent, const QString &text)
+{
+	if (sink())
+	{
+		sink()(text);
+		return;
+	}
+	QMessageBox box(QMessageBox::Warning, QStringLiteral("LibreMerge"), text,
+		QMessageBox::Ok, parent);
+	box.setWindowModality(Qt::WindowModal);
+	box.exec();
+}
+
 bool askReloadChangedFile(QWidget *parent, const QString &path)
 {
 	return askYesNo(parent, fileChangedRescanText().arg(path), kFileChangedRescan);

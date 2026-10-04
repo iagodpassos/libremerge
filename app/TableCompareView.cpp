@@ -445,10 +445,13 @@ bool TableCompareView::runDiff(QString *error)
 	wrapper.SetCreateDiffList(&diffList);
 	wrapper.SetPaths(paths, false);
 	wrapper.SetOptions(&options);
-	// the line filters, and the language "Ignore comment differences" goes
-	// by, as in the text compare (WinMerge's table is the same document)
+	// the line and substitution filters, and the language "Ignore comment
+	// differences" goes by, as in the text compare (WinMerge's table is the
+	// same document)
 	if (auto filterList = lm::currentLineFilters())
 		wrapper.SetFilterList(filterList);
+	if (auto substitutions = lm::currentSubstitutionFilters())
+		wrapper.SetSubstitutionList(substitutions);
 	wrapper.SetFilterCommentsSourceDef(
 		QFileInfo(m_sides[0].path).suffix().toLower().toStdString());
 	if (!wrapper.RunFileDiff())

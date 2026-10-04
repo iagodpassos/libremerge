@@ -156,6 +156,7 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	// off, the same text in another encoding is a difference
 	ctxt.m_bIgnoreCodepage = ignoreCodepageDifferences();
 	ctxt.m_pFilterList = currentLineFilters();
+	ctxt.m_pSubstitutionList = currentSubstitutionFilters();
 
 	FileFilterHelper filter;
 	const QString mask = filterMask.trimmed().isEmpty()

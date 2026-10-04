@@ -753,6 +753,9 @@ bool FileCompareView::runDiff(QString *error)
 	// become trivial, like WinMerge's Tools > Filters
 	if (auto filterList = lm::currentLineFilters())
 		wrapper.SetFilterList(filterList);
+	// substitution filters: a difference that is only a listed pair
+	if (auto substitutions = lm::currentSubstitutionFilters())
+		wrapper.SetSubstitutionList(substitutions);
 	// "Ignore comment differences" needs the language to tell comments
 	// from code: the first pane's, as WinMerge's Rescan takes it (the temp
 	// files carry no extension)

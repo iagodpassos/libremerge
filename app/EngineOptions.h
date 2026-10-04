@@ -7,6 +7,9 @@
 #include "CompareOptions.h"
 
 class FilterList;
+class LineFiltersList;
+class SubstitutionFiltersList;
+class SubstitutionList;
 
 namespace lm
 {
@@ -25,10 +28,27 @@ DIFFOPTIONS currentDiffOptions();
     it reports identical files. */
 bool ignoreCodepageDifferences();
 
-/** The enabled line filters (Tools > Filters) as the engine's filter
-    list: differences whose lines all match become trivial. Null when no
-    expression is enabled. */
+/** The line filters (Tools > Filters) as the engine's filter list:
+    differences whose lines all match an expression become ignored. Null
+    when "Enable Line Filters" is off or no expression is enabled. */
 std::shared_ptr<FilterList> currentLineFilters();
+/** The substitution filters as the engine's list: a difference that is
+    only a listed pair becomes ignored. Null when they are switched off or
+    the list is empty. */
+std::shared_ptr<SubstitutionList> currentSubstitutionFilters();
+
+/** WinMerge's OPT_LINEFILTER_ENABLED with theApp.m_pLineFilters, and
+    theApp.m_pSubstitutionFiltersList (which carries its own switch):
+    copies for the Filters dialog to edit, and saving what it was left
+    with. */
+bool lineFiltersEnabled();
+void copyLineFilters(LineFiltersList *into);
+void copySubstitutionFilters(SubstitutionFiltersList *into);
+void saveLineFilters(bool enabled, const LineFiltersList &list);
+void saveSubstitutionFilters(const SubstitutionFiltersList &list);
+/** Read the filters from the saved settings again, the old
+    "LineFilters/List" layout included (for tests). */
+void reloadFiltersForTest();
 
 /** How a folder comparison decides two files are equal: a COMPARE_TYPE
     from CMP_CONTENT (Full Contents) to CMP_EXISTENCE, WinMerge's

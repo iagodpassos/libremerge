@@ -14,9 +14,9 @@
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMenuBar>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPointer>
-#include <QListWidget>
 #include <QSettings>
 #include <QStyleHints>
 #include <QToolTip>
@@ -58,6 +58,7 @@
 #include "MainWindow.h"
 #include "NewComparisonView.h"
 #include "EngineOptions.h"
+#include "FiltersDialog.h"
 #include "ItemCheckStyle.h"
 #include "OptionsDialog.h"
 #include "Theme.h"
@@ -332,6 +333,10 @@ int main(int argc, char *argv[])
 		QStringLiteral("Render every Options page to <file>-<n>.png and exit (for testing)"),
 		QStringLiteral("file"));
 	parser.addOption(screenshotOptionsOpt);
+	QCommandLineOption screenshotFiltersOpt(QStringLiteral("screenshot-filters"),
+		QStringLiteral("Render every Filters page to <file>-<n>.png, with a sample row each, and exit (for testing)"),
+		QStringLiteral("file"));
+	parser.addOption(screenshotFiltersOpt);
 	QCommandLineOption selftestOptionsOpt(QStringLiteral("selftest-options"),
 		QStringLiteral("Verify the Options dialog's page tree, titles and per-page defaults (for testing)"));
 	parser.addOption(selftestOptionsOpt);
@@ -347,9 +352,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestCompareOptionsOpt(QStringLiteral("selftest-compare-options"),
 		QStringLiteral("Verify the Compare options page and what its options do to file, table and folder comparisons (for testing)"));
 	parser.addOption(selftestCompareOptionsOpt);
-	QCommandLineOption selftestLineFiltersOpt(QStringLiteral("selftest-line-filters"),
-		QStringLiteral("Change the line filters in their dialog and verify which open comparisons are rescanned (for testing)"));
-	parser.addOption(selftestLineFiltersOpt);
+	QCommandLineOption selftestFiltersOpt(QStringLiteral("selftest-filters"),
+		QStringLiteral("Verify the Filters dialog's pages, where the line and substitution filters are kept, what they do to comparisons and what OK rescans (for testing)"));
+	parser.addOption(selftestFiltersOpt);
 	QCommandLineOption selftestThemeOpt(QStringLiteral("selftest-theme"),
 		QStringLiteral("Switch the theme from the Options dialog and verify the whole application follows (for testing)"));
 	parser.addOption(selftestThemeOpt);
@@ -632,6 +637,49 @@ int main(int argc, char *argv[])
 			QString target = path;
 			target.insert(dot < 0 ? target.size() : dot,
 				QStringLiteral("-%1").arg(i));
+			if (!dialog.grab().save(target))
+				return 2;
+		}
+		return 0;
+	}
+
+	if (parser.isSet(screenshotFiltersOpt))
+	{
+		// both pages over the saved filters plus one sample row each, added
+		// with the pages' own buttons; nothing is saved
+		FiltersDialog dialog;
+		dialog.show();
+		QCoreApplication::processEvents();
+		auto *lines = dialog.findChild<QTreeWidget *>(QStringLiteral("lineFilters"));
+		auto *pairs = dialog.findChild<QTreeWidget *>(QStringLiteral("substitutionFilters"));
+		auto *newLine = dialog.findChild<QPushButton *>(QStringLiteral("newLineFilter"));
+		auto *addPair = dialog.findChild<QPushButton *>(QStringLiteral("addSubstitutionFilter"));
+		if (lines == nullptr || pairs == nullptr || newLine == nullptr || addPair == nullptr)
+			return 2;
+		newLine->click();
+		QCoreApplication::processEvents();
+		if (auto *editor = lines->viewport()->findChild<QLineEdit *>())
+		{
+			editor->setText(QStringLiteral("^\\s*Build date:"));
+			QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+			QCoreApplication::sendEvent(editor, &enter);
+			QCoreApplication::processEvents();
+		}
+		lines->topLevelItem(lines->topLevelItemCount() - 1)->setCheckState(0, Qt::Checked);
+		addPair->click();
+		QTreeWidgetItem *pair = pairs->topLevelItem(pairs->topLevelItemCount() - 1);
+		pair->setText(1, QStringLiteral("colour"));
+		pair->setCheckState(3, Qt::Checked);
+		const QString path = parser.value(screenshotFiltersOpt);
+		const int dot = path.lastIndexOf(QLatin1Char('.'));
+		const int pages[] = { FiltersDialog::LineFiltersPage,
+			FiltersDialog::SubstitutionFiltersPage };
+		for (int page : pages)
+		{
+			dialog.showPage(page);
+			QCoreApplication::processEvents();
+			QString target = path;
+			target.insert(dot < 0 ? target.size() : dot, QStringLiteral("-%1").arg(page));
 			if (!dialog.grab().save(target))
 				return 2;
 		}
@@ -2066,12 +2114,12 @@ int main(int argc, char *argv[])
 		return ok ? 0 : 1;
 	}
 
-	if (parser.isSet(selftestLineFiltersOpt))
+	if (parser.isSet(selftestFiltersOpt))
 	{
-		// Tools > Line Filters applied on OK like WinMerge's OnToolsFilters:
-		// changed filters rescan every text and table comparison when one
-		// of them is in front, ask before refreshing the folder comparisons
-		// when a folder comparison is, and are only saved otherwise
+		// WinMerge's Tools > Filters: the Line Filters and Substitution
+		// Filters pages as LineFiltersDlg and SubstitutionFiltersDlg have
+		// them, where the filters are kept, what they do to comparisons
+		// and what OK rescans (CMainFrame::OnToolsFilters)
 		QTemporaryDir dir;
 		if (!dir.isValid())
 			return 2;
@@ -2109,8 +2157,274 @@ int main(int argc, char *argv[])
 				QCoreApplication::processEvents();
 			}
 		};
+		// type into the row editor a list has open, then Enter
+		const auto typeInEditor = [](QTreeWidget *list, const QString &text)
+		{
+			QCoreApplication::processEvents();
+			auto *editor = list->viewport()->findChild<QLineEdit *>();
+			if (editor == nullptr)
+				return false;
+			editor->setText(text);
+			QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+			QCoreApplication::sendEvent(editor, &enter);
+			QCoreApplication::processEvents(); // the commit is queued
+			return true;
+		};
+		const auto button = [](QWidget *scope, const char *name) {
+			return scope->findChild<QPushButton *>(QLatin1String(name));
+		};
+		const auto click = [&button](QWidget *scope, const char *name)
+		{
+			if (QPushButton *found = button(scope, name))
+				found->click();
+			else
+				printf("  no button %s\n", name);
+		};
+		const auto usable = [&button](QWidget *scope, const char *name) {
+			const QPushButton *found = button(scope, name);
+			return found != nullptr && found->isEnabled();
+		};
+		const QString stampExpression = QStringLiteral("^stamp:");
 
-		// one line differs everywhere, and a filter can name it
+		// --- where the filters are kept ---
+		{
+			LineFiltersList lines;
+			lm::copyLineFilters(&lines);
+			SubstitutionFiltersList pairs;
+			lm::copySubstitutionFilters(&pairs);
+			check(!lm::lineFiltersEnabled() && lines.GetCount() == 0 && pairs.GetCount() == 0
+				&& !pairs.GetEnabled() && lm::currentLineFilters() == nullptr
+				&& lm::currentSubstitutionFilters() == nullptr,
+				"storage: no filters, both kinds switched off, by default");
+
+			// the one list LibreMerge kept up to 0.9.7
+			QSettings().setValue(QStringLiteral("LineFilters/List"),
+				QStringList{ QStringLiteral("1\t^one"), QStringLiteral("0\ttwo") });
+			lm::reloadFiltersForTest();
+			lm::copyLineFilters(&lines);
+			const QSettings settings;
+			check(lm::lineFiltersEnabled() && lines.GetCount() == 2
+				&& lines.GetAt(0).filterStr == "^one" && lines.GetAt(0).enabled
+				&& lines.GetAt(1).filterStr == "two" && !lines.GetAt(1).enabled
+				&& !settings.contains(QStringLiteral("LineFilters/List"))
+				&& settings.value(QStringLiteral("LineFilters/Values")).toInt() == 2
+				&& settings.value(QStringLiteral("LineFilters/Filter00")).toString()
+					== QStringLiteral("^one")
+				&& settings.value(QStringLiteral("LineFilters/Enabled00")).toInt() == 1
+				&& settings.value(QStringLiteral("LineFilters/Filter01")).toString()
+					== QStringLiteral("two")
+				&& settings.value(QStringLiteral("LineFilters/Enabled01")).toInt() == 0
+				&& settings.value(QStringLiteral("Settings/IgnoreRegExp")).toBool()
+				&& lm::currentLineFilters() != nullptr,
+				"storage: the old list moves to WinMerge's layout, switched on");
+
+			// a shorter list takes the leftovers away
+			LineFiltersList one;
+			one.AddFilter("^one", true);
+			lm::saveLineFilters(false, one);
+			check(settings.value(QStringLiteral("LineFilters/Values")).toInt() == 1
+				&& !settings.contains(QStringLiteral("LineFilters/Filter01"))
+				&& !settings.contains(QStringLiteral("LineFilters/Enabled01"))
+				&& !settings.value(QStringLiteral("Settings/IgnoreRegExp")).toBool()
+				&& lm::currentLineFilters() == nullptr,
+				"storage: a shorter list, switched off");
+			lm::saveLineFilters(false, LineFiltersList());
+		}
+
+		// --- the Line Filters page ---
+		{
+			FiltersDialog dialog;
+			auto *page = dialog.findChild<QWidget *>(QStringLiteral("lineFiltersPage"));
+			auto *enable = dialog.findChild<QCheckBox *>(QStringLiteral("enableLineFilters"));
+			auto *list = dialog.findChild<QTreeWidget *>(QStringLiteral("lineFilters"));
+			if (page == nullptr || enable == nullptr || list == nullptr)
+				return 1;
+			QStringList labels;
+			for (const QLabel *label : page->findChildren<QLabel *>())
+				labels.append(label->text());
+			const auto text = [&](const char *name) {
+				const QPushButton *found = button(&dialog, name);
+				return found != nullptr ? found->text() : QString();
+			};
+			check(dialog.windowTitle() == FiltersDialog::tr("Filters")
+				&& dialog.currentPage() == FiltersDialog::LineFiltersPage
+				&& enable->text() == FiltersDialog::tr("Enable Line Filters")
+				&& !enable->isChecked()
+				&& labels == QStringList{
+					FiltersDialog::tr("Regular Expressions (one per line):") }
+				&& list->columnCount() == 1
+				&& list->headerItem()->text(0) == FiltersDialog::tr("Regular expression")
+				&& text("newLineFilter") == FiltersDialog::tr("New")
+				&& text("editLineFilter") == FiltersDialog::tr("Edit")
+				&& text("removeLineFilter") == FiltersDialog::tr("Remove"),
+				"line filters page: WinMerge's controls and texts");
+			check(usable(&dialog, "newLineFilter") && !usable(&dialog, "editLineFilter")
+				&& !usable(&dialog, "removeLineFilter"),
+				"line filters page: nothing selected, only New");
+
+			click(&dialog, "newLineFilter");
+			const bool typed = typeInEditor(list, stampExpression);
+			QTreeWidgetItem *row = list->topLevelItem(0);
+			check(typed && list->topLevelItemCount() == 1 && row->text(0) == stampExpression
+				&& row->checkState(0) == Qt::Unchecked && row->isSelected()
+				&& usable(&dialog, "editLineFilter") && usable(&dialog, "removeLineFilter"),
+				"line filters page: New adds an unticked row and edits it");
+			click(&dialog, "editLineFilter");
+			check(typeInEditor(list, QStringLiteral("first"))
+				&& list->topLevelItem(0)->text(0) == QStringLiteral("first"),
+				"line filters page: Edit edits the selected row");
+
+			click(&dialog, "newLineFilter");
+			typeInEditor(list, QStringLiteral("second"));
+			list->setCurrentItem(list->topLevelItem(0));
+			click(&dialog, "removeLineFilter");
+			check(list->topLevelItemCount() == 1
+				&& list->topLevelItem(0)->text(0) == QStringLiteral("second")
+				&& list->topLevelItem(0)->isSelected(),
+				"line filters page: Remove selects the row that took its place");
+			click(&dialog, "removeLineFilter");
+			check(list->topLevelItemCount() == 0 && !usable(&dialog, "editLineFilter")
+				&& !usable(&dialog, "removeLineFilter"),
+				"line filters page: the last row removed");
+
+			// a ticked expression that does not compile keeps the dialog open
+			click(&dialog, "newLineFilter");
+			typeInEditor(list, QStringLiteral("("));
+			list->topLevelItem(0)->setCheckState(0, Qt::Checked);
+			shown.clear();
+			dialog.accept();
+			printf("  message: %s\n", qPrintable(shown.value(0)));
+			check(dialog.result() != QDialog::Accepted && shown.size() == 1
+				&& shown.first().startsWith(QStringLiteral("#1: "))
+				&& shown.first().size() > 6,
+				"line filters page: a bad expression is refused, by its number");
+			list->topLevelItem(0)->setCheckState(0, Qt::Unchecked);
+			enable->setChecked(true);
+			dialog.accept();
+			check(dialog.result() == QDialog::Accepted && dialog.lineFiltersEnabled()
+				&& dialog.lineFilters().GetCount() == 1
+				&& dialog.lineFilters().GetAt(0).filterStr == "("
+				&& !dialog.lineFilters().GetAt(0).enabled,
+				"line filters page: unticked, it is kept as typed");
+
+			// the first row is selected when the dialog opens
+			LineFiltersList two;
+			two.AddFilter("one", false);
+			two.AddFilter("two", true);
+			lm::saveLineFilters(true, two);
+			FiltersDialog again;
+			auto *listAgain = again.findChild<QTreeWidget *>(QStringLiteral("lineFilters"));
+			check(again.findChild<QCheckBox *>(QStringLiteral("enableLineFilters"))->isChecked()
+				&& listAgain->topLevelItemCount() == 2
+				&& listAgain->topLevelItem(0)->isSelected()
+				&& listAgain->topLevelItem(0)->checkState(0) == Qt::Unchecked
+				&& listAgain->topLevelItem(1)->checkState(0) == Qt::Checked
+				&& usable(&again, "editLineFilter"),
+				"line filters page: shows the saved filters, the first selected");
+			lm::saveLineFilters(false, LineFiltersList());
+		}
+
+		// --- the Substitution Filters page ---
+		{
+			FiltersDialog dialog;
+			dialog.showPage(FiltersDialog::SubstitutionFiltersPage);
+			auto *page = dialog.findChild<QWidget *>(QStringLiteral("substitutionFiltersPage"));
+			auto *enable = dialog.findChild<QCheckBox *>(
+				QStringLiteral("enableSubstitutionFilters"));
+			auto *list = dialog.findChild<QTreeWidget *>(QStringLiteral("substitutionFilters"));
+			if (page == nullptr || enable == nullptr || list == nullptr)
+				return 1;
+			QStringList labels;
+			for (const QLabel *label : page->findChildren<QLabel *>())
+				labels.append(label->text());
+			QStringList headers;
+			for (int column = 0; column < list->columnCount(); ++column)
+				headers.append(list->headerItem()->text(column));
+			const auto text = [&](const char *name) {
+				const QPushButton *found = button(&dialog, name);
+				return found != nullptr ? found->text() : QString();
+			};
+			check(dialog.currentPage() == FiltersDialog::SubstitutionFiltersPage
+				&& labels == QStringList{ FiltersDialog::tr(
+					"Changes to the listed pairs below will be ignored or marked as "
+					"insignificant. Patches are unaffected.") }
+				&& enable->text() == FiltersDialog::tr("Enable") && !enable->isChecked()
+				&& headers == QStringList{ FiltersDialog::tr("Find what"),
+					FiltersDialog::tr("Replace with"), FiltersDialog::tr("Regular expression"),
+					FiltersDialog::tr("Match case"),
+					FiltersDialog::tr("Match whole word only") }
+				&& text("addSubstitutionFilter") == FiltersDialog::tr("Add")
+				&& text("removeSubstitutionFilter") == FiltersDialog::tr("Remove")
+				&& text("clearSubstitutionFilters") == FiltersDialog::tr("Clear"),
+				"substitution page: WinMerge's controls and texts");
+			check(usable(&dialog, "addSubstitutionFilter")
+				&& !usable(&dialog, "removeSubstitutionFilter")
+				&& !usable(&dialog, "clearSubstitutionFilters"),
+				"substitution page: nothing listed, only Add");
+
+			click(&dialog, "addSubstitutionFilter");
+			QTreeWidgetItem *row = list->topLevelItem(0);
+			const QString editHere = FiltersDialog::tr("<Edit here>");
+			check(list->topLevelItemCount() == 1 && row->text(0) == editHere
+				&& row->text(1) == editHere && row->checkState(0) == Qt::Checked
+				&& row->checkState(2) == Qt::Unchecked && row->checkState(3) == Qt::Unchecked
+				&& row->checkState(4) == Qt::Unchecked && row->isSelected()
+				&& usable(&dialog, "removeSubstitutionFilter")
+				&& usable(&dialog, "clearSubstitutionFilters"),
+				"substitution page: Add lists a ticked pair to edit");
+
+			// the two texts edit in place; the other columns only tick
+			list->editItem(row, 0);
+			const bool typedPattern = typeInEditor(list, QStringLiteral("foo"));
+			list->editItem(row, 1);
+			const bool typedReplacement = typeInEditor(list, QStringLiteral("bar"));
+			list->editItem(row, 2);
+			QCoreApplication::processEvents();
+			const bool noEditor = list->viewport()->findChild<QLineEdit *>() == nullptr;
+			check(typedPattern && typedReplacement && row->text(0) == QStringLiteral("foo")
+				&& row->text(1) == QStringLiteral("bar") && noEditor,
+				"substitution page: the texts edit in place, the other columns do not");
+
+			// with a regular expression "whole word" does not count
+			row->setCheckState(2, Qt::Checked);
+			row->setCheckState(4, Qt::Checked);
+			enable->setChecked(true);
+			dialog.accept();
+			const SubstitutionFiltersList &accepted = dialog.substitutionFilters();
+			check(dialog.result() == QDialog::Accepted && accepted.GetEnabled()
+				&& accepted.GetCount() == 1 && accepted.GetAt(0).pattern == "foo"
+				&& accepted.GetAt(0).replacement == "bar" && accepted.GetAt(0).enabled
+				&& accepted.GetAt(0).useRegExp && !accepted.GetAt(0).caseSensitive
+				&& !accepted.GetAt(0).matchWholeWordOnly,
+				"substitution page: the pair as accepted");
+
+			// a ticked regular expression that does not compile
+			FiltersDialog bad;
+			auto *badList = bad.findChild<QTreeWidget *>(QStringLiteral("substitutionFilters"));
+			click(&bad, "addSubstitutionFilter");
+			click(&bad, "addSubstitutionFilter");
+			badList->topLevelItem(1)->setText(0, QStringLiteral("("));
+			badList->topLevelItem(1)->setCheckState(2, Qt::Checked);
+			shown.clear();
+			bad.accept();
+			printf("  message: %s\n", qPrintable(shown.value(0)));
+			check(bad.result() != QDialog::Accepted && shown.size() == 1
+				&& shown.first().startsWith(QStringLiteral("#2: "))
+				&& bad.currentPage() == FiltersDialog::SubstitutionFiltersPage,
+				"substitution page: a bad expression is refused, on its page");
+			badList->setCurrentItem(badList->topLevelItem(0));
+			click(&bad, "removeSubstitutionFilter");
+			const bool removed = badList->topLevelItemCount() == 1
+				&& badList->topLevelItem(0)->text(0) == QStringLiteral("(")
+				&& badList->topLevelItem(0)->isSelected();
+			click(&bad, "clearSubstitutionFilters");
+			check(removed && badList->topLevelItemCount() == 0
+				&& !usable(&bad, "removeSubstitutionFilter")
+				&& !usable(&bad, "clearSubstitutionFilters"),
+				"substitution page: Remove and Clear");
+		}
+
+		// --- what the filters do to comparisons ---
 		const QByteArray leftStamp = "alpha\nstamp: 2026-01-01\nomega\n";
 		const QByteArray rightStamp = "alpha\nstamp: 2026-02-02\nomega\n";
 		const QString leftText = dir.filePath(QStringLiteral("left.txt"));
@@ -2142,12 +2456,54 @@ int main(int argc, char *argv[])
 		const QString question = QCoreApplication::translate("MessageBoxes",
 			"Filters updated. Refresh all open folder compares?\n\n"
 			"Select 'No' to refresh later.");
-		const QString expression = QStringLiteral("^stamp:");
-		const auto savedFilters = []() {
-			return QSettings().value(QStringLiteral("LineFilters/List")).toStringList();
-		};
-
 		lm::setCompareOptionsForTest(0);
+		{
+			// text, table and folder: significant differences, ignored ones
+			const auto compared = [&]() {
+				QString result;
+				{
+					MainWindow window;
+					window.openFileComparison({ leftText, rightText });
+					window.openTableComparison(leftTable, rightTable);
+					settle();
+					auto *file = window.findChild<FileCompareView *>();
+					auto *table = window.findChild<TableCompareView *>();
+					result = QStringLiteral("text %1+%2, table %3, ")
+						.arg(file != nullptr ? file->diffCount() : -1)
+						.arg(file != nullptr ? file->ignoredDiffCount() : -1)
+						.arg(table != nullptr ? table->diffCount() : -1);
+				}
+				FolderCompareView view;
+				view.start(folderPairs[0]);
+				waitFor(&view);
+				result += view.rowResultForTest(stamp) == textSame ? QStringLiteral("folder same")
+					: view.rowResultForTest(stamp) == textDiff ? QStringLiteral("folder different")
+					: view.rowResultForTest(stamp);
+				printf("  %s\n", qPrintable(result));
+				return result;
+			};
+			const QString different = QStringLiteral("text 1+0, table 1, folder different");
+			const QString ignored = QStringLiteral("text 0+1, table 0, folder same");
+			LineFiltersList lines;
+			lines.AddFilter(stampExpression.toStdString(), true);
+			lm::saveLineFilters(false, lines);
+			check(compared() == different, "line filters: listed but switched off");
+			lm::saveLineFilters(true, lines);
+			check(compared() == ignored, "line filters: switched on, the line is ignored");
+			lm::saveLineFilters(false, LineFiltersList());
+
+			SubstitutionFiltersList pairs;
+			pairs.Add("2026-01-01", "2026-02-02", false, true, false, true);
+			pairs.SetEnabled(false);
+			lm::saveSubstitutionFilters(pairs);
+			check(compared() == different, "substitution filters: listed but switched off");
+			pairs.SetEnabled(true);
+			lm::saveSubstitutionFilters(pairs);
+			check(compared() == ignored, "substitution filters: the listed pair is ignored");
+			lm::saveSubstitutionFilters(SubstitutionFiltersList());
+		}
+
+		// --- OK in the dialog: what is rescanned ---
 		MainWindow window;
 		window.openFileComparison({ leftText, rightText });
 		window.openTableComparison(leftTable, rightTable);
@@ -2180,84 +2536,96 @@ int main(int argc, char *argv[])
 				results.append(folder->rowResultForTest(name));
 			return results;
 		};
+		const auto savedLines = []() {
+			LineFiltersList lines;
+			lm::copyLineFilters(&lines);
+			QStringList saved{ lm::lineFiltersEnabled() ? QStringLiteral("on")
+				: QStringLiteral("off") };
+			for (size_t i = 0; i < lines.GetCount(); ++i)
+				saved.append((lines.GetAt(i).enabled ? QStringLiteral("1 ") : QStringLiteral("0 "))
+					+ QString::fromStdString(lines.GetAt(i).filterStr));
+			return saved;
+		};
+		const auto savedPairs = []() {
+			SubstitutionFiltersList pairs;
+			lm::copySubstitutionFilters(&pairs);
+			QStringList saved{ pairs.GetEnabled() ? QStringLiteral("on") : QStringLiteral("off") };
+			for (size_t i = 0; i < pairs.GetCount(); ++i)
+				saved.append(QString::fromStdString(pairs.GetAt(i).pattern) + QStringLiteral(" > ")
+					+ QString::fromStdString(pairs.GetAt(i).replacement));
+			return saved;
+		};
 		check(file->diffCount() == 1 && table->diffCount() == 1
 			&& folderResults(stamp) == QStringList{ textDiff, textDiff }
-			&& savedFilters().isEmpty(), "no filters: the line is a difference everywhere");
+			&& savedLines() == QStringList{ QStringLiteral("off") }
+			&& savedPairs() == QStringList{ QStringLiteral("off") },
+			"no filters: the line is a difference everywhere");
 
-		// the dialog is window-modal: edit its list and press a button
-		// from inside its event loop
-		using Edit = std::function<void(QDialog *, QListWidget *)>;
+		// the dialog is window-modal: edit it and press a button from
+		// inside its event loop
+		using Edit = std::function<void(FiltersDialog *)>;
 		const auto withDialog = [&window](const Edit &edit,
-			QDialogButtonBox::StandardButton button)
+			QDialogButtonBox::StandardButton pressed)
 		{
-			QTimer::singleShot(0, &window, [&window, edit, button]() {
-				auto *dialog = window.findChild<QDialog *>(QStringLiteral("lineFiltersDialog"));
-				auto *list = dialog != nullptr ? dialog->findChild<QListWidget *>() : nullptr;
+			QTimer::singleShot(0, &window, [&window, edit, pressed]() {
+				auto *dialog = window.findChild<FiltersDialog *>();
 				auto *buttons = dialog != nullptr
 					? dialog->findChild<QDialogButtonBox *>() : nullptr;
-				if (list == nullptr || buttons == nullptr)
+				if (buttons == nullptr)
 				{
-					printf("no Line Filters dialog to answer\n");
+					printf("no Filters dialog to answer\n");
 					std::exit(3);
 				}
 				if (edit)
-					edit(dialog, list);
-				buttons->button(button)->click();
+					edit(dialog);
+				buttons->button(pressed)->click();
 			});
-			QMetaObject::invokeMethod(&window, "showLineFilters");
+			QMetaObject::invokeMethod(&window, "showFilters");
 		};
-		const auto press = [](QDialog *dialog, const QString &text) {
-			for (QPushButton *button : dialog->findChildren<QPushButton *>())
-				if (button->text() == text)
-				{
-					button->click();
-					return;
-				}
-			printf("  no \"%s\" button\n", qPrintable(text));
+		const auto lineList = [](FiltersDialog *dialog) {
+			return dialog->findChild<QTreeWidget *>(QStringLiteral("lineFilters"));
 		};
-		// Add, type the expression in the row's editor, Enter
-		const auto adding = [&press](const QString &text) -> Edit {
-			return [&press, text](QDialog *dialog, QListWidget *list) {
-				press(dialog, MainWindow::tr("Add"));
-				QCoreApplication::processEvents();
-				auto *editor = list->viewport()->findChild<QLineEdit *>();
-				if (editor == nullptr)
-				{
+		const auto lineSwitch = [](FiltersDialog *dialog) {
+			return dialog->findChild<QCheckBox *>(QStringLiteral("enableLineFilters"));
+		};
+		// New, type the expression, tick it
+		const auto addingLine = [&](const QString &expression) -> Edit {
+			return [&, expression](FiltersDialog *dialog) {
+				click(dialog, "newLineFilter");
+				if (!typeInEditor(lineList(dialog), expression))
 					printf("  no editor on the new row\n");
-					return;
-				}
-				editor->setText(text);
-				QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
-				QCoreApplication::sendEvent(editor, &enter);
-				QCoreApplication::processEvents(); // the commit is queued
+				QTreeWidget *list = lineList(dialog);
+				list->topLevelItem(list->topLevelItemCount() - 1)->setCheckState(0, Qt::Checked);
 				if (!dialog->isVisible())
 					printf("  Enter in the editor closed the dialog\n");
 			};
 		};
-		const auto ticking = [](bool on) -> Edit {
-			return [on](QDialog *, QListWidget *list) {
-				if (list->count() > 0)
-					list->item(0)->setCheckState(on ? Qt::Checked : Qt::Unchecked);
+		const auto switchingLines = [&](bool on) -> Edit {
+			return [&, on](FiltersDialog *dialog) { lineSwitch(dialog)->setChecked(on); };
+		};
+		const auto switchingPairs = [](bool on) -> Edit {
+			return [on](FiltersDialog *dialog) {
+				dialog->findChild<QCheckBox *>(
+					QStringLiteral("enableSubstitutionFilters"))->setChecked(on);
 			};
 		};
-		const Edit removingFirst = [&press](QDialog *dialog, QListWidget *list) {
-			list->setCurrentRow(0);
-			press(dialog, MainWindow::tr("Remove"));
-		};
-		const QString enabled = QStringLiteral("1\t") + expression;
-		const QString disabled = QStringLiteral("0\t") + expression;
+		const QString on = QStringLiteral("on");
+		const QString off = QStringLiteral("off");
+		const QString stampLine = QStringLiteral("1 ") + stampExpression;
 
 		// a text comparison in front
 		tabs->setCurrentWidget(file);
 		settle();
 		shown.clear();
-		withDialog(adding(expression), QDialogButtonBox::Ok);
+		withDialog([&](FiltersDialog *dialog) {
+			addingLine(stampExpression)(dialog);
+			lineSwitch(dialog)->setChecked(true);
+		}, QDialogButtonBox::Ok);
 		settle();
-		check(savedFilters() == QStringList{ enabled }, "a new filter is saved");
+		check(savedLines() == QStringList{ on, stampLine }, "a new line filter is saved");
 		check(fileScans == 1 && file->diffCount() == 0 && file->ignoredDiffCount() == 1,
 			"text in front: the text comparison is rescanned at once");
-		check(tableScans == 1 && table->diffCount() == 0,
-			"text in front: the table too, and it takes the filter");
+		check(tableScans == 1 && table->diffCount() == 0, "text in front: the table too");
 		check(shown == QStringList{ binaryDiffer, binaryDiffer },
 			"text in front: identical files are reported");
 		check(asked.isEmpty() && foldersComparing() == 0
@@ -2268,40 +2636,75 @@ int main(int argc, char *argv[])
 		settle();
 		check(fileScans == 1 && tableScans == 1, "unchanged filters: nothing is rescanned");
 
-		withDialog(ticking(false), QDialogButtonBox::Cancel);
+		withDialog(switchingLines(false), QDialogButtonBox::Cancel);
 		settle();
-		check(fileScans == 1 && tableScans == 1 && savedFilters() == QStringList{ enabled },
+		check(fileScans == 1 && tableScans == 1
+			&& savedLines() == QStringList{ on, stampLine },
 			"Cancel: nothing is saved or rescanned");
 
-		// a table is the same kind of document
+		// a table is the same kind of document; the switch alone is a change
 		tabs->setCurrentWidget(table);
 		settle();
-		withDialog(ticking(false), QDialogButtonBox::Ok);
+		withDialog(switchingLines(false), QDialogButtonBox::Ok);
 		settle();
-		check(savedFilters() == QStringList{ disabled } && fileScans == 2 && tableScans == 2
-			&& file->diffCount() == 1 && file->ignoredDiffCount() == 0
+		check(savedLines() == QStringList{ off, stampLine } && fileScans == 2
+			&& tableScans == 2 && file->diffCount() == 1 && file->ignoredDiffCount() == 0
 			&& table->diffCount() == 1,
-			"table in front: a filter switched off rescans both");
+			"table in front: line filters switched off, both rescanned");
 
-		// a folder comparison in front asks first
+		// substitution filters rescan them as well
+		tabs->setCurrentWidget(file);
+		settle();
+		withDialog([&](FiltersDialog *dialog) {
+			dialog->showPage(FiltersDialog::SubstitutionFiltersPage);
+			click(dialog, "addSubstitutionFilter");
+			auto *list = dialog->findChild<QTreeWidget *>(QStringLiteral("substitutionFilters"));
+			list->topLevelItem(0)->setText(0, QStringLiteral("2026-01-01"));
+			list->topLevelItem(0)->setText(1, QStringLiteral("2026-02-02"));
+			switchingPairs(true)(dialog);
+		}, QDialogButtonBox::Ok);
+		settle();
+		check(savedPairs() == QStringList{ on, QStringLiteral("2026-01-01 > 2026-02-02") }
+			&& fileScans == 3 && tableScans == 3 && file->diffCount() == 0
+			&& file->ignoredDiffCount() == 1 && table->diffCount() == 0,
+			"text in front: a new substitution filter rescans both");
+		{
+			FiltersDialog reopened;
+			check(reopened.currentPage() == FiltersDialog::SubstitutionFiltersPage,
+				"the dialog opens on the page it was accepted on");
+		}
+
+		// a folder comparison in front: substitution filters alone change
+		// nothing there
 		tabs->setCurrentWidget(folders.at(0));
 		settle();
 		asked.clear();
+		withDialog(switchingPairs(false), QDialogButtonBox::Ok);
+		const int startedOnPairs = foldersComparing();
+		settle();
+		check(savedPairs().value(0) == off && asked.isEmpty() && startedOnPairs == 0
+			&& fileScans == 3 && tableScans == 3,
+			"folder in front: changed substitution filters are only saved");
+
+		// changed line filters ask first
 		answer = false;
-		withDialog(ticking(true), QDialogButtonBox::Ok);
+		withDialog(switchingLines(true), QDialogButtonBox::Ok);
 		const int startedOnNo = foldersComparing();
 		settle();
 		check(asked == QStringList{ question }, "folder in front: asks before refreshing");
-		check(startedOnNo == 0 && savedFilters() == QStringList{ enabled }
+		check(startedOnNo == 0 && savedLines() == QStringList{ on, stampLine }
 			&& folderResults(stamp) == QStringList{ textDiff, textDiff },
 			"folder in front, No: saved, refreshed later");
-		check(fileScans == 2 && tableScans == 2 && file->diffCount() == 1,
+		check(fileScans == 3 && tableScans == 3 && file->diffCount() == 0,
 			"folder in front: text and table comparisons are left alone");
 
 		asked.clear();
 		answer = true;
 		const QString second = QStringLiteral("^never there$");
-		withDialog(adding(second), QDialogButtonBox::Ok);
+		withDialog([&](FiltersDialog *dialog) {
+			dialog->showPage(FiltersDialog::LineFiltersPage);
+			addingLine(second)(dialog);
+		}, QDialogButtonBox::Ok);
 		const int startedOnYes = foldersComparing();
 		for (const FolderCompareView *folder : folders)
 			waitFor(folder);
@@ -2311,22 +2714,25 @@ int main(int argc, char *argv[])
 		check(folderResults(stamp) == QStringList{ textSame, textSame }
 			&& folderResults(other) == QStringList{ textDiff, textDiff },
 			"the refreshed folder comparisons take the filters");
-		check(fileScans == 2 && tableScans == 2, "folder in front, Yes: no text rescans");
+		check(fileScans == 3 && tableScans == 3, "folder in front, Yes: no text rescans");
 
 		// nothing to rescan in front: the filters are only saved
 		tabs->setCurrentWidget(selector);
 		settle();
 		asked.clear();
-		withDialog(removingFirst, QDialogButtonBox::Ok);
+		withDialog([&](FiltersDialog *dialog) {
+			lineList(dialog)->setCurrentItem(lineList(dialog)->topLevelItem(0));
+			click(dialog, "removeLineFilter");
+		}, QDialogButtonBox::Ok);
 		const int startedElsewhere = foldersComparing();
 		settle();
-		check(savedFilters() == QStringList{ QStringLiteral("1\t") + second }
-			&& asked.isEmpty() && startedElsewhere == 0 && fileScans == 2 && tableScans == 2,
+		check(savedLines() == QStringList{ on, QStringLiteral("1 ") + second }
+			&& asked.isEmpty() && startedElsewhere == 0 && fileScans == 3 && tableScans == 3,
 			"another tab in front: saved, nothing rescanned");
 
 		lm::setMessageSinkForTest([](const QString &) {});
 		lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
-		printf("line filters: %s\n", ok ? "ok" : "FAILED");
+		printf("filters: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

@@ -5,11 +5,16 @@
 #include "pch.h"
 #include "EngineOptions.h"
 
+#include <mutex>
 #include <QSettings>
+#include <QStringList>
 #include <QVariant>
 
 #include "DiffWrapper.h"
 #include "FilterList.h"
+#include "LineFiltersList.h"
+#include "SubstitutionFiltersList.h"
+#include "SubstitutionList.h"
 #include "OptionsMgr.h"
 #include "OptionsDef.h"
 #include "options_global.h"
@@ -107,6 +112,13 @@ public:
 		val.SetBool(value);
 		return SaveOption(name, val);
 	}
+	int RemoveOption(const String& name) override
+	{
+		// like CRegOptionsMgr: the saved value goes too
+		const int result = COptionsMgr::RemoveOption(name);
+		m_settings.remove(toKey(name));
+		return result;
+	}
 	int FlushOptions() override
 	{
 		m_settings.sync();
@@ -142,6 +154,60 @@ private:
 	QSettings m_settings;
 };
 
+/** theApp.m_pLineFilters and theApp.m_pSubstitutionFiltersList, with the
+    line filters' switch. A folder comparison reads them from its worker
+    thread, hence the lock. */
+struct FilterStore
+{
+	std::mutex mutex;
+	bool lineFiltersEnabled = false;
+	LineFiltersList lineFilters;
+	SubstitutionFiltersList substitutionFilters;
+};
+
+FilterStore &filterStore()
+{
+	static FilterStore store;
+	return store;
+}
+
+/** LibreMerge up to 0.9.7 kept its line filters in one "LineFilters/List"
+    value, each entry "1\t<expression>" or "0\t<expression>", with no
+    switch for them all: the ticked ones applied. Move them to WinMerge's
+    layout once, switched on so that they keep applying. */
+void migrateLineFilters()
+{
+	QSettings settings;
+	const QString oldKey = QStringLiteral("LineFilters/List");
+	if (!settings.contains(oldKey))
+		return;
+	const QStringList entries = settings.value(oldKey).toStringList();
+	settings.remove(oldKey);
+	if (entries.isEmpty() || settings.contains(QStringLiteral("LineFilters/Values")))
+		return;
+	settings.setValue(QStringLiteral("LineFilters/Values"), static_cast<int>(entries.size()));
+	for (int i = 0; i < entries.size(); ++i)
+	{
+		const QString number = QString::number(i).rightJustified(2, QLatin1Char('0'));
+		settings.setValue(QStringLiteral("LineFilters/Filter") + number, entries.at(i).mid(2));
+		settings.setValue(QStringLiteral("LineFilters/Enabled") + number,
+			entries.at(i).startsWith(QStringLiteral("1\t")) ? 1 : 0);
+	}
+	settings.setValue(toKey(OPT_LINEFILTER_ENABLED), true);
+}
+
+void loadFilters(COptionsMgr *options)
+{
+	migrateLineFilters();
+	options->InitOption(OPT_LINEFILTER_ENABLED, false);
+	options->InitOption(OPT_SUBSTITUTION_FILTERS_ENABLED, false);
+	FilterStore &store = filterStore();
+	const std::lock_guard<std::mutex> lock(store.mutex);
+	store.lineFiltersEnabled = options->GetBool(OPT_LINEFILTER_ENABLED);
+	store.lineFilters.Initialize(options);
+	store.substitutionFilters.Initialize(options);
+}
+
 } // namespace
 
 namespace lm
@@ -168,6 +234,7 @@ void installEngineOptions()
 	options.InitOption(OPT_CMP_INDENT_HEURISTIC, true); // upstream default
 	options.InitOption(OPT_CMP_MOVED_BLOCKS, false);    // upstream default
 	options.InitOption(OPT_CMP_METHOD, static_cast<int>(CMP_CONTENT));
+	loadFilters(&options);
 
 	// "Ignore comment differences" asks this registry for a parser of the
 	// file's language, in file and folder comparisons alike: WinMerge fills
@@ -244,24 +311,77 @@ bool ignoreCodepageDifferences()
 
 std::shared_ptr<FilterList> currentLineFilters()
 {
-	auto filterList = std::make_shared<FilterList>();
-	const QStringList entries = QSettings()
-		.value(QStringLiteral("LineFilters/List")).toStringList();
-	for (const QString &entry : entries)
-	{
-		if (entry.startsWith(QStringLiteral("1\t")))
-		{
-			try
-			{
-				filterList->AddRegExp(entry.mid(2).toStdString());
-			}
-			catch (...)
-			{
-				// invalid expression: skip it
-			}
-		}
-	}
-	return filterList->HasRegExps() ? filterList : nullptr;
+	// CDirDoc::LoadLineFilterList; the same as CMergeDoc::Rescan's
+	// "enabled ? MakeFilterList() : nullptr" to the engine
+	FilterStore &store = filterStore();
+	const std::lock_guard<std::mutex> lock(store.mutex);
+	if (!store.lineFiltersEnabled)
+		return nullptr;
+	std::shared_ptr<FilterList> filters = store.lineFilters.MakeFilterList(false);
+	return filters != nullptr && filters->HasRegExps() ? filters : nullptr;
+}
+
+std::shared_ptr<SubstitutionList> currentSubstitutionFilters()
+{
+	// CDirDoc::LoadSubstitutionFiltersList
+	FilterStore &store = filterStore();
+	const std::lock_guard<std::mutex> lock(store.mutex);
+	if (!store.substitutionFilters.GetEnabled() || store.substitutionFilters.GetCount() == 0)
+		return nullptr;
+	return store.substitutionFilters.MakeSubstitutionList();
+}
+
+bool lineFiltersEnabled()
+{
+	FilterStore &store = filterStore();
+	const std::lock_guard<std::mutex> lock(store.mutex);
+	return store.lineFiltersEnabled;
+}
+
+void copyLineFilters(LineFiltersList *into)
+{
+	FilterStore &store = filterStore();
+	const std::lock_guard<std::mutex> lock(store.mutex);
+	into->CloneFrom(&store.lineFilters);
+}
+
+void copySubstitutionFilters(SubstitutionFiltersList *into)
+{
+	FilterStore &store = filterStore();
+	const std::lock_guard<std::mutex> lock(store.mutex);
+	into->CloneFrom(&store.substitutionFilters);
+}
+
+void saveLineFilters(bool enabled, const LineFiltersList &list)
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr)
+		return;
+	FilterStore &store = filterStore();
+	const std::lock_guard<std::mutex> lock(store.mutex);
+	mgr->SaveOption(OPT_LINEFILTER_ENABLED, enabled);
+	store.lineFiltersEnabled = enabled;
+	store.lineFilters.CloneFrom(&list);
+	store.lineFilters.SaveFilters();
+	mgr->FlushOptions();
+}
+
+void saveSubstitutionFilters(const SubstitutionFiltersList &list)
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr)
+		return;
+	FilterStore &store = filterStore();
+	const std::lock_guard<std::mutex> lock(store.mutex);
+	store.substitutionFilters.CloneFrom(&list);
+	store.substitutionFilters.SaveFilters();
+	mgr->FlushOptions();
+}
+
+void reloadFiltersForTest()
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+		loadFilters(mgr);
 }
 
 void setCompareOptionsForTest(int ignoreWhitespace)

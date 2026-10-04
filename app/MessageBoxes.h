@@ -57,6 +57,8 @@ void showIdenticalMessage(QWidget *parent, const QStringList &paths,
 
 /** A plain information box, window-modal (sheets on macOS). */
 void showInformation(QWidget *parent, const QString &text);
+/** The same with the warning icon (MB_OK | MB_ICONEXCLAMATION). */
+void showWarning(QWidget *parent, const QString &text);
 
 /** CMergeDoc::CheckFileChanged's question: another application changed a
     compared file since it was loaded, reload it? "Don't ask this question

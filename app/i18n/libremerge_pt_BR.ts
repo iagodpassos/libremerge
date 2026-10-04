@@ -300,6 +300,81 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     </message>
 </context>
 <context>
+    <name>FiltersDialog</name>
+    <message>
+        <source>Filters</source>
+        <translation>Filtros</translation>
+    </message>
+    <message>
+        <source>Line Filters</source>
+        <translation>Filtros de Linha</translation>
+    </message>
+    <message>
+        <source>Substitution Filters</source>
+        <translation>Filtros de Substituição</translation>
+    </message>
+    <message>
+        <source>Enable Line Filters</source>
+        <translation>Habilitar Filtros de Linha</translation>
+    </message>
+    <message>
+        <source>Regular Expressions (one per line):</source>
+        <translation>Expressões Regulares (uma por linha):</translation>
+    </message>
+    <message>
+        <source>Regular expression</source>
+        <translation>Expressão regular</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>Novo</translation>
+    </message>
+    <message>
+        <source>Edit</source>
+        <translation>Editar</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>Remover</translation>
+    </message>
+    <message>
+        <source>Changes to the listed pairs below will be ignored or marked as insignificant. Patches are unaffected.</source>
+        <translation>Alterações nos pares listados abaixo serão ignoradas ou marcadas como insignificantes. Os patches não são afetados.</translation>
+    </message>
+    <message>
+        <source>Enable</source>
+        <translation>Habilitar</translation>
+    </message>
+    <message>
+        <source>Find what</source>
+        <translation>Encontrar o quê</translation>
+    </message>
+    <message>
+        <source>Replace with</source>
+        <translation>Substituir por</translation>
+    </message>
+    <message>
+        <source>Match case</source>
+        <translation>Corresponder maiúsculas/minúsculas</translation>
+    </message>
+    <message>
+        <source>Match whole word only</source>
+        <translation>Corresponder apenas palavras inteiras</translation>
+    </message>
+    <message>
+        <source>Add</source>
+        <translation>Adicionar</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>Limpar</translation>
+    </message>
+    <message>
+        <source>&lt;Edit here&gt;</source>
+        <translation>&lt;Editar aqui&gt;</translation>
+    </message>
+</context>
+<context>
     <name>FolderCompareView</name>
     <message>
         <source> Filter: </source>
@@ -1015,10 +1090,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Ferramen&amp;tas</translation>
     </message>
     <message>
-        <source>&amp;Line Filters...</source>
-        <translation>&amp;Filtros de Linha...</translation>
-    </message>
-    <message>
         <source>&amp;Help</source>
         <translation>A&amp;juda</translation>
     </message>
@@ -1041,16 +1112,16 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>Nenhum</translation>
     </message>
     <message>
-        <source>Line Filters</source>
-        <translation>Filtros de Linha</translation>
-    </message>
-    <message>
         <source>Settings...</source>
         <translation>Ajustes...</translation>
     </message>
     <message>
         <source>&amp;Options...</source>
         <translation>&amp;Opções...</translation>
+    </message>
+    <message>
+        <source>&amp;Filters...</source>
+        <translation>F&amp;iltros...</translation>
     </message>
     <message>
         <source>Could not reload:
@@ -1091,18 +1162,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
 %1
 
 %2</translation>
-    </message>
-    <message>
-        <source>Differences whose lines all match an enabled regular expression are shown as trivial and skipped by the navigation.</source>
-        <translation>Diferenças cujas linhas casam todas com uma expressão regular habilitada são exibidas como triviais e puladas pela navegação.</translation>
-    </message>
-    <message>
-        <source>Add</source>
-        <translation>Adicionar</translation>
-    </message>
-    <message>
-        <source>Remove</source>
-        <translation>Remover</translation>
     </message>
     <message>
         <source>Select Files or Folders</source>

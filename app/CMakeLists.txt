@@ -20,6 +20,7 @@ qt_add_executable(LibreMerge
   ImageCompareView.cpp
   ImagePane.cpp
   OptionsDialog.cpp
+  FiltersDialog.cpp
   DiffTextEdit.cpp
   Icons.cpp
   ItemCheckStyle.cpp

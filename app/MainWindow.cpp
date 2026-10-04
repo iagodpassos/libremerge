@@ -20,7 +20,6 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
 #include "Dialogs.h"
@@ -35,11 +34,11 @@
 #include <QTimer>
 
 #include "EngineOptions.h"
+#include "FiltersDialog.h"
 #include "FileCompareView.h"
 #include "TableCompareView.h"
 #include "ImageCompareView.h"
 #include "ImageFormats.h"
-#include "ItemCheckStyle.h"
 #include "MessageBoxes.h"
 #include "OptionsDialog.h"
 #include "AboutDialog.h"
@@ -637,8 +636,8 @@ MainWindow::MainWindow(QWidget *parent)
 	});
 
 	QMenu *toolsMenu = menuBar()->addMenu(tr("&Tools"));
-	addMenuAction(toolsMenu, tr("&Line Filters..."), QKeySequence(),
-		[this]() { showLineFilters(); });
+	addMenuAction(toolsMenu, tr("&Filters..."), QKeySequence(),
+		[this]() { showFilters(); });
 
 	QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
 	QAction *aboutAction = helpMenu->addAction(tr("&About LibreMerge"));
@@ -1444,89 +1443,40 @@ void MainWindow::rescanFileComparisons()
 	}
 }
 
-/** WinMerge's line filters: regular expressions whose matching lines
-    are ignored (their diffs become trivial). */
-void MainWindow::showLineFilters()
+/** WinMerge's Tools > Filters (CMainFrame::OnToolsFilters): the line and
+    substitution filters, saved on OK and applied at once to the kind of
+    comparison in front. */
+void MainWindow::showFilters()
 {
-	QDialog dialog(this);
-	dialog.setObjectName(QStringLiteral("lineFiltersDialog"));
-	dialog.setWindowModality(Qt::WindowModal);
-	dialog.setWindowTitle(tr("Line Filters"));
-	auto *layout = new QVBoxLayout(&dialog);
-	auto *note = new QLabel(tr("Differences whose lines all match an "
-		"enabled regular expression are shown as trivial and skipped "
-		"by the navigation."), &dialog);
-	note->setWordWrap(true);
-	layout->addWidget(note);
-
-	auto *list = new QListWidget(&dialog);
-	lm::ensureItemCheckBoxes(list);
-	const QStringList entries = QSettings()
-		.value(QStringLiteral("LineFilters/List")).toStringList();
-	for (const QString &entry : entries)
-	{
-		const bool enabled = entry.startsWith(QStringLiteral("1\t"));
-		auto *item = new QListWidgetItem(entry.mid(2), list);
-		item->setFlags(item->flags() | Qt::ItemIsUserCheckable
-			| Qt::ItemIsEditable);
-		item->setCheckState(enabled ? Qt::Checked : Qt::Unchecked);
-	}
-	layout->addWidget(list, 1);
-
-	auto *rowButtons = new QHBoxLayout;
-	auto *addButton = new QPushButton(tr("Add"), &dialog);
-	connect(addButton, &QPushButton::clicked, &dialog, [list]() {
-		auto *item = new QListWidgetItem(QString(), list);
-		item->setFlags(item->flags() | Qt::ItemIsUserCheckable
-			| Qt::ItemIsEditable);
-		item->setCheckState(Qt::Checked);
-		list->setCurrentItem(item);
-		list->editItem(item);
-	});
-	rowButtons->addWidget(addButton);
-	auto *removeButton = new QPushButton(tr("Remove"), &dialog);
-	connect(removeButton, &QPushButton::clicked, &dialog, [list]() {
-		delete list->currentItem();
-	});
-	rowButtons->addWidget(removeButton);
-	rowButtons->addStretch(1);
-	layout->addLayout(rowButtons);
-
-	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok
-		| QDialogButtonBox::Cancel, &dialog);
-	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-	layout->addWidget(buttons);
-	dialog.resize(480, 360);
-
+	FiltersDialog dialog(this);
 	if (dialog.exec() != QDialog::Accepted)
 		return;
-	QStringList saved;
-	for (int i = 0; i < list->count(); ++i)
-	{
-		const QListWidgetItem *item = list->item(i);
-		if (item->text().trimmed().isEmpty())
-			continue;
-		saved.append((item->checkState() == Qt::Checked
-			? QStringLiteral("1\t") : QStringLiteral("0\t"))
-			+ item->text().trimmed());
-	}
-	// CMainFrame::OnToolsFilters: changed filters apply at once to the
-	// kind of comparison in front. A text or table comparison there rescans
-	// every open one; a folder comparison asks first, and a Yes refreshes
-	// all the open folder comparisons. Anything else in front, or filters
-	// left as they were (LineFiltersList::Compare), rescans nothing
-	const bool changed = saved != entries;
+
+	LineFiltersList lineFilters;
+	lm::copyLineFilters(&lineFilters);
+	SubstitutionFiltersList substitutionFilters;
+	lm::copySubstitutionFilters(&substitutionFilters);
+	const bool lineFiltersChanged = dialog.lineFiltersEnabled() != lm::lineFiltersEnabled()
+		|| !dialog.lineFilters().Compare(&lineFilters);
+	const bool substitutionFiltersChanged =
+		!dialog.substitutionFilters().Compare(&substitutionFilters);
+
+	// a text or table comparison in front rescans every open one when
+	// either kind of filter changed; a folder comparison in front asks
+	// first, and only for changed line filters, and a Yes refreshes all
+	// the open folder comparisons. Anything else in front rescans nothing
 	QWidget *front = m_tabs->currentWidget();
 	bool rescanFiles = false;
 	bool rescanFolders = false;
-	if (changed && (qobject_cast<FileCompareView *>(front) != nullptr
-			|| qobject_cast<TableCompareView *>(front) != nullptr))
-		rescanFiles = true;
-	else if (changed && qobject_cast<FolderCompareView *>(front) != nullptr)
+	if (qobject_cast<FileCompareView *>(front) != nullptr
+		|| qobject_cast<TableCompareView *>(front) != nullptr)
+		rescanFiles = lineFiltersChanged || substitutionFiltersChanged;
+	else if (qobject_cast<FolderCompareView *>(front) != nullptr && lineFiltersChanged)
 		rescanFolders = lm::askRefreshFolderCompares(this);
+
 	// saved whatever the answer, and before the rescans read them
-	QSettings().setValue(QStringLiteral("LineFilters/List"), saved);
+	lm::saveLineFilters(dialog.lineFiltersEnabled(), dialog.lineFilters());
+	lm::saveSubstitutionFilters(dialog.substitutionFilters());
 	if (rescanFiles)
 	{
 		rescanFileComparisons();

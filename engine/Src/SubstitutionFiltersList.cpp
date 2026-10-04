@@ -276,7 +276,9 @@ std::shared_ptr<SubstitutionList> SubstitutionFiltersList::MakeSubstitutionList(
 				if (throwIfInvalid)
 				{
 					plist.reset();
-					const String msg = strutils::format(_T("#%d: %S"), i + 1, e.message().c_str());
+					// (WinMerge formats this with "%S", a narrow string in its
+					// wide build; here the format is narrow already)
+					const String msg = strutils::format(_T("#%d: "), i + 1) + ucr::toTString(e.message());
 					throw std::runtime_error(ucr::toUTF8(msg).c_str());
 				}
 			}

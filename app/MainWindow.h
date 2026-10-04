@@ -94,7 +94,7 @@ protected:
 private slots:
 	void newComparison();
 	void showOptions();
-	void showLineFilters();
+	void showFilters();
 	void closeTab(int index);
 
 private:
