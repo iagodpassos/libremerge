@@ -707,8 +707,16 @@ static auto compute(int op, const ValueType& lval, const ValueType& rval, bool c
 				{
 					if (!caseSensitive)
 					{
+						// LibreMerge: the hash goes by the letter without its
+						// case, as the comparison does. Upstream hashes the
+						// characters as they are, and the searcher then skips
+						// past a match whose case differs from the text
+						// sought ("ERROR" was not found in "an error")
 						auto searcher = std::boyer_moore_horspool_searcher(
-							rvalString->cbegin(), rvalString->cend(), std::hash<char>(),
+							rvalString->cbegin(), rvalString->cend(),
+							[](char c) {
+								return std::hash<int>()(std::tolower(static_cast<unsigned char>(c)));
+							},
 							[](char a, char b) {
 								return std::tolower(static_cast<unsigned char>(a)) ==
 									std::tolower(static_cast<unsigned char>(b));

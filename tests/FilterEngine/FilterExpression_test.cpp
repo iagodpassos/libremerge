@@ -4535,6 +4535,46 @@ TEST_P(FilterExpressionTest, StrFindAndRegexFindFunctions)
 	EXPECT_TRUE(fe.Evaluate(di));
 }
 
+// LibreMerge: a text is found whatever its case and the case of the text
+// it is sought in. Upstream's searcher hashed the characters as they are
+// while comparing them without their case, and skipped past such matches.
+TEST_P(FilterExpressionTest, ContainsWhateverTheCase)
+{
+	PathContext paths("/d/dev/winmerge/src", "/d/dev/winmerge/src");
+	CDiffContext ctxt(paths, 0);
+	DIFFITEM di;
+	di.diffFileInfo[0].filename = "Readme.TXT";
+	di.diffFileInfo[1].filename = "Readme.TXT";
+	di.diffcode.setSideFlag(0);
+	di.diffcode.setSideFlag(1);
+
+	FilterExpression fe;
+	fe.SetDiffContext(&ctxt);
+	fe.optimize = GetParam().optimize;
+
+	EXPECT_TRUE(fe.Parse("\"an error at the end\" contains \"ERROR\""));
+	EXPECT_TRUE(fe.Evaluate(di));
+	EXPECT_TRUE(fe.Parse("\"an ERROR at the end\" contains \"error\""));
+	EXPECT_TRUE(fe.Evaluate(di));
+	EXPECT_TRUE(fe.Parse("\"Error: mixed\" contains \"eRRoR\""));
+	EXPECT_TRUE(fe.Evaluate(di));
+	EXPECT_TRUE(fe.Parse("\"an error at the end\" contains \"AT THE END\""));
+	EXPECT_TRUE(fe.Evaluate(di));
+	EXPECT_TRUE(fe.Parse("\"an error at the end\" contains \"NOWHERE\""));
+	EXPECT_FALSE(fe.Evaluate(di));
+	EXPECT_TRUE(fe.Parse("LeftName contains \".txt\""));
+	EXPECT_TRUE(fe.Evaluate(di));
+	EXPECT_TRUE(fe.Parse("LeftName contains \"README\""));
+	EXPECT_TRUE(fe.Evaluate(di));
+
+	// and by its case when the expression asks for that
+	fe.caseSensitive = true;
+	EXPECT_TRUE(fe.Parse("\"an error at the end\" contains \"ERROR\""));
+	EXPECT_FALSE(fe.Evaluate(di));
+	EXPECT_TRUE(fe.Parse("\"an error at the end\" contains \"error\""));
+	EXPECT_TRUE(fe.Evaluate(di));
+}
+
 INSTANTIATE_TEST_SUITE_P(
 	OptimizationCases,
 	FilterExpressionTest,
