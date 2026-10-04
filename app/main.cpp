@@ -179,6 +179,8 @@ int main(int argc, char *argv[])
 			lm::setMessageSinkForTest([](const QString &) {});
 			// and so would a question: none is expected, the answer is No
 			lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
+			// likewise the save prompt: unsaved changes are discarded
+			MainWindow::setSavePromptForTest([]() { return 2; });
 			break;
 		}
 	}
@@ -1827,6 +1829,61 @@ int main(int argc, char *argv[])
 			QCoreApplication::processEvents();
 			check(window.findChild<NewComparisonView *>() == nullptr
 				&& window.isVisible(), "Cancel closes a lone selection screen");
+		}
+
+		// closing the window offers to save every comparison's unsaved
+		// changes, and one Cancel keeps it open (CMainFrame::OnClose)
+		{
+			const QString mine = dir.filePath(QStringLiteral("mine.txt"));
+			const QString theirs = dir.filePath(QStringLiteral("theirs.txt"));
+			write(mine, "a\n");
+			write(theirs, "b\n");
+			const auto read = [](const QString &path)
+			{
+				QFile f(path);
+				f.open(QIODevice::ReadOnly);
+				return f.readAll();
+			};
+			QList<int> answers; // one per prompt: 0 cancels, 1 saves, 2 discards
+			int prompts = 0;
+			MainWindow::setSavePromptForTest([&]() { return answers.value(prompts++, 0); });
+			MainWindow window;
+			window.show();
+			window.openFileComparison({ mine, theirs });
+			window.openFileComparison({ leftCsv, rightCsv });
+			window.openFileComparison({ left, right });
+			QCoreApplication::processEvents();
+			auto *tabs = window.findChild<QTabWidget *>();
+			auto *text = qobject_cast<FileCompareView *>(tabs->widget(0));
+			auto *table = qobject_cast<TableCompareView *>(tabs->widget(1));
+			if (text == nullptr || table == nullptr)
+				return 2;
+			text->typeAtForTest(0, 0, QStringLiteral("kept "));
+			table->gotoFirstDiff();
+			table->copyCurrentDiff(0);
+
+			// the text asks first and is saved, the table then cancels
+			answers = { 1, 0 };
+			const bool closed = window.close();
+			check(!closed && window.isVisible() && prompts == 2
+				&& read(mine) == "kept a\n" && !text->isModified()
+				&& table->isModified() && tabs->currentIndex() == 1,
+				"closing the window: each unsaved tab asks, Cancel keeps it open");
+			// only the table is left to ask, and it is discarded
+			prompts = 0;
+			answers = { 2 };
+			check(window.close() && !window.isVisible() && prompts == 1
+				&& read(rightCsv) == "k,v\n1,b\n",
+				"closing the window: Discard lets it close");
+
+			// nothing unsaved: no prompt
+			prompts = 0;
+			MainWindow plain;
+			plain.show();
+			plain.openFileComparison({ left, right });
+			QCoreApplication::processEvents();
+			check(plain.close() && prompts == 0, "closing the window: nothing unsaved, nothing asked");
+			MainWindow::setSavePromptForTest([]() { return 2; });
 		}
 
 		// Preserve file time: the saved file keeps its date

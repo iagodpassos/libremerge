@@ -128,6 +128,7 @@ private:
 	QTimer *m_watchTimer;     // gathers a burst of change notifications
 	QTimer *m_fileCheckTimer; // the posted check
 	bool m_checkingFiles = false;
+	bool m_askingToClose = false; // closeEvent is waiting for an answer
 	QElapsedTimer m_lastFileQuestion; // since the reload question closed
 	QHash<QString, lm::FileStamp> m_watchedStamps; // as the watcher last saw them
 };

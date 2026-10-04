@@ -96,6 +96,18 @@ QStringList comparedPaths(QWidget *page)
 	return {};
 }
 
+/** Whether a file, table or image comparison holds unsaved changes. */
+bool hasUnsavedChanges(QWidget *page)
+{
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+		return file->isModified();
+	if (auto *table = qobject_cast<TableCompareView *>(page))
+		return table->isModified();
+	if (auto *image = qobject_cast<ImageCompareView *>(page))
+		return image->isModified();
+	return false;
+}
+
 std::function<int()> &savePromptForTest()
 {
 	static std::function<int()> answer;
@@ -1008,14 +1020,11 @@ bool MainWindow::reloadComparison(QWidget *page, bool reportIdentical)
 
 bool MainWindow::promptAndSaveIfNeeded(QWidget *page, bool closing)
 {
+	if (!hasUnsavedChanges(page))
+		return true;
 	auto *view = qobject_cast<FileCompareView *>(page);
 	auto *table = qobject_cast<TableCompareView *>(page);
 	auto *image = qobject_cast<ImageCompareView *>(page);
-	const bool modified = (view != nullptr && view->isModified())
-		|| (table != nullptr && table->isModified())
-		|| (image != nullptr && image->isModified());
-	if (!modified)
-		return true;
 
 	enum { Cancel, Save, Discard };
 	if (view == nullptr)
@@ -1718,6 +1727,37 @@ void MainWindow::closeEvent(QCloseEvent *event)
 			return;
 		}
 	}
+
+	// every comparison with unsaved changes offers to save them first, and
+	// one Cancel keeps the window open: what WinMerge's OnClose does with
+	// CloseNow (image frames) and SaveAllModified (documents). The tab
+	// that asks comes to the front, the prompt of tables and images
+	// naming no file
+	if (m_askingToClose)
+	{
+		event->ignore(); // a second close while a prompt is still open
+		return;
+	}
+	m_askingToClose = true;
+	bool cancelled = false;
+	for (int i = 0; i < m_tabs->count() && !cancelled; ++i)
+	{
+		QWidget *page = m_tabs->widget(i);
+		if (!hasUnsavedChanges(page))
+			continue;
+		m_tabs->setCurrentIndex(i);
+		cancelled = !promptAndSaveIfNeeded(page, true);
+	}
+	m_askingToClose = false;
+	if (cancelled)
+	{
+		event->ignore();
+		return;
+	}
+	// a check posted by the tabs coming to the front has no window left
+	// to ask on
+	m_fileCheckTimer->stop();
+	m_watchTimer->stop();
 	QMainWindow::closeEvent(event);
 }
 
