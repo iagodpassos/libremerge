@@ -753,6 +753,11 @@ bool FileCompareView::runDiff(QString *error)
 	// become trivial, like WinMerge's Tools > Filters
 	if (auto filterList = lm::currentLineFilters())
 		wrapper.SetFilterList(filterList);
+	// "Ignore comment differences" needs the language to tell comments
+	// from code: the first pane's, as WinMerge's Rescan takes it (the temp
+	// files carry no extension)
+	wrapper.SetFilterCommentsSourceDef(
+		QFileInfo(m_sides[0].path).suffix().toLower().toStdString());
 
 	COptionsMgr *mgr = GetOptionsMgr();
 	const bool detectMoved = mgr != nullptr
@@ -1171,9 +1176,14 @@ void FileCompareView::computeWordSpans()
 		if (tooBig || nonEmptySides < 2)
 			continue;
 
+		// the line ends inside a block compare as the options say
+		// (GetWordDiffArrayInRange)
+		const strdiff::EolCompareMode eolMode = options.bIgnoreLineBreaks
+			? strdiff::EOL_AS_SPACE
+			: options.bIgnoreEol ? strdiff::EOL_IGNORE : strdiff::EOL_STRICT;
 		const std::vector<strdiff::wdiff> wdiffs = strdiff::ComputeWordDiffs(
 			m_paneCount, joined,
-			!options.bIgnoreCase, strdiff::EOL_STRICT,
+			!options.bIgnoreCase, eolMode,
 			options.nIgnoreWhitespace, options.bIgnoreNumbers,
 			kBreakType, false /*byte_level*/);
 
@@ -1821,6 +1831,16 @@ void FileCompareView::refreshByUser()
 	emit aboutToRescan();
 	recompare();
 	emit rescanned();
+}
+
+bool FileCompareView::encodingsDiffer() const
+{
+	for (int side = 1; side < m_paneCount; ++side)
+		if (m_sides[side].unicoding != m_sides[0].unicoding
+			|| m_sides[side].codepage != m_sides[0].codepage
+			|| m_sides[side].bom != m_sides[0].bom)
+			return true;
+	return false;
 }
 
 QString FileCompareView::changedPathOnDisk() const

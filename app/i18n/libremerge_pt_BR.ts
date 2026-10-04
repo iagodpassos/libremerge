@@ -1446,6 +1446,10 @@ Checando identidade binária...</translation>
         <translation>Tema:</translation>
     </message>
     <message>
+        <source>Whitespaces</source>
+        <translation>Espaços em branco</translation>
+    </message>
+    <message>
         <source>Some messages can be hidden by the user. Press Reset to make all messages visible again.</source>
         <translation>Algumas mensagens podem ser ocultadas pelo usuário. Pressione Restaurar para tornar todas as mensagens visíveis novamente.</translation>
     </message>
@@ -1494,12 +1498,8 @@ Checando identidade binária...</translation>
         <translation>A mudança de idioma entra em vigor após reiniciar o LibreMerge.</translation>
     </message>
     <message>
-        <source>Ignore changes</source>
-        <translation>Ignorar alterações</translation>
-    </message>
-    <message>
         <source>Ignore all</source>
-        <translation>Ignorar todos</translation>
+        <translation>Ignorar tudo</translation>
     </message>
     <message>
         <source>Ignore case</source>
@@ -1510,8 +1510,60 @@ Checando identidade binária...</translation>
         <translation>Ignorar linhas em branco</translation>
     </message>
     <message>
-        <source>Ignore carriage return differences</source>
-        <translation>Ignorar diferenças de quebra de linha (CR)</translation>
+        <source>Ignore EOL differences (Windows/Unix/Mac)</source>
+        <translation>Ignorar diferenças de caractere EOL (Windows/Unix/Mac)</translation>
+    </message>
+    <message>
+        <source>Ignore codepage differences</source>
+        <translation>Ignorar diferenças de página de código</translation>
+    </message>
+    <message>
+        <source>Ignore comment differences</source>
+        <translation>Ignorar diferenças de comentário</translation>
+    </message>
+    <message>
+        <source>Ignore missing trailing EOL</source>
+        <translation>Ignorar falta do caractere EOL no final</translation>
+    </message>
+    <message>
+        <source>Ignore line breaks (treat as spaces)</source>
+        <translation>Ignorar quebras de linha (tratar como espaços)</translation>
+    </message>
+    <message>
+        <source>Enable moved block detection</source>
+        <translation>Habilitar detecção de bloco movido</translation>
+    </message>
+    <message>
+        <source>Enable indent heuristic</source>
+        <translation>Habilitar heurística de recuo</translation>
+    </message>
+    <message>
+        <source>Completely unhighlight the ignored differences</source>
+        <translation>Remover completamente o destaque das diferenças ignoradas</translation>
+    </message>
+    <message>
+        <source>Ignore change</source>
+        <translation>Ignorar alteração</translation>
+    </message>
+    <message>
+        <source>default</source>
+        <translation>padrão</translation>
+    </message>
+    <message>
+        <source>minimal</source>
+        <translation>mínimo</translation>
+    </message>
+    <message>
+        <source>patience</source>
+        <translation>paciência</translation>
+    </message>
+    <message>
+        <source>histogram</source>
+        <translation>histograma</translation>
+    </message>
+    <message>
+        <source>none</source>
+        <translation>nenhum</translation>
     </message>
     <message>
         <source>Ignore numbers</source>
@@ -1519,35 +1571,7 @@ Checando identidade binária...</translation>
     </message>
     <message>
         <source>Diff algorithm:</source>
-        <translation>Algoritmo de comparação:</translation>
-    </message>
-    <message>
-        <source>Default</source>
-        <translation>Padrão</translation>
-    </message>
-    <message>
-        <source>Whitespace</source>
-        <translation>Espaços em branco</translation>
-    </message>
-    <message>
-        <source>Minimal</source>
-        <translation>Mínimo</translation>
-    </message>
-    <message>
-        <source>Patience</source>
-        <translation>Patience</translation>
-    </message>
-    <message>
-        <source>Histogram</source>
-        <translation>Histograma</translation>
-    </message>
-    <message>
-        <source>None</source>
-        <translation>Nenhum</translation>
-    </message>
-    <message>
-        <source>Detect moved blocks</source>
-        <translation>Detectar blocos movidos</translation>
+        <translation>Algoritmo da diferenciação:</translation>
     </message>
     <message>
         <source>Open comparisons pick the new options up on Recompare (F5) or when reopened.</source>

@@ -32,6 +32,10 @@ public:
 
 	bool isModified() const;
 	int diffCount() const { return m_diffCount; }
+	/** The two files are in different encodings (Unicode form, code
+	    page or BOM), as WinMerge's Rescan checks for "Ignore codepage
+	    differences". */
+	bool encodingsDiffer() const;
 	QStringList paths() const;
 	QString tabTitle() const;
 	/** WinMerge's file description (strDesc): the tab title shows it

@@ -273,15 +273,16 @@ QWidget *OptionsDialog::buildGeneralPage()
 	return page;
 }
 
-/** WinMerge's Compare > General page (PropCompare), in its order. */
+/** WinMerge's Compare > General page (PropCompare), in its order and
+    with its texts. "Align similar lines" is not offered yet. */
 QWidget *OptionsDialog::buildComparePage()
 {
 	auto *page = new QWidget(this);
 	auto *box = new QVBoxLayout(page);
 
-	auto *whitespace = new QGroupBox(tr("Whitespace"), page);
+	auto *whitespace = new QGroupBox(tr("Whitespaces"), page);
 	auto *whitespaceBox = new QVBoxLayout(whitespace);
-	const QString whitespaceTexts[3] = { tr("Compare"), tr("Ignore changes"),
+	const QString whitespaceTexts[3] = { tr("Compare"), tr("Ignore change"),
 		tr("Ignore all") };
 	for (int i = 0; i < 3; ++i)
 	{
@@ -290,26 +291,42 @@ QWidget *OptionsDialog::buildComparePage()
 	}
 	box->addWidget(whitespace);
 
-	m_chkIgnoreBlank = new QCheckBox(tr("Ignore blank lines"), page);
-	box->addWidget(m_chkIgnoreBlank);
-	m_chkIgnoreCase = new QCheckBox(tr("Ignore case"), page);
-	box->addWidget(m_chkIgnoreCase);
-	m_chkIgnoreEol = new QCheckBox(
-		tr("Ignore carriage return differences"), page);
-	box->addWidget(m_chkIgnoreEol);
-	m_chkIgnoreNumbers = new QCheckBox(tr("Ignore numbers"), page);
-	box->addWidget(m_chkIgnoreNumbers);
-	m_chkMovedBlocks = new QCheckBox(tr("Detect moved blocks"), page);
-	box->addWidget(m_chkMovedBlocks);
+	const auto addCheck = [page, box](const char *name, const QString &text) {
+		auto *check = new QCheckBox(text, page);
+		check->setObjectName(QLatin1String(name));
+		box->addWidget(check);
+		return check;
+	};
+	m_chkIgnoreBlank = addCheck("ignoreBlankLines", tr("Ignore blank lines"));
+	m_chkIgnoreCase = addCheck("ignoreCase", tr("Ignore case"));
+	m_chkIgnoreEol = addCheck("ignoreEol",
+		tr("Ignore EOL differences (Windows/Unix/Mac)"));
+	m_chkIgnoreNumbers = addCheck("ignoreNumbers", tr("Ignore numbers"));
+	m_chkIgnoreCodepage = addCheck("ignoreCodepage",
+		tr("Ignore codepage differences"));
+	m_chkFilterComments = addCheck("filterComments",
+		tr("Ignore comment differences"));
+	m_chkIgnoreMissingEol = addCheck("ignoreMissingTrailingEol",
+		tr("Ignore missing trailing EOL"));
+	m_chkIgnoreLineBreaks = addCheck("ignoreLineBreaks",
+		tr("Ignore line breaks (treat as spaces)"));
+	m_chkMovedBlocks = addCheck("movedBlocks", tr("Enable moved block detection"));
 
 	m_cmbAlgorithm = new QComboBox(page);
-	m_cmbAlgorithm->addItems({ tr("Default"), tr("Minimal"), tr("Patience"),
-		tr("Histogram"), tr("None") });
+	m_cmbAlgorithm->setObjectName(QStringLiteral("diffAlgorithm"));
+	m_cmbAlgorithm->addItems({ tr("default"), tr("minimal"), tr("patience"),
+		tr("histogram"), tr("none") });
 	addLabeled(box, tr("Diff algorithm:"), m_cmbAlgorithm);
-
-	box->addSpacing(8);
-	box->addWidget(noteLabel(tr("Open comparisons pick the new options up on "
-		"Recompare (F5) or when reopened."), page));
+	m_chkIndentHeuristic = addCheck("indentHeuristic", tr("Enable indent heuristic"));
+	// only the xdiff algorithms take the heuristic (UpdateControls)
+	const auto updateIndentHeuristic = [this](int algorithm) {
+		m_chkIndentHeuristic->setEnabled(algorithm != 0 && algorithm != 4);
+	};
+	connect(m_cmbAlgorithm, &QComboBox::currentIndexChanged, this,
+		updateIndentHeuristic);
+	updateIndentHeuristic(m_cmbAlgorithm->currentIndex());
+	m_chkBlankOutIgnored = addCheck("blankOutIgnored",
+		tr("Completely unhighlight the ignored differences"));
 
 	box->addStretch(1);
 	return page;
@@ -487,8 +504,16 @@ void OptionsDialog::load()
 		m_chkIgnoreCase->setChecked(mgr->GetBool(OPT_CMP_IGNORE_CASE));
 		m_chkIgnoreEol->setChecked(mgr->GetBool(OPT_CMP_IGNORE_EOL));
 		m_chkIgnoreNumbers->setChecked(mgr->GetBool(OPT_CMP_IGNORE_NUMBERS));
+		m_chkIgnoreCodepage->setChecked(mgr->GetBool(OPT_CMP_IGNORE_CODEPAGE));
+		m_chkFilterComments->setChecked(mgr->GetBool(OPT_CMP_FILTER_COMMENTLINES));
+		m_chkIgnoreMissingEol->setChecked(
+			mgr->GetBool(OPT_CMP_IGNORE_MISSING_TRAILING_EOL));
+		m_chkIgnoreLineBreaks->setChecked(mgr->GetBool(OPT_CMP_IGNORE_LINE_BREAKS));
 		m_chkMovedBlocks->setChecked(mgr->GetBool(OPT_CMP_MOVED_BLOCKS));
 		m_cmbAlgorithm->setCurrentIndex(mgr->GetInt(OPT_CMP_DIFF_ALGORITHM));
+		m_chkIndentHeuristic->setChecked(mgr->GetBool(OPT_CMP_INDENT_HEURISTIC));
+		m_chkBlankOutIgnored->setChecked(
+			mgr->GetBool(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES));
 	}
 	m_cmbCompareMethod->setCurrentIndex(lm::currentCompareMethod());
 	loadMessageBoxes();
@@ -526,9 +551,20 @@ void OptionsDialog::save()
 		mgr->SaveOption(OPT_CMP_IGNORE_EOL, m_chkIgnoreEol->isChecked());
 		mgr->SaveOption(OPT_CMP_IGNORE_NUMBERS,
 			m_chkIgnoreNumbers->isChecked());
+		mgr->SaveOption(OPT_CMP_IGNORE_CODEPAGE, m_chkIgnoreCodepage->isChecked());
+		mgr->SaveOption(OPT_CMP_FILTER_COMMENTLINES,
+			m_chkFilterComments->isChecked());
+		mgr->SaveOption(OPT_CMP_IGNORE_MISSING_TRAILING_EOL,
+			m_chkIgnoreMissingEol->isChecked());
+		mgr->SaveOption(OPT_CMP_IGNORE_LINE_BREAKS,
+			m_chkIgnoreLineBreaks->isChecked());
 		mgr->SaveOption(OPT_CMP_MOVED_BLOCKS, m_chkMovedBlocks->isChecked());
 		mgr->SaveOption(OPT_CMP_DIFF_ALGORITHM,
 			m_cmbAlgorithm->currentIndex());
+		mgr->SaveOption(OPT_CMP_INDENT_HEURISTIC,
+			m_chkIndentHeuristic->isChecked());
+		mgr->SaveOption(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES,
+			m_chkBlankOutIgnored->isChecked());
 		mgr->FlushOptions();
 	}
 	lm::saveCompareMethod(m_cmbCompareMethod->currentIndex());
@@ -572,8 +608,14 @@ void OptionsDialog::restoreDefaults(int page)
 		m_chkIgnoreCase->setChecked(false);
 		m_chkIgnoreEol->setChecked(false);
 		m_chkIgnoreNumbers->setChecked(false);
+		m_chkIgnoreCodepage->setChecked(false);
+		m_chkFilterComments->setChecked(false);
+		m_chkIgnoreMissingEol->setChecked(false);
+		m_chkIgnoreLineBreaks->setChecked(false);
 		m_chkMovedBlocks->setChecked(false);
 		m_cmbAlgorithm->setCurrentIndex(0);
+		m_chkIndentHeuristic->setChecked(true);
+		m_chkBlankOutIgnored->setChecked(false);
 		break;
 	case FolderPage:
 		m_cmbCompareMethod->setCurrentIndex(0); // Full Contents

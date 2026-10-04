@@ -445,6 +445,10 @@ bool TableCompareView::runDiff(QString *error)
 	wrapper.SetCreateDiffList(&diffList);
 	wrapper.SetPaths(paths, false);
 	wrapper.SetOptions(&options);
+	// the language "Ignore comment differences" goes by, as in the text
+	// compare (WinMerge's table is the same document)
+	wrapper.SetFilterCommentsSourceDef(
+		QFileInfo(m_sides[0].path).suffix().toLower().toStdString());
 	if (!wrapper.RunFileDiff())
 	{
 		if (error != nullptr)
@@ -816,6 +820,13 @@ void TableCompareView::refreshByUser()
 	emit aboutToRescan();
 	recompare();
 	emit rescanned();
+}
+
+bool TableCompareView::encodingsDiffer() const
+{
+	return m_sides[0].unicoding != m_sides[1].unicoding
+		|| m_sides[0].codepage != m_sides[1].codepage
+		|| m_sides[0].bom != m_sides[1].bom;
 }
 
 QString TableCompareView::changedPathOnDisk() const

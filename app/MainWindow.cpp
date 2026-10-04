@@ -34,6 +34,7 @@
 #include <QKeyEvent>
 #include <QTimer>
 
+#include "EngineOptions.h"
 #include "FileCompareView.h"
 #include "TableCompareView.h"
 #include "ImageCompareView.h"
@@ -893,17 +894,20 @@ void MainWindow::reportIfIdentical(QWidget *page, bool opening)
 	QStringList paths;
 	int diffs = -1;
 	bool modified = false;
+	bool otherEncoding = false;
 	if (auto *file = qobject_cast<FileCompareView *>(page))
 	{
 		paths = file->paths();
 		diffs = file->diffCount();
 		modified = file->isModified();
+		otherEncoding = file->encodingsDiffer();
 	}
 	else if (auto *table = qobject_cast<TableCompareView *>(page))
 	{
 		paths = table->paths();
 		diffs = table->diffCount();
 		modified = table->isModified();
+		otherEncoding = table->encodingsDiffer();
 	}
 	else if (auto *image = qobject_cast<ImageCompareView *>(page))
 	{
@@ -912,6 +916,10 @@ void MainWindow::reportIfIdentical(QWidget *page, bool opening)
 		modified = image->isModified();
 	}
 	if (diffs != 0)
+		return;
+	// the same text in another encoding is not identical unless "Ignore
+	// codepage differences" says so (the end of WinMerge's Rescan)
+	if (otherEncoding && !lm::ignoreCodepageDifferences())
 		return;
 	const auto empty = [](const QString &path) { return path.isEmpty(); };
 	// "Don't show message if new buffers created": never for File > New
@@ -1406,9 +1414,28 @@ void MainWindow::showOptions()
 {
 	// the WinMerge-style categorized options dialog (General, Compare)
 	OptionsDialog dialog(this);
-	dialog.exec();
+	const bool accepted = dialog.exec() == QDialog::Accepted;
 	// the auto-reload mode decides what is watched
 	updateFileWatches();
+	if (accepted)
+		applyDiffOptions();
+}
+
+void MainWindow::applyDiffOptions()
+{
+	// a forced Rescan of every merge document, as WinMerge does on OK
+	// whatever was changed: the files are checked for changes made
+	// elsewhere, compared with the new options, and reported when
+	// identical. Folder comparisons keep their results until refreshed
+	// (CDirDoc::RefreshOptions only updates the display), and so do images
+	for (int i = 0; i < m_tabs->count(); ++i)
+	{
+		QWidget *page = m_tabs->widget(i);
+		if (auto *file = qobject_cast<FileCompareView *>(page))
+			file->refreshByUser();
+		else if (auto *table = qobject_cast<TableCompareView *>(page))
+			table->refreshByUser();
+	}
 }
 
 /** WinMerge's line filters: regular expressions whose matching lines

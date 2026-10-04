@@ -9,6 +9,8 @@
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QCheckBox>
+#include <QDialogButtonBox>
+#include <QRadioButton>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMenuBar>
@@ -27,6 +29,7 @@
 #include <QTabWidget>
 #include <QTreeWidget>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include "DiffTextEdit.h"
 #include "ImagePane.h"
@@ -69,6 +72,8 @@
 #include "IAbortable.h"
 #include "image_compare_hook.h"
 #include "ImgMergeBuffer.hpp"
+// engine (option names, for the selftests)
+#include "OptionsDef.h"
 
 namespace
 {
@@ -337,6 +342,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestReloadOpt(QStringLiteral("selftest-reload"),
 		QStringLiteral("Change compared files behind the comparison and verify the reload question, File > Reload and the auto-reload modes (for testing)"));
 	parser.addOption(selftestReloadOpt);
+	QCommandLineOption selftestCompareOptionsOpt(QStringLiteral("selftest-compare-options"),
+		QStringLiteral("Verify the Compare options page and what its options do to file, table and folder comparisons (for testing)"));
+	parser.addOption(selftestCompareOptionsOpt);
 	QCommandLineOption selftestThemeOpt(QStringLiteral("selftest-theme"),
 		QStringLiteral("Switch the theme from the Options dialog and verify the whole application follows (for testing)"));
 	parser.addOption(selftestThemeOpt);
@@ -1605,6 +1613,451 @@ int main(int argc, char *argv[])
 		}
 		lm::setMessageSinkForTest([](const QString &) {});
 		printf("identical: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestCompareOptionsOpt))
+	{
+		// WinMerge's Options > Compare > General: the page as PropCompare
+		// lays it out, and what the options do to a file, a table and a
+		// folder comparison. The messages are collected instead of shown
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		QStringList shown;
+		lm::setMessageSinkForTest([&shown](const QString &text) { shown.append(text); });
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 3; ++i)
+				QCoreApplication::processEvents();
+		};
+		const auto utf16 = [](const QString &text)
+		{
+			QByteArray bytes("\xFF\xFE", 2); // little endian, with its BOM
+			for (const QChar c : text)
+			{
+				bytes.append(static_cast<char>(c.unicode() & 0xFF));
+				bytes.append(static_cast<char>(c.unicode() >> 8));
+			}
+			return bytes;
+		};
+		const auto message = [](const char *text) {
+			return QCoreApplication::translate("MessageBoxes", text);
+		};
+		const QString binaryMatch = message("Selected files are identical (binary match).");
+		const QString binaryDiffer = message("Selected files are identical (with current settings).\n"
+			"But differ at the binary level.");
+
+		// --- the page ---
+		{
+			OptionsDialog dialog;
+			dialog.selectCategoryForTest(2); // Compare > General
+			dialog.grab(); // lays the page out
+			QWidget *page = dialog.pageForTest(OptionsDialog::ComparePage);
+			const auto top = [page](const QWidget *widget) {
+				return widget->mapTo(page, QPoint(0, 0)).y();
+			};
+			// PropCompare's controls, top to bottom, with its texts
+			const struct { const char *name; const char *text; } rows[] = {
+				{ "ignoreBlankLines", QT_TRANSLATE_NOOP("OptionsDialog", "Ignore blank lines") },
+				{ "ignoreCase", QT_TRANSLATE_NOOP("OptionsDialog", "Ignore case") },
+				{ "ignoreEol", QT_TRANSLATE_NOOP("OptionsDialog",
+					"Ignore EOL differences (Windows/Unix/Mac)") },
+				{ "ignoreNumbers", QT_TRANSLATE_NOOP("OptionsDialog", "Ignore numbers") },
+				{ "ignoreCodepage", QT_TRANSLATE_NOOP("OptionsDialog",
+					"Ignore codepage differences") },
+				{ "filterComments", QT_TRANSLATE_NOOP("OptionsDialog",
+					"Ignore comment differences") },
+				{ "ignoreMissingTrailingEol", QT_TRANSLATE_NOOP("OptionsDialog",
+					"Ignore missing trailing EOL") },
+				{ "ignoreLineBreaks", QT_TRANSLATE_NOOP("OptionsDialog",
+					"Ignore line breaks (treat as spaces)") },
+				{ "movedBlocks", QT_TRANSLATE_NOOP("OptionsDialog",
+					"Enable moved block detection") },
+				{ "diffAlgorithm", nullptr },
+				{ "indentHeuristic", QT_TRANSLATE_NOOP("OptionsDialog",
+					"Enable indent heuristic") },
+				{ "blankOutIgnored", QT_TRANSLATE_NOOP("OptionsDialog",
+					"Completely unhighlight the ignored differences") },
+			};
+			const QList<QRadioButton *> radios = page->findChildren<QRadioButton *>();
+			bool layout = radios.size() == 3
+				&& radios.at(0)->text() == OptionsDialog::tr("Compare")
+				&& radios.at(1)->text() == OptionsDialog::tr("Ignore change")
+				&& radios.at(2)->text() == OptionsDialog::tr("Ignore all")
+				&& top(radios.at(0)) < top(radios.at(1))
+				&& top(radios.at(1)) < top(radios.at(2));
+			int above = layout ? top(radios.at(2)) : -1;
+			for (const auto &row : rows)
+			{
+				auto *widget = page->findChild<QWidget *>(QLatin1String(row.name));
+				auto *box = qobject_cast<QCheckBox *>(widget);
+				const bool fits = widget != nullptr && top(widget) > above
+					&& (row.text == nullptr
+						|| (box != nullptr && box->text() == OptionsDialog::tr(row.text)));
+				if (!fits)
+					printf("  out of place: %s\n", row.name);
+				layout = layout && fits;
+				if (widget != nullptr)
+					above = top(widget);
+			}
+			layout = layout && page->findChildren<QCheckBox *>().size() == 11;
+			check(layout, "page: WinMerge's controls, order and texts");
+
+			const auto box = [page](const char *name) {
+				return page->findChild<QCheckBox *>(QLatin1String(name));
+			};
+			auto *algorithm = page->findChild<QComboBox *>(QStringLiteral("diffAlgorithm"));
+			QCheckBox *heuristic = box("indentHeuristic");
+			if (!layout || algorithm == nullptr || heuristic == nullptr)
+				return 1;
+			const QStringList algorithms = { OptionsDialog::tr("default"),
+				OptionsDialog::tr("minimal"), OptionsDialog::tr("patience"),
+				OptionsDialog::tr("histogram"), OptionsDialog::tr("none") };
+			QStringList offered;
+			for (int i = 0; i < algorithm->count(); ++i)
+				offered.append(algorithm->itemText(i));
+			check(offered == algorithms, "page: the five diff algorithms");
+
+			// WinMerge's defaults: all off but the indent heuristic
+			const auto atDefaults = [&]() {
+				bool defaults = radios.at(0)->isChecked() && algorithm->currentIndex() == 0;
+				for (QCheckBox *each : page->findChildren<QCheckBox *>())
+					defaults = defaults && each->isChecked() == (each == heuristic);
+				return defaults;
+			};
+			check(atDefaults(), "page: defaults");
+
+			// only the xdiff algorithms take the indent heuristic
+			bool rule = true;
+			for (int i = 0; i < algorithm->count(); ++i)
+			{
+				algorithm->setCurrentIndex(i);
+				rule = rule && heuristic->isEnabled() == (i != 0 && i != 4);
+			}
+			check(rule, "page: indent heuristic follows the algorithm");
+
+			const char *const added[] = { "ignoreCodepage", "filterComments",
+				"ignoreMissingTrailingEol", "ignoreLineBreaks", "blankOutIgnored" };
+			for (const char *name : added)
+				box(name)->setChecked(true);
+			heuristic->setChecked(false);
+			algorithm->setCurrentIndex(3); // histogram
+			dialog.saveForTest();
+			const DIFFOPTIONS saved = lm::currentDiffOptions();
+			const QSettings settings;
+			check(saved.bFilterCommentsLines && saved.bIgnoreMissingTrailingEol
+				&& saved.bIgnoreLineBreaks && saved.bCompletelyBlankOutIgnoredChanges
+				&& !saved.bIndentHeuristic && saved.nDiffAlgorithm == 3
+				&& lm::ignoreCodepageDifferences()
+				&& settings.value(QStringLiteral("Settings/IgnoreCodepage")).toBool()
+				&& settings.value(QStringLiteral("Settings/FilterCommentsLines")).toBool()
+				&& settings.value(QStringLiteral("Settings/IgnoreMissingTrailingEol")).toBool()
+				&& settings.value(QStringLiteral("Settings/IgnoreLineBreaks")).toBool()
+				&& settings.value(QStringLiteral(
+					"Settings/CompletelyBlankOutIgnoredChanges")).toBool()
+				&& !settings.value(QStringLiteral("Settings/IndentHeuristic")).toBool(),
+				"page: saved to the options");
+
+			// another dialog shows what was saved; Defaults puts it back
+			OptionsDialog again;
+			QWidget *pageAgain = again.pageForTest(OptionsDialog::ComparePage);
+			bool loaded = !pageAgain->findChild<QCheckBox *>(
+				QStringLiteral("indentHeuristic"))->isChecked()
+				&& pageAgain->findChild<QComboBox *>(
+					QStringLiteral("diffAlgorithm"))->currentIndex() == 3;
+			for (const char *name : added)
+				loaded = loaded
+					&& pageAgain->findChild<QCheckBox *>(QLatin1String(name))->isChecked();
+			check(loaded, "page: saved options shown again");
+			dialog.restoreDefaultsForTest();
+			check(atDefaults(), "page: Defaults");
+			dialog.saveForTest();
+			const DIFFOPTIONS reset = lm::currentDiffOptions();
+			check(!reset.bFilterCommentsLines && !reset.bIgnoreMissingTrailingEol
+				&& !reset.bIgnoreLineBreaks && !reset.bCompletelyBlankOutIgnoredChanges
+				&& reset.bIndentHeuristic && reset.nDiffAlgorithm == 0
+				&& !lm::ignoreCodepageDifferences(), "page: Defaults saved");
+		}
+
+		// --- file comparisons ---
+		const QString leftC = dir.filePath(QStringLiteral("left.c"));
+		const QString rightC = dir.filePath(QStringLiteral("right.c"));
+		const QByteArray leftCode = "int total; // the sum\nint count;\n";
+		const QByteArray rightCode = "int total; // sum of everything\nint count;\n";
+		write(leftC, leftCode);
+		write(rightC, rightCode);
+		// the same two texts where no language tells what a comment is
+		const QString leftPlain = dir.filePath(QStringLiteral("left.txt"));
+		const QString rightPlain = dir.filePath(QStringLiteral("right.txt"));
+		write(leftPlain, leftCode);
+		write(rightPlain, rightCode);
+		// a line break moved inside the same words; then with another
+		// number of lines; then with a real change next to it
+		const QString leftWrap = dir.filePath(QStringLiteral("wrap-left.txt"));
+		const QString rightWrap = dir.filePath(QStringLiteral("wrap-right.txt"));
+		const QByteArray leftWrapped = "alpha\none two\nthree\nomega\n";
+		const QByteArray rightWrapped = "alpha\none\ntwo three\nomega\n";
+		write(leftWrap, leftWrapped);
+		write(rightWrap, rightWrapped);
+		const QString leftTall = dir.filePath(QStringLiteral("tall-left.txt"));
+		const QString rightTall = dir.filePath(QStringLiteral("tall-right.txt"));
+		write(leftTall, "alpha\none two three\nomega\n");
+		write(rightTall, "alpha\none\ntwo\nthree\nomega\n");
+		const QString leftEdit = dir.filePath(QStringLiteral("edit-left.txt"));
+		const QString rightEdit = dir.filePath(QStringLiteral("edit-right.txt"));
+		write(leftEdit, "alpha\none two\nthree LEFT\nomega\n");
+		write(rightEdit, "alpha\none\ntwo three RIGHT\nomega\n");
+		// one text in two encodings, and with and without a BOM
+		const QString text = QStringLiteral("héllo\nworld\n");
+		const QString utf8File = dir.filePath(QStringLiteral("utf8.txt"));
+		const QString utf8Copy = dir.filePath(QStringLiteral("utf8-copy.txt"));
+		const QString utf8Bom = dir.filePath(QStringLiteral("utf8-bom.txt"));
+		const QString utf16File = dir.filePath(QStringLiteral("utf16.txt"));
+		write(utf8File, text.toUtf8());
+		write(utf8Copy, text.toUtf8());
+		write(utf8Bom, QByteArray("\xEF\xBB\xBF") + text.toUtf8());
+		write(utf16File, utf16(text));
+
+		struct Counts
+		{
+			int diffs = -1;
+			int ignored = -1;
+			int wordSpans = -1;
+			QStringList messages;
+		};
+		const auto opened = [&](const QStringList &paths) {
+			shown.clear();
+			MainWindow window;
+			window.openFileComparison(paths);
+			settle();
+			Counts counts;
+			if (auto *view = window.findChild<FileCompareView *>())
+			{
+				counts.diffs = view->diffCount();
+				counts.ignored = view->ignoredDiffCount();
+				counts.wordSpans = view->wordSpanCountForTest(0);
+			}
+			counts.messages = shown;
+			return counts;
+		};
+		const auto is = [](const Counts &counts, int diffs, int ignored,
+			const QStringList &messages = {}) {
+			if (counts.diffs != diffs || counts.ignored != ignored
+				|| counts.messages != messages)
+				printf("  got %d difference(s), %d ignored, %d message(s)\n", counts.diffs,
+					counts.ignored, static_cast<int>(counts.messages.size()));
+			return counts.diffs == diffs && counts.ignored == ignored
+				&& counts.messages == messages;
+		};
+
+		lm::setCompareOptionsForTest(0);
+		check(is(opened({ leftC, rightC }), 1, 0), "comments: a difference by default");
+		lm::setCompareFlagForTest(OPT_CMP_FILTER_COMMENTLINES, true);
+		check(is(opened({ leftC, rightC }), 0, 1, { binaryDiffer }),
+			"comments: ignored, the files identical with the settings");
+		check(is(opened({ leftPlain, rightPlain }), 1, 0),
+			"comments: only where the language has them");
+		lm::setCompareFlagForTest(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES, true);
+		check(is(opened({ leftC, rightC }), 0, 0, { binaryDiffer }),
+			"comments: unhighlighted completely");
+
+		lm::setCompareOptionsForTest(0);
+		check(is(opened({ leftWrap, rightWrap }), 1, 0), "line breaks: a difference by default");
+		const Counts strictEdit = opened({ leftEdit, rightEdit });
+		lm::setCompareFlagForTest(OPT_CMP_IGNORE_LINE_BREAKS, true);
+		check(is(opened({ leftWrap, rightWrap }), 0, 1, { binaryDiffer }),
+			"line breaks: ignored when the words are the same");
+		check(is(opened({ leftTall, rightTall }), 0, 1, { binaryDiffer }),
+			"line breaks: ignored across another number of lines");
+		// inside a real difference the moved break is not highlighted
+		const Counts looseEdit = opened({ leftEdit, rightEdit });
+		printf("  word highlights on the left: %d strict, %d as spaces\n",
+			strictEdit.wordSpans, looseEdit.wordSpans);
+		check(is(strictEdit, 1, 0) && is(looseEdit, 1, 0)
+			&& looseEdit.wordSpans == 1 && strictEdit.wordSpans > 1,
+			"line breaks: a real change stays, its moved break unmarked");
+		lm::setCompareFlagForTest(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES, true);
+		check(is(opened({ leftWrap, rightWrap }), 0, 0, { binaryDiffer }),
+			"line breaks: unhighlighted completely");
+		check(is(opened({ leftTall, rightTall }), 0, 1, { binaryDiffer }),
+			"line breaks: the extra lines stay marked");
+
+		// the same text in another encoding: no difference to show, yet
+		// not identical unless the option says so
+		lm::setCompareOptionsForTest(0);
+		check(is(opened({ utf8File, utf8Copy }), 0, 0, { binaryMatch }),
+			"codepage: same encoding, identical");
+		check(is(opened({ utf8File, utf16File }), 0, 0),
+			"codepage: another encoding is not identical");
+		check(is(opened({ utf8File, utf8Bom }), 0, 0),
+			"codepage: a BOM alone counts too");
+		check(is(opened({ utf8File, utf8Copy, utf16File }), 0, 0),
+			"codepage: 3-way, one pane in another encoding");
+		lm::setCompareFlagForTest(OPT_CMP_IGNORE_CODEPAGE, true);
+		check(is(opened({ utf8File, utf16File }), 0, 0, { binaryDiffer }),
+			"codepage: ignored, identical with the settings");
+		check(is(opened({ utf8File, utf8Copy, utf16File }), 0, 0, { binaryDiffer }),
+			"codepage: ignored, 3-way");
+
+		// --- tables ---
+		const QString utf8Table = dir.filePath(QStringLiteral("utf8.csv"));
+		const QString utf16Table = dir.filePath(QStringLiteral("utf16.csv"));
+		const QString otherTable = dir.filePath(QStringLiteral("other.csv"));
+		const QString table = QStringLiteral("id,name\n1,café\n2,tea\n");
+		write(utf8Table, table.toUtf8());
+		write(utf16Table, utf16(table));
+		write(otherTable, "id,name\n1,coffee\n2,tea\n");
+		const auto openedTable = [&](const QString &left, const QString &right) {
+			shown.clear();
+			MainWindow window;
+			window.openTableComparison(left, right);
+			settle();
+			auto *view = window.findChild<TableCompareView *>();
+			return view != nullptr && view->diffCount() == 0 ? shown
+				: QStringList{ QStringLiteral("?") };
+		};
+		lm::setCompareOptionsForTest(0);
+		check(openedTable(utf8Table, utf16Table).isEmpty(),
+			"table: another encoding is not identical");
+		lm::setCompareFlagForTest(OPT_CMP_IGNORE_CODEPAGE, true);
+		check(openedTable(utf8Table, utf16Table) == QStringList{ binaryDiffer },
+			"table: codepage ignored, identical with the settings");
+
+		// --- folders ---
+		const QString leftDir = dir.filePath(QStringLiteral("L"));
+		const QString rightDir = dir.filePath(QStringLiteral("R"));
+		write(leftDir + QStringLiteral("/code.c"), leftCode);
+		write(rightDir + QStringLiteral("/code.c"), rightCode);
+		write(leftDir + QStringLiteral("/wrap.txt"), leftWrapped);
+		write(rightDir + QStringLiteral("/wrap.txt"), rightWrapped);
+		write(leftDir + QStringLiteral("/codepage.txt"), text.toUtf8());
+		write(rightDir + QStringLiteral("/codepage.txt"), utf16(text));
+		write(leftDir + QStringLiteral("/eol.txt"), "first\nlast\n");
+		write(rightDir + QStringLiteral("/eol.txt"), "first\nlast");
+		const QStringList names = { QStringLiteral("code.c"), QStringLiteral("wrap.txt"),
+			QStringLiteral("codepage.txt"), QStringLiteral("eol.txt") };
+		const QString textSame = QObject::tr("Text files are identical");
+		const QString textDiff = QObject::tr("Text files are different");
+		const auto waitFor = [](const FolderCompareView *view)
+		{
+			for (int i = 0; view != nullptr && i < 400 && view->isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+		};
+		// which of the four files a folder comparison finds identical
+		const auto identicalIn = [&](const char *what) {
+			FolderCompareView view;
+			view.start(QStringList{ leftDir, rightDir });
+			waitFor(&view);
+			QStringList same;
+			for (const QString &name : names)
+			{
+				const QString result = view.rowResultForTest(name);
+				if (result == textSame)
+					same.append(name);
+				else if (result != textDiff)
+					same.append(name + QStringLiteral(" (") + result + QLatin1Char(')'));
+			}
+			printf("  folder, %s: identical: %s\n", what,
+				same.isEmpty() ? "none" : qPrintable(same.join(QStringLiteral(", "))));
+			return same;
+		};
+		lm::setCompareOptionsForTest(0);
+		check(identicalIn("defaults").isEmpty(), "folder: four differences by default");
+		const struct { const String &option; const char *name; const char *what; } flags[] = {
+			{ OPT_CMP_FILTER_COMMENTLINES, "code.c", "folder: comment differences ignored" },
+			{ OPT_CMP_IGNORE_LINE_BREAKS, "wrap.txt", "folder: line breaks ignored" },
+			{ OPT_CMP_IGNORE_CODEPAGE, "codepage.txt", "folder: codepage differences ignored" },
+			{ OPT_CMP_IGNORE_MISSING_TRAILING_EOL, "eol.txt",
+				"folder: missing trailing EOL ignored" },
+		};
+		for (const auto &flag : flags)
+		{
+			lm::setCompareOptionsForTest(0);
+			lm::setCompareFlagForTest(flag.option, true);
+			check(identicalIn(flag.name) == QStringList{ QLatin1String(flag.name) }, flag.what);
+		}
+
+		// --- OK in the Options dialog recompares what is open ---
+		{
+			lm::setCompareOptionsForTest(0);
+			MainWindow window;
+			window.openFileComparison({ leftC, rightC });
+			window.openTableComparison(utf8Table, otherTable);
+			window.openFolderComparison(QStringList{ leftDir, rightDir });
+			settle();
+			auto *file = window.findChild<FileCompareView *>();
+			auto *tableView = window.findChild<TableCompareView *>();
+			auto *folder = window.findChild<FolderCompareView *>();
+			if (file == nullptr || tableView == nullptr || folder == nullptr)
+				return 2;
+			waitFor(folder);
+			int fileScans = 0, tableScans = 0;
+			QObject::connect(file, &FileCompareView::rescanned, [&fileScans]() { ++fileScans; });
+			QObject::connect(tableView, &TableCompareView::rescanned,
+				[&tableScans]() { ++tableScans; });
+			// the dialog is modal: tick the box and press a button from
+			// inside its event loop
+			const auto answerDialog = [&window](bool tick, QDialogButtonBox::StandardButton button) {
+				QTimer::singleShot(0, &window, [&window, tick, button]() {
+					auto *dialog = window.findChild<OptionsDialog *>();
+					auto *buttons = dialog != nullptr
+						? dialog->findChild<QDialogButtonBox *>() : nullptr;
+					if (buttons == nullptr)
+					{
+						printf("no Options dialog to answer\n");
+						std::exit(3);
+					}
+					dialog->pageForTest(OptionsDialog::ComparePage)->findChild<QCheckBox *>(
+						QStringLiteral("filterComments"))->setChecked(tick);
+					buttons->button(button)->click();
+				});
+				QMetaObject::invokeMethod(&window, "showOptions");
+			};
+
+			shown.clear();
+			answerDialog(true, QDialogButtonBox::Cancel);
+			settle();
+			check(fileScans == 0 && tableScans == 0 && file->diffCount() == 1
+				&& !lm::currentDiffOptions().bFilterCommentsLines,
+				"Options, Cancel: nothing recompared");
+
+			answerDialog(true, QDialogButtonBox::Ok);
+			settle();
+			check(fileScans == 1 && file->diffCount() == 0 && file->ignoredDiffCount() == 1
+				&& shown == QStringList{ binaryDiffer },
+				"Options, OK: the open file comparison takes the new options");
+			check(tableScans == 1 && tableView->diffCount() == 1,
+				"Options, OK: the open table is recompared too");
+			check(!folder->isComparingForTest()
+				&& folder->rowResultForTest(QStringLiteral("code.c")) == textDiff,
+				"Options, OK: a folder comparison keeps its results");
+
+			// every OK rescans, whatever was changed
+			answerDialog(true, QDialogButtonBox::Ok);
+			settle();
+			check(fileScans == 2 && tableScans == 2, "Options, OK again: recompared again");
+		}
+
+		lm::setCompareOptionsForTest(0);
+		lm::setMessageSinkForTest([](const QString &) {});
+		printf("compare options: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

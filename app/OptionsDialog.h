@@ -136,8 +136,14 @@ private:
 	QCheckBox *m_chkIgnoreCase;
 	QCheckBox *m_chkIgnoreEol;
 	QCheckBox *m_chkIgnoreNumbers;
+	QCheckBox *m_chkIgnoreCodepage;
+	QCheckBox *m_chkFilterComments;
+	QCheckBox *m_chkIgnoreMissingEol;
+	QCheckBox *m_chkIgnoreLineBreaks;
 	QCheckBox *m_chkMovedBlocks;
 	QComboBox *m_cmbAlgorithm;
+	QCheckBox *m_chkIndentHeuristic;
+	QCheckBox *m_chkBlankOutIgnored;
 	// Compare > Folder
 	QComboBox *m_cmbCompareMethod;
 	// Message Boxes

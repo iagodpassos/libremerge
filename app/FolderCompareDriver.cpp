@@ -153,6 +153,8 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	// OPT_CP_DETECT outside the CJK locales: valid UTF-8 reads as UTF-8,
 	// HTML/XML/.rc files by their declared charset
 	ctxt.m_iGuessEncodingType = (50001 << 16) | 1;
+	// off, the same text in another encoding is a difference
+	ctxt.m_bIgnoreCodepage = ignoreCodepageDifferences();
 	ctxt.m_pFilterList = currentLineFilters();
 
 	FileFilterHelper filter;

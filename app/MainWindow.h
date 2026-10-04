@@ -64,6 +64,10 @@ public:
 	    (used by tests; same as pressing Next after opening). */
 	void gotoFirstDifference();
 
+	/** CMainFrame::ApplyDiffOptions, run when the Options dialog is
+	    accepted: every open text and table comparison is recompared with
+	    the options as they are now. */
+	void applyDiffOptions();
 	/** WinMerge's File > Reload (OnFileReload) for the current
 	    comparison: unsaved changes are offered for saving, then the
 	    files are read from disk again. */

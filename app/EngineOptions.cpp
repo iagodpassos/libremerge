@@ -15,6 +15,8 @@
 #include "options_global.h"
 #include "UnicodeString.h"
 #include "stringdiffs.h"
+#include "SyntaxParserRegistry.h"
+#include "CrystalLineSyntaxParser.h"
 
 namespace
 {
@@ -157,10 +159,22 @@ void installEngineOptions()
 	options.InitOption(OPT_CMP_IGNORE_CASE, false);
 	options.InitOption(OPT_CMP_IGNORE_NUMBERS, false);
 	options.InitOption(OPT_CMP_IGNORE_EOL, false);
+	options.InitOption(OPT_CMP_IGNORE_CODEPAGE, false);
+	options.InitOption(OPT_CMP_FILTER_COMMENTLINES, false);
+	options.InitOption(OPT_CMP_IGNORE_MISSING_TRAILING_EOL, false);
+	options.InitOption(OPT_CMP_IGNORE_LINE_BREAKS, false);
+	options.InitOption(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES, false);
 	options.InitOption(OPT_CMP_DIFF_ALGORITHM, 0);
 	options.InitOption(OPT_CMP_INDENT_HEURISTIC, true); // upstream default
 	options.InitOption(OPT_CMP_MOVED_BLOCKS, false);    // upstream default
 	options.InitOption(OPT_CMP_METHOD, static_cast<int>(CMP_CONTENT));
+
+	// "Ignore comment differences" asks this registry for a parser of the
+	// file's language, in file and folder comparisons alike: WinMerge fills
+	// it at startup (CMergeApp::InitSyntaxParserFactories). The built-in
+	// parsers are the ones carried here, the same the highlighting uses
+	LangServices::SyntaxParserRegistry::GetInstance().RegisterFactory(
+		&CrystalLineSyntaxParserFactory::GetInstance());
 }
 
 int currentCompareMethod()
@@ -212,7 +226,20 @@ DIFFOPTIONS currentDiffOptions()
 	options.bIgnoreEol = mgr->GetBool(OPT_CMP_IGNORE_EOL);
 	options.nDiffAlgorithm = mgr->GetInt(OPT_CMP_DIFF_ALGORITHM);
 	options.bIndentHeuristic = mgr->GetBool(OPT_CMP_INDENT_HEURISTIC);
+	// the engine's post-filter turns these differences into ignored
+	// (trivial) ones, or drops them when asked to unhighlight completely
+	options.bFilterCommentsLines = mgr->GetBool(OPT_CMP_FILTER_COMMENTLINES);
+	options.bIgnoreMissingTrailingEol = mgr->GetBool(OPT_CMP_IGNORE_MISSING_TRAILING_EOL);
+	options.bIgnoreLineBreaks = mgr->GetBool(OPT_CMP_IGNORE_LINE_BREAKS);
+	options.bCompletelyBlankOutIgnoredChanges =
+		mgr->GetBool(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES);
 	return options;
+}
+
+bool ignoreCodepageDifferences()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr != nullptr && mgr->GetBool(OPT_CMP_IGNORE_CODEPAGE);
 }
 
 std::shared_ptr<FilterList> currentLineFilters()
@@ -248,6 +275,17 @@ void setCompareOptionsForTest(int ignoreWhitespace)
 	mgr->Set(OPT_CMP_IGNORE_CASE, false);
 	mgr->Set(OPT_CMP_IGNORE_NUMBERS, false);
 	mgr->Set(OPT_CMP_IGNORE_EOL, false);
+	mgr->Set(OPT_CMP_IGNORE_CODEPAGE, false);
+	mgr->Set(OPT_CMP_FILTER_COMMENTLINES, false);
+	mgr->Set(OPT_CMP_IGNORE_MISSING_TRAILING_EOL, false);
+	mgr->Set(OPT_CMP_IGNORE_LINE_BREAKS, false);
+	mgr->Set(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES, false);
+}
+
+void setCompareFlagForTest(const std::string &option, bool on)
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+		mgr->Set(option, on);
 }
 
 } // namespace lm

@@ -57,6 +57,20 @@ public:
 
 	bool isModified() const;
 	int diffCount() const { return m_diffCount; }
+	/** The differences the compare options ignore (shown in their own
+	    color, skipped by the navigation). */
+	int ignoredDiffCount() const
+	{
+		int count = 0;
+		for (const Block &block : m_blocks)
+			if (block.trivial)
+				++count;
+		return count;
+	}
+	/** Some pane's file is in another encoding than the first one's
+	    (Unicode form, code page or BOM), as WinMerge's Rescan checks for
+	    "Ignore codepage differences". */
+	bool encodingsDiffer() const;
 	int paneCount() const { return m_paneCount; }
 	QStringList paths() const;
 	/** Top view line of the first pane (for tests). */
@@ -82,6 +96,15 @@ public:
 		int count = 0;
 		for (const WordSpan &span : m_wordSpans)
 			if (span.side == side && span.length == 0)
+				++count;
+		return count;
+	}
+	/** Word-level highlights on one side (for tests). */
+	int wordSpanCountForTest(int side) const
+	{
+		int count = 0;
+		for (const WordSpan &span : m_wordSpans)
+			if (span.side == side)
 				++count;
 		return count;
 	}
