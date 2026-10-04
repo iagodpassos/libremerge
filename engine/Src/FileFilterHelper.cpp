@@ -7,6 +7,7 @@
 
 #include "pch.h"
 #include "FileFilterHelper.h"
+#include <algorithm>
 #include "FilterExpression.h"
 #include "UnicodeString.h"
 #include "FilterList.h"
@@ -571,6 +572,10 @@ FileFilterHelper::ParseExtensions(const String &extensions) const
 				bool exclude = token[0] == '!';
 				if (exclude)
 					token = token.substr(1);
+				// LibreMerge: a mask may write its folders the POSIX way too,
+				// "build/" for "build\\" (upstream takes the backslash only,
+				// and a mask ending in a slash never matched anything)
+				std::replace(token.begin(), token.end(), _T('/'), _T('\\'));
 				bool isdir = token.length() > 0 && token.back() == '\\';
 				if (isdir)
 					token.resize(token.size() - 1);

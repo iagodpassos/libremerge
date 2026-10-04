@@ -11,6 +11,9 @@
 #include "LineFiltersList.h"
 #include "SubstitutionFiltersList.h"
 #include "SubstitutionList.h"
+#include "FileFilterHelper.h"
+#include <filesystem>
+#include <fstream>
 
 namespace
 {
@@ -76,6 +79,70 @@ TEST(FiltersList, SubstitutionFilters_BadExpressionIsReportedByNumber)
 	std::shared_ptr<SubstitutionList> substitutions = plain.MakeSubstitutionList(true);
 	ASSERT_NE(nullptr, substitutions);
 	EXPECT_EQ("f[x)", substitutions->Subst("f(x)"));
+}
+
+// A mask names a folder by ending in a separator; upstream takes the
+// backslash only, here the forward slash counts too.
+TEST(FiltersList, FileFilter_FolderMaskTakesEitherSlash)
+{
+	FileFilterHelper helper;
+	helper.SetMaskOrExpression(_T("*.*;!build\\"));
+	EXPECT_FALSE(helper.includeDir(_T("build")));
+	EXPECT_TRUE(helper.includeDir(_T("src")));
+	EXPECT_TRUE(helper.includeFile(_T("a.txt")));
+
+	helper.SetMaskOrExpression(_T("*.*;!build/"));
+	EXPECT_FALSE(helper.includeDir(_T("build")));
+	EXPECT_TRUE(helper.includeDir(_T("src")));
+	EXPECT_TRUE(helper.includeFile(_T("a.txt")));
+	EXPECT_TRUE(helper.includeFile(_T("build"))); // a file of that name stays
+
+	// inside the mask too
+	helper.SetMaskOrExpression(_T("*.*;!src/gen/"));
+	EXPECT_FALSE(helper.includeDir(_T("src\\gen")));
+	EXPECT_TRUE(helper.includeDir(_T("src\\lib")));
+	helper.SetMaskOrExpression(_T("*.*;!src\\gen\\"));
+	EXPECT_FALSE(helper.includeDir(_T("src\\gen")));
+	EXPECT_TRUE(helper.includeDir(_T("src\\lib")));
+
+	// only these folders: files anywhere, folders by name
+	helper.SetMaskOrExpression(_T("*.*;docs/"));
+	EXPECT_TRUE(helper.includeDir(_T("docs")));
+	EXPECT_FALSE(helper.includeDir(_T("build")));
+}
+
+// Upstream's reload of one filter looked for it in the list without ever
+// stepping forward: fine while every filter reloads in list order, an
+// endless loop once a file that went away breaks that order.
+TEST(FiltersList, FileFilter_ReloadSurvivesAFilterFileThatWentAway)
+{
+	namespace fs = std::filesystem;
+	const fs::path dir = fs::temp_directory_path() / "libremerge-filters-reload-test";
+	fs::remove_all(dir);
+	fs::create_directories(dir);
+	const auto write = [&dir](const char *file, const char *name)
+	{
+		std::ofstream out(dir / file);
+		out << "name: " << name << "\ndesc: test\ndef: include\nf: \\.tmp$\n";
+	};
+	write("a.flt", "First");
+	write("b.flt", "Second");
+
+	FileFilterHelper helper;
+	helper.LoadFileFilterDirPattern(dir.string(), _T("*.flt"));
+	ASSERT_EQ(2u, helper.GetFileFilters().size());
+
+	fs::remove(dir / "a.flt");
+	write("b.flt", "Second, edited");
+	helper.ReloadUpdatedFilters(); // used to never return
+
+	std::vector<String> names;
+	for (const FileFilterInfo& info : helper.GetFileFilters())
+		names.push_back(info.name);
+	EXPECT_EQ(2u, names.size());
+	EXPECT_NE(names.end(), std::find(names.begin(), names.end(), String(_T("First"))));
+	EXPECT_NE(names.end(), std::find(names.begin(), names.end(), String(_T("Second, edited"))));
+	fs::remove_all(dir);
 }
 
 } // namespace

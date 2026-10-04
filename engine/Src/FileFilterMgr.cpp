@@ -356,6 +356,11 @@ int FileFilterMgr::ReloadFilterFromDisk(FileFilter * pfilter)
 			m_filters.erase(iter);
 			break;
 		}
+		// LibreMerge: upstream never advances here. It gets away with it
+		// while every filter reloads in list order (each one is first by
+		// its turn), and spins forever once a file that cannot be read
+		// any more breaks that order
+		++iter;
 	}
 	m_filters.push_back(FileFilterPtr(newfilter));
 	return errorcode;
