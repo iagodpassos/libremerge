@@ -290,6 +290,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestMerge3Opt(QStringLiteral("selftest-merge3"),
 		QStringLiteral("3-way: merge left into middle, then middle into right, and verify (for testing)"));
 	parser.addOption(selftestMerge3Opt);
+	QCommandLineOption selftestLastLineOpt(QStringLiteral("selftest-last-line"),
+		QStringLiteral("Compare files whose last lines differ and verify what is a difference (for testing)"));
+	parser.addOption(selftestLastLineOpt);
 	QCommandLineOption selftestUndoRescanOpt(QStringLiteral("selftest-undo-rescan"),
 		QStringLiteral("Edit, recompare (realigning the edited pane), undo and redo (for testing)"));
 	parser.addOption(selftestUndoRescanOpt);
@@ -5895,6 +5898,95 @@ int main(int argc, char *argv[])
 		printf("selector closed: %d, comparisons open: %lld\n",
 			selectorClosed, static_cast<long long>(comparisons));
 		return (selectorClosed && comparisons == 1) ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestLastLineOpt))
+	{
+		// the diff engine is handed every line with its line ending, the
+		// last one too: the lines only one file has at its end are the
+		// whole difference, the line before them is none of it, and an
+		// empty last line is a line like any other
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+		};
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		// the view lines of the differences between two texts
+		const auto differing = [&](const QByteArray &leftText, const QByteArray &rightText)
+		{
+			write(left, leftText);
+			write(right, rightText);
+			FileCompareView view;
+			QString error;
+			if (!view.compare(left, right, &error))
+			{
+				printf("compare failed: %s\n", qPrintable(error));
+				std::exit(2);
+			}
+			QList<int> lines = view.diffLinesForTest();
+			lines.prepend(view.diffCount()); // how many differences, then their lines
+			return lines;
+		};
+		check(differing("a\nb\n", "a\nb\nc\nd\n") == QList<int>{ 1, 2, 3 },
+			"text: lines added at the end are the whole difference");
+		check(differing("a\nb\nc\n", "a\n") == QList<int>{ 1, 1, 2 },
+			"text: lines removed at the end are the whole difference");
+		check(differing("a\n\n", "a\n") == QList<int>{ 1, 1 },
+			"text: an empty last line is a line of its own");
+		check(differing("a\nb\nc\n", "a\nx\nc\n") == QList<int>{ 1, 1 }
+			&& differing("a\nb\n", "a\nx\n") == QList<int>{ 1, 1 }
+			&& differing("a\nb\n", "a\nb\n") == QList<int>{ 0 },
+			"text: a changed line and identical files are as they were");
+		{
+			// merging the lines at the end makes the files the same
+			write(left, "a\nb\n");
+			write(right, "a\nb\nc\nd\n");
+			FileCompareView view;
+			QString error;
+			if (!view.compare(left, right, &error))
+				return 2;
+			view.copyAllFrom(1, 0);
+			view.recompare();
+			const bool saved = view.saveSideAt(0, &error);
+			check(saved && view.diffCount() == 0 && read(left) == read(right)
+				&& read(left) == "a\nb\nc\nd\n",
+				"text: the lines at the end merge and save as they are");
+		}
+		{
+			const QString leftTable = dir.filePath(QStringLiteral("left.csv"));
+			const QString rightTable = dir.filePath(QStringLiteral("right.csv"));
+			write(leftTable, "id,name\n1,apple\n");
+			write(rightTable, "id,name\n1,apple\n2,banana\n");
+			TableCompareView view;
+			QString error;
+			if (!view.compare(leftTable, rightTable, &error))
+			{
+				printf("table compare failed: %s\n", qPrintable(error));
+				return 2;
+			}
+			check(view.diffCount() == 1 && view.diffRowsForTest() == QList<int>{ 2 },
+				"table: a row added at the end is the whole difference");
+		}
+		printf("last line: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
 	}
 
 	if (parser.isSet(selftestUndoRescanOpt))

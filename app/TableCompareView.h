@@ -32,6 +32,9 @@ public:
 
 	bool isModified() const;
 	int diffCount() const { return m_diffCount; }
+	/** The rows the differences take, the header's among them and ignored
+	    differences left out (for tests). */
+	QList<int> diffRowsForTest() const;
 	/** The two files are in different encodings (Unicode form, code
 	    page or BOM), as WinMerge's Rescan checks for "Ignore codepage
 	    differences". */

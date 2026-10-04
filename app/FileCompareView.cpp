@@ -595,6 +595,16 @@ void FileCompareView::startBlank()
 	resetUndoHistory();
 }
 
+QList<int> FileCompareView::diffLinesForTest() const
+{
+	QList<int> lines;
+	for (const Block &block : m_blocks)
+		if (!block.trivial && !block.resolved)
+			for (int line = block.viewBegin; line <= block.viewEnd; ++line)
+				lines.append(line);
+	return lines;
+}
+
 QString FileCompareView::tabTitle() const
 {
 	QStringList names;
@@ -736,7 +746,14 @@ bool FileCompareView::runDiff(QString *error)
 				*error = tr("cannot create temporary file");
 			return false;
 		}
-		const QByteArray bytes = m_realLines[i].join(QChar('\n')).toUtf8();
+		// every line goes with its line ending, the last one too, as
+		// upstream's buffers save them: the engine takes a last line
+		// without one for a line that differs from the same line with
+		// others after it, and does not see an empty last line at all
+		// (a pane with nothing in it stays an empty file)
+		QByteArray bytes = m_realLines[i].join(QChar('\n')).toUtf8();
+		if (!bytes.isEmpty())
+			bytes.append('\n');
 		temp[i].write(bytes);
 		temp[i].flush();
 		paths.SetPath(i, temp[i].fileName().toStdString(), false);

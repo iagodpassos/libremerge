@@ -89,6 +89,9 @@ public:
 	{
 		return collectRealLines(side);
 	}
+	/** The view lines the differences take, ignored and merged ones left
+	    out (for tests). */
+	QList<int> diffLinesForTest() const;
 	/** Zero-length word spans (insertion markers) on one side (for
 	    tests). */
 	int insertionMarkersForTest(int side) const

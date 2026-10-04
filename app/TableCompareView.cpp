@@ -434,7 +434,12 @@ bool TableCompareView::runDiff(QString *error)
 				*error = tr("cannot create temporary file");
 			return false;
 		}
-		temp[i].write(m_sides[i].rawLines.join(QChar('\n')).toUtf8());
+		// every row goes with its line ending, the last one too (see the
+		// text compare's runDiff)
+		QByteArray bytes = m_sides[i].rawLines.join(QChar('\n')).toUtf8();
+		if (!m_sides[i].rawLines.isEmpty())
+			bytes.append('\n');
+		temp[i].write(bytes);
 		temp[i].flush();
 		paths.SetPath(i, temp[i].fileName().toStdString(), false);
 	}
@@ -480,6 +485,16 @@ bool TableCompareView::runDiff(QString *error)
 	}
 	computeCellDiffs();
 	return true;
+}
+
+QList<int> TableCompareView::diffRowsForTest() const
+{
+	QList<int> rows;
+	for (const Block &block : m_blocks)
+		if (!block.trivial)
+			for (int row = block.viewBegin; row <= block.viewEnd; ++row)
+				rows.append(row);
+	return rows;
 }
 
 void TableCompareView::rebuildModel()
