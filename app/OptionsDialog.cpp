@@ -3,6 +3,7 @@
 
 #include "OptionsDialog.h"
 #include "EngineOptions.h"
+#include "ItemCheckStyle.h"
 #include "MessageBoxes.h"
 #include "Theme.h"
 
@@ -342,6 +343,7 @@ QWidget *OptionsDialog::buildMessageBoxesPage()
 	box->addLayout(intro);
 
 	m_messageList = new QTreeWidget(page);
+	lm::ensureItemCheckBoxes(m_messageList);
 	m_messageList->setRootIsDecorated(false);
 	m_messageList->setHeaderLabels({ tr("Message"), tr("Answer") });
 	m_messageList->header()->setStretchLastSection(false);

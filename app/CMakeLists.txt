@@ -22,6 +22,7 @@ qt_add_executable(LibreMerge
   OptionsDialog.cpp
   DiffTextEdit.cpp
   Icons.cpp
+  ItemCheckStyle.cpp
   LocationPane.cpp
   SyntaxHighlighter.cpp
   Theme.cpp

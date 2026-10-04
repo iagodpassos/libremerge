@@ -51,6 +51,7 @@
 #include "MainWindow.h"
 #include "NewComparisonView.h"
 #include "EngineOptions.h"
+#include "ItemCheckStyle.h"
 #include "OptionsDialog.h"
 #include "Theme.h"
 #ifdef LM_HAVE_PORTAL
@@ -672,6 +673,35 @@ int main(int argc, char *argv[])
 		dialog.selectCategoryForTest(5); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
+
+		// every row of the Message Boxes list shows its check box (the
+		// macOS 27 style left all but the first one out)
+		{
+			dialog.selectCategoryForTest(4); // Message Boxes
+			dialog.grab(); // lays the pages out
+			auto *list = dialog.pageForTest(OptionsDialog::MessageBoxesPage)
+				->findChild<QTreeWidget *>();
+			const QImage image = list != nullptr
+				? list->viewport()->grab().toImage() : QImage();
+			const qreal ratio = image.devicePixelRatio();
+			int rows = 0, drawn = 0;
+			for (int i = 0; list != nullptr && i < list->topLevelItemCount(); ++i)
+			{
+				const QRect row = list->visualItemRect(list->topLevelItem(i));
+				const QRect box(qRound((row.left() + 2) * ratio), qRound((row.top() + 2) * ratio),
+					qRound(26 * ratio), qRound((row.height() - 4) * ratio));
+				const QRgb background = image.pixel(box.left(), box.top());
+				bool inked = false;
+				for (int y = box.top(); y <= box.bottom() && !inked; ++y)
+					for (int x = box.left(); x <= box.right() && !inked; ++x)
+						inked = image.rect().contains(x, y) && image.pixel(x, y) != background;
+				++rows;
+				drawn += inked ? 1 : 0;
+			}
+			printf("item check boxes: %d of %d drawn (%s)\n", drawn, rows,
+				lm::itemCheckBoxesNeedHelp() ? "painted here" : "platform style");
+			ok = ok && rows > 0 && drawn == rows;
+		}
 		printf("options dialog: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}

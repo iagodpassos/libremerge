@@ -37,6 +37,7 @@
 #include "TableCompareView.h"
 #include "ImageCompareView.h"
 #include "ImageFormats.h"
+#include "ItemCheckStyle.h"
 #include "MessageBoxes.h"
 #include "OptionsDialog.h"
 #include "AboutDialog.h"
@@ -1063,6 +1064,7 @@ void MainWindow::showLineFilters()
 	layout->addWidget(note);
 
 	auto *list = new QListWidget(&dialog);
+	lm::ensureItemCheckBoxes(list);
 	const QStringList entries = QSettings()
 		.value(QStringLiteral("LineFilters/List")).toStringList();
 	for (const QString &entry : entries)
