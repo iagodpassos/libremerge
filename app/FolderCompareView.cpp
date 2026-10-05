@@ -963,7 +963,7 @@ void FolderCompareView::ensureFilterBar()
 {
 	if (m_filterBar != nullptr)
 		return;
-	m_filterBar = new DisplayFilterBar(this);
+	m_filterBar = new DisplayFilterBar(DisplayFilterBar::Items, this);
 	// under the toolbar, above the list
 	m_layout->insertWidget(1, m_filterBar);
 	connect(m_filterBar, &DisplayFilterBar::applyRequested, this,

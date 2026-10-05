@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <memory>
 #include <QSet>
 #include <QStringList>
 #include <QWidget>
@@ -8,9 +9,13 @@
 
 #include "FileOps.h"
 
+class DisplayFilterBar;
+class LineFilterHelper;
 class QAction;
 class QLabel;
+class QMenu;
 class QTableView;
+class QVBoxLayout;
 class TableSideModel;
 
 /**
@@ -18,7 +23,9 @@ class TableSideModel;
  * compare): the same line diff engine drives the alignment, rows in a
  * difference are colored, and the individual cells that differ are
  * emphasized. Blocks can be copied between sides and saved back with
- * the original encoding and line endings.
+ * the original encoding and line endings. WinMerge's table is its text
+ * window in another dress, so the display filter bar is here as well,
+ * with rows for lines and the cells of a row for a filter's columns.
  */
 class TableCompareView : public QWidget
 {
@@ -71,6 +78,34 @@ public:
 	    was loaded or saved here (CheckFileChanged); empty when none. */
 	QString changedPathOnDisk() const;
 
+	/** WinMerge's display filter bar, as in the text compare: the rows a
+	    line filter does not hold for are hidden on both sides. The View
+	    menu's item shows the bar or closes it, its shortcut only shows it;
+	    the filter applied stays in use without the bar. */
+	void showDisplayFilterBar();
+	void toggleDisplayFilterBar();
+	bool displayFilterBarShown() const { return m_filterBar != nullptr; }
+	/** CMergeDoc::OnViewDisplayFilterBarApply: the bar's field becomes the
+	    filter and the files are compared again. */
+	void applyDisplayFilter();
+	QString displayFilter() const;
+	/** The header's context menu (upstream's IDR_POPUP_MERGEVIEWHEADER)
+	    for a column of one side, -1 for a click past the last one. */
+	void buildHeaderMenu(int side, int column, QMenu *menu);
+	/** CMergeDoc::AddColumnToDisplayFilters: ask for a condition on a
+	    column of one side, by its text (0), as a number (1) or as a date
+	    and time (2), and apply the filter with it. */
+	void addColumnToDisplayFilter(int side, int column, int dataType);
+	/** Upstream's "Auto-Fit All Columns": every column as wide as its
+	    widest cell on either side. */
+	void autoFitColumns();
+	DisplayFilterBar *displayFilterBarForTest() const { return m_filterBar; }
+	QTableView *tableForTest(int side) const { return m_tables[side]; }
+	int currentDiffForTest() const { return m_current; }
+	/** The lines of the rows on show, the header's row left out, an empty
+	    one for a row the side does not have (for tests). */
+	QStringList shownRowsForTest(int side) const;
+
 signals:
 	/** A recompare asked for by the user is about to run: WinMerge's
 	    Rescan first checks the files for changes made elsewhere. */
@@ -119,9 +154,19 @@ private:
 		int viewBegin;    // where the change was, to reselect
 	};
 
+	class LineProvider;
+
 	bool loadSide(int side, const QString &path, QString *error);
 	bool runDiff(QString *error);
 	void rebuildModel();
+	void hideLines();
+	bool blockFiltered(int blockIndex) const;
+	bool hasInvisibleLines() const;
+	bool endsShownStretch(int viewRow) const;
+	int modelRowOf(int viewRow) const;
+	void ensureFilterBar();
+	void hideFilterBar();
+	void closeDisplayFilterBar();
 	void computeCellDiffs();
 	void updateStatus();
 	void gotoDiff(int blockIndex);
@@ -142,6 +187,13 @@ private:
 	std::vector<Block> m_blocks;
 	// view row -> real row per side (-1 = ghost)
 	QList<int> m_viewToReal[2];
+	// the display filter: the view rows it hides (empty when none), and
+	// the rows the grids show, in order, as view rows
+	std::unique_ptr<LineFilterHelper> m_displayFilter;
+	QList<bool> m_hiddenRows;
+	QList<int> m_modelRows;
+	DisplayFilterBar *m_filterBar = nullptr;
+	QVBoxLayout *m_layout = nullptr;
 	// "row,column" pairs whose cells differ between the sides
 	QSet<quint64> m_cellDiffs[2];
 	QTableView *m_tables[2];

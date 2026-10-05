@@ -7,23 +7,30 @@
 
 class FileFilterCombo;
 class FileFilterHelper;
-class FileFilterMenu;
+class LineFilterHelper;
+class QMenu;
 class QPushButton;
 class QToolButton;
 
 /**
- * WinMerge's display filter bar (CDirFilterBar): the strip a folder
- * window shows above its list for a filter that only hides items of the
- * comparison it already has. A field for the mask or filter expression,
- * checked as it is typed and with a history of its own
- * ("Files\DisplayExt"), the "=" menu that puts one together, Apply and
- * Close. The folder window owns the filter itself and applies it.
+ * WinMerge's display filter bar, the strip a window shows above its
+ * content for a filter that only hides what the comparison already has:
+ * items of a folder window (CDirFilterBar) or lines of a file window
+ * (CLineFilterBar). A field for the filter, checked as it is typed and
+ * with a history of its own ("Files\DisplayExt", "Files\DisplayLine"),
+ * the "=" menu that puts one together, Apply and Close. The window owns
+ * the filter itself and applies it.
  */
 class DisplayFilterBar : public QWidget
 {
 	Q_OBJECT
 public:
-	explicit DisplayFilterBar(QWidget *parent = nullptr);
+	enum Kind
+	{
+		Items, ///< a folder window: a file mask or filter expression
+		Lines, ///< a file window: a text to find or a line expression
+	};
+	explicit DisplayFilterBar(Kind kind, QWidget *parent = nullptr);
 	~DisplayFilterBar() override;
 
 	/** What the field holds (GetFilterText). */
@@ -38,7 +45,8 @@ public:
 	void focusField();
 
 	FileFilterCombo *field() const { return m_field; }
-	FileFilterMenu *menuForTest() const { return m_menu; }
+	/** The "=" button's menu: a FileFilterMenu or a LineFilterMenu. */
+	QMenu *menuForTest() const { return m_menu; }
 
 signals:
 	/** The Apply button, or Enter in the field. */
@@ -51,11 +59,16 @@ protected:
 	void keyPressEvent(QKeyEvent *event) override;
 
 private:
+	void showMenu();
+	void takeFromMenu(const QString &filter);
+
+	Kind m_kind;
 	// a filter of its own to parse what is typed with
 	std::unique_ptr<FileFilterHelper> m_checker;
+	std::unique_ptr<LineFilterHelper> m_lineChecker;
 	FileFilterCombo *m_field;
 	QToolButton *m_menuButton;
-	FileFilterMenu *m_menu;
+	QMenu *m_menu;
 	QPushButton *m_apply;
 	QPushButton *m_close;
 };

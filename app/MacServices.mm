@@ -13,6 +13,19 @@
 
 #import <AppKit/AppKit.h>
 
+/** Takes the quit Apple event in AppKit's place, and does nothing. */
+@interface LmQuitRequests : NSObject
+- (void)ignore:(NSAppleEventDescriptor *)event withReply:(NSAppleEventDescriptor *)reply;
+@end
+
+@implementation LmQuitRequests
+- (void)ignore:(NSAppleEventDescriptor *)event withReply:(NSAppleEventDescriptor *)reply
+{
+	Q_UNUSED(event);
+	Q_UNUSED(reply);
+}
+@end
+
 @interface LmServicesProvider : NSObject
 {
 @public
@@ -67,6 +80,22 @@ void installMacServices(MainWindow *window)
 void activateAppForTest()
 {
 	[NSApp activateIgnoringOtherApps:YES];
+}
+
+void ignoreQuitRequestsForTest()
+{
+	static LmQuitRequests *requests = [[LmQuitRequests alloc] init];
+	const auto install = []() {
+		[[NSAppleEventManager sharedAppleEventManager] setEventHandler:requests
+			andSelector:@selector(ignore:withReply:)
+			forEventClass:kCoreEventClass andEventID:kAEQuitApplication];
+	};
+	install();
+	// AppKit puts its own handler in when the application finishes
+	// launching, which a selftest reaches with its first events
+	[[NSNotificationCenter defaultCenter]
+		addObserverForName:NSApplicationDidFinishLaunchingNotification object:nil queue:nil
+		usingBlock:^(NSNotification *) { install(); }];
 }
 
 QStringList appMenuItemsForTest(const QString &menuTitle)

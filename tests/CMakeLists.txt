@@ -15,6 +15,7 @@ set(TEST_SOURCES
   FilterEngine/FilterExpression_test.cpp
   FiltersList/FiltersList_test.cpp
   FullQuickCompare/FullQuickCompare_test.cpp
+  LineFilterHelper/LineFilterHelper_test.cpp
   MoveDetection/RenameMoveDetection_test.cpp
   OptionsMgr/VariantValue_test.cpp
   StringDiffs/stringdiffs_test.cpp

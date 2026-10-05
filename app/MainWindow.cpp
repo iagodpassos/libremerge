@@ -378,16 +378,21 @@ MainWindow::MainWindow(QWidget *parent)
 			}
 		});
 	viewMenu->addSeparator();
-	// WinMerge's display filter bar of the folder window (see
-	// displayFilterBarCommand for the two things the item does)
+	// WinMerge's display filter bar, of the folder window and of the file
+	// window, its table too (see displayFilterBarCommand for the two
+	// things the item does)
 	QAction *filterBarAction = viewMenu->addAction(tr("Displa&y Filter Bar"));
 	filterBarAction->setObjectName(QStringLiteral("displayFilterBarAction"));
 	filterBarAction->setCheckable(true);
 	filterBarAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_L));
-	const auto syncFilterBarAction = [folderView, filterBarAction]() {
-		FolderCompareView *folder = folderView();
-		filterBarAction->setEnabled(folder != nullptr);
-		filterBarAction->setChecked(folder != nullptr && folder->displayFilterBarShown());
+	const auto syncFilterBarAction = [folderView, fileView, tableView, filterBarAction]() {
+		const FolderCompareView *folder = folderView();
+		const FileCompareView *file = fileView();
+		const TableCompareView *table = tableView();
+		filterBarAction->setEnabled(folder != nullptr || file != nullptr || table != nullptr);
+		filterBarAction->setChecked(folder != nullptr ? folder->displayFilterBarShown()
+			: file != nullptr ? file->displayFilterBarShown()
+			: table != nullptr && table->displayFilterBarShown());
 	};
 	connect(filterBarAction, &QAction::triggered, this, [this, syncFilterBarAction]() {
 		displayFilterBarCommand(QGuiApplication::queryKeyboardModifiers());
@@ -1280,13 +1285,29 @@ void MainWindow::openSelfComparison(const QString &path)
 
 void MainWindow::displayFilterBarCommand(Qt::KeyboardModifiers held)
 {
-	auto *folder = qobject_cast<FolderCompareView *>(m_tabs->currentWidget());
-	if (folder == nullptr)
-		return;
-	if (held.testFlag(Qt::ControlModifier) && held.testFlag(Qt::ShiftModifier))
-		folder->showDisplayFilterBar();
-	else
-		folder->toggleDisplayFilterBar();
+	const bool byShortcut = held.testFlag(Qt::ControlModifier)
+		&& held.testFlag(Qt::ShiftModifier);
+	if (auto *folder = qobject_cast<FolderCompareView *>(m_tabs->currentWidget()))
+	{
+		if (byShortcut)
+			folder->showDisplayFilterBar();
+		else
+			folder->toggleDisplayFilterBar();
+	}
+	else if (auto *file = qobject_cast<FileCompareView *>(m_tabs->currentWidget()))
+	{
+		if (byShortcut)
+			file->showDisplayFilterBar();
+		else
+			file->toggleDisplayFilterBar();
+	}
+	else if (auto *table = qobject_cast<TableCompareView *>(m_tabs->currentWidget()))
+	{
+		if (byShortcut)
+			table->showDisplayFilterBar();
+		else
+			table->toggleDisplayFilterBar();
+	}
 }
 
 void MainWindow::wireFolderRowSync(FolderCompareView *folder)

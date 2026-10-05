@@ -6,7 +6,10 @@
 #include <QStringList>
 
 class FileFilterHelper;
+class ILineDataProvider;
+class LineFilterHelper;
 struct FileFilterErrorInfo;
+struct FilterExpression;
 
 namespace lm
 {
@@ -58,12 +61,38 @@ void loadFilterFiles(FileFilterHelper *helper);
     empty when it is valid. The helper keeps the mask. */
 QStringList fileFilterErrors(FileFilterHelper *helper, const QString &mask);
 QString formatFilterError(const FileFilterErrorInfo &error);
+/** The same for a line filter of the file window's filter bar, a text to
+    find or an expression behind "le:" (LineFilterHelper). */
+QStringList lineFilterErrors(LineFilterHelper *helper, const QString &filter);
+QString formatFilterError(const FilterExpression &expression);
+
+/** One file of a comparison, for a line filter that asks about the files
+    rather than about their lines. */
+struct ComparedFile
+{
+	QString path; ///< empty for a pane without a file
+	int unicoding = 0;
+	int codepage = 0;
+	bool bom = false;
+};
+/** The filter has a text or an expression, and it parses: it hides
+    lines. */
+bool lineFilterHides(LineFilterHelper *filter);
+/** CMergeDoc::HideLines, the display filter's part: the lines of a
+    comparison the filter leaves out, one entry a line; empty when the
+    filter hides none. The counts are the comparison's differences and
+    ignored differences, which an expression may ask about as well
+    (CMergeDoc::CreateDiffItem). */
+QList<bool> linesHiddenByFilter(LineFilterHelper *filter, const ILineDataProvider &lines,
+	const QList<ComparedFile> &files, int significantDiffs, int ignoredDiffs);
 
 /** The mask fields' shared history (WinMerge's "Files\Ext"), the latest
     first. The folder window's filter bar keeps one of its own
     ("Files\DisplayExt"). */
 QString fileFilterHistoryKey();
 QString displayFilterHistoryKey();
+/** The file window's filter bar keeps its own too ("Files\DisplayLine"). */
+QString lineDisplayFilterHistoryKey();
 QStringList fileFilterHistory(const QString &key = fileFilterHistoryKey());
 void rememberFileFilter(const QString &mask,
 	const QString &key = fileFilterHistoryKey());

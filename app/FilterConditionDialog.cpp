@@ -20,6 +20,31 @@ QString quoted(QString value)
 	return QLatin1Char('"') + value + QLatin1Char('"');
 }
 
+/** strutils::format_strings: "%1" to "%3" stand for the arguments, and
+    any other character behind a "%" for itself. Not QString::arg, which
+    would take a "%2" inside an argument for a place and complain about a
+    pattern without one (the left-hand side can be a whole filter). */
+QString formatted(const QString &pattern, const QStringList &arguments)
+{
+	QString result;
+	for (int i = 0; i < pattern.size(); ++i)
+	{
+		if (pattern.at(i) != QLatin1Char('%'))
+		{
+			result += pattern.at(i);
+			continue;
+		}
+		if (++i >= pattern.size())
+			break;
+		const int place = pattern.at(i).unicode() - '0';
+		if (place > 0 && place <= arguments.size())
+			result += arguments.at(place - 1);
+		else
+			result += pattern.at(i);
+	}
+	return result;
+}
+
 } // namespace
 
 FilterConditionDialog::FilterConditionDialog(bool difference, int side, const QString &field,
@@ -209,13 +234,13 @@ QString FilterConditionDialog::leftHandSide() const
 	if (!m_difference)
 	{
 		static const char *const sides[] = { "", "Left", "Middle", "Right" };
-		return m_transform.arg(property(QLatin1String(sides[qBound(0, m_side, 3)])));
+		return formatted(m_transform, { property(QLatin1String(sides[qBound(0, m_side, 3)])) });
 	}
 	static const char *const first[] = { "Left", "Left", "Middle" };
 	static const char *const second[] = { "Right", "Middle", "Right" };
 	const int pair = qBound(0, m_side, 2);
-	return m_transform.arg(property(QLatin1String(first[pair])),
-		property(QLatin1String(second[pair])));
+	return formatted(m_transform, { property(QLatin1String(first[pair])),
+		property(QLatin1String(second[pair])) });
 }
 
 bool FilterConditionDialog::isStringField(bool includeContent) const

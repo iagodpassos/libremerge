@@ -8,8 +8,12 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QGuiApplication>
 #include <QHeaderView>
 #include <QLabel>
+#include <QMenu>
+#include <QPainter>
+#include <QPaintEvent>
 #include <QScrollBar>
 #include <QSettings>
 #include <QTableView>
@@ -17,8 +21,11 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+#include "DisplayFilterBar.h"
+#include "FileFilters.h"
 #include "FileOps.h"
 #include "Icons.h"
+#include "LineFilterMenu.h"
 #include "MessageBoxes.h"
 #include "Theme.h"
 
@@ -26,6 +33,9 @@
 #include "DiffWrapper.h"
 #include "DiffList.h"
 #include "EngineOptions.h"
+#include "FilterEngine/FilterExpression.h"
+#include "FilterEngine/ILineDataProvider.h"
+#include "LineFilterHelper.h"
 #include "PathContext.h"
 #include "UniFile.h"
 
@@ -97,7 +107,213 @@ quint64 cellKey(int row, int column)
 		| static_cast<quint32>(column);
 }
 
+/** A row's header tells whether hidden rows follow the row. */
+constexpr int kBoundaryRole = Qt::UserRole + 1;
+
+/** The grid of a side, with a rule under each row that hidden rows
+    follow: upstream's editor draws its boundary line there, in the colour
+    of the text and from the margin on (CCrystalTextView's
+    DrawBoundaryLine). */
+class RuledTableView : public QTableView
+{
+public:
+	using QTableView::QTableView;
+
+protected:
+	void paintEvent(QPaintEvent *event) override
+	{
+		QTableView::paintEvent(event);
+		const QAbstractItemModel *rows = model();
+		if (rows == nullptr || rows->rowCount() == 0)
+			return;
+		// the rows in what is being painted; none when it starts under
+		// the last one
+		const int first = rowAt(event->rect().top());
+		int last = rowAt(event->rect().bottom());
+		if (first < 0)
+			return;
+		if (last < 0)
+			last = rows->rowCount() - 1;
+		QPainter painter(viewport());
+		painter.setPen(palette().color(QPalette::Text));
+		for (int row = first; row <= last; ++row)
+		{
+			if (!rows->headerData(row, Qt::Vertical, kBoundaryRole).toBool())
+				continue;
+			const int y = rowViewportPosition(row) + rowHeight(row) - 1;
+			painter.drawLine(0, y, viewport()->width(), y);
+		}
+	}
+};
+
+/** The margin's part of that rule. */
+class RuledRowHeader : public QHeaderView
+{
+public:
+	explicit RuledRowHeader(QWidget *parent)
+		: QHeaderView(Qt::Vertical, parent)
+	{
+		// as a table view sets up the header it makes for itself
+		setSectionsClickable(true);
+		setHighlightSections(true);
+	}
+
+protected:
+	void paintSection(QPainter *painter, const QRect &rect, int logicalIndex) const override
+	{
+		painter->save();
+		QHeaderView::paintSection(painter, rect, logicalIndex);
+		painter->restore();
+		if (model() == nullptr
+			|| !model()->headerData(logicalIndex, Qt::Vertical, kBoundaryRole).toBool())
+			return;
+		painter->save();
+		painter->setPen(palette().color(QPalette::Text));
+		painter->drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom());
+		painter->restore();
+	}
+};
+
+/** A cell of a line the way upstream's table reads it for a filter
+    (CCrystalTextBuffer::GetColumnCount and GetCellText): the delimiters
+    outside quotes part the cells, and a cell keeps the quotes it is
+    written with. */
+int rawCellCount(const QString &line, QChar delimiter)
+{
+	int count = 1;
+	bool quoted = false;
+	for (const QChar c : line)
+	{
+		if (c == QChar('"'))
+			quoted = !quoted;
+		else if (!quoted && c == delimiter)
+			++count;
+	}
+	return count;
+}
+
+QString rawCell(const QString &line, QChar delimiter, int column)
+{
+	QString cell;
+	int current = 0;
+	bool quoted = false;
+	for (int i = 0; i < line.size() && current <= column; ++i)
+	{
+		const QChar c = line.at(i);
+		if (current == column && (quoted || c != delimiter))
+			cell.append(c);
+		if (c == QChar('"'))
+			quoted = !quoted;
+		else if (!quoted && c == delimiter)
+			++current;
+	}
+	return cell;
+}
+
 } // namespace
+
+/**
+ * What a line filter expression asks about the rows (CMergeDoc as an
+ * ILineDataProvider, its buffers in table mode): the view rows of both
+ * sides, ghost rows included, with the flags upstream's buffers carry
+ * and the cells of a row for its columns.
+ */
+class TableCompareView::LineProvider : public ILineDataProvider
+{
+public:
+	explicit LineProvider(const TableCompareView *view)
+		: m_view(view)
+	{
+		const int rows = static_cast<int>(view->m_viewToReal[0].size());
+		for (int side = 0; side < 2; ++side)
+		{
+			m_flags[side].assign(rows, 0);
+			m_realIndex[side].assign(rows, 0);
+			int real = 0;
+			for (int row = 0; row < rows; ++row)
+			{
+				// (a ghost row counts as the real row that follows it)
+				m_realIndex[side][row] = real;
+				if (view->m_viewToReal[side].value(row, -1) < 0)
+					m_flags[side][row] |= LF_GHOST;
+				else
+					++real;
+			}
+			m_realCount[side] = real;
+		}
+		// the difference flags, as PrimeTextBuffers sets them
+		for (const Block &block : view->m_blocks)
+			for (int side = 0; side < 2; ++side)
+				for (int row = block.viewBegin; row <= block.viewEnd && row < rows; ++row)
+				{
+					unsigned &flags = m_flags[side][row];
+					if (block.trivial)
+						flags |= LF_TRIVIAL;
+					else if (!(flags & LF_GHOST))
+						flags |= LF_DIFF;
+				}
+	}
+
+	int GetLineCount() const override
+	{
+		return static_cast<int>(m_flags[0].size());
+	}
+	std::string GetLine(int pane, int lineIndex) const override
+	{
+		return line(pane, lineIndex).toStdString();
+	}
+	int GetColumnCount(int pane, int lineIndex) const override
+	{
+		return valid(pane, lineIndex)
+			? rawCellCount(line(pane, lineIndex), m_view->m_delimiter) : 1;
+	}
+	std::string GetColumn(int pane, int lineIndex, int columnIndex) const override
+	{
+		return rawCell(line(pane, lineIndex), m_view->m_delimiter, columnIndex).toStdString();
+	}
+	int GetRealLineNumber(int pane, int lineIndex) const override
+	{
+		return valid(pane, lineIndex) ? m_realIndex[pane][lineIndex] : 0;
+	}
+	unsigned GetLineFlags(int pane, int lineIndex) const override
+	{
+		return valid(pane, lineIndex) ? m_flags[pane][lineIndex] : 0;
+	}
+	unsigned GetLineEol(int pane, int lineIndex) const override
+	{
+		if (!valid(pane, lineIndex))
+			return EOL_NONE;
+		// the file's line ending, which every row of a side shares here;
+		// the last row has none when the file ends without one
+		const Side &side = m_view->m_sides[pane];
+		if (!side.hadFinalEol && m_realIndex[pane][lineIndex] == m_realCount[pane] - 1)
+			return EOL_NONE;
+		if (side.eol == QStringLiteral("\r\n"))
+			return EOL_CRLF;
+		return side.eol == QStringLiteral("\r") ? EOL_CR : EOL_LF;
+	}
+
+private:
+	bool valid(int pane, int lineIndex) const
+	{
+		return pane >= 0 && pane < 2 && lineIndex >= 0
+			&& lineIndex < static_cast<int>(m_flags[pane].size());
+	}
+	/** The row's line as the file has it, empty for a ghost row. */
+	QString line(int pane, int lineIndex) const
+	{
+		if (!valid(pane, lineIndex))
+			return QString();
+		const int real = m_view->m_viewToReal[pane].value(lineIndex, -1);
+		return real >= 0 && real < m_view->m_sides[pane].rawLines.size()
+			? m_view->m_sides[pane].rawLines.at(real) : QString();
+	}
+
+	const TableCompareView *m_view;
+	std::vector<unsigned> m_flags[2];
+	std::vector<int> m_realIndex[2];
+	int m_realCount[2] = {};
+};
 
 /** Read-only model over one side's aligned rows. */
 class TableSideModel : public QAbstractTableModel
@@ -108,12 +324,9 @@ public:
 
 	int rowCount(const QModelIndex &parent = {}) const override
 	{
-		if (parent.isValid())
-			return 0;
-		int rows = static_cast<int>(m_view->m_viewToReal[m_side].size());
-		if (m_view->m_firstRowIsHeader && rows > 0)
-			--rows;
-		return rows;
+		// the rows on show: not the header's, not the ones a display
+		// filter hides
+		return parent.isValid() ? 0 : static_cast<int>(m_view->m_modelRows.size());
 	}
 
 	int columnCount(const QModelIndex &parent = {}) const override
@@ -166,6 +379,8 @@ public:
 	QVariant headerData(int section, Qt::Orientation orientation,
 		int role) const override
 	{
+		if (orientation == Qt::Vertical && role == kBoundaryRole)
+			return m_view->endsShownStretch(toViewRow(section));
 		if (role != Qt::DisplayRole)
 			return {};
 		if (orientation == Qt::Horizontal)
@@ -195,7 +410,7 @@ public:
 private:
 	int toViewRow(int modelRow) const
 	{
-		return m_view->m_firstRowIsHeader ? modelRow + 1 : modelRow;
+		return m_view->m_modelRows.value(modelRow, -1);
 	}
 
 	TableCompareView *m_view;
@@ -207,8 +422,10 @@ TableCompareView::~TableCompareView() = default;
 
 TableCompareView::TableCompareView(QWidget *parent)
 	: QWidget(parent)
+	, m_displayFilter(std::make_unique<LineFilterHelper>())
 {
 	auto *layout = new QVBoxLayout(this);
+	m_layout = layout;
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(0);
 
@@ -280,7 +497,8 @@ TableCompareView::TableCompareView(QWidget *parent)
 	for (int i = 0; i < 2; ++i)
 	{
 		m_models[i] = new TableSideModel(this, i);
-		m_tables[i] = new QTableView(this);
+		m_tables[i] = new RuledTableView(this);
+		m_tables[i]->setVerticalHeader(new RuledRowHeader(m_tables[i]));
 		m_tables[i]->setModel(m_models[i]);
 		m_tables[i]->setEditTriggers(QAbstractItemView::NoEditTriggers);
 		m_tables[i]->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -308,6 +526,15 @@ TableCompareView::TableCompareView(QWidget *parent)
 			this, [this](const QModelIndex &index) {
 				// select the difference under the double-clicked row
 				selectDiffAtModelRow(index.row());
+			});
+		// upstream's menu of a right click on the headers
+		QHeaderView *header = m_tables[i]->horizontalHeader();
+		header->setContextMenuPolicy(Qt::CustomContextMenu);
+		connect(header, &QWidget::customContextMenuRequested, this,
+			[this, i, header](const QPoint &pos) {
+				QMenu menu(this);
+				buildHeaderMenu(i, header->logicalIndexAt(pos), &menu);
+				menu.exec(header->mapToGlobal(pos));
 			});
 	}
 	layout->addLayout(tables, 1);
@@ -536,12 +763,226 @@ void TableCompareView::rebuildModel()
 		while (m_viewToReal[side].size() < totalRows)
 			m_viewToReal[side].append(-1);
 
+	// upstream's Rescan hides the lines once the buffers are primed; the
+	// header's row is shown as the header whatever the filter makes of it
+	hideLines();
+	m_modelRows.clear();
+	for (int row = m_firstRowIsHeader ? 1 : 0; row < totalRows; ++row)
+		if (row >= m_hiddenRows.size() || !m_hiddenRows.at(row))
+			m_modelRows.append(row);
+
 	int columns = 1;
 	for (int side = 0; side < 2; ++side)
 		for (const QStringList &row : m_sides[side].cells)
 			columns = qMax(columns, static_cast<int>(row.size()));
 	for (int side = 0; side < 2; ++side)
 		m_models[side]->refresh(columns);
+}
+
+/** CMergeDoc::HideLines, its display filter part: a row the filter's
+    expression does not hold for is hidden on both sides. Nothing is
+    hidden without a filter, or by one that does not parse. */
+void TableCompareView::hideLines()
+{
+	m_hiddenRows.clear();
+	if (!lm::lineFilterHides(m_displayFilter.get()))
+		return;
+	QList<lm::ComparedFile> files;
+	for (const Side &side : m_sides)
+		files.append({ side.path, side.unicoding, side.codepage, side.bom });
+	int ignored = 0;
+	for (const Block &block : m_blocks)
+		if (block.trivial)
+			++ignored;
+	m_hiddenRows = lm::linesHiddenByFilter(m_displayFilter.get(), LineProvider(this), files,
+		m_diffCount, ignored);
+}
+
+/** A shown row with a hidden one right after it. */
+bool TableCompareView::endsShownStretch(int viewRow) const
+{
+	return viewRow >= 0 && viewRow + 1 < m_hiddenRows.size() && !m_hiddenRows.at(viewRow)
+		&& m_hiddenRows.at(viewRow + 1);
+}
+
+/** CMergeEditView::IsDiffFiltered: every row of the difference is
+    hidden. */
+bool TableCompareView::blockFiltered(int blockIndex) const
+{
+	if (m_hiddenRows.isEmpty())
+		return false;
+	const Block &block = m_blocks[blockIndex];
+	for (int row = block.viewBegin; row <= block.viewEnd; ++row)
+		if (row >= m_hiddenRows.size() || !m_hiddenRows.at(row))
+			return false;
+	return true;
+}
+
+/** CMergeDoc::HasInvisibleLines over every difference there is to copy:
+    one of them has a hidden row. */
+bool TableCompareView::hasInvisibleLines() const
+{
+	for (const Block &block : m_blocks)
+	{
+		if (block.trivial)
+			continue;
+		for (int row = block.viewBegin; row <= block.viewEnd; ++row)
+			if (row < m_hiddenRows.size() && m_hiddenRows.at(row))
+				return true;
+	}
+	return false;
+}
+
+/** The grid's row for a view row: its own when it shows, else the first
+    one that shows after it, or the last. */
+int TableCompareView::modelRowOf(int viewRow) const
+{
+	if (m_modelRows.isEmpty())
+		return -1;
+	const auto at = std::lower_bound(m_modelRows.cbegin(), m_modelRows.cend(), viewRow);
+	return at == m_modelRows.cend() ? static_cast<int>(m_modelRows.size()) - 1
+		: static_cast<int>(at - m_modelRows.cbegin());
+}
+
+QStringList TableCompareView::shownRowsForTest(int side) const
+{
+	QStringList rows;
+	for (const int viewRow : m_modelRows)
+	{
+		const int real = m_viewToReal[side].value(viewRow, -1);
+		rows.append(real >= 0 && real < m_sides[side].rawLines.size()
+			? m_sides[side].rawLines.at(real) : QString());
+	}
+	return rows;
+}
+
+QString TableCompareView::displayFilter() const
+{
+	return QString::fromStdString(m_displayFilter->GetStringOrExpression());
+}
+
+void TableCompareView::ensureFilterBar()
+{
+	if (m_filterBar != nullptr)
+		return;
+	m_filterBar = new DisplayFilterBar(DisplayFilterBar::Lines, this);
+	// under the toolbar, above the grids
+	m_layout->insertWidget(1, m_filterBar);
+	connect(m_filterBar, &DisplayFilterBar::applyRequested, this,
+		&TableCompareView::applyDisplayFilter);
+	connect(m_filterBar, &DisplayFilterBar::closeRequested, this,
+		&TableCompareView::closeDisplayFilterBar);
+}
+
+/** CMergeEditFrame::HideFilterBar: the bar goes away; the filter it
+    applied stays in use. */
+void TableCompareView::hideFilterBar()
+{
+	if (m_filterBar == nullptr)
+		return;
+	m_filterBar->hide();
+	m_filterBar->deleteLater(); // it may be the one asking
+	m_filterBar = nullptr;
+}
+
+/** CMergeEditFrame::OnDisplayFilterBarClose. */
+void TableCompareView::closeDisplayFilterBar()
+{
+	hideFilterBar();
+	m_tables[m_tables[1]->hasFocus() ? 1 : 0]->setFocus();
+}
+
+void TableCompareView::showDisplayFilterBar()
+{
+	ensureFilterBar();
+	if (!displayFilter().isEmpty())
+		m_filterBar->setFilterText(displayFilter());
+	m_filterBar->focusField();
+}
+
+void TableCompareView::toggleDisplayFilterBar()
+{
+	if (m_filterBar == nullptr)
+		ensureFilterBar();
+	else
+		hideFilterBar();
+}
+
+void TableCompareView::applyDisplayFilter()
+{
+	if (m_filterBar == nullptr)
+		return;
+	QGuiApplication::setOverrideCursor(Qt::WaitCursor);
+	// the text as it is typed: saving it reads the list again, which puts
+	// its latest entry in the field
+	const QString text = m_filterBar->filterText();
+	m_filterBar->saveFilterText();
+	m_displayFilter->SetStringOrExpression(text.toStdString());
+	if (!text.isEmpty()
+		&& m_displayFilter->GetFilterExpression().errorCode == FILTER_ERROR_NO_ERROR)
+		m_filterBar->setFilterApplied(true);
+	// FlushAndRescan(true): the comparison runs again, and hides the rows
+	recompare();
+	m_tables[m_tables[1]->hasFocus() ? 1 : 0]->setFocus();
+	QGuiApplication::restoreOverrideCursor();
+}
+
+void TableCompareView::buildHeaderMenu(int side, int column, QMenu *menu)
+{
+	QAction *headers = menu->addAction(tr("Use First Line as Headers"));
+	headers->setObjectName(QStringLiteral("useFirstLineAsHeaders"));
+	headers->setCheckable(true);
+	headers->setChecked(m_firstRowIsHeader);
+	connect(headers, &QAction::triggered, m_actHeader, &QAction::setChecked);
+	QAction *fit = menu->addAction(tr("Auto-Fit All Columns"));
+	fit->setObjectName(QStringLiteral("autoFitAllColumns"));
+	connect(fit, &QAction::triggered, this, &TableCompareView::autoFitColumns);
+	menu->addSeparator();
+	QMenu *filter = menu->addMenu(tr("&Filter by This Column"));
+	const struct { const char *text; const char *name; } kinds[] = {
+		{ QT_TR_NOOP("&Text..."), "filterColumnText" },
+		{ QT_TR_NOOP("&Number..."), "filterColumnNumber" },
+		{ QT_TR_NOOP("&Date/Time..."), "filterColumnDateTime" },
+	};
+	for (int kind = 0; kind < 3; ++kind)
+	{
+		QAction *action = filter->addAction(tr(kinds[kind].text));
+		action->setObjectName(QLatin1String(kinds[kind].name));
+		connect(action, &QAction::triggered, this,
+			[this, side, column, kind]() { addColumnToDisplayFilter(side, column, kind); });
+	}
+}
+
+void TableCompareView::addColumnToDisplayFilter(int side, int column, int dataType)
+{
+	if (column < 0 || dataType < 0 || dataType > 2)
+		return; // (CMergeEditView::OnFilterMenuColumn: no column was clicked)
+	// a menu that is asked without being shown: the side's own columns,
+	// joined with AND
+	LineFilterMenu menu(this);
+	menu.setTarget(side == 1 ? 3 : side + 1, 0, column);
+	const std::optional<QString> filter =
+		menu.apply(LineFilterMenu::ColumnText + dataType, displayFilter());
+	if (!filter.has_value())
+		return;
+	ensureFilterBar();
+	m_displayFilter->SetStringOrExpression(filter->toStdString());
+	m_filterBar->setFilterText(displayFilter());
+	applyDisplayFilter();
+}
+
+void TableCompareView::autoFitColumns()
+{
+	// upstream measures every buffer's cells for one set of widths
+	for (QTableView *table : m_tables)
+		table->resizeColumnsToContents();
+	const int columns = m_models[0]->columnCount();
+	for (int column = 0; column < columns; ++column)
+	{
+		const int width = qMax(m_tables[0]->columnWidth(column), m_tables[1]->columnWidth(column));
+		for (QTableView *table : m_tables)
+			table->setColumnWidth(column, width);
+	}
 }
 
 /** Cells that differ between the paired rows of each difference. */
@@ -606,9 +1047,11 @@ void TableCompareView::updateStatus()
 
 int TableCompareView::nextActive(int from, int direction) const
 {
+	// (not a difference the display filter hides whole: upstream's
+	// Find...NonFilteredDiff)
 	for (int b = from + direction;
 		b >= 0 && b < static_cast<int>(m_blocks.size()); b += direction)
-		if (!m_blocks[b].trivial)
+		if (!m_blocks[b].trivial && !blockFiltered(b))
 			return b;
 	return -1;
 }
@@ -618,10 +1061,8 @@ void TableCompareView::gotoDiff(int blockIndex)
 	if (blockIndex < 0 || blockIndex >= static_cast<int>(m_blocks.size()))
 		return;
 	m_current = blockIndex;
-	const int headerOffset = m_firstRowIsHeader ? 1 : 0;
-	const int modelRow =
-		qMax(0, m_blocks[blockIndex].viewBegin - headerOffset);
-	for (int i = 0; i < 2; ++i)
+	const int modelRow = modelRowOf(m_blocks[blockIndex].viewBegin);
+	for (int i = 0; i < 2 && modelRow >= 0; ++i)
 		m_tables[i]->scrollTo(m_models[i]->index(modelRow, 0),
 			QAbstractItemView::PositionAtCenter);
 	m_models[0]->refresh(m_models[0]->columnCount());
@@ -662,7 +1103,7 @@ void TableCompareView::gotoLastDiff()
  *  version of WinMerge's LineToDiff + SelectDiff). */
 void TableCompareView::selectDiffAtModelRow(int modelRow)
 {
-	const int viewRow = modelRow + (m_firstRowIsHeader ? 1 : 0);
+	const int viewRow = m_modelRows.value(modelRow, -1);
 	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
 		if (!m_blocks[b].trivial && viewRow >= m_blocks[b].viewBegin
 			&& viewRow <= m_blocks[b].viewEnd)
@@ -811,7 +1252,8 @@ void TableCompareView::copyCurrentDiff(int sourceSide)
 	// land on the next difference below the merged spot
 	m_current = -1;
 	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
-		if (!m_blocks[b].trivial && m_blocks[b].viewBegin >= wasViewBegin)
+		if (!m_blocks[b].trivial && m_blocks[b].viewBegin >= wasViewBegin
+			&& !blockFiltered(b))
 		{
 			gotoDiff(b);
 			return;
@@ -821,6 +1263,15 @@ void TableCompareView::copyCurrentDiff(int sourceSide)
 
 void TableCompareView::copyAllFrom(int sourceSide)
 {
+	// CMergeDoc::CopyMultipleList: not with hidden lines among the
+	// differences to copy
+	if (hasInvisibleLines())
+	{
+		lm::showError(this, tr("Merging/copying differences that contain hidden lines is "
+			"not currently supported.\n\nPlease clear the display filter or adjust the "
+			"filter settings to show all lines before merging."));
+		return;
+	}
 	const int target = 1 - sourceSide;
 	pushUndo(captureEntry(target, 0));
 	m_sides[target].rawLines = m_sides[sourceSide].rawLines;

@@ -22,4 +22,11 @@ QStringList appMenuItemsForTest(const QString &menuTitle = QString());
     window's menu bar (for tests launched from a terminal). */
 void activateAppForTest();
 
+/** Leave unanswered what asks the application to quit from outside: the
+    Dock's Quit, a script, a tool that closes applications without a window
+    (for tests: a selftest shows none, and AppKit ends a process asked to
+    quit there and then, its checks unfinished, with the exit code of a
+    success). */
+void ignoreQuitRequestsForTest();
+
 } // namespace lm

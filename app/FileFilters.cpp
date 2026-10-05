@@ -8,10 +8,16 @@
 #include <QSettings>
 #include <QStandardPaths>
 
+#include "DiffContext.h"
+#include "DiffItem.h"
+#include "DiffWrapper.h"
 #include "FileFilter.h"
 #include "FileFilterHelper.h"
 #include "FileFilterMgr.h"
 #include "FilterEngine/FilterError.h"
+#include "FilterEngine/FilterExpression.h"
+#include "FilterEngine/ILineDataProvider.h"
+#include "LineFilterHelper.h"
 #include "OptionsDef.h"
 #include "OptionsMgr.h"
 #include "options_global.h"
@@ -235,6 +241,88 @@ QString formatFilterError(const FileFilterErrorInfo &error)
 	return message;
 }
 
+QString formatFilterError(const FilterExpression &expression)
+{
+	if (expression.errorCode == FILTER_ERROR_NO_ERROR)
+		return QString();
+	QString message = filterErrorMessage(expression.errorCode);
+	if (expression.errorPosition >= 0)
+		message += QLatin1Char(' ') + translated(QT_TRANSLATE_NOOP("FileFilters", "at position"))
+			+ QLatin1Char(' ') + QString::number(expression.errorPosition + 1);
+	message += QStringLiteral(": ") + QString::fromStdString(expression.expression);
+	if (!expression.name.empty())
+		message += QStringLiteral(" (\"") + QString::fromStdString(expression.name)
+			+ QStringLiteral("\")");
+	return message;
+}
+
+QStringList lineFilterErrors(LineFilterHelper *helper, const QString &filter)
+{
+	helper->SetStringOrExpression(filter.toStdString());
+	const QString error = formatFilterError(helper->GetFilterExpression());
+	return error.isEmpty() ? QStringList() : QStringList{ error };
+}
+
+bool lineFilterHides(LineFilterHelper *filter)
+{
+	return !filter->GetStringOrExpression().empty()
+		&& filter->GetFilterExpression().errorCode == FILTER_ERROR_NO_ERROR;
+}
+
+QList<bool> linesHiddenByFilter(LineFilterHelper *filter, const ILineDataProvider &lines,
+	const QList<ComparedFile> &files, int significantDiffs, int ignoredDiffs)
+{
+	QList<bool> hidden;
+	if (!lineFilterHides(filter))
+		return hidden;
+	FilterExpression &expression = filter->GetFilterExpression();
+	// CreateDiffItem: the files, for what the expression asks about them
+	const int sides = static_cast<int>(files.size());
+	PathContext paths;
+	paths.SetSize(sides);
+	DIFFITEM item;
+	item.diffcode.diffcode = (significantDiffs > 0 ? DIFFCODE::DIFF : DIFFCODE::SAME)
+		| DIFFCODE::TEXT | DIFFCODE::FILE | (sides > 2 ? DIFFCODE::THREEWAY : 0);
+	item.nsdiffs = significantDiffs;
+	item.nidiffs = ignoredDiffs;
+	for (int side = 0; side < sides; ++side)
+	{
+		const ComparedFile &file = files.at(side);
+		if (file.path.isEmpty())
+		{
+			paths.SetPath(side, String(), false);
+			continue; // an untitled pane
+		}
+		const QFileInfo info(file.path);
+		paths.SetPath(side, info.absolutePath().toStdString(), false);
+		item.diffcode.setSideFlag(side);
+		item.diffFileInfo[side].Update(info.absoluteFilePath().toStdString());
+		item.diffFileInfo[side].SetFile(info.fileName().toStdString());
+		item.diffFileInfo[side].encoding.SetUnicoding(
+			static_cast<ucr::UNICODESET>(file.unicoding));
+		item.diffFileInfo[side].encoding.SetCodepage(file.codepage);
+		item.diffFileInfo[side].encoding.m_bom = file.bom;
+	}
+	CDiffContext context(paths, CMP_CONTENT);
+	expression.SetDiffContext(&context);
+	FilterSharedContext shared;
+	FilterEvalContext evaluation{ &expression, &item, &lines, &shared };
+	const int count = lines.GetLineCount();
+	hidden.reserve(count);
+	bool any = false;
+	for (int line = 0; line < count; ++line)
+	{
+		evaluation.lineIndex = line;
+		const bool hide = !expression.Evaluate(evaluation);
+		hidden.append(hide);
+		any = any || hide;
+	}
+	expression.SetDiffContext(nullptr);
+	if (!any)
+		hidden.clear();
+	return hidden;
+}
+
 QStringList fileFilterErrors(FileFilterHelper *helper, const QString &mask)
 {
 	helper->SetMaskOrExpression(mask.toStdString());
@@ -252,6 +340,11 @@ QString fileFilterHistoryKey()
 QString displayFilterHistoryKey()
 {
 	return QStringLiteral("Files/DisplayExt");
+}
+
+QString lineDisplayFilterHistoryKey()
+{
+	return QStringLiteral("Files/DisplayLine");
 }
 
 QStringList fileFilterHistory(const QString &key)

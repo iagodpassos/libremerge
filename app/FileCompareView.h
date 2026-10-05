@@ -4,6 +4,7 @@
 #include <memory>
 #include <QSet>
 #include <QStringList>
+#include <QTextDocument>
 #include <QWidget>
 #include <vector>
 
@@ -13,9 +14,13 @@ class QAction;
 class QCheckBox;
 class QLabel;
 class QLineEdit;
+class QMenu;
 class QPlainTextEdit;
 class QToolButton;
+class QVBoxLayout;
 class DiffTextEdit;
+class DisplayFilterBar;
+class LineFilterHelper;
 class LocationPane;
 class SyntaxHighlighter;
 
@@ -24,7 +29,9 @@ class SyntaxHighlighter;
  * panes driven by the engine's CDiffWrapper. Supports difference
  * navigation, copying diff blocks between sides (undoable; into the
  * middle pane in 3-way mode), free editing with recompare, and saving
- * with the original encoding/EOL preserved.
+ * with the original encoding/EOL preserved. A display filter, typed in
+ * the filter bar or added from a pane's context menu, hides the lines
+ * it does not find.
  */
 class FileCompareView : public QWidget
 {
@@ -191,6 +198,44 @@ public:
 	    self-compare. */
 	void setSideDescription(int side, const QString &description);
 
+	// --- WinMerge's display filter of the file window: the filter bar
+	// (CLineFilterBar) and the filter itself
+	// (CMergeDoc::m_displayFilterHelper), a text to find in the lines or a
+	// line expression behind "le:". The lines it does not find are hidden
+	// in every pane ---
+
+	/** What Ctrl+Shift+L does (CMergeDoc::OnViewDisplayFilterBar): show
+	    the bar, the filter in use in its field, and put the keyboard
+	    there. */
+	void showDisplayFilterBar();
+	/** What the View menu item does
+	    (CMergeEditFrame::OnViewDisplayFilterBar): show the bar, or close
+	    it. The filter stays in use either way. */
+	void toggleDisplayFilterBar();
+	bool displayFilterBarShown() const { return m_filterBar != nullptr; }
+	/** The bar's Apply (CMergeDoc::OnViewDisplayFilterBarApply): the
+	    field's filter is the one in use, and the files are compared again
+	    as upstream does, which hides the lines. */
+	void applyDisplayFilter();
+	/** The filter in use, empty when there is none. */
+	QString displayFilter() const;
+	DisplayFilterBar *displayFilterBarForTest() const { return m_filterBar; }
+	/** CMergeDoc::AddToDisplayFilters: the lines must also contain the
+	    text; the bar comes up with the filter, which is applied. */
+	void addToDisplayFilter(const QString &text);
+	/** CMergeEditView::OnAddToDisplayFilters for a pane: its selection
+	    when that is within one line, otherwise the word at the cursor. */
+	void addSelectionToDisplayFilter(int side);
+	/** A pane's context menu with this view's items in it (for tests
+	    too). */
+	void buildPaneMenu(int side, QMenu *menu);
+	/** Whether a view line is hidden, and the texts of the lines a pane
+	    shows, ghost lines left out (for tests). */
+	bool lineHiddenForTest(int viewLine) const;
+	QStringList shownLinesForTest(int side) const;
+	int currentDiffForTest() const { return m_current; }
+	DiffTextEdit *paneForTest(int side) const { return m_panes[side]; }
+
 signals:
 	/** A recompare asked for by the user is about to run: WinMerge's
 	    Rescan first checks the files for changes made elsewhere. */
@@ -204,11 +249,14 @@ signals:
 	void optionsRequested();
 
 private:
+	class LineProvider;
+
 	struct Block
 	{
 		int begin[3];
 		int end[3]; // inclusive, real lines; end < begin means "no lines on this side"
 		bool trivial;
+		int op = 0;            // the engine's OP_* of the difference
 		bool resolved = false; // merged in place since the last recompare
 		// view coordinates (shared by all panes once ghost-aligned)
 		int viewBegin = 0;
@@ -288,6 +336,16 @@ private:
 	void setSideModified(int side, bool modified);
 	void syncScroll(int pane, int value);
 	void syncHScroll(int pane, int value);
+	void hideLines();
+	void applyHiddenLines();
+	bool blockFiltered(int blockIndex) const;
+	bool hasInvisibleLines() const;
+	void updateLocationViewport();
+	bool findInPane(DiffTextEdit *pane, const QString &needle,
+		QTextDocument::FindFlags flags);
+	void ensureFilterBar();
+	void hideFilterBar();
+	void closeDisplayFilterBar();
 
 	int m_paneCount = 2;
 	bool m_readOnly[3] = {};
@@ -327,6 +385,14 @@ private:
 	};
 	QList<UndoRef> m_undoOrder;       // chronological edit order across panes
 	QList<UndoRef> m_redoOrder;
+	// the display filter, the view lines it hides (as of the last
+	// comparison; empty when it hides none) and, while some are hidden,
+	// how many lines show before each view line
+	std::unique_ptr<LineFilterHelper> m_displayFilter;
+	QList<bool> m_hiddenLines;
+	std::vector<int> m_shownBefore;
+	DisplayFilterBar *m_filterBar = nullptr; // exists while it is shown
+	QVBoxLayout *m_layout = nullptr;
 	int m_diffCount = 0;
 	int m_current = -1; // index into m_blocks; -1 = none
 	int m_activePane = 0;

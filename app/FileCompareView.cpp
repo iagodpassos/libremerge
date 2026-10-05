@@ -35,7 +35,10 @@
 #include <QVBoxLayout>
 
 #include "DiffTextEdit.h"
+#include "DisplayFilterBar.h"
 #include "EngineOptions.h"
+#include "FileFilterCombo.h"
+#include "FileFilters.h"
 #include "Icons.h"
 #include "LocationPane.h"
 #include "SyntaxHighlighter.h"
@@ -47,7 +50,10 @@
 // engine
 #include "DiffWrapper.h"
 #include "DiffList.h"
+#include "FilterEngine/FilterExpression.h"
+#include "FilterEngine/ILineDataProvider.h"
 #include "FilterList.h"
+#include "LineFilterHelper.h"
 #include "MovedLines.h"
 #include "OptionsDef.h"
 #include "OptionsMgr.h"
@@ -166,12 +172,134 @@ QString eolName(const QString &eol)
 
 } // namespace
 
+/**
+ * What a line filter expression asks about the lines (CMergeDoc as an
+ * ILineDataProvider): the view lines of every pane, ghost lines included,
+ * with the flags upstream's text buffers carry, taken once when the
+ * filter is about to look at them all.
+ */
+class FileCompareView::LineProvider : public ILineDataProvider
+{
+public:
+	explicit LineProvider(const FileCompareView *view)
+		: m_view(view)
+	{
+		const int sides = view->m_paneCount;
+		for (int side = 0; side < sides; ++side)
+		{
+			const QTextDocument *doc = view->m_panes[side]->document();
+			m_flags[side].assign(doc->blockCount(), 0);
+			m_realIndex[side].assign(doc->blockCount(), 0);
+			int line = 0;
+			int real = 0;
+			for (QTextBlock block = doc->begin(); block.isValid(); block = block.next(), ++line)
+			{
+				// (a ghost line counts as the real line that follows it,
+				// as CDiffTextBuffer::ComputeRealLine has it)
+				m_realIndex[side][line] = real;
+				if (isGhostBlock(block))
+					m_flags[side][line] |= LF_GHOST;
+				else
+					++real;
+			}
+			m_realCount[side] = real;
+		}
+		// the difference flags, as PrimeTextBuffers sets them
+		for (const Block &block : view->m_blocks)
+		{
+			if (block.resolved)
+				continue;
+			for (int side = 0; side < sides; ++side)
+			{
+				unsigned threeWay = 0;
+				if (block.op == OP_1STONLY)
+					threeWay = LF_DIFF_1STONLY;
+				else if (block.op == OP_2NDONLY)
+					threeWay = LF_DIFF_2NDONLY;
+				else if (block.op == OP_3RDONLY)
+					threeWay = LF_DIFF_3RDONLY;
+				for (int line = block.viewBegin; line <= block.viewEnd
+					&& line < static_cast<int>(m_flags[side].size()); ++line)
+				{
+					unsigned &flags = m_flags[side][line];
+					flags |= threeWay;
+					if (block.trivial)
+						flags |= LF_TRIVIAL;
+					else if (!(flags & LF_GHOST))
+						flags |= LF_DIFF;
+				}
+			}
+		}
+		for (int side = 0; side < sides; ++side)
+			for (const int real : view->m_movedLines[side])
+				if (real >= 0 && real < static_cast<int>(view->m_realToView[side].size()))
+				{
+					const int line = view->m_realToView[side][real];
+					if (line >= 0 && line < static_cast<int>(m_flags[side].size()))
+						m_flags[side][line] |= LF_MOVED;
+				}
+	}
+
+	int GetLineCount() const override
+	{
+		return static_cast<int>(m_flags[0].size());
+	}
+	std::string GetLine(int pane, int lineIndex) const override
+	{
+		if (!valid(pane, lineIndex))
+			return {};
+		return m_view->m_panes[pane]->document()->findBlockByNumber(lineIndex)
+			.text().toStdString();
+	}
+	// (no table editing in this view: a line is its one column)
+	int GetColumnCount(int, int) const override { return 1; }
+	std::string GetColumn(int pane, int lineIndex, int) const override
+	{
+		return GetLine(pane, lineIndex);
+	}
+	int GetRealLineNumber(int pane, int lineIndex) const override
+	{
+		return valid(pane, lineIndex) ? m_realIndex[pane][lineIndex] : 0;
+	}
+	unsigned GetLineFlags(int pane, int lineIndex) const override
+	{
+		return valid(pane, lineIndex) ? m_flags[pane][lineIndex] : 0;
+	}
+	unsigned GetLineEol(int pane, int lineIndex) const override
+	{
+		if (!valid(pane, lineIndex))
+			return EOL_NONE;
+		// the file's line ending, which every line of a pane shares here;
+		// the last line has none when the file ends without one
+		const Side &side = m_view->m_sides[pane];
+		if (!side.hadFinalEol && m_realIndex[pane][lineIndex] == m_realCount[pane] - 1)
+			return EOL_NONE;
+		if (side.eol == QStringLiteral("\r\n"))
+			return EOL_CRLF;
+		return side.eol == QStringLiteral("\r") ? EOL_CR : EOL_LF;
+	}
+
+private:
+	bool valid(int pane, int lineIndex) const
+	{
+		return pane >= 0 && pane < m_view->m_paneCount && lineIndex >= 0
+			&& lineIndex < static_cast<int>(m_flags[pane].size());
+	}
+
+	const FileCompareView *m_view;
+	std::vector<unsigned> m_flags[3];
+	std::vector<int> m_realIndex[3];
+	int m_realCount[3] = {};
+};
+
 FileCompareView::~FileCompareView() = default;
 
 FileCompareView::FileCompareView(QWidget *parent)
 	: QWidget(parent)
+	, m_displayFilter(std::make_unique<LineFilterHelper>())
 {
 	auto *layout = new QVBoxLayout(this);
+	m_layout = layout;
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(0);
 
@@ -297,6 +425,12 @@ FileCompareView::FileCompareView(QWidget *parent)
 	m_locationPane = new LocationPane(this);
 	panes->addWidget(m_locationPane);
 	connect(m_locationPane, &LocationPane::jumpRequested, this, [this](int line) {
+		// the pane counts the lines that show: back to a view line
+		if (!m_shownBefore.empty())
+		{
+			const auto it = std::upper_bound(m_shownBefore.begin(), m_shownBefore.end(), line);
+			line = qMax(0, static_cast<int>(it - m_shownBefore.begin()) - 1);
+		}
 		for (int side = 0; side < m_paneCount; ++side)
 		{
 			QTextCursor cursor(m_panes[side]->document()->findBlockByNumber(
@@ -368,6 +502,8 @@ FileCompareView::FileCompareView(QWidget *parent)
 			[this](int viewLine) { selectDiffAtViewLine(viewLine); });
 		m_panes[i]->setFileDropHook(
 			[this, i](const QString &path) { changeSideFile(i, path); });
+		m_panes[i]->setContextMenuHook(
+			[this, i](QMenu *menu) { buildPaneMenu(i, menu); });
 		m_panes[i]->setTabStopDistance(
 			4 * QFontMetricsF(mono).horizontalAdvance(QLatin1Char(' ')));
 		// debug spy: LM_DEBUG_EDITS=1 prints every real document edit
@@ -408,10 +544,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 			});
 	}
 	connect(m_panes[0]->verticalScrollBar(), &QScrollBar::valueChanged,
-		this, [this]() {
-			m_locationPane->setViewport(m_panes[0]->firstVisibleLine(),
-				m_panes[0]->visibleLineCount());
-		});
+		this, [this]() { updateLocationViewport(); });
 
 	// WinMerge's diff pane: the current difference's content, one row per
 	// file, in a resizable bottom panel
@@ -834,6 +967,7 @@ bool FileCompareView::runDiff(QString *error)
 			block.end[side] = dr.end[side];
 		}
 		block.trivial = (dr.op == OP_TRIVIAL);
+		block.op = dr.op;
 		if (!block.trivial)
 			++m_diffCount;
 		m_blocks.push_back(block);
@@ -841,6 +975,8 @@ bool FileCompareView::runDiff(QString *error)
 	m_diffStale = false;
 	rebuildAlignment();
 	computeWordSpans();
+	// upstream's Rescan hides the lines right after the buffers are primed
+	hideLines();
 	return true;
 }
 
@@ -1389,12 +1525,39 @@ void FileCompareView::applyHighlights()
 			}
 		}
 	}
-	m_locationPane->setBands(std::move(bands),
-		qMax(1, m_panes[0]->document()->blockCount()));
-	m_locationPane->setViewport(m_panes[0]->firstVisibleLine(),
-		m_panes[0]->visibleLineCount());
+	int totalLines = m_panes[0]->document()->blockCount();
+	if (!m_shownBefore.empty())
+	{
+		// hidden lines take no room in the location pane, which upstream
+		// draws by the lines its views show: a band keeps the lines of it
+		// that show, and goes when none does
+		const int lines = static_cast<int>(m_shownBefore.size()) - 1;
+		std::vector<LocationPane::Band> shown;
+		for (LocationPane::Band band : bands)
+		{
+			const int first = qBound(0, band.firstLine, lines);
+			const int last = qBound(0, band.lastLine + 1, lines);
+			if (m_shownBefore[last] <= m_shownBefore[first])
+				continue;
+			band.firstLine = m_shownBefore[first];
+			band.lastLine = m_shownBefore[last] - 1;
+			shown.push_back(band);
+		}
+		bands = std::move(shown);
+		totalLines = m_shownBefore[lines];
+	}
+	m_locationPane->setBands(std::move(bands), qMax(1, totalLines));
+	updateLocationViewport();
 
 	updateDiffPane();
+}
+
+void FileCompareView::updateLocationViewport()
+{
+	int first = m_panes[0]->firstVisibleLine();
+	if (!m_shownBefore.empty())
+		first = m_shownBefore[qBound(0, first, static_cast<int>(m_shownBefore.size()) - 1)];
+	m_locationPane->setViewport(first, m_panes[0]->visibleLineCount());
 }
 
 /** Fill the bottom diff pane with the current difference's content, one
@@ -1763,10 +1926,13 @@ void FileCompareView::changeSideFile(int side, const QString &path)
 	emit pathsChanged();
 }
 
+/** The next difference to stop at: not an ignored one, not one merged
+    since the comparison, and not one the display filter hides whole
+    (upstream's Find...NonFilteredDiff). */
 int FileCompareView::nextActive(int from, int direction) const
 {
 	for (int b = from + direction; b >= 0 && b < static_cast<int>(m_blocks.size()); b += direction)
-		if (!m_blocks[b].trivial && !m_blocks[b].resolved)
+		if (!m_blocks[b].trivial && !m_blocks[b].resolved && !blockFiltered(b))
 			return b;
 	return -1;
 }
@@ -1809,7 +1975,7 @@ void FileCompareView::gotoNextDiff()
 		for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
 		{
 			if (!m_blocks[b].trivial && !m_blocks[b].resolved
-				&& m_blocks[b].viewBegin >= line)
+				&& m_blocks[b].viewBegin >= line && !blockFiltered(b))
 			{
 				next = b;
 				break;
@@ -1833,7 +1999,7 @@ void FileCompareView::gotoPrevDiff()
 		for (int b = static_cast<int>(m_blocks.size()) - 1; b >= 0; --b)
 		{
 			if (!m_blocks[b].trivial && !m_blocks[b].resolved
-				&& m_blocks[b].viewEnd <= line)
+				&& m_blocks[b].viewEnd <= line && !blockFiltered(b))
 			{
 				prev = b;
 				break;
@@ -2089,6 +2255,8 @@ void FileCompareView::copyCurrentDiff(int sourceSide, int targetSide, bool advan
 	applyBlockCopy(m_current, sourceSide, target, false);
 	refreshSideMaps(target);
 	setSideModified(target, true);
+	// the lines the copy wrote anew are hidden where they were
+	applyHiddenLines();
 
 	if (advance)
 	{
@@ -2129,6 +2297,15 @@ void FileCompareView::copyAllFrom(int sourceSide, int targetSide)
 		m_status->setText(tr("The merge target is read-only."));
 		return;
 	}
+	// CMergeDoc::CopyMultipleList: not with hidden lines among the
+	// differences to copy
+	if (hasInvisibleLines())
+	{
+		lm::showError(this, tr("Merging/copying differences that contain hidden lines is "
+			"not currently supported.\n\nPlease clear the display filter or adjust the "
+			"filter settings to show all lines before merging."));
+		return;
+	}
 
 	bool first = true;
 	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
@@ -2143,6 +2320,7 @@ void FileCompareView::copyAllFrom(int sourceSide, int targetSide)
 		return; // nothing to copy
 	refreshSideMaps(target);
 	setSideModified(target, true);
+	applyHiddenLines();
 	m_current = -1;
 	applyHighlights();
 	updateStatus();
@@ -2482,7 +2660,7 @@ void FileCompareView::findNext(bool backward)
 		flags |= QTextDocument::FindCaseSensitively;
 
 	DiffTextEdit *pane = m_panes[m_activePane];
-	if (pane->find(needle, flags))
+	if (findInPane(pane, needle, flags))
 	{
 		m_findStatus->clear();
 		return;
@@ -2491,8 +2669,29 @@ void FileCompareView::findNext(bool backward)
 	QTextCursor cursor = pane->textCursor();
 	cursor.movePosition(backward ? QTextCursor::End : QTextCursor::Start);
 	pane->setTextCursor(cursor);
-	m_findStatus->setText(pane->find(needle, flags)
+	m_findStatus->setText(findInPane(pane, needle, flags)
 		? tr("Search wrapped") : tr("Not found"));
+}
+
+/** Find from the pane's cursor on, past what a hidden line holds
+    (CCrystalTextView::FindText skips the invisible lines). */
+bool FileCompareView::findInPane(DiffTextEdit *pane, const QString &needle,
+	QTextDocument::FindFlags flags)
+{
+	QTextDocument *doc = pane->document();
+	QTextCursor from = pane->textCursor();
+	for (;;)
+	{
+		const QTextCursor match = doc->find(needle, from, flags);
+		if (match.isNull())
+			return false;
+		if (doc->findBlock(match.selectionStart()).isVisible())
+		{
+			pane->setTextCursor(match);
+			return true;
+		}
+		from = match;
+	}
 }
 
 void FileCompareView::replaceOne()
@@ -2536,8 +2735,12 @@ void FileCompareView::replaceAll()
 	QTextCursor match = pane->document()->find(needle, 0, flags);
 	while (!match.isNull())
 	{
-		match.insertText(m_replaceEdit->text());
-		++count;
+		// (what a hidden line holds is not found, so not replaced)
+		if (pane->document()->findBlock(match.selectionStart()).isVisible())
+		{
+			match.insertText(m_replaceEdit->text());
+			++count;
+		}
 		// continue after the replacement (safe even when it contains
 		// the search text)
 		match = pane->document()->find(needle, match.position(), flags);
@@ -2708,6 +2911,224 @@ FileCompareView::SaveResult FileCompareView::saveSide(int side, QString *error)
 	m_syncing = false;
 	setSideModified(side, false);
 	return SaveResult::Saved;
+}
+
+// --- WinMerge's display filter of the file window ---
+
+/** CMergeDoc::HideLines, its display filter part (the diff context, the
+    other thing upstream hides lines by, is not here): a line the filter's
+    expression does not hold for is hidden in every pane. Nothing is
+    hidden without a filter, or by one that does not parse. */
+void FileCompareView::hideLines()
+{
+	QList<bool> hidden;
+	if (lm::lineFilterHides(m_displayFilter.get()))
+	{
+		QList<lm::ComparedFile> files;
+		for (int side = 0; side < m_paneCount; ++side)
+			files.append({ m_sides[side].path, m_sides[side].unicoding, m_sides[side].codepage,
+				m_sides[side].bom });
+		hidden = lm::linesHiddenByFilter(m_displayFilter.get(), LineProvider(this), files,
+			m_diffCount, ignoredDiffCount());
+	}
+	m_hiddenLines = hidden;
+	applyHiddenLines();
+}
+
+/** Hand the hidden lines to the panes, again after something wrote lines
+    anew (a merge): a new line shows until told otherwise. */
+void FileCompareView::applyHiddenLines()
+{
+	const bool any = m_hiddenLines.contains(true);
+	m_shownBefore.clear();
+	if (any)
+	{
+		m_shownBefore.resize(m_hiddenLines.size() + 1);
+		int shown = 0;
+		for (int line = 0; line < m_hiddenLines.size(); ++line)
+		{
+			m_shownBefore[line] = shown;
+			shown += m_hiddenLines.at(line) ? 0 : 1;
+		}
+		m_shownBefore[m_hiddenLines.size()] = shown;
+	}
+	m_syncing = true;
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		// only while the pane has the lines the filter looked at
+		if (any && m_panes[side]->document()->blockCount() != m_hiddenLines.size())
+			continue;
+		m_panes[side]->setHiddenLines(any ? m_hiddenLines : QList<bool>());
+	}
+	// the panes scroll by the lines that show: level them again
+	const int active = qBound(0, m_activePane, m_paneCount - 1);
+	const int value = m_panes[active]->verticalScrollBar()->value();
+	for (int side = 0; side < m_paneCount; ++side)
+		if (side != active)
+			m_panes[side]->verticalScrollBar()->setValue(value);
+	m_syncing = false;
+}
+
+/** CMergeEditView::IsDiffFiltered: every line of the difference is
+    hidden. */
+bool FileCompareView::blockFiltered(int blockIndex) const
+{
+	if (m_shownBefore.empty())
+		return false;
+	const Block &block = m_blocks[blockIndex];
+	const int lines = static_cast<int>(m_shownBefore.size()) - 1;
+	const int first = qBound(0, block.viewBegin, lines);
+	const int last = qBound(0, block.viewEnd + 1, lines);
+	return m_shownBefore[last] == m_shownBefore[first];
+}
+
+/** CMergeDoc::HasInvisibleLines over every difference there is to copy:
+    one of them has a hidden line. */
+bool FileCompareView::hasInvisibleLines() const
+{
+	if (m_shownBefore.empty())
+		return false;
+	const int lines = static_cast<int>(m_shownBefore.size()) - 1;
+	for (const Block &block : m_blocks)
+	{
+		if (block.trivial || block.resolved)
+			continue;
+		const int first = qBound(0, block.viewBegin, lines);
+		const int last = qBound(0, block.viewEnd + 1, lines);
+		if (m_shownBefore[last] - m_shownBefore[first] < last - first)
+			return true;
+	}
+	return false;
+}
+
+QString FileCompareView::displayFilter() const
+{
+	return QString::fromStdString(m_displayFilter->GetStringOrExpression());
+}
+
+void FileCompareView::ensureFilterBar()
+{
+	if (m_filterBar != nullptr)
+		return;
+	m_filterBar = new DisplayFilterBar(DisplayFilterBar::Lines, this);
+	// under the toolbar, above the panes
+	m_layout->insertWidget(1, m_filterBar);
+	connect(m_filterBar, &DisplayFilterBar::applyRequested, this,
+		&FileCompareView::applyDisplayFilter);
+	connect(m_filterBar, &DisplayFilterBar::closeRequested, this,
+		&FileCompareView::closeDisplayFilterBar);
+}
+
+/** CMergeEditFrame::HideFilterBar: the bar goes away; the filter it
+    applied stays in use. */
+void FileCompareView::hideFilterBar()
+{
+	if (m_filterBar == nullptr)
+		return;
+	m_filterBar->hide();
+	m_filterBar->deleteLater(); // it may be the one asking
+	m_filterBar = nullptr;
+}
+
+/** CMergeEditFrame::OnDisplayFilterBarClose. */
+void FileCompareView::closeDisplayFilterBar()
+{
+	hideFilterBar();
+	m_panes[qBound(0, m_activePane, m_paneCount - 1)]->setFocus();
+}
+
+void FileCompareView::showDisplayFilterBar()
+{
+	ensureFilterBar();
+	if (!displayFilter().isEmpty())
+		m_filterBar->setFilterText(displayFilter());
+	m_filterBar->focusField();
+}
+
+void FileCompareView::toggleDisplayFilterBar()
+{
+	if (m_filterBar == nullptr)
+		ensureFilterBar();
+	else
+		hideFilterBar();
+}
+
+void FileCompareView::applyDisplayFilter()
+{
+	if (m_filterBar == nullptr)
+		return;
+	QGuiApplication::setOverrideCursor(Qt::WaitCursor);
+	// the text as it is typed: saving it reads the list again, which puts
+	// its latest entry in the field
+	const QString text = m_filterBar->filterText();
+	m_filterBar->saveFilterText();
+	m_displayFilter->SetStringOrExpression(text.toStdString());
+	if (!text.isEmpty()
+		&& m_displayFilter->GetFilterExpression().errorCode == FILTER_ERROR_NO_ERROR)
+		m_filterBar->setFilterApplied(true);
+	// FlushAndRescan(true): the comparison runs again, and hides the lines
+	recompare();
+	m_panes[qBound(0, m_activePane, m_paneCount - 1)]->setFocus();
+	QGuiApplication::restoreOverrideCursor();
+}
+
+void FileCompareView::addToDisplayFilter(const QString &text)
+{
+	m_displayFilter->AddToExpression(
+		_T("Line contains ") + LineFilterHelper::Quote(text.toStdString()), _T("AND"));
+	ensureFilterBar();
+	m_filterBar->setFilterText(displayFilter());
+	applyDisplayFilter();
+}
+
+void FileCompareView::addSelectionToDisplayFilter(int side)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	const QTextCursor cursor = m_panes[side]->textCursor();
+	const QTextDocument *doc = m_panes[side]->document();
+	QString text;
+	if (cursor.hasSelection()
+		&& doc->findBlock(cursor.selectionStart()) == doc->findBlock(cursor.selectionEnd()))
+		text = cursor.selectedText();
+	if (text.isEmpty())
+	{
+		QTextCursor word = cursor;
+		word.setPosition(cursor.position());
+		word.select(QTextCursor::WordUnderCursor);
+		text = word.selectedText();
+	}
+	if (!text.isEmpty())
+		addToDisplayFilter(text);
+}
+
+/** WinMerge's pane menu has "Add to Filters" above Undo, with the line
+    and the substitution filters in it too; those two are not here. */
+void FileCompareView::buildPaneMenu(int side, QMenu *menu)
+{
+	QAction *first = menu->actions().value(0);
+	auto *filters = new QMenu(tr("Add to &Filters"), menu);
+	QAction *display = filters->addAction(tr("Add to &Display Filter"));
+	display->setObjectName(QStringLiteral("addToDisplayFilter"));
+	connect(display, &QAction::triggered, this,
+		[this, side]() { addSelectionToDisplayFilter(side); });
+	menu->insertMenu(first, filters);
+	menu->insertSeparator(first);
+}
+
+bool FileCompareView::lineHiddenForTest(int viewLine) const
+{
+	return m_panes[0]->isLineHidden(viewLine);
+}
+
+QStringList FileCompareView::shownLinesForTest(int side) const
+{
+	QStringList lines;
+	for (QTextBlock block = m_panes[side]->document()->begin(); block.isValid();
+		block = block.next())
+		if (block.isVisible() && !isGhostBlock(block))
+			lines.append(block.text());
+	return lines;
 }
 
 void FileCompareView::syncScroll(int pane, int value)

@@ -77,6 +77,7 @@ set(L2_SOURCES
   Src/FilterList.cpp
   Src/FilterErrorMessages.cpp
   Src/LineFiltersList.cpp
+  Src/LineFilterHelper.cpp
   Src/SubstitutionList.cpp
   Src/SubstitutionFiltersList.cpp
   Src/CompareEngines/ByteCompare.cpp

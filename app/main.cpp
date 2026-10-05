@@ -11,6 +11,7 @@
 #include <QCheckBox>
 #include <QDateTimeEdit>
 #include <QDialogButtonBox>
+#include <QHeaderView>
 #include <QRadioButton>
 #include <QKeyEvent>
 #include <QMenu>
@@ -68,6 +69,9 @@
 #include "FileFilters.h"
 #include "FilterConditionDialog.h"
 #include "FiltersDialog.h"
+#include "LineFilterMenu.h"
+#include "MatchInsideDialog.h"
+#include "ReplaceLists.h"
 #include "ItemCheckStyle.h"
 #include "OptionsDialog.h"
 #include "Theme.h"
@@ -81,6 +85,7 @@
 
 // engine (folder-compare image hook)
 #include "DiffItem.h"
+#include "LineFilterHelper.h"
 #include "IAbortable.h"
 #include "image_compare_hook.h"
 #include "ImgMergeBuffer.hpp"
@@ -192,6 +197,13 @@ int main(int argc, char *argv[])
 		{
 			QApplication::setOrganizationName(QStringLiteral("LibreMerge-Selftest"));
 			QSettings().clear();
+#ifdef Q_OS_MACOS
+			// a selftest ends when its checks are done, not when something
+			// asks the application to quit: AppKit ends the process there
+			// and then, the checks unfinished and the exit code telling of
+			// no failure
+			lm::ignoreQuitRequestsForTest();
+#endif
 			// informational boxes (identical files...) would wait forever
 			// for a click in a headless run
 			lm::setMessageSinkForTest([](const QString &) {});
@@ -385,6 +397,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestDisplayFilterOpt(QStringLiteral("selftest-display-filter"),
 		QStringLiteral("Verify the folder window's display filter: its bar, what it hides in the tree and in the flat list, the columns' header menu and the Filter by Comparison Result dialog (for testing)"));
 	parser.addOption(selftestDisplayFilterOpt);
+	QCommandLineOption selftestLineFilterOpt(QStringLiteral("selftest-line-filter"),
+		QStringLiteral("Verify the file window's display filter: its bar, the lines it hides, the editor around hidden lines, the navigation, the \"=\" menu and the pane menu's item (for testing)"));
+	parser.addOption(selftestLineFilterOpt);
 	QCommandLineOption selftestThemeOpt(QStringLiteral("selftest-theme"),
 		QStringLiteral("Switch the theme from the Options dialog and verify the whole application follows (for testing)"));
 	parser.addOption(selftestThemeOpt);
@@ -4144,7 +4159,8 @@ int main(int argc, char *argv[])
 			bar = view.displayFilterBarForTest();
 			field = bar->field();
 			field->setEditText(QStringLiteral("*.txt"));
-			bar->menuForTest()->pickForTest(Menu::SizeFirst);
+			if (auto *barMenu = qobject_cast<FileFilterMenu *>(bar->menuForTest()))
+				barMenu->pickForTest(Menu::SizeFirst);
 			const QString made = field->mask();
 			const bool notYet = view.displayFilter() == QStringLiteral("*.md") && !field->isApplied();
 			bar->findChild<QPushButton *>(QStringLiteral("displayFilterApply"))->click();
@@ -4697,18 +4713,1540 @@ int main(int argc, char *argv[])
 			window.displayFilterBarCommand(Qt::NoModifier);
 			settle();
 			const bool menuCloses = !folder->displayFilterBarShown();
+			// (a file comparison has a bar of its own, not shown yet: the item
+			// goes by the tab in front)
+			window.displayFilterBarCommand(chord);
 			window.openBlankComparison();
 			settle();
 			check(action->text() == MainWindow::tr("Displa&y Filter Bar")
 				&& action->shortcut() == QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_L)
 				&& action->isCheckable() && idle && usable && shownAndTicked && closed
-				&& !action->isEnabled(),
+				&& action->isEnabled() && !action->isChecked()
+				&& folder->displayFilterBarShown(),
 				"View menu: Display Filter Bar, for the folder comparison in front");
 			check(keysOnlyShow && menuCloses,
 				"View menu: the shortcut only shows the bar, the item shows and closes it");
 		}
 
 		printf("display filter: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestLineFilterOpt))
+	{
+		// WinMerge's display filter of the file window: the filter bar,
+		// the lines its filter hides, what the editor does around hidden
+		// lines, the differences it leaves out of the navigation, the "="
+		// menu and the pane menu's "Add to Display Filter"
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 3; ++i)
+				QCoreApplication::processEvents();
+			QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+		};
+		const auto say = [](const char *what, const QStringList &lines) {
+			printf("  %s: %s\n", what, qPrintable(lines.join(QStringLiteral(" | "))));
+		};
+		const auto list = [](std::initializer_list<const char *> texts) {
+			QStringList lines;
+			for (const char *text : texts)
+				lines.append(QLatin1String(text));
+			return lines;
+		};
+		const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+		const QString language = qEnvironmentVariable("LIBREMERGE_LANGUAGE", QStringLiteral("en"));
+		const auto shoot = [&shots, &language](QWidget *widget, const char *name)
+		{
+			if (!shots.isEmpty())
+				widget->grab().save(QStringLiteral("%1/lf-%2-%3.png").arg(shots, language,
+					QLatin1String(name)));
+		};
+		const QString historyKey = lm::lineDisplayFilterHistoryKey();
+		// upstream's words for a copy it refuses
+		const char *const refusal = "Merging/copying differences that contain hidden lines is "
+			"not currently supported.\n\nPlease clear the display filter or adjust the "
+			"filter settings to show all lines before merging.";
+		QStringList messages;
+		lm::setMessageSinkForTest([&messages](const QString &text) { messages.append(text); });
+		lm::setReplaceListBaseForTest(dir.filePath(QStringLiteral("lists")));
+		QStringList opened;
+		lm::setReplaceListOpenerForTest([&opened](const QString &path) { opened.append(path); });
+		// type a filter in the bar and press Apply
+		const auto apply = [&settle](FileCompareView &view, const QString &text)
+		{
+			view.showDisplayFilterBar();
+			DisplayFilterBar *bar = view.displayFilterBarForTest();
+			bar->field()->setEditText(text);
+			emit bar->field()->lineEdit()->textEdited(text); // as typed
+			bar->findChild<QPushButton *>(QStringLiteral("displayFilterApply"))->click();
+			settle();
+		};
+		const auto key = [](QWidget *target, int code, Qt::KeyboardModifiers modifiers = Qt::NoModifier,
+			const QString &text = QString())
+		{
+			QKeyEvent press(QEvent::KeyPress, code, modifiers, text);
+			QCoreApplication::sendEvent(target, &press);
+		};
+		// select from the start of a view line to a column of another
+		const auto select = [](DiffTextEdit *pane, int fromLine, int toLine, int toColumn)
+		{
+			QTextCursor cursor(pane->document()->findBlockByNumber(fromLine));
+			const QTextBlock last = pane->document()->findBlockByNumber(toLine);
+			cursor.setPosition(last.position() + (toColumn < 0 ? last.length() - 1 : toColumn),
+				QTextCursor::KeepAnchor);
+			pane->setTextCursor(cursor);
+		};
+
+		// --- two files: a changed line, a line of the left alone and two
+		// of the right alone, with lines alike between them ---
+		//   0 alpha       alpha
+		//   1 ERROR one   ERROR one
+		//   2 beta        beta changed
+		//   3 gamma       gamma
+		//   4 ERROR two   -
+		//   5 delta       delta
+		//   6 epsilon     epsilon
+		//   7 -           extra error
+		//   8 -           zeta
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		const QByteArray leftText = "alpha\nERROR one\nbeta\ngamma\nERROR two\ndelta\nepsilon\n";
+		const QByteArray rightText =
+			"alpha\nERROR one\nbeta changed\ngamma\ndelta\nepsilon\nextra error\nzeta\n";
+		const auto fresh = [&]() {
+			write(left, leftText);
+			write(right, rightText);
+		};
+		const auto open = [&](FileCompareView &view) {
+			QString error;
+			if (!view.compare(left, right, &error))
+			{
+				printf("compare failed: %s\n", qPrintable(error));
+				std::exit(2);
+			}
+			settle();
+		};
+		fresh();
+
+		{
+			FileCompareView view;
+			view.resize(900, 520);
+			open(view);
+			const QStringList allLeft = view.shownLinesForTest(0);
+			const QStringList allRight = view.shownLinesForTest(1);
+			check(view.diffCount() == 3 && !view.displayFilterBarShown()
+				&& view.displayFilter().isEmpty() && allLeft.size() == 7 && allRight.size() == 8,
+				"start: three differences, every line shown, no bar and no filter");
+
+			// --- the bar ---
+			view.toggleDisplayFilterBar();
+			DisplayFilterBar *bar = view.displayFilterBarForTest();
+			if (bar == nullptr)
+				return 1;
+			check(bar->field()->mask().isEmpty()
+				&& bar->field()->lineEdit()->placeholderText() == DisplayFilterBar::tr("e.g. %1")
+					.arg(QStringLiteral("ERROR / le:Line contains \"ERROR\""))
+				&& bar->findChild<QPushButton *>(QStringLiteral("displayFilterApply")) != nullptr
+				&& qobject_cast<LineFilterMenu *>(bar->menuForTest()) != nullptr,
+				"bar: the same strip as the folder window's, for a line filter");
+			view.toggleDisplayFilterBar();
+			settle();
+			check(!view.displayFilterBarShown(), "bar: the View menu item shows it and closes it");
+
+			// --- Apply: a text to find hides the lines without it ---
+			apply(view, QStringLiteral("ERROR"));
+			bar = view.displayFilterBarForTest();
+			say("left shows", view.shownLinesForTest(0));
+			say("right shows", view.shownLinesForTest(1));
+			check(view.displayFilter() == QStringLiteral("ERROR")
+				&& view.shownLinesForTest(0) == list({ "ERROR one", "ERROR two" })
+				&& view.shownLinesForTest(1) == list({ "ERROR one", "extra error" })
+				&& view.lineHiddenForTest(0) && !view.lineHiddenForTest(4)
+				&& bar->field()->isApplied() && view.diffCount() == 3
+				&& lm::fileFilterHistory(historyKey) == list({ "ERROR" })
+				&& lm::fileFilterHistory(lm::displayFilterHistoryKey()).isEmpty(),
+				"Apply: a text to find hides the lines without it, whatever its case");
+			shoot(&view, "bar");
+
+			// --- the differences a filter hides whole are passed over ---
+			view.gotoFirstDiff();
+			const int first = view.currentDiffForTest();
+			view.gotoNextDiff();
+			const int second = view.currentDiffForTest();
+			view.gotoNextDiff();
+			const int still = view.currentDiffForTest();
+			view.gotoPrevDiff();
+			const int back = view.currentDiffForTest();
+			view.gotoPrevDiff();
+			const int stays = view.currentDiffForTest();
+			view.gotoLastDiff();
+			printf("  differences stopped at: %d %d %d %d %d %d\n", first, second, still, back, stays,
+				view.currentDiffForTest());
+			check(first == 1 && second == 2 && still == 2 && back == 1 && stays == 1
+				&& view.currentDiffForTest() == 2,
+				"navigation: a difference with every line hidden is passed over");
+
+			// --- Copy All: not with hidden lines among the differences ---
+			messages.clear();
+			const QStringList rightBefore = view.realLinesForTest(1);
+			view.copyAllFrom(0, 1);
+			check(messages == QStringList{ QCoreApplication::translate("FileCompareView", refusal) }
+				&& view.realLinesForTest(1) == rightBefore && !view.isModified(),
+				"Copy All: refused while a difference has hidden lines");
+
+			// --- expressions ---
+			apply(view, QStringLiteral("le:Different"));
+			const QStringList differentLeft = view.shownLinesForTest(0);
+			const QStringList differentRight = view.shownLinesForTest(1);
+			apply(view, QStringLiteral("le:LeftMissing"));
+			const QStringList missingRight = view.shownLinesForTest(1);
+			const bool missingLeftEmpty = view.shownLinesForTest(0).isEmpty();
+			apply(view, QStringLiteral("le:LineLength > 9"));
+			const QStringList longRight = view.shownLinesForTest(1);
+			apply(view, QStringLiteral("le:LeftLineNumber <= 2 or RightEOLStr = \"CRLF\""));
+			const QStringList topLeft = view.shownLinesForTest(0);
+			say("different, left", differentLeft);
+			say("different, right", differentRight);
+			say("longer than 9, right", longRight);
+			check(differentLeft == list({ "beta", "ERROR two" })
+				&& differentRight == list({ "beta changed", "extra error", "zeta" })
+				&& missingLeftEmpty && missingRight == list({ "extra error", "zeta" })
+				&& longRight == list({ "beta changed", "extra error" })
+				&& topLeft == list({ "alpha", "ERROR one" }),
+				"Apply: a line expression, on a line's status, side, length, number and ending");
+
+			// --- a rule under each shown line that hidden lines follow, from
+			// the margin on (CCrystalTextView's DrawBoundaryLine) ---
+			{
+				apply(view, QStringLiteral("le:Different")); // shows 2, 4, 7 and 8
+				DiffTextEdit *pane = view.paneForTest(1);
+				const auto ruled = [pane](int line, bool margin)
+				{
+					const QImage image = pane->grab().toImage();
+					const int bottom = pane->lineBottomForTest(line);
+					if (bottom < 0)
+						return false;
+					// (past the text, and clear of the scroll bar a Mac lays
+					// over the edge)
+					const QPoint inText = pane->viewport()->mapTo(pane,
+						QPoint(pane->viewport()->width() / 2, bottom - 1));
+					const QPoint at = margin ? QPoint(pane->contentsRect().left() + 1, inText.y())
+						: inText;
+					const qreal ratio = image.devicePixelRatio();
+					return image.pixelColor(qRound(at.x() * ratio), qRound(at.y() * ratio))
+						== pane->palette().color(QPalette::Text);
+				};
+				const bool under = ruled(2, false) && ruled(4, false) && ruled(2, true)
+					&& ruled(4, true);
+				const bool notUnder = !ruled(7, false) && !ruled(8, false) && !ruled(7, true);
+				shoot(&view, "rules");
+				apply(view, QString());
+				check(under && notUnder && !ruled(2, false) && !ruled(2, true),
+					"rules: one under each shown line that hidden lines follow");
+			}
+
+			// --- one that does not parse hides nothing, and is marked ---
+			apply(view, QStringLiteral("le:Line contains"));
+			bar = view.displayFilterBarForTest();
+			printf("  its error: %s\n", qPrintable(bar->field()->errors().join(QStringLiteral(" / "))));
+			check(view.shownLinesForTest(0) == allLeft && view.shownLinesForTest(1) == allRight
+				&& !bar->field()->errors().isEmpty() && !bar->field()->isApplied()
+				&& view.displayFilter() == QStringLiteral("le:Line contains"),
+				"Apply: an expression that does not parse is marked, and hides nothing");
+
+			// --- an empty field takes the filter away; the history stays ---
+			apply(view, QStringLiteral("ERROR"));
+			apply(view, QString());
+			check(view.displayFilter().isEmpty() && view.shownLinesForTest(0) == allLeft
+				&& view.shownLinesForTest(1) == allRight && !view.lineHiddenForTest(0)
+				&& lm::fileFilterHistory(historyKey).value(0) == QStringLiteral("ERROR")
+				&& lm::fileFilterHistory(historyKey).size() == 6,
+				"Apply: an empty field shows every line again");
+
+			// --- Enter applies, Esc closes; the filter stays in use, and
+			// through a recompare ---
+			bar = view.displayFilterBarForTest();
+			bar->field()->setEditText(QStringLiteral("zeta"));
+			key(bar->field()->lineEdit(), Qt::Key_Return);
+			settle();
+			const QStringList zeta = view.shownLinesForTest(1);
+			key(view.displayFilterBarForTest()->field()->lineEdit(), Qt::Key_Escape);
+			settle();
+			const bool closed = !view.displayFilterBarShown();
+			view.recompare();
+			settle();
+			view.showDisplayFilterBar();
+			check(zeta == list({ "zeta" }) && closed && view.displayFilter() == QStringLiteral("zeta")
+				&& view.shownLinesForTest(1) == zeta && view.shownLinesForTest(0).isEmpty()
+				&& view.displayFilterBarForTest()->field()->mask() == QStringLiteral("zeta"),
+				"keys: Enter applies, Esc closes; the filter stays, through a recompare too");
+
+			// --- an edit shows in the filter's lines once compared again ---
+			view.typeAtForTest(0, 3, QStringLiteral("zeta "));
+			view.recompare();
+			settle();
+			say("after typing zeta into gamma, left", view.shownLinesForTest(0));
+			check(view.shownLinesForTest(0) == list({ "zeta gamma" }),
+				"edits: the lines are looked at again when the files are compared again");
+		}
+
+		// --- the editor around hidden lines ---
+		{
+			fresh();
+			FileCompareView view;
+			open(view);
+			apply(view, QStringLiteral("ERROR"));
+			DiffTextEdit *pane = view.paneForTest(0);
+
+			// copy leaves the hidden lines out, as it does the ghost lines
+			view.selectAllAndCopyForTest(0);
+			const QString copied = QGuiApplication::clipboard()->text();
+			check(copied == QStringLiteral("ERROR one\nERROR two"),
+				"copy: only the lines that show");
+
+			// the cursor never rests in a hidden line
+			view.setCursorViewLineForTest(0, 1);
+			view.setCursorViewLineForTest(0, 2);
+			const int forward = view.cursorViewLineForTest(0);
+			view.setCursorViewLineForTest(0, 3);
+			const int backward = view.cursorViewLineForTest(0);
+			view.setCursorViewLineForTest(0, 1);
+			key(pane, Qt::Key_Down);
+			const int down = view.cursorViewLineForTest(0);
+			key(pane, Qt::Key_Up);
+			pane->moveCursor(QTextCursor::EndOfLine); // (the End key is the text's end on a Mac)
+			key(pane, Qt::Key_Right);
+			const int rightward = view.cursorViewLineForTest(0);
+			const int column = pane->textCursor().positionInBlock();
+			key(pane, Qt::Key_Left);
+			const int leftward = view.cursorViewLineForTest(0);
+			printf("  cursor lines: %d %d %d %d(%d) %d\n", forward, backward, down, rightward, column,
+				leftward);
+			check(forward == 4 && backward == 1 && down == 4 && rightward == 4 && column == 0
+				&& leftward == 1,
+				"cursor: it goes from a shown line to the next, never into a hidden one");
+
+			// Backspace at the start of a line that follows hidden lines
+			// joins nothing
+			const QStringList before = view.realLinesForTest(0);
+			view.setCursorViewLineForTest(0, 4);
+			key(pane, Qt::Key_Backspace, Qt::NoModifier, QStringLiteral("\b"));
+			check(view.realLinesForTest(0) == before && !view.isModified(),
+				"Backspace: a hidden line above is not joined");
+
+			// Delete over a selection that spans hidden lines takes the
+			// stretches that show
+			select(pane, 1, 4, -1);
+			key(pane, Qt::Key_Delete, Qt::NoModifier, QStringLiteral("\x7f"));
+			say("after Delete, left", view.realLinesForTest(0));
+			check(view.realLinesForTest(0) == list({ "alpha", "beta", "gamma", "", "delta",
+					"epsilon" }),
+				"Delete: the hidden lines of the selection stay");
+			view.undoActive();
+			check(view.realLinesForTest(0) == before, "Delete: one undo brings it all back");
+		}
+		{
+			// a first line with hidden lines after it: it goes whole, they
+			// stay the hidden lines they are, through an undo as well
+			fresh();
+			FileCompareView view;
+			open(view);
+			apply(view, QStringLiteral("alpha"));
+			DiffTextEdit *pane = view.paneForTest(0);
+			pane->selectAll();
+			key(pane, Qt::Key_Delete, Qt::NoModifier, QStringLiteral("\x7f"));
+			const QStringList left = view.realLinesForTest(0);
+			const QStringList shownAfter = view.shownLinesForTest(0);
+			const bool noneShows = shownAfter.isEmpty();
+			view.undoActive();
+			say("after the Delete, left has", left);
+			say("after the Delete, left shows", shownAfter);
+			say("after the undo, left shows", view.shownLinesForTest(0));
+			check(left == list({ "ERROR one", "beta", "gamma", "ERROR two", "delta", "epsilon" })
+				&& noneShows && view.realLinesForTest(0).size() == 7
+				&& view.shownLinesForTest(0) == list({ "alpha" }),
+				"Delete at the top: the hidden lines stay hidden, after an undo too");
+		}
+		{
+			// typing over one, and cutting one
+			fresh();
+			FileCompareView view;
+			open(view);
+			apply(view, QStringLiteral("ERROR"));
+			DiffTextEdit *pane = view.paneForTest(0);
+			select(pane, 1, 4, 5);
+			key(pane, Qt::Key_X, Qt::NoModifier, QStringLiteral("X"));
+			say("after typing over, left", view.realLinesForTest(0));
+			const QStringList typed = view.realLinesForTest(0);
+			view.undoActive();
+			const QStringList undone = view.realLinesForTest(0);
+			select(pane, 1, 4, 5);
+			key(pane, Qt::Key_X, Qt::ControlModifier, QStringLiteral("x"));
+			const QString cut = QGuiApplication::clipboard()->text();
+			say("after cutting, left", view.realLinesForTest(0));
+			check(typed == list({ "alpha", "beta", "gamma", "X two", "delta", "epsilon" })
+				&& undone.size() == 7 && undone.value(1) == QStringLiteral("ERROR one")
+				&& cut == QStringLiteral("ERROR one\nERROR")
+				&& view.realLinesForTest(0) == list({ "alpha", "beta", "gamma", " two", "delta",
+					"epsilon" }),
+				"typing and Cut: over the lines that show, in one undo step");
+		}
+		{
+			// pasting over one, Replace All, and the menu of a right click
+			fresh();
+			FileCompareView view;
+			view.resize(900, 520);
+			open(view);
+			apply(view, QStringLiteral("ERROR"));
+			DiffTextEdit *pane = view.paneForTest(0);
+			const QStringList before = view.realLinesForTest(0);
+			QGuiApplication::clipboard()->setText(QStringLiteral("PASTED"));
+			select(pane, 1, 4, 5);
+			pane->paste();
+			const QStringList pasted = view.realLinesForTest(0);
+			view.undoActive();
+			say("after pasting over, left", pasted);
+			check(pasted == list({ "alpha", "beta", "gamma", "PASTED two", "delta", "epsilon" })
+				&& view.realLinesForTest(0) == before,
+				"Paste: over the lines that show, in one undo step");
+
+			QLineEdit *findField = nullptr;
+			QLineEdit *replaceField = nullptr;
+			for (QLineEdit *edit : view.findChildren<QLineEdit *>())
+			{
+				if (edit->placeholderText() == FileCompareView::tr("Find"))
+					findField = edit;
+				else if (edit->placeholderText() == FileCompareView::tr("Replace with"))
+					replaceField = edit;
+			}
+			QPushButton *replaceAll = nullptr;
+			for (QPushButton *button : view.findChildren<QPushButton *>())
+				if (button->text() == FileCompareView::tr("Replace All"))
+					replaceAll = button;
+			if (findField == nullptr || replaceField == nullptr || replaceAll == nullptr)
+				return 1;
+			view.showFindBar();
+			findField->setText(QStringLiteral("e"));
+			replaceField->setText(QStringLiteral("#"));
+			replaceAll->click();
+			say("after replacing every e, left", view.realLinesForTest(0));
+			check(view.realLinesForTest(0) == list({ "alpha", "#RROR on#", "beta", "gamma",
+					"#RROR two", "delta", "epsilon" }),
+				"Replace All: what the hidden lines hold stays");
+
+			// the menu of a right click, handed over in place of being opened
+			// (on screen it lasts only while the application is in front)
+			QStringList offered;
+			DiffTextEdit::setContextMenuPresenterForTest([&offered](QMenu *menu) {
+				for (const QAction *action : menu->actions())
+					offered.append(action->isSeparator() ? QStringLiteral("-")
+						: action->menu() != nullptr ? QStringLiteral(">") + action->text()
+						: action->text());
+				offered.append(menu->findChild<QAction *>(QStringLiteral("addToDisplayFilter"))
+					!= nullptr ? QStringLiteral("(with the item)") : QStringLiteral("(without)"));
+			});
+			// (a click's event comes through the viewport)
+			QContextMenuEvent rightClick(QContextMenuEvent::Mouse, QPoint(40, 10),
+				pane->viewport()->mapToGlobal(QPoint(40, 10)));
+			QCoreApplication::sendEvent(pane->viewport(), &rightClick);
+			DiffTextEdit::setContextMenuPresenterForTest({});
+			check(offered.value(0) == QStringLiteral(">") + FileCompareView::tr("Add to &Filters")
+				&& offered.value(1) == QStringLiteral("-") && offered.size() > 4
+				&& offered.constLast() == QStringLiteral("(with the item)"),
+				"right click: the pane's menu offers Add to Display Filter, above its own items");
+		}
+		{
+			// find passes over the hidden lines; a single copy is allowed,
+			// and what it writes stays hidden
+			fresh();
+			FileCompareView view;
+			open(view);
+			apply(view, QStringLiteral("extra"));
+			QLineEdit *findField = nullptr;
+			for (QLineEdit *edit : view.findChildren<QLineEdit *>())
+				if (edit->placeholderText() == FileCompareView::tr("Find"))
+					findField = edit;
+			if (findField == nullptr)
+				return 1;
+			view.showFindBar();
+			view.setCursorViewLineForTest(1, 7);
+			findField->setText(QStringLiteral("zeta"));
+			view.findNext(false);
+			const int afterHidden = view.cursorViewLineForTest(1);
+			findField->setText(QStringLiteral("error"));
+			view.findNext(false);
+			const int afterShown = view.cursorViewLineForTest(1);
+			check(afterHidden == 7 && afterShown == 7
+				&& view.paneForTest(1)->textCursor().selectedText() == QStringLiteral("error"),
+				"find: what a hidden line holds is not found");
+
+			view.gotoFirstDiff();
+			const int current = view.currentDiffForTest();
+			view.copyCurrentDiff(1, 0, false);
+			say("after copying the last difference, left", view.realLinesForTest(0));
+			check(current == 2 && view.realLinesForTest(0).mid(7) == list({ "extra error", "zeta" })
+				&& !view.paneForTest(0)->isLineHidden(7) && view.paneForTest(0)->isLineHidden(8)
+				&& view.shownLinesForTest(0) == list({ "extra error" }),
+				"Copy: one difference at a time is allowed, and its hidden lines stay hidden");
+		}
+
+		// --- the pane menu's "Add to Display Filter" ---
+		{
+			fresh();
+			FileCompareView view;
+			open(view);
+			QMenu menu;
+			view.buildPaneMenu(0, &menu);
+			const QAction *first = menu.actions().value(0);
+			QMenu *filters = first != nullptr ? first->menu() : nullptr;
+			QAction *add = filters != nullptr
+				? filters->findChild<QAction *>(QStringLiteral("addToDisplayFilter")) : nullptr;
+			if (add == nullptr)
+				return 1;
+			check(filters->title() == FileCompareView::tr("Add to &Filters")
+				&& add->text() == FileCompareView::tr("Add to &Display Filter")
+				&& menu.actions().value(1) != nullptr && menu.actions().value(1)->isSeparator(),
+				"pane menu: Add to Filters, at the top");
+			// the word at the cursor
+			view.setCursorViewLineForTest(0, 3);
+			add->trigger();
+			settle();
+			const QString byWord = view.displayFilter();
+			const QStringList gamma = view.shownLinesForTest(1);
+			// a selection within a line joins it with AND
+			apply(view, QStringLiteral("alpha"));
+			DiffTextEdit *pane = view.paneForTest(0);
+			view.addToDisplayFilter(QStringLiteral("say \"hi\""));
+			const QString quoted = view.displayFilter();
+			apply(view, QStringLiteral("o"));
+			QTextCursor selection(pane->document()->findBlockByNumber(1));
+			selection.setPosition(selection.position() + 5, QTextCursor::KeepAnchor);
+			pane->setTextCursor(selection);
+			QMenu again;
+			view.buildPaneMenu(0, &again);
+			again.findChild<QAction *>(QStringLiteral("addToDisplayFilter"))->trigger();
+			settle();
+			say("lines with o and ERROR, left", view.shownLinesForTest(0));
+			check(byWord == QStringLiteral("le:Line contains \"gamma\"") && gamma == list({ "gamma" })
+				&& quoted == QStringLiteral(
+					"le:Line contains \"alpha\" AND Line contains \"say \"\"hi\"\"\"")
+				&& view.displayFilter()
+					== QStringLiteral("le:Line contains \"o\" AND Line contains \"ERROR\"")
+				&& view.shownLinesForTest(0) == list({ "ERROR one", "ERROR two" })
+				&& view.displayFilterBarShown()
+				&& view.displayFilterBarForTest()->field()->isApplied(),
+				"Add to Display Filter: the word at the cursor or the selection, joined with AND");
+		}
+
+		// --- the "=" menu ---
+		{
+			using Menu = LineFilterMenu;
+			QWidget host;
+			Menu menu(&host);
+			// (the bars above made menus of their own: none has looked for
+			// the replace lists yet, which is what makes their folders)
+			const bool noFoldersYet = !QDir(lm::replaceListFolder(false)).exists()
+				&& !QDir(lm::replaceListFolder(true)).exists();
+			QStringList chosen;
+			int reopened = 0;
+			QObject::connect(&menu, &Menu::filterChosen, [&chosen](const QString &filter) {
+				chosen.append(filter);
+			});
+			QObject::connect(&menu, &Menu::reopenRequested, [&reopened]() { ++reopened; });
+			const auto made = [&menu](int command, const QString &filter = QString()) {
+				return menu.apply(command, filter).value_or(QStringLiteral("(nothing)"));
+			};
+			const auto t = [](const char *text) {
+				return QCoreApplication::translate("LineFilterMenu", text);
+			};
+			const QString errors = QStringLiteral("ERROR");
+			const QString expression = QStringLiteral("le:Line contains \"ERROR\"");
+
+			QStringList top;
+			for (const QAction *action : menu.actions())
+				top.append(action->isSeparator() ? QStringLiteral("-") : action->text());
+			int leaves = 0;
+			for (const QAction *action : menu.findChildren<QAction *>())
+				if (action->menu() == nullptr && !action->isSeparator())
+					++leaves;
+			const int submenus = static_cast<int>(menu.findChildren<QMenu *>().size());
+			printf("  %d items in %d submenus\n", leaves, submenus);
+			// the whole of upstream's IDR_POPUP_LINEFILTERMENU, a row a line: how
+			// deep, a popup, an item or a separator, and its text
+			const struct { int depth; char kind; const char *text; } resource[] = {
+				{ 1, 'I', "&Clear All" },
+				{ 1, 'S', "" },
+				{ 1, 'P', "Add L&ine Condition" },
+				{ 2, 'I', "L&ine Text..." },
+				{ 2, 'P', "&Column" },
+				{ 3, 'I', "&Text..." },
+				{ 3, 'I', "&Number..." },
+				{ 3, 'I', "&Date/Time..." },
+				{ 3, 'I', "Column: &1" },
+				{ 3, 'I', "Column: &2" },
+				{ 3, 'I', "Column: &3" },
+				{ 3, 'I', "Column: &4" },
+				{ 3, 'I', "Column: &5" },
+				{ 3, 'I', "Column: &6" },
+				{ 3, 'I', "Column: &7" },
+				{ 3, 'I', "Column: &8" },
+				{ 3, 'I', "Column: &9" },
+				{ 3, 'I', "Column: 1&0" },
+				{ 2, 'I', "Line L&ength..." },
+				{ 2, 'I', "&Word Count..." },
+				{ 2, 'P', "Line &Number" },
+				{ 3, 'I', "&Odd Lines" },
+				{ 3, 'I', "&Even Lines" },
+				{ 3, 'I', "&Custom Range..." },
+				{ 2, 'P', "Line &Status" },
+				{ 3, 'I', "Different" },
+				{ 3, 'I', "Identical" },
+				{ 3, 'I', "Trivial" },
+				{ 3, 'S', "" },
+				{ 3, 'I', "Exists" },
+				{ 3, 'I', "Missing" },
+				{ 3, 'I', "Moved" },
+				{ 3, 'I', "Bookmarked" },
+				{ 2, 'P', "&EOL" },
+				{ 3, 'I', "&Windows (CRLF)" },
+				{ 3, 'I', "&Unix (LF)" },
+				{ 3, 'I', "&Mac (CR)" },
+				{ 3, 'I', "None" },
+				{ 1, 'I', "Target: &Any (Left/Middle/Right)" },
+				{ 1, 'I', "Target: &Left" },
+				{ 1, 'I', "Target: &Middle" },
+				{ 1, 'I', "Target: &Right" },
+				{ 1, 'S', "" },
+				{ 1, 'P', "Add &Difference Condition" },
+				{ 2, 'P', "L&ine Text" },
+				{ 3, 'I', "Equal" },
+				{ 3, 'I', "Not Equal" },
+				{ 2, 'P', "&Column" },
+				{ 3, 'P', "&Text" },
+				{ 4, 'I', "Equal" },
+				{ 4, 'I', "Not Equal" },
+				{ 3, 'P', "&Number" },
+				{ 4, 'I', "Equal" },
+				{ 4, 'I', "Not Equal" },
+				{ 4, 'I', "Less Than" },
+				{ 4, 'I', "Less Than or Equal to" },
+				{ 4, 'I', "Greater Than" },
+				{ 4, 'I', "Greater Than or Equal to" },
+				{ 3, 'P', "&Date/Time" },
+				{ 4, 'I', "Equal" },
+				{ 4, 'I', "Not Equal" },
+				{ 4, 'I', "Less Than" },
+				{ 4, 'I', "Less Than or Equal to" },
+				{ 4, 'I', "Greater Than" },
+				{ 4, 'I', "Greater Than or Equal to" },
+				{ 3, 'I', "Column: &1" },
+				{ 3, 'I', "Column: &2" },
+				{ 3, 'I', "Column: &3" },
+				{ 3, 'I', "Column: &4" },
+				{ 3, 'I', "Column: &5" },
+				{ 3, 'I', "Column: &6" },
+				{ 3, 'I', "Column: &7" },
+				{ 3, 'I', "Column: &8" },
+				{ 3, 'I', "Column: &9" },
+				{ 3, 'I', "Column: 1&0" },
+				{ 2, 'P', "Line L&ength" },
+				{ 3, 'I', "Equal" },
+				{ 3, 'I', "Not Equal" },
+				{ 3, 'I', "Less Than" },
+				{ 3, 'I', "Less Than or Equal to" },
+				{ 3, 'I', "Greater Than" },
+				{ 3, 'I', "Greater Than or Equal to" },
+				{ 3, 'S', "" },
+				{ 3, 'I', "Less than 10" },
+				{ 3, 'I', "10 or more" },
+				{ 3, 'I', "Less than 100" },
+				{ 3, 'I', "100 or more" },
+				{ 3, 'I', "Less than 1000" },
+				{ 3, 'I', "1000 or more" },
+				{ 3, 'I', "Custom Range..." },
+				{ 2, 'P', "Line &Status" },
+				{ 3, 'I', "Different" },
+				{ 3, 'I', "Identical" },
+				{ 3, 'I', "Trivial" },
+				{ 2, 'P', "&EOL" },
+				{ 3, 'I', "Equal" },
+				{ 3, 'I', "Not Equal" },
+				{ 1, 'I', "Target: &Left and Right" },
+				{ 1, 'I', "Target: Left and &Middle" },
+				{ 1, 'I', "Target: Middle and &Right" },
+				{ 1, 'I', "Target: &All" },
+				{ 1, 'S', "" },
+				{ 1, 'P', "&Transform Line/Column" },
+				{ 2, 'I', "&Trim" },
+				{ 2, 'I', "Normalize &Whitespace" },
+				{ 2, 'I', "&Replace" },
+				{ 2, 'I', "Reg&ex Replace" },
+				{ 2, 'I', "&Lowercase" },
+				{ 2, 'I', "&Uppercase" },
+				{ 2, 'I', "&Half-width" },
+				{ 2, 'I', "&Full-width" },
+				{ 2, 'I', "Normalize &Unicode" },
+				{ 2, 'P', "&Chinese Conversion" },
+				{ 3, 'I', "&Simplified Chinese" },
+				{ 3, 'I', "&Traditional Chinese" },
+				{ 2, 'P', "&Japanese Conversion" },
+				{ 3, 'I', "&Hiragana" },
+				{ 3, 'I', "&Katakana" },
+				{ 2, 'P', "Replace &Lists" },
+				{ 3, 'I', "&Create String Replace List and Insert..." },
+				{ 3, 'I', "Create &Regex Replace List and Insert..." },
+				{ 3, 'S', "" },
+				{ 3, 'P', "&String Replace Lists" },
+				{ 4, 'I', "<None>" },
+				{ 3, 'P', "Re&gex Replace Lists" },
+				{ 4, 'I', "<None>" },
+				{ 3, 'S', "" },
+				{ 3, 'I', "Open String Replace Lists Folder..." },
+				{ 3, 'I', "Open Regex Replace Lists Folder..." },
+				{ 1, 'P', "&Refine Current Filter" },
+				{ 2, 'P', "Add Con&text Lines" },
+				{ 3, 'I', "&0 Lines" },
+				{ 3, 'I', "&1 Line" },
+				{ 3, 'I', "&3 Lines" },
+				{ 3, 'I', "&5 Lines" },
+				{ 3, 'I', "&7 Lines" },
+				{ 2, 'P', "Filter by &Occurrence" },
+				{ 3, 'I', "&First" },
+				{ 3, 'I', "&Last" },
+				{ 3, 'I', "First &5 Matches" },
+				{ 3, 'I', "After First &5" },
+				{ 3, 'I', "&Custom Range..." },
+				{ 3, 'S', "" },
+				{ 3, 'I', "By &Block" },
+				{ 2, 'P', "&Range" },
+				{ 3, 'I', "&Inside..." },
+				{ 3, 'I', "&Outside..." },
+				{ 1, 'P', "Create &Range" },
+				{ 2, 'I', "&Inside..." },
+				{ 2, 'I', "&Outside..." },
+				{ 1, 'S', "" },
+				{ 1, 'I', "Match &case" },
+				{ 1, 'S', "" },
+				{ 1, 'I', "Combine: A&ND" },
+				{ 1, 'I', "Combine: &OR" },
+			};
+			QStringList wanted;
+			for (const auto &row : resource)
+				wanted.append(QString(row.depth, QLatin1Char(' ')) + QLatin1Char(row.kind)
+					+ (row.kind == 'S' ? QString() : t(row.text)));
+			QStringList built;
+			const std::function<void(const QMenu *, int)> walk = [&](const QMenu *popup, int depth)
+			{
+				for (const QAction *action : popup->actions())
+				{
+					const QString indent(depth, QLatin1Char(' '));
+					if (action->isSeparator())
+						built.append(indent + QLatin1Char('S'));
+					else if (action->menu() != nullptr)
+					{
+						built.append(indent + QLatin1Char('P') + action->text());
+						walk(action->menu(), depth + 1);
+					}
+					else
+						built.append(indent + QLatin1Char('I') + action->text());
+				}
+			};
+			walk(&menu, 1);
+			for (int row = 0; row < qMax(wanted.size(), built.size()); ++row)
+				if (wanted.value(row) != built.value(row))
+				{
+					printf("  row %d: upstream has [%s], the menu [%s]\n", row,
+						qPrintable(wanted.value(row)), qPrintable(built.value(row)));
+					break;
+				}
+			check(wanted == built, "menu: every popup, item and separator of upstream's, in its order");
+			check(top == QStringList{ t("&Clear All"), QStringLiteral("-"), t("Add L&ine Condition"),
+					t("Target: &Any (Left/Middle/Right)"), t("Target: &Left"), t("Target: &Middle"),
+					t("Target: &Right"), QStringLiteral("-"), t("Add &Difference Condition"),
+					t("Target: &Left and Right"), t("Target: Left and &Middle"),
+					t("Target: Middle and &Right"), t("Target: &All"), QStringLiteral("-"),
+					t("&Transform Line/Column"), t("&Refine Current Filter"), t("Create &Range"),
+					QStringLiteral("-"), t("Match &case"), QStringLiteral("-"), t("Combine: A&ND"),
+					t("Combine: &OR") }
+				&& leaves == 120 && submenus == 25,
+				"menu: upstream's items, in its order");
+
+			// conditions join the filter with the operator in use
+			check(made(Menu::MaskClear, errors).isEmpty()
+				&& made(Menu::LineOdd) == QStringLiteral("le:(LineNumber % 2) = 1")
+				&& made(Menu::LineEven, errors)
+					== QStringLiteral("le:Line contains \"ERROR\" AND (LineNumber % 2) = 0")
+				&& made(Menu::LineDifferent, expression) == expression + QStringLiteral(" AND Different")
+				&& made(Menu::LineIdentical) == QStringLiteral("le:Identical")
+				&& made(Menu::LineTrivial) == QStringLiteral("le:Trivial")
+				&& made(Menu::LineExists) == QStringLiteral("le:Exists")
+				&& made(Menu::LineMissing) == QStringLiteral("le:Missing")
+				&& made(Menu::LineMoved) == QStringLiteral("le:Moved")
+				&& made(Menu::LineBookmarked) == QStringLiteral("le:Bookmarked")
+				&& made(Menu::EolCrLf) == QStringLiteral("le:EOLStr = \"CRLF\"")
+				&& made(Menu::EolNone) == QStringLiteral("le:EOLStr = \"None\""),
+				"line conditions: joined to the filter, a text to find turned into its expression");
+
+			// the targets, the operator and the column are kept, and the menu
+			// comes back
+			menu.pickForTest(Menu::ConditionLeft);
+			menu.pickForTest(Menu::OperatorOr);
+			const QString leftOr = made(Menu::LineExists, expression);
+			const QString leftNumber = made(Menu::LineOdd);
+			const bool ticks = menu.actionForTest(Menu::ConditionLeft)->isChecked()
+				&& !menu.actionForTest(Menu::ConditionAny)->isChecked()
+				&& menu.actionForTest(Menu::OperatorOr)->isChecked()
+				&& !menu.actionForTest(Menu::OperatorAnd)->isChecked();
+			menu.pickForTest(Menu::ConditionRight);
+			const QString rightEol = made(Menu::EolLf);
+			menu.pickForTest(Menu::ConditionAny);
+			menu.pickForTest(Menu::OperatorAnd);
+			printf("  %s | %s | %s | reopened %d times\n", qPrintable(leftOr), qPrintable(leftNumber),
+				qPrintable(rightEol), reopened);
+			check(leftOr == expression + QStringLiteral(" OR LeftExists")
+				&& leftNumber == QStringLiteral("le:(LeftLineNumber % 2) = 1")
+				&& rightEol == QStringLiteral("le:RightEOLStr = \"LF\"")
+				&& ticks && reopened == 5 && chosen.isEmpty(),
+				"targets and operator: kept, ticked, and the menu comes back");
+
+			// differences between two sides, or among all of them
+			const QString lineEqual = made(Menu::DiffLineEqual);
+			const QString lengthClose = made(Menu::DiffLineLengthFirst + 6);
+			const QString eolDiffers = made(Menu::DiffEolNotEqual);
+			const QString columnText = made(Menu::DiffColumnFirst + 1);
+			menu.pickForTest(Menu::Column1 + 2);
+			const QString columnNumber = made(Menu::DiffColumnNumberLess);
+			const bool lessShown = menu.actionForTest(Menu::DiffColumnNumberLess)->isVisible();
+			menu.pickForTest(Menu::ConditionDiffLeftMiddle);
+			const QString leftMiddle = made(Menu::DiffLineNotEqual);
+			menu.pickForTest(Menu::ConditionDiffAll);
+			const QString allLines = made(Menu::DiffLineEqual);
+			const QString allLength = made(Menu::DiffLineLengthFirst + 1);
+			const QString allNumber = made(Menu::DiffColumnFirst + 3);
+			const QString allEol = made(Menu::DiffEolEqual);
+			const bool lessHidden = !menu.actionForTest(Menu::DiffColumnNumberLess)->isVisible()
+				&& !menu.actionForTest(Menu::DiffColumnDateTimeLess)->isVisible()
+				&& menu.actionForTest(Menu::DiffColumnFirst + 2)->isVisible()
+				&& menu.actionForTest(Menu::DiffLineLengthFirst + 2)->isVisible();
+			menu.pickForTest(Menu::ConditionDiffLeftRight);
+			menu.pickForTest(Menu::Column1);
+			printf("  %s | %s | %s\n", qPrintable(columnNumber), qPrintable(allNumber),
+				qPrintable(allLength));
+			check(lineEqual == QStringLiteral("le:LeftLine = RightLine")
+				&& lengthClose == QStringLiteral("le:abs(LeftLineLength - RightLineLength) < 10")
+				&& eolDiffers == QStringLiteral("le:LeftEOL != RightEOL")
+				&& columnText == QStringLiteral("le:LeftColumn1 != RightColumn1")
+				&& columnNumber == QStringLiteral("le:toNumber(LeftColumn3) < toNumber(RightColumn3)")
+				&& leftMiddle == QStringLiteral("le:LeftLine != MiddleLine")
+				&& allLines == QStringLiteral("le:allequal(Line)")
+				&& allLength == QStringLiteral("le:not allequal(LineLength)")
+				&& allNumber == QStringLiteral("le:not allequal(toNumber(Column3))")
+				&& allEol == QStringLiteral("le:allequal(EOL)") && lessShown && lessHidden,
+				"difference conditions: between two sides, or among all of them");
+
+			// what the conditions look at, transformed
+			const QString trimmed = made(Menu::FuncFirst, expression);
+			const QString lowered = made(Menu::FuncFirst + 4,
+				QStringLiteral("le:LeftLine = RightLine and Column2 contains \"a(b\""));
+			const QString spaced = made(Menu::FuncFirst + 1, QString());
+			const QString nested = made(Menu::FuncFirst + 5,
+				QStringLiteral("le:@cs replace(Line, \"Line\", \"x\") = LineAt(1)"));
+			printf("  %s\n  %s\n  %s\n", qPrintable(lowered), qPrintable(spaced), qPrintable(nested));
+			check(trimmed == QStringLiteral("le:trim(Line) contains \"ERROR\"")
+				&& lowered == QStringLiteral(
+					"le:toLower(LeftLine) = toLower(RightLine) and toLower(Column2) contains \"a(b\"")
+				&& spaced == QStringLiteral("le:regexReplace(Line, \"[ \\t]+\", \" \")")
+				&& nested == QStringLiteral(
+					"le:@cs replace(toUpper(Line), \"Line\", \"x\") = toUpper(LineAt(1))"),
+				"transformations: around every line or column text, strings left alone");
+
+			// the filter as a whole, refined
+			const QString context = made(Menu::LineContextFirst + 2, errors);
+			const QString firstMatch = made(Menu::MatchNumberFirst, errors);
+			const QString lastMatch = made(Menu::MatchNumberFirst + 1, expression);
+			menu.pickForTest(Menu::OccurrenceByBlock);
+			const QString byBlock = made(Menu::MatchNumberFirst + 3, QStringLiteral("le:@cs Different"));
+			const bool blockTicked = menu.actionForTest(Menu::OccurrenceByBlock)->isChecked();
+			menu.pickForTest(Menu::OccurrenceByBlock);
+			const QString sensitive = made(Menu::MatchCase, errors);
+			const QString insensitive = made(Menu::MatchCase, sensitive);
+			menu.setFilterSource([&sensitive]() { return sensitive; });
+			emit menu.aboutToShow(); // (what it looks at as it opens)
+			const bool caseTicked = menu.actionForTest(Menu::MatchCase)->isChecked();
+			shoot(&menu, "menu");
+			menu.setFilterSource([&expression]() { return expression; });
+			check(context == QStringLiteral("le:matchContext(Line contains \"ERROR\", 3, 3)")
+				&& firstMatch == QStringLiteral("le:matchNumber(Line contains \"ERROR\") = 1")
+				&& lastMatch == QStringLiteral("le:matchNumber(Line contains \"ERROR\") = "
+					"matchCount(Line contains \"ERROR\")")
+				&& byBlock == QStringLiteral("le:@cs matchBlockNumber(Different) > 5") && blockTicked
+				&& sensitive == QStringLiteral("le:@cs Line contains \"ERROR\"")
+				&& insensitive == expression && caseTicked,
+				"refinements: context lines, occurrences and Match case, on the whole filter");
+
+			// everything the menu makes without asking parses
+			int parsed = 0;
+			QStringList broken;
+			const auto sweep = [&](const QString &from) {
+				for (int command = Menu::MaskClear; command <= Menu::OperatorOr; ++command)
+				{
+					const bool asks = command == Menu::LineRange || command == Menu::LineLengthRange
+						|| command == Menu::WordCountRange
+						|| (command >= Menu::ColumnText && command <= Menu::ColumnDateTime)
+						|| command == Menu::LineNumberRange || command == Menu::DiffLineLengthRange
+						|| command == Menu::MatchNumberRange
+						|| (command >= Menu::MatchInsideWrap && command <= Menu::MatchOutside)
+						|| (command >= Menu::CreateReplaceList
+							&& command <= Menu::RegexReplaceListLast);
+					// (a refinement is of a filter there is: of none, upstream
+					// leaves its frame to be filled in)
+					const bool refines = (command >= Menu::LineContextFirst
+						&& command <= Menu::MatchNumberLast) || command == Menu::MatchCase;
+					const QAction *item = menu.actionForTest(command);
+					if (asks || (refines && from.isEmpty()) || (item != nullptr && !item->isVisible()))
+						continue;
+					const std::optional<QString> filter = menu.apply(command, from);
+					if (!filter.has_value() || filter->isEmpty())
+						continue;
+					LineFilterHelper helper;
+					if (helper.SetStringOrExpression(filter->toStdString()))
+						++parsed;
+					else
+						broken.append(*filter);
+				}
+			};
+			for (int side = Menu::ConditionAny; side <= Menu::ConditionRight; ++side)
+				for (int pair = Menu::ConditionDiffLeftRight; pair <= Menu::ConditionDiffAll; ++pair)
+				{
+					menu.pickForTest(side);
+					menu.pickForTest(pair);
+					sweep(QString());
+					sweep(expression);
+				}
+			menu.pickForTest(Menu::ConditionAny);
+			menu.pickForTest(Menu::ConditionDiffLeftRight);
+			printf("  %d filters made\n", parsed);
+			for (const QString &filter : broken)
+				printf("  not parsed: %s\n", qPrintable(filter));
+			check(parsed > 1500 && broken.isEmpty(), "engine: every filter the menu makes parses");
+			// (of no filter, a refinement is its frame, as upstream has it,
+			// and Match case comes before the conditions it is for)
+			const QString caseFirst = made(Menu::MatchCase);
+			check(made(Menu::LineContextFirst + 1) == QStringLiteral("le:matchContext(, 1, 1)")
+				&& made(Menu::MatchNumberFirst) == QStringLiteral("le:matchNumber() = 1")
+				&& made(Menu::LineDifferent, caseFirst) == QStringLiteral("le:@cs Different"),
+				"refinements of no filter: upstream's frames, and Match case ahead of a condition");
+
+			// --- the items that ask: the Filter Condition dialog ---
+			const auto answer = [&host](const QString &value, QString *lhs = nullptr)
+			{
+				QTimer::singleShot(0, &host, [&host, value, lhs]() {
+					auto *dialog = host.findChild<FilterConditionDialog *>();
+					if (dialog == nullptr)
+					{
+						printf("no Filter Condition dialog to answer\n");
+						std::exit(3);
+					}
+					if (lhs != nullptr)
+						*lhs = dialog->findChild<QLabel *>(QStringLiteral("conditionLhs"))->text();
+					if (!value.isEmpty())
+						dialog->findChild<QComboBox *>(QStringLiteral("conditionValue1"))
+							->setEditText(value);
+					dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
+				});
+			};
+			answer(QStringLiteral("x"));
+			const QString byText = made(Menu::LineRange);
+			answer(QStringLiteral("10"));
+			const QString byLength = made(Menu::LineLengthRange, expression);
+			answer(QString());
+			const QString byWords = made(Menu::WordCountRange);
+			menu.pickForTest(Menu::Column1 + 1);
+			answer(QStringLiteral("7"));
+			const QString byColumn = made(Menu::ColumnNumber);
+			answer(QStringLiteral("x"));
+			const QString byColumnText = made(Menu::ColumnText);
+			menu.pickForTest(Menu::Column1);
+			answer(QStringLiteral("2"));
+			const QString byNumber = made(Menu::LineNumberRange);
+			QString occurrenceLhs;
+			answer(QStringLiteral("1"), &occurrenceLhs);
+			const QString byOccurrence = made(Menu::MatchNumberRange,
+				QStringLiteral("le:(LineNumber % 2) = 1"));
+			answer(QStringLiteral("3"));
+			const QString byLengthGap = made(Menu::DiffLineLengthRange);
+			printf("  %s | %s | %s\n", qPrintable(byWords), qPrintable(byColumn),
+				qPrintable(byOccurrence));
+			check(byText == QStringLiteral("le:Line contains \"x\"")
+				&& byLength == expression + QStringLiteral(" AND LineLength = 10")
+				&& byWords == QStringLiteral("le:regexCount(Line, \"\\S+\") = 0")
+				&& byColumn == QStringLiteral("le:toNumber(Column2) = 7")
+				&& byColumnText == QStringLiteral("le:Column2 contains \"x\"")
+				&& byNumber == QStringLiteral("le:LineNumber > 2")
+				&& occurrenceLhs == QStringLiteral("matchNumber((LineNumber % 2) = 1)")
+				&& byOccurrence == QStringLiteral("le:matchNumber((LineNumber % 2) = 1) > 1")
+				&& byLengthGap == QStringLiteral("le:abs(LeftLineLength - RightLineLength) = 3"),
+				"conditions asked for: in the Filter Condition dialog, by the kind of value");
+
+			// --- ranges: the Match Inside/Outside dialog ---
+			QStringList found;
+			const auto range = [&](const QString &start, const QString &end)
+			{
+				QTimer::singleShot(0, &host, [&host, &found, &shoot, start, end]() {
+					auto *dialog = host.findChild<MatchInsideDialog *>();
+					if (dialog == nullptr)
+					{
+						printf("no Match Inside/Outside dialog to answer\n");
+						std::exit(3);
+					}
+					auto *first = dialog->findChild<FileFilterCombo *>(
+						QStringLiteral("matchInsideStart"));
+					auto *second = dialog->findChild<FileFilterCombo *>(
+						QStringLiteral("matchInsideEnd"));
+					found = QStringList{ first->mask(), second->mask() };
+					if (start != QStringLiteral("(as it is)"))
+					{
+						first->setEditText(start);
+						second->setEditText(end);
+					}
+					shoot(dialog, "range");
+					dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
+				});
+			};
+			range(QStringLiteral("BEGIN"), QStringLiteral("le:@cs Line = \"END\""));
+			const QString inside = made(Menu::MatchInside, errors);
+			// (its fields start with the latest filter the bar applied)
+			const QStringList fieldsAtFirst = found;
+			range(QString(), QString());
+			const QString outside = made(Menu::MatchOutside);
+			range(QStringLiteral("(as it is)"), QString());
+			const QString wrapped = made(Menu::MatchInsideWrap, errors);
+			const QStringList fieldsWrapped = found;
+			printf("  %s\n  %s\n", qPrintable(inside), qPrintable(outside));
+			check(inside == QStringLiteral("le:@cs Line contains \"ERROR\" AND "
+					"matchInside(Line contains \"BEGIN\", Line = \"END\")")
+				&& outside == QStringLiteral(
+					"le:not matchInside(Line contains \"BEGIN\", Line contains \"END\")")
+				&& wrapped == QStringLiteral(
+					"le:matchInside(Line contains \"ERROR\", Line contains \"ERROR\")")
+				&& fieldsAtFirst.size() == 2 && fieldsAtFirst.at(0) == fieldsAtFirst.at(1)
+				&& !fieldsAtFirst.at(0).isEmpty()
+				&& fieldsWrapped == QStringList{ errors, errors },
+				"ranges: the two filters asked for in their dialog");
+
+			// the "=" of a field of that dialog: a menu of its own, which comes
+			// back after a target is picked, the pick kept, and whose condition
+			// lands in the field
+			bool menuShown = false;
+			bool menuBack = false;
+			QString fieldAfter;
+			QTimer::singleShot(0, &host, [&]() {
+				auto *dialog = host.findChild<MatchInsideDialog *>();
+				auto *button = dialog != nullptr
+					? dialog->findChild<QToolButton *>(QStringLiteral("matchInsideStartMenu")) : nullptr;
+				if (button == nullptr)
+				{
+					printf("no Match Inside/Outside dialog with its \"=\" button\n");
+					std::exit(3);
+				}
+				auto *field = dialog->findChild<FileFilterCombo *>(QStringLiteral("matchInsideStart"));
+				field->setEditText(QStringLiteral("BEGIN"));
+				button->click();
+				// (a menu is told from its aboutToShow that it opens: on screen
+				// it lasts only while the application is the one in front)
+				auto *popup = dialog->findChild<Menu *>();
+				menuShown = popup != nullptr;
+				int shows = 0;
+				if (popup != nullptr)
+				{
+					QObject::connect(popup, &QMenu::aboutToShow, [&shows]() { ++shows; });
+					// as a click on an item goes: the menu closes, then the item acts
+					popup->close();
+					popup->actionForTest(Menu::ConditionLeft)->trigger();
+				}
+				settle();
+				auto *again = dialog->findChild<Menu *>();
+				menuBack = again != nullptr && again == popup && shows == 1
+					&& again->actionForTest(Menu::ConditionLeft)->isChecked();
+				if (again != nullptr)
+				{
+					again->close();
+					again->actionForTest(Menu::LineExists)->trigger();
+				}
+				settle();
+				menuBack = menuBack && shows == 1; // (a condition does not bring it back)
+				fieldAfter = field->mask();
+				dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Cancel)->click();
+			});
+			const QString cancelledRange = made(Menu::MatchInside, errors);
+			printf("  the field after its menu: %s\n", qPrintable(fieldAfter));
+			check(menuShown && menuBack
+				&& fieldAfter == QStringLiteral("le:Line contains \"BEGIN\" AND LeftExists")
+				&& cancelledRange == QStringLiteral("(nothing)"),
+				"ranges: a field's \"=\" menu comes back after a target, and fills the field");
+
+			// --- replace lists ---
+			const QString listFolder = lm::replaceListFolder(false);
+			emit menu.aboutToShow();
+			const bool foldersMade = noFoldersYet && QDir(listFolder).exists()
+				&& QDir(lm::replaceListFolder(true)).exists();
+			QStringList none;
+			for (const QMenu *sub : menu.findChildren<QMenu *>())
+				if (sub->title() == t("&String Replace Lists") || sub->title() == t("Re&gex Replace Lists"))
+					for (const QAction *action : sub->actions())
+						none.append(action->text() + (action->isEnabled() ? "" : " (off)"));
+			const QString newList = QDir(listFolder).filePath(QStringLiteral("errors.tsv"));
+			lm::setReplaceListChooserForTest([&newList](const QString &, bool) { return newList; });
+			const QString created = made(Menu::CreateReplaceList, expression);
+			const bool written = QFile::exists(newList) && opened == QStringList{ newList };
+			write(newList, "# what the errors are called\nERROR\tfailure\n");
+			lm::setReplaceListChooserForTest([](const QString &, bool) { return QString(); });
+			const QString cancelled = made(Menu::CreateRegexReplaceList, expression);
+			emit menu.aboutToShow();
+			const QAction *listed = menu.actionForTest(Menu::StringReplaceListFirst);
+			const QString listedName = listed != nullptr ? listed->text() : QString();
+			const QString picked = made(Menu::StringReplaceListFirst,
+				QStringLiteral("le:Line contains \"failure\""));
+			opened.clear();
+			const bool folderOnly = !menu.apply(Menu::RegexReplaceListsFolder, expression).has_value()
+				&& opened == QStringList{ lm::replaceListFolder(true) };
+			printf("  %s\n", qPrintable(picked));
+			check(none == QStringList{ t("<None>") + QStringLiteral(" (off)"),
+					t("<None>") + QStringLiteral(" (off)") }
+				&& created == QStringLiteral("le:replaceWithList(Line, \"%1\") contains \"ERROR\"")
+					.arg(newList)
+				&& foldersMade && written && cancelled == QStringLiteral("(nothing)")
+				&& listedName == QStringLiteral("errors.tsv")
+				&& picked == QStringLiteral("le:replaceWithList(Line, \"%1\") contains \"failure\"")
+					.arg(newList)
+				&& folderOnly
+				&& lm::replaceListPathForExpression(QDir::homePath() + QStringLiteral("/a/b.tsv"))
+					== QStringLiteral("%HOME%/a/b.tsv"),
+				"replace lists: made from the template, listed, and written into the filter");
+
+			// the engine reads the list: ERROR is "failure" to the filter
+			fresh();
+			FileCompareView view;
+			open(view);
+			apply(view, picked);
+			const QStringList anyCase = view.shownLinesForTest(1);
+			apply(view, made(Menu::MatchCase, picked));
+			const QStringList sameCase = view.shownLinesForTest(1);
+			// (a list's path may name a variable of the environment, as the
+			// one the menu writes for a list under the home folder does)
+			qputenv("LIBREMERGE_SELFTEST_LISTS", QFile::encodeName(listFolder));
+			apply(view, QStringLiteral("le:replaceWithList(Line, "
+				"\"%LIBREMERGE_SELFTEST_LISTS%/errors.tsv\") contains \"failure\""));
+			say("lines whose ERROR reads failure, right", anyCase);
+			say("the same, matching case", sameCase);
+			check(view.shownLinesForTest(0) == list({ "ERROR one", "ERROR two" })
+				&& anyCase == list({ "ERROR one", "extra error" })
+				&& sameCase == list({ "ERROR one" }) && view.shownLinesForTest(1) == anyCase,
+				"replace lists: applied by the engine, by the filter's case rule");
+			apply(view, picked);
+
+			// --- where the menu lives: the bar's "=" ---
+			DisplayFilterBar *bar = view.displayFilterBarForTest();
+			auto *barMenu = qobject_cast<Menu *>(bar->menuForTest());
+			if (barMenu == nullptr)
+				return 1;
+			bar->field()->setEditText(QStringLiteral("zeta"));
+			barMenu->pickForTest(Menu::LineDifferent);
+			const QString inField = bar->field()->mask();
+			const bool notYet = view.displayFilter() == picked && !bar->field()->isApplied();
+			bar->findChild<QPushButton *>(QStringLiteral("displayFilterApply"))->click();
+			settle();
+			check(inField == QStringLiteral("le:Line contains \"zeta\" AND Different") && notYet
+				&& view.displayFilter() == inField && view.shownLinesForTest(1) == list({ "zeta" }),
+				"\"=\": its menu changes the bar's field, for Apply to take");
+			// the button opens it, and a pick of how conditions join brings it
+			// back, the pick kept for as long as the bar is there
+			int shows = 0;
+			QObject::connect(barMenu, &QMenu::aboutToShow, [&shows]() { ++shows; });
+			bar->findChild<QToolButton *>(QStringLiteral("displayFilterMaskMenu"))->click();
+			const bool opened = shows == 1;
+			barMenu->close(); // as a click on an item goes: the menu closes, the item acts
+			barMenu->actionForTest(Menu::OperatorOr)->trigger();
+			settle();
+			const bool back = shows == 2 && barMenu->actionForTest(Menu::OperatorOr)->isChecked();
+			barMenu->close();
+			barMenu->actionForTest(Menu::LineTrivial)->trigger();
+			settle();
+			barMenu->close();
+			check(opened && back && shows == 2
+				&& bar->field()->mask() == inField + QStringLiteral(" OR Trivial"),
+				"\"=\": the menu comes back after a pick of the operator, which it keeps");
+		}
+
+		// --- three files, each with a line of its own ---
+		{
+			const QString paths[3] = { dir.filePath(QStringLiteral("a.txt")),
+				dir.filePath(QStringLiteral("b.txt")), dir.filePath(QStringLiteral("c.txt")) };
+			write(paths[0], "s0\nA left\ns1\nB\ns2\nC\ns3\n");
+			write(paths[1], "s0\nA\ns1\nB middle\ns2\nC\ns3\n");
+			write(paths[2], "s0\nA\ns1\nB\ns2\nC right\ns3\n");
+			FileCompareView view;
+			QString error;
+			if (!view.compare(QStringList{ paths[0], paths[1], paths[2] }, &error))
+			{
+				printf("3-way compare failed: %s\n", qPrintable(error));
+				return 2;
+			}
+			settle();
+			const auto shownBy = [&](const char *filter) {
+				apply(view, QLatin1String(filter));
+				return view.shownLinesForTest(0) + view.shownLinesForTest(1) + view.shownLinesForTest(2);
+			};
+			const QStringList leftMiddle = shownBy("le:DifferentLeftMiddle");
+			const QStringList middleRight = shownBy("le:DifferentMiddleRight");
+			const QStringList leftRight = shownBy("le:DifferentLeftRight");
+			const QStringList middleText = shownBy("le:MiddleLine contains \"middle\"");
+			const QStringList identical = shownBy("le:Identical");
+			say("left and middle differ", leftMiddle);
+			say("middle and right differ", middleRight);
+			say("left and right differ", leftRight);
+			check(view.paneCount() == 3 && view.diffCount() == 3
+				&& leftMiddle == list({ "A left", "B", "A", "B middle", "A", "B" })
+				&& middleRight == list({ "B", "C", "B middle", "C", "B", "C right" })
+				&& leftRight == list({ "A left", "C", "A", "C", "A", "C right" })
+				&& middleText == list({ "B", "B middle", "B" })
+				&& identical == list({ "s0", "s1", "s2", "s3", "s0", "s1", "s2", "s3", "s0", "s1",
+					"s2", "s3" }),
+				"three files: which sides differ, a side's own text, in every pane");
+		}
+
+		// --- moved lines and ignored differences ---
+		{
+			const QString movedLeft = dir.filePath(QStringLiteral("moved-left.txt"));
+			const QString movedRight = dir.filePath(QStringLiteral("moved-right.txt"));
+			write(movedLeft, "one\ntwo\nthree\nfour\nfive\nsix\n\nmoved block line 1\n"
+				"moved block line 2\nmoved block line 3\nseven\n");
+			write(movedRight, "moved block line 1\nmoved block line 2\nmoved block line 3\none\ntwo\n"
+				"three\nfour\nfive\nsix\nseven\n");
+			lm::setCompareFlagForTest(OPT_CMP_MOVED_BLOCKS, true);
+			lm::setCompareFlagForTest(OPT_CMP_IGNORE_BLANKLINES, true);
+			FileCompareView view;
+			QString error;
+			if (!view.compare(movedLeft, movedRight, &error))
+				return 2;
+			settle();
+			apply(view, QStringLiteral("le:Moved"));
+			const QStringList moved = view.shownLinesForTest(0);
+			apply(view, QStringLiteral("le:Trivial"));
+			const QStringList trivial = view.shownLinesForTest(0);
+			say("moved, left", moved);
+			say("trivial, left", trivial);
+			lm::setCompareFlagForTest(OPT_CMP_MOVED_BLOCKS, false);
+			lm::setCompareFlagForTest(OPT_CMP_IGNORE_BLANKLINES, false);
+			check(moved == list({ "moved block line 1", "moved block line 2", "moved block line 3" })
+				&& trivial == QStringList{ QString() } && view.ignoredDiffCount() == 1,
+				"line status: moved lines and ignored differences are told apart");
+		}
+
+		// --- a table: its rows for lines, a row's cells for its columns ---
+		const QString leftTable = dir.filePath(QStringLiteral("left.csv"));
+		const QString rightTable = dir.filePath(QStringLiteral("right.csv"));
+		//   0 id,name,price    id,name,price   (the header's row)
+		//   1 1,apple,10       1,apple,11
+		//   2 2,banana,20      2,banana,20
+		//   3 3,cherry,30      3,cereja,30
+		//   4 4,date,40        5,elder,50
+		//   5 -                6,fig,60
+		//   6 9,"x,y",90       9,"x,y",90
+		write(leftTable, "id,name,price\n1,apple,10\n2,banana,20\n3,cherry,30\n4,date,40\n"
+			"9,\"x,y\",90\n");
+		write(rightTable, "id,name,price\n1,apple,11\n2,banana,20\n3,cereja,30\n5,elder,50\n"
+			"6,fig,60\n9,\"x,y\",90\n");
+		const auto applyTable = [&settle](TableCompareView &table, const QString &text)
+		{
+			table.showDisplayFilterBar();
+			DisplayFilterBar *bar = table.displayFilterBarForTest();
+			bar->field()->setEditText(text);
+			emit bar->field()->lineEdit()->textEdited(text); // as typed
+			bar->findChild<QPushButton *>(QStringLiteral("displayFilterApply"))->click();
+			settle();
+		};
+		{
+			TableCompareView view;
+			view.resize(900, 400);
+			QString error;
+			if (!view.compare(leftTable, rightTable, &error))
+			{
+				printf("table compare failed: %s\n", qPrintable(error));
+				return 2;
+			}
+			settle();
+			const QStringList allLeft = view.shownRowsForTest(0);
+			const QStringList allRight = view.shownRowsForTest(1);
+			check(view.diffCount() == 2 && allLeft.size() == 6 && allRight.size() == 6
+				&& allLeft.value(4).isEmpty() && !view.displayFilterBarShown()
+				&& view.displayFilter().isEmpty(),
+				"table, start: two differences, six rows under the header's, no bar");
+
+			// a text to find, and the differences
+			applyTable(view, QStringLiteral("BANANA"));
+			const QStringList banana = view.shownRowsForTest(0) + view.shownRowsForTest(1);
+			const bool applied = view.displayFilterBarForTest()->field()->isApplied()
+				&& view.displayFilter() == QStringLiteral("BANANA")
+				&& lm::fileFilterHistory(historyKey).value(0) == QStringLiteral("BANANA");
+			applyTable(view, QStringLiteral("le:Different"));
+			say("table, different, left", view.shownRowsForTest(0));
+			say("table, different, right", view.shownRowsForTest(1));
+			check(banana == list({ "2,banana,20", "2,banana,20" }) && applied
+				&& view.shownRowsForTest(0) == list({ "1,apple,10", "3,cherry,30", "4,date,40",
+					"" })
+				&& view.shownRowsForTest(1) == list({ "1,apple,11", "3,cereja,30", "5,elder,50",
+					"6,fig,60" }),
+				"table, Apply: the rows the filter does not hold for go, on both sides");
+
+			// the rule under a row that hidden rows follow: rows 1 and 5 here
+			{
+				QTableView *table = view.tableForTest(1);
+				const QImage image = table->grab().toImage();
+				const qreal ratio = image.devicePixelRatio();
+				const QColor ink = table->palette().color(QPalette::Text);
+				const auto ruled = [&](int modelRow, bool margin)
+				{
+					const int y = table->rowViewportPosition(modelRow) + table->rowHeight(modelRow) - 1;
+					// (past the last column, clear of the edge's scroll bar)
+					const int pastColumns = table->columnViewportPosition(2) + table->columnWidth(2) + 10;
+					const QPoint at = margin
+						? table->verticalHeader()->mapTo(table, QPoint(1, y))
+						: table->viewport()->mapTo(table, QPoint(pastColumns, y));
+					return image.pixelColor(qRound(at.x() * ratio), qRound(at.y() * ratio)) == ink;
+				};
+				shoot(&view, "table");
+				check(ruled(0, false) && ruled(3, false) && ruled(0, true) && ruled(3, true)
+					&& !ruled(1, false) && !ruled(2, false) && !ruled(1, true),
+					"table, rules: one under each row that hidden rows follow");
+			}
+
+			// a row's cells: of either side, of one side, as numbers, and
+			// with the quotes they are written with, as upstream reads them
+			const auto leftBy = [&](const char *filter) {
+				applyTable(view, QLatin1String(filter));
+				return view.shownRowsForTest(0);
+			};
+			const QStringList dear = leftBy("le:toNumber(Column3) > 25");
+			const QStringList apple = leftBy("le:LeftColumn2 = \"apple\"");
+			const QStringList rightE = leftBy("le:RightColumn2 contains \"e\"");
+			const QStringList quoted = leftBy("le:Column2 = \"\"\"x,y\"\"\"");
+			const QStringList bare = leftBy("le:Column2 = \"x,y\"");
+			const QStringList named = leftBy("le:Column1 = \"id\" or LeftColumn1 = \"2\"");
+			say("table, third cell above 25, left", dear);
+			say("table, right name with an e, left", rightE);
+			check(dear == list({ "3,cherry,30", "4,date,40", "", "9,\"x,y\",90" })
+				&& apple == list({ "1,apple,10" })
+				&& rightE == list({ "1,apple,10", "3,cherry,30", "4,date,40" })
+				&& quoted == list({ "9,\"x,y\",90" }) && bare.isEmpty()
+				&& named == list({ "2,banana,20" }),
+				"table, columns: a row's cells, of either side or of one");
+
+			// differences hidden whole are passed over; Copy All is refused
+			applyTable(view, QStringLiteral("le:LeftColumn2 = \"apple\""));
+			view.gotoFirstDiff();
+			const int first = view.currentDiffForTest();
+			view.gotoNextDiff();
+			const int next = view.currentDiffForTest();
+			view.gotoLastDiff();
+			const int last = view.currentDiffForTest();
+			messages.clear();
+			view.copyAllFrom(0);
+			const bool refused = !view.isModified() && messages
+				== QStringList{ QCoreApplication::translate("TableCompareView", refusal) };
+			// one difference at a time is allowed
+			view.copyCurrentDiff(0);
+			settle();
+			printf("  table, differences stopped at: %d %d %d\n", first, next, last);
+			check(first == 0 && next == 0 && last == 0 && refused && view.isModified()
+				&& view.diffCount() == 1
+				&& view.shownRowsForTest(1) == list({ "1,apple,10" }),
+				"table: hidden differences are passed over, Copy All refused, a copy allowed");
+			view.undo();
+			settle();
+
+			// the header's menu
+			applyTable(view, QString());
+			QMenu menu;
+			view.buildHeaderMenu(1, 1, &menu);
+			QStringList items;
+			for (const QAction *action : menu.actions())
+				items.append(action->isSeparator() ? QStringLiteral("-") : action->text());
+			QStringList kinds;
+			if (const QAction *last = menu.actions().value(3); last != nullptr && last->menu())
+				for (const QAction *action : last->menu()->actions())
+					kinds.append(action->text());
+			const auto t = [](const char *text) {
+				return QCoreApplication::translate("TableCompareView", text);
+			};
+			auto *headers = menu.findChild<QAction *>(QStringLiteral("useFirstLineAsHeaders"));
+			auto *fit = menu.findChild<QAction *>(QStringLiteral("autoFitAllColumns"));
+			auto *byText = menu.findChild<QAction *>(QStringLiteral("filterColumnText"));
+			if (headers == nullptr || fit == nullptr || byText == nullptr)
+				return 1;
+			check(items == QStringList{ t("Use First Line as Headers"), t("Auto-Fit All Columns"),
+					QStringLiteral("-"), t("&Filter by This Column") }
+				&& kinds == QStringList{ t("&Text..."), t("&Number..."), t("&Date/Time...") }
+				&& headers->isChecked(),
+				"table, header menu: upstream's items");
+
+			// Filter by This Column: the condition is asked for, joins the
+			// filter with AND, and the bar comes up with it applied
+			const auto answer = [&view](const QString &value, QString *lhs)
+			{
+				QTimer::singleShot(0, &view, [&view, value, lhs]() {
+					auto *dialog = view.findChild<FilterConditionDialog *>();
+					if (dialog == nullptr)
+					{
+						printf("no Filter Condition dialog to answer\n");
+						std::exit(3);
+					}
+					*lhs = dialog->findChild<QLabel *>(QStringLiteral("conditionLhs"))->text();
+					dialog->findChild<QComboBox *>(QStringLiteral("conditionValue1"))
+						->setEditText(value);
+					dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
+				});
+			};
+			view.toggleDisplayFilterBar(); // (closed: the menu's item brings it back)
+			settle();
+			QString lhsText, lhsNumber;
+			answer(QStringLiteral("an"), &lhsText);
+			byText->trigger();
+			settle();
+			const QString byName = view.displayFilter();
+			const QStringList withAn = view.shownRowsForTest(1);
+			const bool cameUp = view.displayFilterBarShown()
+				&& view.displayFilterBarForTest()->field()->isApplied()
+				&& view.displayFilterBarForTest()->filterText() == byName;
+			answer(QStringLiteral("20"), &lhsNumber);
+			view.addColumnToDisplayFilter(0, 2, 1);
+			settle();
+			// (past the last column there is nothing to ask about)
+			view.addColumnToDisplayFilter(0, -1, 0);
+			printf("  %s | %s | %s\n", qPrintable(lhsText), qPrintable(lhsNumber),
+				qPrintable(view.displayFilter()));
+			check(lhsText == QStringLiteral("RightColumn2") && lhsNumber == QStringLiteral("toNumber(LeftColumn3)")
+				&& byName == QStringLiteral("le:RightColumn2 contains \"an\"")
+				&& withAn == list({ "2,banana,20" }) && cameUp
+				&& view.displayFilter() == QStringLiteral(
+					"le:RightColumn2 contains \"an\" AND toNumber(LeftColumn3) = 20")
+				&& view.shownRowsForTest(0) == list({ "2,banana,20" }),
+				"table, Filter by This Column: asked for, joined with AND and applied");
+
+			// the header's row is the header whatever the filter makes of
+			// it; as a row it goes by the filter like the others
+			applyTable(view, QStringLiteral("le:Column2 = \"name\" or Column2 = \"banana\""));
+			const QStringList asHeader = view.shownRowsForTest(0);
+			headers->trigger();
+			settle();
+			const QStringList asRow = view.shownRowsForTest(0);
+			QMenu again;
+			view.buildHeaderMenu(0, 0, &again);
+			auto *headersAgain = again.findChild<QAction *>(QStringLiteral("useFirstLineAsHeaders"));
+			const bool unticked = headersAgain != nullptr && !headersAgain->isChecked();
+			if (headersAgain != nullptr)
+				headersAgain->trigger();
+			settle();
+			check(asHeader == list({ "2,banana,20" })
+				&& asRow == list({ "id,name,price", "2,banana,20" }) && unticked
+				&& view.shownRowsForTest(0) == asHeader,
+				"table, Use First Line as Headers: the header's row is no row of the filter's");
+
+			// Auto-Fit All Columns: one set of widths for both sides
+			applyTable(view, QString());
+			QTableView *leftGrid = view.tableForTest(0);
+			QTableView *rightGrid = view.tableForTest(1);
+			const int before = leftGrid->columnWidth(1);
+			fit->trigger();
+			settle();
+			printf("  column widths: %d before, then %d %d %d\n", before, leftGrid->columnWidth(0),
+				leftGrid->columnWidth(1), leftGrid->columnWidth(2));
+			check(leftGrid->columnWidth(1) != before
+				&& leftGrid->columnWidth(0) == rightGrid->columnWidth(0)
+				&& leftGrid->columnWidth(1) == rightGrid->columnWidth(1)
+				&& leftGrid->columnWidth(2) == rightGrid->columnWidth(2)
+				&& leftGrid->columnWidth(1) > leftGrid->columnWidth(0),
+				"table, Auto-Fit All Columns: as wide as the widest cell of either side");
+		}
+
+		// --- the View menu's item, for a file comparison too ---
+		{
+			fresh();
+			MainWindow window;
+			window.resize(1100, 640);
+			auto *action = window.findChild<QAction *>(QStringLiteral("displayFilterBarAction"));
+			if (action == nullptr)
+				return 1;
+			window.openFileComparison(left, right);
+			settle();
+			auto *file = window.findChild<FileCompareView *>();
+			if (file == nullptr)
+				return 1;
+			const bool usable = action->isEnabled() && !action->isChecked();
+			action->trigger();
+			settle();
+			const bool shownAndTicked = file->displayFilterBarShown() && action->isChecked();
+			apply(*file, QStringLiteral("ERROR"));
+			window.show();
+			settle();
+			shoot(&window, "window");
+			action->trigger();
+			settle();
+			const bool closed = !file->displayFilterBarShown() && !action->isChecked()
+				&& file->displayFilter() == QStringLiteral("ERROR");
+			const Qt::KeyboardModifiers chord = Qt::ControlModifier | Qt::ShiftModifier;
+			window.displayFilterBarCommand(chord);
+			const DisplayFilterBar *byKeys = file->displayFilterBarForTest();
+			window.displayFilterBarCommand(chord);
+			check(usable && shownAndTicked && closed && byKeys != nullptr
+				&& file->displayFilterBarForTest() == byKeys
+				&& byKeys->filterText() == QStringLiteral("ERROR"),
+				"View menu: Display Filter Bar, for the file comparison in front");
+
+			// and for a table
+			window.openTableComparison(leftTable, rightTable);
+			settle();
+			auto *table = window.findChild<TableCompareView *>();
+			if (table == nullptr)
+				return 1;
+			const bool tableUsable = action->isEnabled() && !action->isChecked();
+			action->trigger();
+			settle();
+			// (its own bar: the file comparison's stays as it was)
+			const bool tableShown = table->displayFilterBarShown() && action->isChecked()
+				&& file->displayFilterBarForTest() == byKeys;
+			window.displayFilterBarCommand(chord);
+			applyTable(*table, QStringLiteral("fig"));
+			action->trigger();
+			settle();
+			check(tableUsable && tableShown && !table->displayFilterBarShown()
+				&& !action->isChecked() && table->displayFilter() == QStringLiteral("fig")
+				&& table->shownRowsForTest(1) == list({ "6,fig,60" })
+				&& file->displayFilter() == QStringLiteral("ERROR"),
+				"View menu: Display Filter Bar, for the table in front");
+		}
+
+		lm::setMessageSinkForTest([](const QString &) {});
+		lm::setReplaceListBaseForTest(QString());
+		lm::setReplaceListChooserForTest({});
+		lm::setReplaceListOpenerForTest({});
+		printf("line filter: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

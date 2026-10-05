@@ -27,6 +27,13 @@ inline bool isGhostBlock(const QTextBlock &block)
  * QPlainTextEdit with a line-number gutter. The gutter background can be
  * tinted per line to mirror the diff highlighting, and the numbering can
  * be remapped so ghost lines show no number.
+ *
+ * View lines can be hidden, WinMerge's LF_INVISIBLE lines of a view with
+ * "hide lines" on (the display filter of the file window). As in its
+ * editor, a hidden line is left out of what is copied and stays when a
+ * selection that spans it is typed over, cut or deleted. The cursor does
+ * not rest in one: only a selection's end does, in the hidden lines the
+ * text ends with.
  */
 class DiffTextEdit : public QPlainTextEdit
 {
@@ -67,6 +74,32 @@ public:
 		m_fileDropHook = std::move(hook);
 	}
 
+	/** Called with the pane's context menu before it is shown, for the
+	    compare view to put its own items in. */
+	void setContextMenuHook(std::function<void(QMenu *menu)> hook)
+	{
+		m_contextMenuHook = std::move(hook);
+	}
+
+	/** What is handed the pane's context menu in place of opening it (for
+	    tests: a menu on screen lasts only while the application is the
+	    one in front). */
+	static void setContextMenuPresenterForTest(std::function<void(QMenu *menu)> presenter);
+
+	/** Hide the view lines whose entry is true and show the others; an
+	    empty list shows every line. */
+	void setHiddenLines(const QList<bool> &hidden);
+	bool hasHiddenLines() const { return m_hasHiddenLines; }
+	bool isLineHidden(int viewLine) const;
+	/** Where a shown line ends in the viewport, -1 for a hidden one (for
+	    tests of what is drawn under it). */
+	int lineBottomForTest(int viewLine) const;
+	/** Remove the text between two positions the way upstream's editor
+	    does around hidden lines (CCrystalTextBuffer::DeleteText): every
+	    stretch of visible lines goes on its own and the hidden lines
+	    between them stay. One undo step. */
+	void removeKeepingHidden(int from, int to);
+
 	int gutterWidth() const;
 	void paintGutter(QPaintEvent *event);
 
@@ -78,6 +111,11 @@ protected:
 	void paintEvent(QPaintEvent *event) override;
 	void mouseDoubleClickEvent(QMouseEvent *event) override;
 	void resizeEvent(QResizeEvent *event) override;
+	void keyPressEvent(QKeyEvent *event) override;
+	void inputMethodEvent(QInputMethodEvent *event) override;
+	void contextMenuEvent(QContextMenuEvent *event) override;
+	void dragMoveEvent(QDragMoveEvent *event) override;
+	void dropEvent(QDropEvent *event) override;
 	QMimeData *createMimeDataFromSelection() const override;
 	bool canInsertFromMimeData(const QMimeData *source) const override;
 	void insertFromMimeData(const QMimeData *source) override;
@@ -85,9 +123,19 @@ protected:
 private slots:
 	void updateGutterWidth();
 	void updateGutter(const QRect &rect, int dy);
+	void keepCursorOnShownLine();
 
 private:
+	bool spansHiddenLine(int from, int to) const;
+	bool endsShownStretch(const QTextBlock &block) const;
+	bool selectionSpansHiddenLine() const;
+	void removeSelectionKeepingHidden();
+
 	QWidget *m_gutter;
+	bool m_hasHiddenLines = false;
+	bool m_movingCursor = false;
+	int m_lastCursorPosition = 0;
+	std::function<void(QMenu *)> m_contextMenuHook;
 	QHash<int, QColor> m_lineColors;
 	QList<int> m_lineNumbers;
 	QList<InsertionMarker> m_markers;

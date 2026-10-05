@@ -13,10 +13,12 @@
 #include "FileFilterHelper.h"
 #include "FileFilterMenu.h"
 #include "FileFilters.h"
+#include "LineFilterHelper.h"
+#include "LineFilterMenu.h"
 
-DisplayFilterBar::DisplayFilterBar(QWidget *parent)
+DisplayFilterBar::DisplayFilterBar(Kind kind, QWidget *parent)
 	: QWidget(parent)
-	, m_checker(std::make_unique<FileFilterHelper>())
+	, m_kind(kind)
 {
 	setObjectName(QStringLiteral("displayFilterBar"));
 	auto *row = new QHBoxLayout(this);
@@ -25,33 +27,54 @@ DisplayFilterBar::DisplayFilterBar(QWidget *parent)
 
 	m_field = new FileFilterCombo(this);
 	m_field->setObjectName(QStringLiteral("displayFilterMask"));
-	m_field->setHistoryKey(lm::displayFilterHistoryKey());
-	m_field->setChecker([this](const QString &text) {
-		return lm::fileFilterErrors(m_checker.get(), text);
-	});
-	m_field->lineEdit()->setPlaceholderText(
-		tr("e.g. %1").arg(QStringLiteral("*.txt|fe:Size > 100KB")));
+	if (kind == Lines)
+	{
+		m_lineChecker = std::make_unique<LineFilterHelper>();
+		m_field->setHistoryKey(lm::lineDisplayFilterHistoryKey());
+		m_field->setChecker([this](const QString &text) {
+			return lm::lineFilterErrors(m_lineChecker.get(), text);
+		});
+		m_field->lineEdit()->setPlaceholderText(
+			tr("e.g. %1").arg(QStringLiteral("ERROR / le:Line contains \"ERROR\"")));
+	}
+	else
+	{
+		m_checker = std::make_unique<FileFilterHelper>();
+		m_field->setHistoryKey(lm::displayFilterHistoryKey());
+		m_field->setChecker([this](const QString &text) {
+			return lm::fileFilterErrors(m_checker.get(), text);
+		});
+		m_field->lineEdit()->setPlaceholderText(
+			tr("e.g. %1").arg(QStringLiteral("*.txt|fe:Size > 100KB")));
+	}
 	m_field->lineEdit()->installEventFilter(this);
 	row->addWidget(m_field, 1);
 
-	// the "=" button: ready-made changes to the filter (CFileFilterHelperMenu)
+	// the "=" button: ready-made changes to the filter
+	// (CFileFilterHelperMenu, CLineFilterHelperMenu)
 	m_menuButton = new QToolButton(this);
 	m_menuButton->setObjectName(QStringLiteral("displayFilterMaskMenu"));
 	m_menuButton->setText(QStringLiteral("="));
 	row->addWidget(m_menuButton);
-	m_menu = new FileFilterMenu(this);
-	m_menu->setMaskSource([this]() { return m_field->mask(); });
-	const auto showMenu = [this]() {
-		m_menu->popup(m_menuButton->mapToGlobal(QPoint(0, m_menuButton->height())));
-	};
-	connect(m_menuButton, &QToolButton::clicked, this, showMenu);
-	connect(m_menu, &FileFilterMenu::reopenRequested, this, showMenu, Qt::QueuedConnection);
-	// ShowFilterMenu: what an item made goes into the field, to be applied
-	connect(m_menu, &FileFilterMenu::maskChosen, this, [this](const QString &mask) {
-		m_field->setMask(mask, false);
-		m_field->setApplied(false);
-		focusField();
-	});
+	connect(m_menuButton, &QToolButton::clicked, this, &DisplayFilterBar::showMenu);
+	if (kind == Lines)
+	{
+		auto *menu = new LineFilterMenu(this);
+		menu->setFilterSource([this]() { return m_field->mask(); });
+		connect(menu, &LineFilterMenu::reopenRequested, this, &DisplayFilterBar::showMenu,
+			Qt::QueuedConnection);
+		connect(menu, &LineFilterMenu::filterChosen, this, &DisplayFilterBar::takeFromMenu);
+		m_menu = menu;
+	}
+	else
+	{
+		auto *menu = new FileFilterMenu(this);
+		menu->setMaskSource([this]() { return m_field->mask(); });
+		connect(menu, &FileFilterMenu::reopenRequested, this, &DisplayFilterBar::showMenu,
+			Qt::QueuedConnection);
+		connect(menu, &FileFilterMenu::maskChosen, this, &DisplayFilterBar::takeFromMenu);
+		m_menu = menu;
+	}
 
 	m_apply = new QPushButton(tr("&Apply"), this);
 	m_apply->setObjectName(QStringLiteral("displayFilterApply"));
@@ -71,6 +94,19 @@ DisplayFilterBar::DisplayFilterBar(QWidget *parent)
 
 DisplayFilterBar::~DisplayFilterBar() = default;
 
+void DisplayFilterBar::showMenu()
+{
+	m_menu->popup(m_menuButton->mapToGlobal(QPoint(0, m_menuButton->height())));
+}
+
+/** ShowFilterMenu: what an item made goes into the field, to be applied. */
+void DisplayFilterBar::takeFromMenu(const QString &filter)
+{
+	m_field->setMask(filter, false);
+	m_field->setApplied(false);
+	focusField();
+}
+
 QString DisplayFilterBar::filterText() const
 {
 	return m_field->mask();
@@ -87,7 +123,8 @@ void DisplayFilterBar::saveFilterText()
 		return;
 	// CSuperComboBox's SaveState, then LoadState: the list is read again
 	// and the field shows its latest entry
-	lm::rememberFileFilter(m_field->mask(), lm::displayFilterHistoryKey());
+	lm::rememberFileFilter(m_field->mask(), m_kind == Lines
+		? lm::lineDisplayFilterHistoryKey() : lm::displayFilterHistoryKey());
 	m_field->loadHistoryAndShowLatest();
 	m_field->checkNow();
 }

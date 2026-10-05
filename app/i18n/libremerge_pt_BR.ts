@@ -342,6 +342,14 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
         <translation>O destino da mesclagem é somente leitura.</translation>
     </message>
     <message>
+        <source>Merging/copying differences that contain hidden lines is not currently supported.
+
+Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
+        <translation>No momento não é possível mesclar/copiar diferenças que contêm linhas ocultas.
+
+Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas antes de mesclar.</translation>
+    </message>
+    <message>
         <source>Swapping reloads both files. Discard unsaved changes?</source>
         <translation>Trocar os painéis recarrega os dois arquivos. Descartar as alterações não salvas?</translation>
     </message>
@@ -379,6 +387,14 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>cannot write %1</source>
         <translation>não foi possível gravar %1</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Filters</source>
+        <translation>Adicionar aos &amp;Filtros</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Display Filter</source>
+        <translation>Adicionar ao Filtro &amp;de Exibição</translation>
     </message>
 </context>
 <context>
@@ -1670,6 +1686,437 @@ O arquivo pode ser somente leitura.</translation>
     </message>
 </context>
 <context>
+    <name>LineFilterMenu</name>
+    <message>
+        <source>Equal</source>
+        <translation>Igual</translation>
+    </message>
+    <message>
+        <source>Not Equal</source>
+        <translation>Não Igual</translation>
+    </message>
+    <message>
+        <source>Less Than</source>
+        <translation>Menos Que</translation>
+    </message>
+    <message>
+        <source>Less Than or Equal to</source>
+        <translation>Menos Que ou Igual a</translation>
+    </message>
+    <message>
+        <source>Greater Than</source>
+        <translation>Maior Que</translation>
+    </message>
+    <message>
+        <source>Greater Than or Equal to</source>
+        <translation>Maior Que ou Igual a</translation>
+    </message>
+    <message>
+        <source>Column: &amp;1</source>
+        <translation>Coluna: &amp;1</translation>
+    </message>
+    <message>
+        <source>Column: &amp;2</source>
+        <translation>Coluna: &amp;2</translation>
+    </message>
+    <message>
+        <source>Column: &amp;3</source>
+        <translation>Coluna: &amp;3</translation>
+    </message>
+    <message>
+        <source>Column: &amp;4</source>
+        <translation>Coluna: &amp;4</translation>
+    </message>
+    <message>
+        <source>Column: &amp;5</source>
+        <translation>Coluna: &amp;5</translation>
+    </message>
+    <message>
+        <source>Column: &amp;6</source>
+        <translation>Coluna: &amp;6</translation>
+    </message>
+    <message>
+        <source>Column: &amp;7</source>
+        <translation>Coluna: &amp;7</translation>
+    </message>
+    <message>
+        <source>Column: &amp;8</source>
+        <translation>Coluna: &amp;8</translation>
+    </message>
+    <message>
+        <source>Column: &amp;9</source>
+        <translation>Coluna: &amp;9</translation>
+    </message>
+    <message>
+        <source>Column: 1&amp;0</source>
+        <translation>Coluna: 1&amp;0</translation>
+    </message>
+    <message>
+        <source>&amp;Clear All</source>
+        <translation>&amp;Limpar Tudo</translation>
+    </message>
+    <message>
+        <source>Add L&amp;ine Condition</source>
+        <translation>Adicionar Condição de L&amp;inha</translation>
+    </message>
+    <message>
+        <source>L&amp;ine Text...</source>
+        <translation>Texto da L&amp;inha...</translation>
+    </message>
+    <message>
+        <source>&amp;Column</source>
+        <translation>&amp;Coluna</translation>
+    </message>
+    <message>
+        <source>&amp;Text...</source>
+        <translation>&amp;Texto...</translation>
+    </message>
+    <message>
+        <source>&amp;Number...</source>
+        <translation>&amp;Número...</translation>
+    </message>
+    <message>
+        <source>&amp;Date/Time...</source>
+        <translation>&amp;Data/Hora...</translation>
+    </message>
+    <message>
+        <source>Line L&amp;ength...</source>
+        <translation>Comprim&amp;ento da Linha...</translation>
+    </message>
+    <message>
+        <source>&amp;Word Count...</source>
+        <translation>C&amp;ontagem de Palavras...</translation>
+    </message>
+    <message>
+        <source>Line &amp;Number</source>
+        <translation>&amp;Número da Linha</translation>
+    </message>
+    <message>
+        <source>&amp;Odd Lines</source>
+        <translation>Lin&amp;has Ímpares</translation>
+    </message>
+    <message>
+        <source>&amp;Even Lines</source>
+        <translation>Linhas &amp;Pares</translation>
+    </message>
+    <message>
+        <source>&amp;Custom Range...</source>
+        <translation>&amp;Intervalo Personalizado...</translation>
+    </message>
+    <message>
+        <source>Line &amp;Status</source>
+        <translation>&amp;Status da Linha</translation>
+    </message>
+    <message>
+        <source>Different</source>
+        <translation>Diferentes</translation>
+    </message>
+    <message>
+        <source>Identical</source>
+        <translation>Idênticos(as)</translation>
+    </message>
+    <message>
+        <source>Trivial</source>
+        <translation>Triviais</translation>
+    </message>
+    <message>
+        <source>Exists</source>
+        <translation>Existe</translation>
+    </message>
+    <message>
+        <source>Missing</source>
+        <translation>Ausentes</translation>
+    </message>
+    <message>
+        <source>Moved</source>
+        <translation>Movidos(as)</translation>
+    </message>
+    <message>
+        <source>Bookmarked</source>
+        <translation>Marcados(as)</translation>
+    </message>
+    <message>
+        <source>&amp;EOL</source>
+        <translation>&amp;Fim de Linha</translation>
+    </message>
+    <message>
+        <source>&amp;Windows (CRLF)</source>
+        <translation>&amp;Windows (CRLF)</translation>
+    </message>
+    <message>
+        <source>&amp;Unix (LF)</source>
+        <translation>&amp;Unix (LF)</translation>
+    </message>
+    <message>
+        <source>&amp;Mac (CR)</source>
+        <translation>&amp;Mac (CR)</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>Nenhum</translation>
+    </message>
+    <message>
+        <source>Target: &amp;Any (Left/Middle/Right)</source>
+        <translation>A&amp;lvo: Qualquer (Esquerda/Meio/Direita)</translation>
+    </message>
+    <message>
+        <source>Target: &amp;Left</source>
+        <translation>Alvo: &amp;Esquerda</translation>
+    </message>
+    <message>
+        <source>Target: &amp;Middle</source>
+        <translation>Alvo: &amp;Meio</translation>
+    </message>
+    <message>
+        <source>Target: &amp;Right</source>
+        <translation>Alvo: &amp;Direita</translation>
+    </message>
+    <message>
+        <source>Add &amp;Difference Condition</source>
+        <translation>Adicionar Condição de D&amp;iferença</translation>
+    </message>
+    <message>
+        <source>L&amp;ine Text</source>
+        <translation>Texto da L&amp;inha</translation>
+    </message>
+    <message>
+        <source>&amp;Text</source>
+        <translation>&amp;Texto</translation>
+    </message>
+    <message>
+        <source>&amp;Number</source>
+        <translation>&amp;Número</translation>
+    </message>
+    <message>
+        <source>&amp;Date/Time</source>
+        <translation>&amp;Data/Hora</translation>
+    </message>
+    <message>
+        <source>Line L&amp;ength</source>
+        <translation>Comprim&amp;ento da Linha</translation>
+    </message>
+    <message>
+        <source>Less than 10</source>
+        <translation>Menos de 10</translation>
+    </message>
+    <message>
+        <source>10 or more</source>
+        <translation>10 ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 100</source>
+        <translation>Menos de 100</translation>
+    </message>
+    <message>
+        <source>100 or more</source>
+        <translation>100 ou mais</translation>
+    </message>
+    <message>
+        <source>Less than 1000</source>
+        <translation>Menos de 1000</translation>
+    </message>
+    <message>
+        <source>1000 or more</source>
+        <translation>1000 ou mais</translation>
+    </message>
+    <message>
+        <source>Custom Range...</source>
+        <translation>Intervalo Personalizado...</translation>
+    </message>
+    <message>
+        <source>Target: &amp;Left and Right</source>
+        <translation>Alvo: &amp;Esquerda e Direita</translation>
+    </message>
+    <message>
+        <source>Target: Left and &amp;Middle</source>
+        <translation>Alvo: Esquerda e &amp;Meio</translation>
+    </message>
+    <message>
+        <source>Target: Middle and &amp;Right</source>
+        <translation>Alvo: Meio e &amp;Direita</translation>
+    </message>
+    <message>
+        <source>Target: &amp;All</source>
+        <translation>&amp;Alvo: Todos</translation>
+    </message>
+    <message>
+        <source>&amp;Transform Line/Column</source>
+        <translation>&amp;Transformar Linha/Coluna</translation>
+    </message>
+    <message>
+        <source>&amp;Trim</source>
+        <translation>&amp;Aparar</translation>
+    </message>
+    <message>
+        <source>Normalize &amp;Whitespace</source>
+        <translation>N&amp;ormalizar Espaços em Branco</translation>
+    </message>
+    <message>
+        <source>&amp;Replace</source>
+        <translation>S&amp;ubstituir</translation>
+    </message>
+    <message>
+        <source>Reg&amp;ex Replace</source>
+        <translation>Substituir por Reg&amp;ex</translation>
+    </message>
+    <message>
+        <source>&amp;Lowercase</source>
+        <translation>Minúscu&amp;las</translation>
+    </message>
+    <message>
+        <source>&amp;Uppercase</source>
+        <translation>Maiúsc&amp;ulas</translation>
+    </message>
+    <message>
+        <source>&amp;Half-width</source>
+        <translation>Meia lar&amp;gura</translation>
+    </message>
+    <message>
+        <source>&amp;Full-width</source>
+        <translation>L&amp;argura total</translation>
+    </message>
+    <message>
+        <source>Normalize &amp;Unicode</source>
+        <translation>Normalizar &amp;Unicode</translation>
+    </message>
+    <message>
+        <source>&amp;Chinese Conversion</source>
+        <translation>Conversão do &amp;Chinês</translation>
+    </message>
+    <message>
+        <source>&amp;Simplified Chinese</source>
+        <translation>Chinês &amp;Simplificado</translation>
+    </message>
+    <message>
+        <source>&amp;Traditional Chinese</source>
+        <translation>Chinês &amp;Tradicional</translation>
+    </message>
+    <message>
+        <source>&amp;Japanese Conversion</source>
+        <translation>Conversão do &amp;Japonês</translation>
+    </message>
+    <message>
+        <source>&amp;Hiragana</source>
+        <translation>&amp;Hiragana</translation>
+    </message>
+    <message>
+        <source>&amp;Katakana</source>
+        <translation>&amp;Katakana</translation>
+    </message>
+    <message>
+        <source>Replace &amp;Lists</source>
+        <translation>&amp;Listas de Substituição</translation>
+    </message>
+    <message>
+        <source>&amp;Create String Replace List and Insert...</source>
+        <translation>&amp;Criar Lista de Substituição de String e Inserir...</translation>
+    </message>
+    <message>
+        <source>Create &amp;Regex Replace List and Insert...</source>
+        <translation>Criar Lista de Substituição de &amp;Regex e Inserir...</translation>
+    </message>
+    <message>
+        <source>&amp;String Replace Lists</source>
+        <translation>Listas de Substituição de &amp;String</translation>
+    </message>
+    <message>
+        <source>Re&amp;gex Replace Lists</source>
+        <translation>Listas de Substituição de Re&amp;gex</translation>
+    </message>
+    <message>
+        <source>Open String Replace Lists Folder...</source>
+        <translation>Abrir Pasta de Listas de Substituição de String...</translation>
+    </message>
+    <message>
+        <source>Open Regex Replace Lists Folder...</source>
+        <translation>Abrir Pasta de Listas de Substituição de Regex...</translation>
+    </message>
+    <message>
+        <source>&amp;Refine Current Filter</source>
+        <translation>&amp;Refinar Filtro Atual</translation>
+    </message>
+    <message>
+        <source>Add Con&amp;text Lines</source>
+        <translation>Adicionar Linhas de Con&amp;texto</translation>
+    </message>
+    <message>
+        <source>&amp;0 Lines</source>
+        <translation>&amp;0 Linhas</translation>
+    </message>
+    <message>
+        <source>&amp;1 Line</source>
+        <translation>&amp;1 Linha</translation>
+    </message>
+    <message>
+        <source>&amp;3 Lines</source>
+        <translation>&amp;3 Linhas</translation>
+    </message>
+    <message>
+        <source>&amp;5 Lines</source>
+        <translation>&amp;5 Linhas</translation>
+    </message>
+    <message>
+        <source>&amp;7 Lines</source>
+        <translation>&amp;7 Linhas</translation>
+    </message>
+    <message>
+        <source>Filter by &amp;Occurrence</source>
+        <translation>Filtrar por &amp;Ocorrência</translation>
+    </message>
+    <message>
+        <source>&amp;First</source>
+        <translation>&amp;Primeira</translation>
+    </message>
+    <message>
+        <source>&amp;Last</source>
+        <translation>Ú&amp;ltima</translation>
+    </message>
+    <message>
+        <source>First &amp;5 Matches</source>
+        <translation>&amp;5 Primeiras Correspondências</translation>
+    </message>
+    <message>
+        <source>After First &amp;5</source>
+        <translation>Depois das &amp;5 Primeiras</translation>
+    </message>
+    <message>
+        <source>By &amp;Block</source>
+        <translation>Por &amp;Bloco</translation>
+    </message>
+    <message>
+        <source>&amp;Range</source>
+        <translation>Inte&amp;rvalo</translation>
+    </message>
+    <message>
+        <source>&amp;Inside...</source>
+        <translation>Por &amp;Dentro...</translation>
+    </message>
+    <message>
+        <source>&amp;Outside...</source>
+        <translation>P&amp;or Fora...</translation>
+    </message>
+    <message>
+        <source>Create &amp;Range</source>
+        <translation>Criar Inte&amp;rvalo</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Corresponder maiúsculas/minúsculas</translation>
+    </message>
+    <message>
+        <source>Combine: A&amp;ND</source>
+        <translation>Combi&amp;nar: E</translation>
+    </message>
+    <message>
+        <source>Combine: &amp;OR</source>
+        <translation>Combinar: &amp;OU</translation>
+    </message>
+    <message>
+        <source>&lt;None&gt;</source>
+        <translation>&lt;Nenhum&gt;</translation>
+    </message>
+</context>
+<context>
     <name>LocationPane</name>
     <message>
         <source>Location pane — click to jump</source>
@@ -2081,6 +2528,29 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>Displa&amp;y Filter Bar</source>
         <translation>E&amp;xibir Barra de Filtros</translation>
+    </message>
+</context>
+<context>
+    <name>MatchInsideDialog</name>
+    <message>
+        <source>Match Inside/Outside Filter Expressions</source>
+        <translation>Corresponder Expressões de Filtro Por Dentro/Por Fora</translation>
+    </message>
+    <message>
+        <source>&amp;Start filter:</source>
+        <translation>&amp;Iniciar filtro:</translation>
+    </message>
+    <message>
+        <source>&amp;End filter:</source>
+        <translation>&amp;Encerrar filtro:</translation>
+    </message>
+    <message>
+        <source>Lines between start and end filter matches will be included.</source>
+        <translation>As linhas entre o início e o fim das correspondências do filtro serão incluídas.</translation>
+    </message>
+    <message>
+        <source>e.g. %1</source>
+        <translation>p.ex. %1</translation>
     </message>
 </context>
 <context>
@@ -2666,6 +3136,55 @@ Checando identidade binária...</translation>
     </message>
 </context>
 <context>
+    <name>ReplaceLists</name>
+    <message>
+        <source># Regex replacement list
+# Format: regex&lt;TAB&gt;replacement
+# Backreferences like $1, $2 are supported
+
+(\d{4})-(\d{2})-(\d{2})	$1_$2_$3
+</source>
+        <translation># Lista de substituição de regex
+# Formato: regex&lt;TAB&gt;substituição
+# Referências anteriores como $1, $2 são suportadas
+
+(\d{4})-(\d{2})-(\d{2})	$1_$2_$3
+</translation>
+    </message>
+    <message>
+        <source># Replacement list
+# Format: search&lt;TAB&gt;replacement
+# Lines starting with # are ignored
+
+from1	to1
+from2	to2
+</source>
+        <translation># Lista de substituição
+# Formato: busca&lt;TAB&gt;substituição
+# Linhas começando com # são ignoradas
+
+de1	para1
+de2	para2
+</translation>
+    </message>
+    <message>
+        <source>Failed to create folder:
+%1</source>
+        <translation>Falha ao criar a pasta:
+%1</translation>
+    </message>
+    <message>
+        <source>Tab-Separated Values (*.tsv *.txt);;All Files (*)</source>
+        <translation>Valores Separados por Tabulação (*.tsv *.txt);;Todos os Arquivos (*)</translation>
+    </message>
+    <message>
+        <source>Failed to create file:
+%1</source>
+        <translation>Falha ao criar o arquivo:
+%1</translation>
+    </message>
+</context>
+<context>
     <name>TableCompareView</name>
     <message>
         <source>First Difference</source>
@@ -2740,6 +3259,30 @@ Checando identidade binária...</translation>
         <translation>o motor de comparação falhou</translation>
     </message>
     <message>
+        <source>Use First Line as Headers</source>
+        <translation>Use a Primeira Linha como Cabeçalhos</translation>
+    </message>
+    <message>
+        <source>Auto-Fit All Columns</source>
+        <translation>Ajustar Automaticamente Todas as Colunas</translation>
+    </message>
+    <message>
+        <source>&amp;Filter by This Column</source>
+        <translation>&amp;Filtrar por Esta Coluna</translation>
+    </message>
+    <message>
+        <source>&amp;Text...</source>
+        <translation>&amp;Texto...</translation>
+    </message>
+    <message>
+        <source>&amp;Number...</source>
+        <translation>&amp;Número...</translation>
+    </message>
+    <message>
+        <source>&amp;Date/Time...</source>
+        <translation>&amp;Data/Hora...</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translation>Os arquivos são idênticos</translation>
     </message>
@@ -2765,6 +3308,14 @@ Checando identidade binária...</translation>
     <message>
         <source>  • unsaved changes</source>
         <translation>  • alterações não salvas</translation>
+    </message>
+    <message>
+        <source>Merging/copying differences that contain hidden lines is not currently supported.
+
+Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
+        <translation>No momento não é possível mesclar/copiar diferenças que contêm linhas ocultas.
+
+Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas antes de mesclar.</translation>
     </message>
     <message>
         <source>could not create the backup file %1</source>
