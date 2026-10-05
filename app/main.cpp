@@ -72,6 +72,8 @@
 #include "LineFilterMenu.h"
 #include "MatchInsideDialog.h"
 #include "ReplaceLists.h"
+#include "ProjectLinks.h"
+#include "StarPrompt.h"
 #include "ItemCheckStyle.h"
 #include "OptionsDialog.h"
 #include "Theme.h"
@@ -305,6 +307,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestLastLineOpt(QStringLiteral("selftest-last-line"),
 		QStringLiteral("Compare files whose last lines differ and verify what is a difference (for testing)"));
 	parser.addOption(selftestLastLineOpt);
+	QCommandLineOption selftestStarPromptOpt(QStringLiteral("selftest-star-prompt"),
+		QStringLiteral("Verify the request for a star and the Help menu's project pages (for testing)"));
+	parser.addOption(selftestStarPromptOpt);
 	QCommandLineOption selftestUndoRescanOpt(QStringLiteral("selftest-undo-rescan"),
 		QStringLiteral("Edit, recompare (realigning the edited pane), undo and redo (for testing)"));
 	parser.addOption(selftestUndoRescanOpt);
@@ -558,6 +563,379 @@ int main(int argc, char *argv[])
 		return (cancel != QStringLiteral("Cancel")
 			&& paste != QStringLiteral("&Paste")
 			&& fileMenu != QStringLiteral("&File")) ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestStarPromptOpt))
+	{
+		// LibreMerge's request for a star (see StarPrompt) and the Help
+		// menu's links to the project's pages. The request waits for use
+		// of the application, shows on the "Select Files or Folders"
+		// screen in a few sessions at most, and an answer ends it for
+		// good; a page opens at a click and at nothing else
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		write(left, "one\ntwo\n");
+		write(right, "one\n2\n");
+		const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+		const QString language = qEnvironmentVariable("LIBREMERGE_LANGUAGE", QStringLiteral("en"));
+
+		// the pages the browser was handed
+		QList<QUrl> opened;
+		lm::setProjectPageOpenerForTest([&opened](const QUrl &page) { opened << page; });
+		using Prompt = lm::StarPrompt;
+		Prompt *prompt = Prompt::instance();
+		const QDate firstDay(2026, 3, 2);
+		// the application used on a number of days, started twice on each,
+		// for a number of comparisons
+		const auto use = [&](int days, int comparisons)
+		{
+			for (int i = 0; i < days; ++i)
+			{
+				prompt->noteAppStarted(firstDay.addDays(i));
+				prompt->noteAppStarted(firstDay.addDays(i));
+			}
+			for (int i = 0; i < comparisons; ++i)
+				prompt->noteComparisonOpened();
+		};
+		// a new user's settings, in a session of its own
+		const auto startOver = [&]()
+		{
+			QSettings().clear();
+			prompt->startSessionForTest();
+			opened.clear();
+		};
+		// the next run of the application, taken to the selection screen
+		struct Run
+		{
+			std::unique_ptr<MainWindow> window;
+			QPointer<NewComparisonView> selector;
+			QPointer<StarPromptBar> strip;
+		};
+		const auto nextRun = [&](bool openSelector = true)
+		{
+			prompt->startSessionForTest();
+			Run run;
+			run.window = std::make_unique<MainWindow>();
+			run.window->resize(1100, 700);
+			if (openSelector)
+				run.window->openSelector();
+			else
+				run.window->openBlankComparison();
+			run.window->show();
+			QCoreApplication::processEvents();
+			run.selector = run.window->findChild<NewComparisonView *>();
+			run.strip = run.window->findChild<StarPromptBar *>();
+			return run;
+		};
+		// (a strip that was answered is deleted once its click is over)
+		const auto settle = []()
+		{
+			QCoreApplication::processEvents();
+			QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+		};
+
+		// --- who is asked ---
+		{
+			const Run run = nextRun();
+			check(!prompt->due() && run.selector != nullptr && run.strip == nullptr,
+				"a new user is not asked");
+		}
+		startOver();
+		use(Prompt::kDaysOfUse - 1, Prompt::kComparisons);
+		{
+			const bool early = !prompt->due();
+			prompt->noteAppStarted(firstDay.addDays(Prompt::kDaysOfUse - 1));
+			check(early && prompt->due(), "the comparisons alone do not ask: the days of use too");
+		}
+		startOver();
+		use(Prompt::kDaysOfUse, Prompt::kComparisons - 1);
+		{
+			const bool early = !prompt->due();
+			prompt->noteComparisonOpened();
+			check(early && prompt->due(), "the days alone do not ask: the comparisons too");
+		}
+		startOver();
+		for (int i = 0; i < 3 * Prompt::kDaysOfUse; ++i)
+			prompt->noteAppStarted(firstDay);
+		use(0, Prompt::kComparisons);
+		check(!prompt->due(), "a day counts once, however often the application starts");
+
+		// what a comparison is: files, folders, tables or images that
+		// were opened, not the blank one the application starts on
+		startOver();
+		use(Prompt::kDaysOfUse, Prompt::kComparisons - 1);
+		{
+			MainWindow window;
+			window.openBlankComparison();
+			window.openBlankComparison();
+			const bool blank = !prompt->due();
+			window.openFileComparison(left, right);
+			check(blank && prompt->due(), "an opened comparison counts, a blank one does not");
+		}
+
+		// --- the strip ---
+		startOver();
+		use(Prompt::kDaysOfUse, Prompt::kComparisons);
+		{
+			const Run run = nextRun();
+			QLabel *text = run.strip ? run.strip->findChild<QLabel *>(
+				QStringLiteral("starPromptText")) : nullptr;
+			QPushButton *button = run.strip ? run.strip->findChild<QPushButton *>(
+				QStringLiteral("starPromptButton")) : nullptr;
+			QToolButton *close = run.strip ? run.strip->findChild<QToolButton *>(
+				QStringLiteral("starPromptClose")) : nullptr;
+			check(run.strip != nullptr && run.strip->isVisible() && text != nullptr
+				&& !text->text().isEmpty() && button != nullptr && !button->text().isEmpty()
+				&& close != nullptr && !close->toolTip().isEmpty(),
+				"someone who has used the application is asked: the text, the button, the close");
+			if (run.strip == nullptr || button == nullptr || close == nullptr)
+				return 1;
+
+			// on the selection screen, in the room above its buttons, and
+			// after them for the Tab key
+			QPushButton *compare = nullptr, *cancel = nullptr;
+			for (QPushButton *candidate : run.selector->findChildren<QPushButton *>())
+			{
+				if (candidate->text() == NewComparisonView::tr("Compare"))
+					compare = candidate;
+				else if (candidate->text() == NewComparisonView::tr("Cancel"))
+					cancel = candidate;
+			}
+			bool placed = compare != nullptr && cancel != nullptr
+				&& run.selector->isAncestorOf(run.strip);
+			if (placed)
+			{
+				const QRect stripRect(run.strip->mapTo(run.selector, QPoint(0, 0)),
+					run.strip->size());
+				const QRect compareRect(compare->mapTo(run.selector, QPoint(0, 0)),
+					compare->size());
+				placed = stripRect.bottom() < compareRect.top()
+					&& stripRect.width() > 3 * compareRect.width()
+					&& stripRect.height() < 3 * compareRect.height();
+				// (the order of the Tab key, from the top of the screen)
+				int atCompare = -1, atCancel = -1, atButton = -1, atClose = -1;
+				QWidget *next = run.selector;
+				for (int i = 0; i < 2000 && (atCompare < 0 || atCancel < 0
+					|| atButton < 0 || atClose < 0); ++i)
+				{
+					next = next->nextInFocusChain();
+					if (next == compare)
+						atCompare = i;
+					else if (next == cancel)
+						atCancel = i;
+					else if (next == button)
+						atButton = i;
+					else if (next == close)
+						atClose = i;
+				}
+				placed = placed && atCompare >= 0 && atCompare < atCancel
+					&& atCancel < atButton && atButton < atClose;
+			}
+			check(placed, "the strip sits above the screen's buttons and after them for the Tab key");
+
+			// only there
+			run.window->openFileComparison(left, right);
+			QCoreApplication::processEvents();
+			check(run.window->findChildren<StarPromptBar *>().size() == 1 && !run.strip->isVisible(),
+				"a comparison has no strip");
+			check(opened.isEmpty(), "no page opens by itself");
+
+			if (!shots.isEmpty())
+			{
+				// the screen with the strip, in both themes
+				run.window->openSelector();
+				for (const bool dark : { false, true })
+				{
+					lm::Theme::instance()->setMode(dark ? lm::ThemeMode::Dark
+						: lm::ThemeMode::Light);
+					for (int i = 0; i < 8; ++i)
+					{
+						QThread::msleep(25);
+						QCoreApplication::processEvents();
+					}
+					run.window->grab().save(QStringLiteral("%1/star-%2-%3.png").arg(shots,
+						language, QLatin1String(dark ? "dark" : "light")));
+					run.strip->grab().save(QStringLiteral("%1/star-%2-%3-strip.png").arg(shots,
+						language, QLatin1String(dark ? "dark" : "light")));
+				}
+				// and in a narrow window, where the text takes two lines
+				run.window->resize(640, 620);
+				for (int i = 0; i < 8; ++i)
+				{
+					QThread::msleep(25);
+					QCoreApplication::processEvents();
+				}
+				run.window->grab().save(QStringLiteral("%1/star-%2-narrow.png").arg(shots,
+					language));
+				lm::Theme::instance()->setMode(lm::ThemeMode::System);
+				QCoreApplication::processEvents();
+			}
+		}
+
+		// --- left unanswered: a few sessions, then no more ---
+		startOver();
+		use(Prompt::kDaysOfUse, Prompt::kComparisons);
+		{
+			// (a session that never came to the selection screen is none
+			// of them)
+			for (int i = 0; i < Prompt::kSessions + 1; ++i)
+				nextRun(false);
+			int sessions = 0;
+			bool again = true, more = false;
+			for (int i = 0; i < Prompt::kSessions + 2; ++i)
+			{
+				const Run run = nextRun();
+				if (run.strip == nullptr)
+					continue;
+				++sessions;
+				// the screen opened once more in a session, the last of
+				// them too, still has its strip, and the session is one
+				NewComparisonView another;
+				another.show();
+				QCoreApplication::processEvents();
+				again = again && another.findChild<StarPromptBar *>() != nullptr;
+			}
+			{
+				NewComparisonView another;
+				more = another.findChild<StarPromptBar *>() != nullptr;
+			}
+			check(sessions == Prompt::kSessions && again && !more && !prompt->due()
+				&& opened.isEmpty(),
+				"left unanswered, the strip shows in three sessions and no more");
+		}
+
+		// --- the answers ---
+		startOver();
+		use(Prompt::kDaysOfUse, Prompt::kComparisons);
+		{
+			const Run run = nextRun();
+			// (a second strip on show: the answer is for both)
+			NewComparisonView another;
+			another.show();
+			QCoreApplication::processEvents();
+			const QPointer<StarPromptBar> second = another.findChild<StarPromptBar *>();
+			const bool two = run.strip != nullptr && second != nullptr;
+			if (two)
+				run.strip->findChild<QPushButton *>(QStringLiteral("starPromptButton"))->click();
+			settle();
+			check(two && opened == QList<QUrl>{ lm::projectPage() } && run.strip == nullptr
+				&& second == nullptr && !prompt->due(),
+				"the button opens the project's page and takes the strips away");
+		}
+		{
+			const Run later = nextRun();
+			check(later.strip == nullptr && opened.size() == 1,
+				"answered with the button, it is not asked again");
+		}
+		startOver();
+		use(Prompt::kDaysOfUse, Prompt::kComparisons);
+		{
+			const Run run = nextRun();
+			const bool asked = run.strip != nullptr;
+			if (asked)
+				run.strip->findChild<QToolButton *>(QStringLiteral("starPromptClose"))->click();
+			settle();
+			check(asked && opened.isEmpty() && run.strip == nullptr && !prompt->due(),
+				"the close ends the request and opens no page");
+			// more use, the messages of Options > Message Boxes shown
+			// again, another session: nothing asks again
+			use(2 * Prompt::kDaysOfUse, 2 * Prompt::kComparisons);
+			OptionsDialog dialog;
+			dialog.resetMessageBoxesForTest();
+			const Run later = nextRun();
+			check(later.strip == nullptr && !prompt->due() && opened.isEmpty(),
+				"nothing brings it back: not more use, not Options > Message Boxes");
+		}
+
+		// --- the Help menu: the project's pages above About ---
+		startOver();
+		{
+			MainWindow window;
+			QMenu *help = nullptr;
+			for (QAction *title : window.menuBar()->actions())
+				if (title->menu() != nullptr)
+					help = title->menu(); // the last of the bar
+			const QList<QAction *> items = help != nullptr ? help->actions() : QList<QAction *>();
+			const char *const names[] = { "helpProjectPage", "helpReportProblem", "helpTranslate" };
+			const QUrl pages[] = { lm::projectPage(), lm::projectIssuesPage(),
+				lm::projectTranslationsPage() };
+			bool fine = items.size() == 5 && items.at(3)->isSeparator()
+				&& items.at(4)->menuRole() == QAction::AboutRole;
+			QSet<QChar> mnemonics;
+			for (int i = 0; fine && i < 5; ++i)
+			{
+				if (i == 3)
+					continue;
+				// (one letter each, to pick the item from the keyboard)
+				const QString label = items.at(i)->text();
+				const int mark = label.indexOf(QLatin1Char('&'));
+				fine = mark >= 0 && mark + 1 < label.size()
+					&& !mnemonics.contains(label.at(mark + 1).toLower());
+				if (fine)
+					mnemonics.insert(label.at(mark + 1).toLower());
+			}
+			for (int i = 0; fine && i < 3; ++i)
+			{
+				QAction *item = items.at(i);
+				item->trigger();
+				fine = item->objectName() == QLatin1String(names[i])
+					&& item->menuRole() == QAction::NoRole
+					&& opened.size() == i + 1 && opened.last() == pages[i];
+			}
+			check(fine, "Help: the project's page, its issues and the call for translators, above About");
+			if (!shots.isEmpty() && help != nullptr)
+				help->grab().save(QStringLiteral("%1/star-%2-help.png").arg(shots, language));
+			const QString home = QStringLiteral("https://github.com/iagodpassos/libremerge");
+			check(lm::projectPage() == QUrl(home)
+				&& lm::projectIssuesPage() == QUrl(home + QStringLiteral("/issues"))
+				&& lm::projectTranslationsPage().toString().startsWith(home + QStringLiteral("/issues/"))
+				&& AboutDialog::homepageUrl() == lm::projectPage(),
+				"the pages are the project's own, the About box's among them");
+		}
+
+		// --- the texts, in the catalog of the language in use ---
+		if (language != QStringLiteral("en"))
+		{
+			const char *const menu[] = { "LibreMerge on &GitHub", "&Report a Problem",
+				"Help &Translate" };
+			const char *const strip[] = {
+				"Enjoying LibreMerge? A star on GitHub helps other people find the project.",
+				"Star on GitHub", "Close" };
+			bool translated = true;
+			for (const char *text : menu)
+				if (QCoreApplication::translate("MainWindow", text) == QLatin1String(text))
+				{
+					printf("not translated: %s\n", text);
+					translated = false;
+				}
+			for (const char *text : strip)
+				if (QCoreApplication::translate("StarPromptBar", text) == QLatin1String(text))
+				{
+					printf("not translated: %s\n", text);
+					translated = false;
+				}
+			check(translated, "the new texts are in the catalog");
+		}
+
+		lm::setProjectPageOpenerForTest({});
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
 	}
 
 	if (parser.isSet(selftestMenuRolesOpt))
@@ -7961,6 +8339,12 @@ int main(int argc, char *argv[])
 		printf("remaining diffs: %d\n", view.diffCount());
 		return view.diffCount() == 0 ? 0 : 1;
 	}
+
+	// a day of use, for the request that waits for a few of them (see
+	// StarPrompt), counted before the first screen asks whether it is
+	// due; a screenshot for testing is none
+	if (!parser.isSet(screenshotOpt))
+		lm::StarPrompt::instance()->noteAppStarted();
 
 	MainWindow window;
 #ifdef Q_OS_MACOS

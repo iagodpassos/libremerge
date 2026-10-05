@@ -5,6 +5,7 @@
 #include "FileFilterMenu.h"
 #include "FileFilters.h"
 #include "OptionsDialog.h"
+#include "StarPrompt.h"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -211,6 +212,8 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	layout->addLayout(filterRow);
 
 	layout->addStretch(1);
+	// (where the request for a star goes, see below)
+	const int starPlace = layout->count();
 
 	auto *buttons = new QGridLayout;
 	buttons->setColumnStretch(0, 1);
@@ -243,6 +246,13 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	connect(cancelButton, &QPushButton::clicked, this, &NewComparisonView::cancelled);
 	buttons->addWidget(cancelButton, 0, 2);
 	layout->addLayout(buttons);
+
+	// LibreMerge's one request of its users, in the room the screen has
+	// to spare above the buttons, and only when it is due (see
+	// StarPrompt). It is made after them: the Tab key reaches Compare
+	// and Cancel as it always did, and the strip last.
+	if (QWidget *starBar = lm::StarPrompt::instance()->createBar(content))
+		layout->insertWidget(starPlace, starBar);
 
 	outer->addWidget(content, 1);
 

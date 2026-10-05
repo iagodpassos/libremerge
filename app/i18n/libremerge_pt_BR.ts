@@ -2426,6 +2426,18 @@ O arquivo pode ser somente leitura.</translation>
         <translation>A&amp;juda</translation>
     </message>
     <message>
+        <source>LibreMerge on &amp;GitHub</source>
+        <translation>LibreMerge no &amp;GitHub</translation>
+    </message>
+    <message>
+        <source>&amp;Report a Problem</source>
+        <translation>&amp;Relatar um Problema</translation>
+    </message>
+    <message>
+        <source>Help &amp;Translate</source>
+        <translation>Ajudar a &amp;Traduzir</translation>
+    </message>
+    <message>
         <source>&amp;About LibreMerge</source>
         <translation>&amp;Sobre o LibreMerge</translation>
     </message>
@@ -3182,6 +3194,21 @@ de2	para2
 %1</source>
         <translation>Falha ao criar o arquivo:
 %1</translation>
+    </message>
+</context>
+<context>
+    <name>StarPromptBar</name>
+    <message>
+        <source>Enjoying LibreMerge? A star on GitHub helps other people find the project.</source>
+        <translation>Gostando do LibreMerge? Uma estrela no GitHub ajuda outras pessoas a encontrar o projeto.</translation>
+    </message>
+    <message>
+        <source>Star on GitHub</source>
+        <translation>Dar uma estrela</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Fechar</translation>
     </message>
 </context>
 <context>

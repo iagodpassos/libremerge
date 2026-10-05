@@ -15,6 +15,8 @@
 #include <QTextBrowser>
 #include <QVBoxLayout>
 
+#include "ProjectLinks.h"
+
 namespace
 {
 
@@ -221,7 +223,7 @@ QString AboutDialog::platformText()
 
 QUrl AboutDialog::homepageUrl()
 {
-	return QUrl(QStringLiteral("https://github.com/iagodpassos/libremerge"));
+	return lm::projectPage();
 }
 
 QString AboutDialog::contributorsMarkdown()

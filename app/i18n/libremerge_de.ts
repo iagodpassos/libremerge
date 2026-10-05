@@ -2634,6 +2634,21 @@ Patches sind nicht betroffen.</translation>
         <translation>&amp;Hilfe</translation>
     </message>
     <message>
+        <source>LibreMerge on &amp;GitHub</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>LibreMerge auf &amp;GitHub</translation>
+    </message>
+    <message>
+        <source>&amp;Report a Problem</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Problem melden</translation>
+    </message>
+    <message>
+        <source>Help &amp;Translate</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Bei der Übersetzung &amp;helfen</translation>
+    </message>
+    <message>
         <source>&amp;About LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Ü&amp;ber LibreMerge</translation>
@@ -3455,6 +3470,23 @@ von2	zu2
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Datei erstellen ist fehlgeschlagen:
 %1</translation>
+    </message>
+</context>
+<context>
+    <name>StarPromptBar</name>
+    <message>
+        <source>Enjoying LibreMerge? A star on GitHub helps other people find the project.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Gefällt Ihnen LibreMerge? Ein Stern auf GitHub hilft anderen, das Projekt zu finden.</translation>
+    </message>
+    <message>
+        <source>Star on GitHub</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Stern vergeben</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Schließen</translation>
     </message>
 </context>
 <context>

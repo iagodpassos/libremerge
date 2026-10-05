@@ -46,6 +46,8 @@
 #include "ArchiveCompare.h"
 #include "FolderCompareView.h"
 #include "NewComparisonView.h"
+#include "ProjectLinks.h"
+#include "StarPrompt.h"
 
 // engine
 #include "OptionsMgr.h"
@@ -668,6 +670,19 @@ MainWindow::MainWindow(QWidget *parent)
 		[this]() { showFilters(); });
 
 	QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
+	// the project's pages, opened in the browser: LibreMerge's own items
+	// (WinMerge's Help menu has links of its kind, Release Notes and
+	// Translations, to pages of its site)
+	addMenuAction(helpMenu, tr("LibreMerge on &GitHub"), QKeySequence(),
+		[]() { lm::openProjectPage(lm::projectPage()); })
+		->setObjectName(QStringLiteral("helpProjectPage"));
+	addMenuAction(helpMenu, tr("&Report a Problem"), QKeySequence(),
+		[]() { lm::openProjectPage(lm::projectIssuesPage()); })
+		->setObjectName(QStringLiteral("helpReportProblem"));
+	addMenuAction(helpMenu, tr("Help &Translate"), QKeySequence(),
+		[]() { lm::openProjectPage(lm::projectTranslationsPage()); })
+		->setObjectName(QStringLiteral("helpTranslate"));
+	helpMenu->addSeparator();
 	QAction *aboutAction = helpMenu->addAction(tr("&About LibreMerge"));
 	aboutAction->setMenuRole(QAction::AboutRole);
 	connect(aboutAction, &QAction::triggered, this, [this]() {
@@ -1564,6 +1579,9 @@ void MainWindow::rememberComparison(const QStringList &paths)
 	for (const QString &path : paths)
 		if (path.isEmpty())
 			return; // untitled panes are not reopenable
+	// a comparison of files or folders was opened: use of the
+	// application, which the request for a star waits for
+	lm::StarPrompt::instance()->noteComparisonOpened();
 	QSettings settings;
 	const QString key = QStringLiteral("RecentComparisons/List");
 	QStringList entries = settings.value(key).toStringList();

@@ -40,6 +40,8 @@ qt_add_executable(LibreMerge
   FolderCompareDriver.cpp
   ArchiveCompare.cpp
   AboutDialog.cpp
+  ProjectLinks.cpp
+  StarPrompt.cpp
   DesktopIntegration.cpp
   FileOps.cpp
   EngineOptions.cpp
