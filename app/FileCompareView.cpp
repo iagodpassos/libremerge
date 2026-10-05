@@ -1674,7 +1674,7 @@ void FileCompareView::updatePaneStatus(int side)
 	const int col = cursor.positionInBlock() + 1;
 	// like WinMerge, the maximum column is the line length + 1
 	const int maxCol = qMax(1, cursor.block().length());
-	m_posLabels[side]->setText(tr("Lin: %1  Col: %2/%3  Car: %2/%3")
+	m_posLabels[side]->setText(tr("Ln: %1  Col: %2/%3  Ch: %2/%3")
 		.arg(realLine).arg(col).arg(maxCol));
 }
 

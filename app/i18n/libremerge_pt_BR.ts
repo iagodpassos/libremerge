@@ -9,7 +9,7 @@
     </message>
     <message>
         <source>LibreMerge comes with ABSOLUTELY NO WARRANTY. It is free software and can be redistributed under the conditions of the %1, version 3 or later.</source>
-        <translation>O LibreMerge vem com ABSOLUTAMENTE NENHUMA GARANTIA. Ele é um software livre e pode ser redistribuído sob as condiçôes da %1, versão 3 ou posterior.</translation>
+        <translation>O LibreMerge vem com ABSOLUTAMENTE NENHUMA GARANTIA. Ele é um software livre e pode ser redistribuído sob as condições da %1, versão 3 ou posterior.</translation>
     </message>
     <message>
         <source>GNU General Public License</source>
@@ -243,6 +243,10 @@ LibreMerge compares text files; binary comparison is not supported yet.</source>
 O LibreMerge compara arquivos de texto; comparação binária ainda não é suportada.</translation>
     </message>
     <message>
+        <source>Ln: %1  Col: %2/%3  Ch: %2/%3</source>
+        <translation>Lin: %1  Col: %2/%3  Car: %2/%3</translation>
+    </message>
+    <message>
         <source>cannot open %1</source>
         <translation>não foi possível abrir %1</translation>
     </message>
@@ -288,10 +292,6 @@ O LibreMerge compara arquivos de texto; comparação binária ainda não é supo
     <message>
         <source>  • unsaved changes</source>
         <translation>  • alterações não salvas</translation>
-    </message>
-    <message>
-        <source>Lin: %1  Col: %2/%3  Car: %2/%3</source>
-        <translation>Lin: %1  Col: %2/%3  Car: %2/%3</translation>
     </message>
     <message>
         <source>Copy Full Path</source>
