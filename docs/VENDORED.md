@@ -29,6 +29,33 @@ scanlines and produce the same diffs; format support follows Qt's decoders
 instead of FreeImage's (writing GIF and multi-page files back is not
 supported, unlike WinMerge).
 
+## Translations
+
+LibreMerge mirrors WinMerge's interface, so its translations take
+WinMerge's wording wherever WinMerge has the text. They come from the
+catalogs of the same commit, `Translations/WinMerge/*.po`, GPL like the
+rest:
+
+| Local file | Upstream catalog | Upstream maintainer and translators |
+|---|---|---|
+| `app/i18n/libremerge_de.ts` | `German.po` | Tim Gerundt; René Nicolaus, Winfried Peter, Jörg Schneider |
+| `app/i18n/libremerge_pt_BR.ts` | `Brazilian.po` | as listed in the catalog's header |
+
+In the German file every text that is not WinMerge's as it stands carries
+a translator comment, which Qt Linguist shows next to it:
+
+- `After WinMerge's "…".` marks WinMerge's translation of that text,
+  fitted to a LibreMerge label that differs from it in the accelerator,
+  the ending or the shortcut, or naming LibreMerge where WinMerge's
+  translators named their application (140 texts);
+- `LibreMerge's own text: not in WinMerge's catalog.` marks a text
+  translated for LibreMerge, in WinMerge's vocabulary (155 texts). These
+  are the ones a native speaker's review matters most for.
+
+The other 491 are WinMerge's translations unchanged, the odd ones
+included: a text follows WinMerge's wording until a review says
+otherwise.
+
 ## Deliberately excluded (and why)
 
 - **All MFC GUI code** (`*Dlg`, `*Bar`, `*Menu`, `*View`, `*Frm`, `*Doc`, `Src/Common` widgets): MFC is Windows-only and non-redistributable. The UI is rebuilt in Qt.

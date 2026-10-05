@@ -20,7 +20,7 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - **Line filters** (regular expressions that mark matching differences as trivial) and **moved block detection**
 - **Find and replace** in the compare panes (⌘F, wrap-around, match case)
 - **Syntax highlighting** for 47 languages, via WinMerge's own parsers
-- **Light and dark themes** for the whole window, or follow the system (on Linux, the dark style of GNOME and KDE, picked up as you switch it), chosen under Options > General; **English and Brazilian Portuguese** interface following the system language
+- **Light and dark themes** for the whole window, or follow the system (on Linux, the dark style of GNOME and KDE, picked up as you switch it), chosen under Options > General; **English, German and Brazilian Portuguese** interface following the system language
 - Drag & drop files or folders onto the window or the Dock icon; a WinMerge-style "Select Files or Folders" screen with history, paths verified as you type, auto completion, read-only flags and swap; a single file opens against a snapshot of itself, to review your own edits
 - Comparison options carried over from WinMerge: ignore whitespace/case/blank lines/EOL/numbers, diff algorithm selection (Myers, minimal, patience, histogram)
 - An **Options dialog laid out like WinMerge's**, with its General settings (close with Esc, preserve file times on save, verify paths, auto completion) and its Message Boxes page, where the "files are identical" notices can be hidden and brought back

@@ -549,11 +549,15 @@ int main(int argc, char *argv[])
 		const char *pasteText = "&Paste";
 		const QString cancel = QCoreApplication::translate(themeContext, cancelText);
 		const QString paste = QCoreApplication::translate(textControlContext, pasteText);
-		printf("%s: Cancel -> %s, &Paste -> %s (translations: %s)\n",
-			qPrintable(language), qPrintable(cancel), qPrintable(paste),
+		// LibreMerge's own catalog is in the binary: a language it is
+		// translated to has its menus in that language
+		const QString fileMenu = MainWindow::tr("&File");
+		printf("%s: Cancel -> %s, &Paste -> %s, &File -> %s (translations: %s)\n",
+			qPrintable(language), qPrintable(cancel), qPrintable(paste), qPrintable(fileMenu),
 			qPrintable(QLibraryInfo::path(QLibraryInfo::TranslationsPath)));
 		return (cancel != QStringLiteral("Cancel")
-			&& paste != QStringLiteral("&Paste")) ? 0 : 1;
+			&& paste != QStringLiteral("&Paste")
+			&& fileMenu != QStringLiteral("&File")) ? 0 : 1;
 	}
 
 	if (parser.isSet(selftestMenuRolesOpt))
@@ -856,6 +860,38 @@ int main(int argc, char *argv[])
 			printf("item check boxes: %d of %d drawn (%s)\n", drawn, rows,
 				lm::itemCheckBoxesNeedHelp() ? "painted here" : "platform style");
 			ok = ok && rows > 0 && drawn == rows;
+		}
+		// the language list: the system's, English, and every catalog the
+		// binary carries, each of which loads and has the menus' texts
+		{
+			auto *languages = dialog.pageForTest(OptionsDialog::GeneralPage)
+				->findChild<QComboBox *>(QStringLiteral("language"));
+			QStringList offered;
+			for (int i = 0; languages != nullptr && i < languages->count(); ++i)
+				offered.append(languages->itemData(i).toString());
+			const QString prefix = QStringLiteral("libremerge_");
+			QStringList catalogs;
+			for (const QString &name : QDir(QStringLiteral(":/i18n")).entryList(
+					{ prefix + QStringLiteral("*.qm") }, QDir::Files, QDir::Name))
+				catalogs.append(QFileInfo(name).completeBaseName().mid(prefix.size()));
+			bool listed = !catalogs.isEmpty() && offered.value(0).isEmpty()
+				&& offered.contains(QStringLiteral("en_US"))
+				&& offered.size() == catalogs.size() + 2;
+			// (held in variables: the answer comes from the catalog asked)
+			const char *menuContext = "MainWindow";
+			const char *menuText = "&File";
+			for (const QString &code : catalogs)
+			{
+				QTranslator catalog;
+				const bool loaded = catalog.load(QLocale(code), QStringLiteral("libremerge"),
+					QStringLiteral("_"), QStringLiteral(":/i18n"));
+				const QString file = loaded ? catalog.translate(menuContext, menuText) : QString();
+				printf("language %s: %s, &File -> %s\n", qPrintable(code),
+					offered.contains(code) ? "offered" : "NOT OFFERED", qPrintable(file));
+				listed = listed && offered.contains(code) && !file.isEmpty()
+					&& file != QLatin1String(menuText);
+			}
+			ok = ok && listed;
 		}
 		printf("options dialog: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
@@ -6766,6 +6802,11 @@ int main(int argc, char *argv[])
 		const QStringList items = lm::appMenuItemsForTest();
 		bool ok = !items.isEmpty()
 			&& items.first().endsWith(QLatin1String("\t0"));
+		// (Qt's own name for the entry, in the language in use: held in
+		// variables so lupdate leaves it to Qt's catalog)
+		const char *appMenuContext = "MAC_APPLICATION_MENU";
+		const char *servicesText = "Services";
+		const QString services = QCoreApplication::translate(appMenuContext, servicesText);
 		for (const QString &item : items)
 		{
 			printf("%s\n", qPrintable(item));
@@ -6773,7 +6814,8 @@ int main(int argc, char *argv[])
 			const bool submenu = item.endsWith(QLatin1String("\t1"));
 			// the Services entry is the only application-menu item that
 			// legitimately opens a submenu
-			if (submenu && !title.startsWith(QStringLiteral("Servi")))
+			if (submenu && !title.startsWith(services)
+				&& !title.startsWith(QStringLiteral("Servi")))
 				ok = false;
 		}
 		// the overlay submenu belongs to the Image menu; macOS installs the
@@ -6784,14 +6826,14 @@ int main(int argc, char *argv[])
 			lm::appMenuItemsForTest(QStringLiteral("*")).size() > 3;
 		if (installed)
 		{
-			QStringList imageItems = lm::appMenuItemsForTest(QStringLiteral("Image"));
-			if (imageItems.isEmpty())
-				imageItems = lm::appMenuItemsForTest(QStringLiteral("Imagem"));
+			// the two menus by their names in the language in use (the
+			// German overlay, "Überlagerung", starts like its "About")
+			const QString imageTitle = MainWindow::tr("&Image").remove(QLatin1Char('&'));
+			const QString overlayTitle = MainWindow::tr("&Overlay").remove(QLatin1Char('&'));
+			const QStringList imageItems = lm::appMenuItemsForTest(imageTitle);
 			bool overlayHome = false;
 			for (const QString &item : imageItems)
-				if ((item.startsWith(QStringLiteral("Overlay"))
-						|| item.startsWith(QStringLiteral("Sobreposi")))
-					&& item.endsWith(QLatin1String("\t1")))
+				if (item.startsWith(overlayTitle) && item.endsWith(QLatin1String("\t1")))
 					overlayHome = true;
 			printf("overlay submenu in the Image menu: %d\n", overlayHome);
 			ok = ok && overlayHome;

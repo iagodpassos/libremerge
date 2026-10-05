@@ -261,7 +261,10 @@ QWidget *OptionsDialog::buildGeneralPage()
 	m_cmbTheme->addItem(tr("Dark"), static_cast<int>(lm::ThemeMode::Dark));
 	addLabeled(box, tr("Theme:"), m_cmbTheme);
 	m_cmbLanguage = new QComboBox(page);
+	m_cmbLanguage->setObjectName(QStringLiteral("language"));
 	m_cmbLanguage->addItem(tr("System default"), QString());
+	// (each language under its own name, in the alphabet's order)
+	m_cmbLanguage->addItem(QStringLiteral("Deutsch"), QStringLiteral("de"));
 	m_cmbLanguage->addItem(QStringLiteral("English"), QStringLiteral("en_US"));
 	m_cmbLanguage->addItem(
 		QString::fromUtf8("Portugu\xC3\xAAs (Brasil)"), QStringLiteral("pt_BR"));
