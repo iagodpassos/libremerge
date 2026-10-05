@@ -112,6 +112,11 @@ branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
 - `FileFilterHelper.cpp` / `FileFilter.cpp`: filter match paths
   canonicalized with `paths::ToWindowsPath` — `.flt` regexes use `\\` as
   the separator and existing filters keep working unchanged
+- `FilterEngine/FilterExpressionNodes.cpp` (`compute`, `contains`): the
+  searcher's hash goes by the letter without its case, as its comparison
+  does. Upstream hashes the characters as they are, and the searcher
+  then skips past a match whose letters are in another case than the
+  text sought (`Name contains ".txt"` did not find `Readme.TXT`)
 
 **Test-suite adaptations** are listed in the commit history; the most
 notable is that upstream `paths_test.cpp` (Windows path semantics) is
