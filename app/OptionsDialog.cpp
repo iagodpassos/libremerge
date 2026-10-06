@@ -264,8 +264,10 @@ QWidget *OptionsDialog::buildGeneralPage()
 	m_cmbLanguage->setObjectName(QStringLiteral("language"));
 	m_cmbLanguage->addItem(tr("System default"), QString());
 	// (each language under its own name, in the alphabet's order)
+	m_cmbLanguage->addItem(QString::fromUtf8("Catal\xC3\xA0"), QStringLiteral("ca"));
 	m_cmbLanguage->addItem(QStringLiteral("Deutsch"), QStringLiteral("de"));
 	m_cmbLanguage->addItem(QStringLiteral("English"), QStringLiteral("en_US"));
+	m_cmbLanguage->addItem(QString::fromUtf8("Espa\xC3\xB1ol"), QStringLiteral("es"));
 	m_cmbLanguage->addItem(
 		QString::fromUtf8("Portugu\xC3\xAAs (Brasil)"), QStringLiteral("pt_BR"));
 	addLabeled(box, tr("Language:"), m_cmbLanguage);

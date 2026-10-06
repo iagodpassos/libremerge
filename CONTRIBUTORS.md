@@ -17,7 +17,9 @@ Every one of these contributions shaped a release.
 ## Translations
 
 * Brazilian Portuguese: Iago Passos
+* Catalan: the WinMerge translation (Jordi Vilar, Pere Orga), completed where it stops short and extended to LibreMerge's own texts
 * German: the WinMerge translation (maintained by Tim Gerundt; René Nicolaus, Winfried Peter, Jörg Schneider), extended to LibreMerge's own texts
+* Spanish: the WinMerge translation (Dean Grimm, Jesús M. Delgado 'MacK', Mario Angel, Nelson Ariza, P0rsche-911), extended to LibreMerge's own texts
 * Native speakers reviewing other languages are very welcome, see [issue #5](https://github.com/iagodpassos/libremerge/issues/5)
 
 ## Based on WinMerge

@@ -66,6 +66,8 @@ run_one selftest-show-filters
 # native menu check: runs under cocoa (dmg validation), skips offscreen
 LIBREMERGE_LANGUAGE=pt_BR run_one selftest-app-menu
 LIBREMERGE_LANGUAGE=de run_one selftest-app-menu
+LIBREMERGE_LANGUAGE=es run_one selftest-app-menu
+LIBREMERGE_LANGUAGE=ca run_one selftest-app-menu
 run_one selftest-about
 run_one selftest-options
 run_one selftest-general-options
@@ -81,10 +83,18 @@ run_one selftest-theme
 run_one selftest-menu-roles
 LIBREMERGE_LANGUAGE=pt_BR run_one selftest-qt-i18n
 LIBREMERGE_LANGUAGE=de run_one selftest-qt-i18n
-# (the request for a star and the Help menu's pages, in the three languages)
-LIBREMERGE_LANGUAGE=en run_one selftest-star-prompt
-LIBREMERGE_LANGUAGE=pt_BR run_one selftest-star-prompt
-LIBREMERGE_LANGUAGE=de run_one selftest-star-prompt
+LIBREMERGE_LANGUAGE=es run_one selftest-qt-i18n
+LIBREMERGE_LANGUAGE=ca run_one selftest-qt-i18n
+# the accelerator letters of the menus, one item each, in the catalogs
+# built from WinMerge's (English keeps WinMerge's letters as they stand,
+# and the Portuguese catalog its translators' doubles)
+for lang in de es ca; do
+  LIBREMERGE_LANGUAGE=$lang run_one selftest-menu-mnemonics
+done
+# (the request for a star and the Help menu's pages, in every language)
+for lang in en pt_BR de es ca; do
+  LIBREMERGE_LANGUAGE=$lang run_one selftest-star-prompt
+done
 run_one selftest-desktop-integration
 run_one selftest-table "$TMP/left.csv" "$TMP/right.csv"
 run_one selftest-image "$TMP/left.png" "$TMP/right.png"

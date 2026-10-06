@@ -38,21 +38,34 @@ rest:
 
 | Local file | Upstream catalog | Upstream maintainer and translators |
 |---|---|---|
+| `app/i18n/libremerge_ca.ts` | `Catalan.po` | Jordi Vilar, Pere Orga |
 | `app/i18n/libremerge_de.ts` | `German.po` | Tim Gerundt; René Nicolaus, Winfried Peter, Jörg Schneider |
+| `app/i18n/libremerge_es.ts` | `Spanish.po` | Dean Grimm, Jesús M. Delgado 'MacK', Mario Angel, Nelson Ariza, P0rsche-911 |
 | `app/i18n/libremerge_pt_BR.ts` | `Brazilian.po` | as listed in the catalog's header |
 
-In the German file every text that is not WinMerge's as it stands carries
-a translator comment, which Qt Linguist shows next to it:
+In the files built from WinMerge's catalogs (German, Spanish, Catalan)
+every text that is not WinMerge's as it stands carries a translator
+comment, which Qt Linguist shows next to it:
 
 - `After WinMerge's "…".` marks WinMerge's translation of that text,
   fitted to a LibreMerge label that differs from it in the accelerator,
   the ending or the shortcut, or naming LibreMerge where WinMerge's
-  translators named their application (140 texts);
+  translators named their application; a few accelerators moved to a
+  letter that is free in the LibreMerge menu the label sits in;
 - `LibreMerge's own text: not in WinMerge's catalog.` marks a text
-  translated for LibreMerge, in WinMerge's vocabulary (155 texts). These
-  are the ones a native speaker's review matters most for.
+  translated for LibreMerge, in WinMerge's vocabulary. These are the
+  ones a native speaker's review matters most for;
+- `WinMerge's catalog leaves this text in English: translated for
+  LibreMerge.` marks a text WinMerge has but its translators have not
+  reached. The Catalan catalog has many of them.
 
-The other 491 are WinMerge's translations unchanged, the odd ones
+| Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream |
+|---|---|---|---|---|
+| German | 491 | 140 | 155 | 0 |
+| Spanish | 487 | 147 | 158 | 0 |
+| Catalan | 200 | 142 | 158 | 292 |
+
+The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
 otherwise.
 

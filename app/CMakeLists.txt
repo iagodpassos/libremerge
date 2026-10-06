@@ -50,7 +50,8 @@ qt_add_executable(LibreMerge
 qt_add_resources(LibreMerge "i18n"
   PREFIX "/i18n"
   BASE i18n
-  FILES i18n/libremerge_de.qm i18n/libremerge_pt_BR.qm
+  FILES i18n/libremerge_ca.qm i18n/libremerge_de.qm i18n/libremerge_es.qm
+    i18n/libremerge_pt_BR.qm
 )
 
 # About box: the contributors list (shown by the Contributors button) and
@@ -89,14 +90,22 @@ if(APPLE)
   # localized titles for the Finder Services menu entry
   target_sources(LibreMerge PRIVATE
     ${CMAKE_SOURCE_DIR}/packaging/en.lproj/ServicesMenu.strings
+    ${CMAKE_SOURCE_DIR}/packaging/ca.lproj/ServicesMenu.strings
     ${CMAKE_SOURCE_DIR}/packaging/de.lproj/ServicesMenu.strings
+    ${CMAKE_SOURCE_DIR}/packaging/es.lproj/ServicesMenu.strings
     ${CMAKE_SOURCE_DIR}/packaging/pt.lproj/ServicesMenu.strings)
   set_source_files_properties(
     ${CMAKE_SOURCE_DIR}/packaging/en.lproj/ServicesMenu.strings
     PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/en.lproj")
   set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/packaging/ca.lproj/ServicesMenu.strings
+    PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/ca.lproj")
+  set_source_files_properties(
     ${CMAKE_SOURCE_DIR}/packaging/de.lproj/ServicesMenu.strings
     PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/de.lproj")
+  set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/packaging/es.lproj/ServicesMenu.strings
+    PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/es.lproj")
   set_source_files_properties(
     ${CMAKE_SOURCE_DIR}/packaging/pt.lproj/ServicesMenu.strings
     PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/pt.lproj")

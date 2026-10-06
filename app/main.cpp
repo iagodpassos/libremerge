@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // LibreMerge: Qt application entry point.
 #include <functional>
+#include <QHash>
 #include <QApplication>
 #include <QClipboard>
 #include <QGuiApplication>
@@ -414,6 +415,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestArchiveMixedOpt(QStringLiteral("selftest-archive-mixed"),
 		QStringLiteral("Compare a folder against an archive, 2- and 3-way (for testing)"));
 	parser.addOption(selftestArchiveMixedOpt);
+	QCommandLineOption selftestMnemonicsOpt(QStringLiteral("selftest-menu-mnemonics"),
+		QStringLiteral("Verify that no two items of a menu share an accelerator letter in the UI language (for testing)"));
+	parser.addOption(selftestMnemonicsOpt);
 	QCommandLineOption selftestQtI18nOpt(QStringLiteral("selftest-qt-i18n"),
 		QStringLiteral("Verify Qt's own strings are translated for the UI language (for testing)"));
 	parser.addOption(selftestQtI18nOpt);
@@ -531,6 +535,87 @@ int main(int argc, char *argv[])
 		ok = ok && opened == 1 && selectorGone;
 		printf("ok: %d\n", ok);
 		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestMnemonicsOpt))
+	{
+		// the letter after "&" picks an item from the keyboard: within a
+		// menu of the menu bar, and across the bar's titles, no two labels
+		// of the language in use may claim the same one. WinMerge's
+		// catalogs give a label the letter that is free in WinMerge's
+		// menu, and LibreMerge's menus do not hold quite the same items.
+		// The filter popups are WinMerge's menus item for item, doubles
+		// of their own included, with items shown and hidden by state:
+		// theirs are noted, not counted.
+		int shared = 0, noted = 0, menus = 0;
+		const auto letterOf = [](const QString &label)
+		{
+			// the first "&" that is not an "&&"
+			for (int i = 0; i + 1 < label.size(); ++i)
+			{
+				if (label.at(i) != QLatin1Char('&'))
+					continue;
+				if (label.at(i + 1) == QLatin1Char('&'))
+				{
+					++i;
+					continue;
+				}
+				return label.at(i + 1).toLower();
+			}
+			return QChar();
+		};
+		const auto report = [&](const QString &where, const QList<QAction *> &actions,
+			bool counts)
+		{
+			++menus;
+			QHash<QChar, QStringList> claims;
+			for (QAction *action : actions)
+			{
+				if (action->isSeparator() || !action->isVisible())
+					continue;
+				if (qEnvironmentVariableIsSet("LIBREMERGE_SELFTEST_VERBOSE"))
+					printf("  [%s] %s\n", qPrintable(where), qPrintable(action->text()));
+				const QChar letter = letterOf(action->text());
+				if (!letter.isNull())
+					claims[letter].append(action->text());
+			}
+			for (auto it = claims.cbegin(); it != claims.cend(); ++it)
+				if (it.value().size() > 1)
+				{
+					(counts ? shared : noted) += 1;
+					printf("%s%s: '%s' shared by %s\n", counts ? "" : "(noted) ",
+						qPrintable(where), qPrintable(QString(it.key())),
+						qPrintable(it.value().join(QStringLiteral(" | "))));
+				}
+		};
+		const std::function<void(QMenu *, const QString &, bool)> walk =
+			[&](QMenu *menu, const QString &where, bool counts)
+		{
+			emit menu->aboutToShow(); // builds the dynamic menus
+			report(where, menu->actions(), counts);
+			for (QAction *action : menu->actions())
+				if (QMenu *submenu = action->menu())
+					walk(submenu, where + QStringLiteral(" > ")
+						+ submenu->title().remove(QLatin1Char('&')), counts);
+		};
+		{
+			MainWindow window;
+			report(QStringLiteral("menu bar"), window.menuBar()->actions(), true);
+			for (QAction *title : window.menuBar()->actions())
+				if (QMenu *menu = title->menu())
+					walk(menu, menu->title().remove(QLatin1Char('&')), true);
+		}
+		{
+			FileFilterMenu menu;
+			walk(&menu, QStringLiteral("file filter menu"), false);
+		}
+		{
+			LineFilterMenu menu;
+			walk(&menu, QStringLiteral("line filter menu"), false);
+		}
+		printf("menus: %d, letters shared: %d (and %d noted in the filter popups)\n",
+			menus, shared, noted);
+		return shared == 0 ? 0 : 1;
 	}
 
 	if (parser.isSet(selftestQtI18nOpt))

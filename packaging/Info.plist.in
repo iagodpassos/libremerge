@@ -7,7 +7,9 @@
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>
+		<string>ca</string>
 		<string>de</string>
+		<string>es</string>
 		<string>pt</string>
 	</array>
 	<key>CFBundleExecutable</key>
