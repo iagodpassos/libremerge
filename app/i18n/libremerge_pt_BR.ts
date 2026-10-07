@@ -2247,7 +2247,7 @@ O arquivo pode ser somente leitura.</translation>
     </message>
     <message>
         <source>Show Rig&amp;ht Only Missing Items</source>
-        <translation>Mostrar Só It&amp;ens Ausentes à Direita</translation>
+        <translation>Mostrar Só Itens &amp;Ausentes à Direita</translation>
     </message>
     <message>
         <source>Zoom &amp;In</source>
@@ -2259,7 +2259,7 @@ O arquivo pode ser somente leitura.</translation>
     </message>
     <message>
         <source>&amp;Actual Size</source>
-        <translation>Tamanho &amp;Original</translation>
+        <translation>Tamanho Ori&amp;ginal</translation>
     </message>
     <message>
         <source>Next &amp;Pane</source>
@@ -2311,7 +2311,7 @@ O arquivo pode ser somente leitura.</translation>
     </message>
     <message>
         <source>Copy All to Le&amp;ft</source>
-        <translation>Copiar T&amp;udo para a Esquerda</translation>
+        <translation>Copiar Tudo para a E&amp;squerda</translation>
     </message>
     <message>
         <source>S&amp;wap Panes</source>
@@ -2399,7 +2399,7 @@ O arquivo pode ser somente leitura.</translation>
     </message>
     <message>
         <source>&amp;Active Pane</source>
-        <translation>Painel &amp;Ativo</translation>
+        <translation>Painel A&amp;tivo</translation>
     </message>
     <message>
         <source>Rotate &amp;Right 90°</source>
@@ -2411,7 +2411,7 @@ O arquivo pode ser somente leitura.</translation>
     </message>
     <message>
         <source>Flip V&amp;ertically</source>
-        <translation>Inverter V&amp;erticalmente</translation>
+        <translation>Inverter &amp;Verticalmente</translation>
     </message>
     <message>
         <source>Flip H&amp;orizontally</source>

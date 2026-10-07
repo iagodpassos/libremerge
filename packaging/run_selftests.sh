@@ -85,10 +85,9 @@ LIBREMERGE_LANGUAGE=pt_BR run_one selftest-qt-i18n
 LIBREMERGE_LANGUAGE=de run_one selftest-qt-i18n
 LIBREMERGE_LANGUAGE=es run_one selftest-qt-i18n
 LIBREMERGE_LANGUAGE=ca run_one selftest-qt-i18n
-# the accelerator letters of the menus, one item each, in the catalogs
-# built from WinMerge's (English keeps WinMerge's letters as they stand,
-# and the Portuguese catalog its translators' doubles)
-for lang in de es ca; do
+# the accelerator letters of the menus, one item each, in every catalog
+# (English keeps WinMerge's letters as they stand)
+for lang in pt_BR de es ca; do
   LIBREMERGE_LANGUAGE=$lang run_one selftest-menu-mnemonics
 done
 # (the request for a star and the Help menu's pages, in every language)
