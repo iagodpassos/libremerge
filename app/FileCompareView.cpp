@@ -490,8 +490,19 @@ FileCompareView::FileCompareView(QWidget *parent)
 
 		panes->addLayout(column, 1);
 
+		// a pane that scrolled, through its scroll bar or by itself; up
+		// to Qt 6.5.0 (Debian 12's 6.4, in the AppImage) a QPlainTextEdit
+		// sets its own scroll bar with the bar's signals blocked whenever
+		// it scrolls by itself (centerCursor, the cursor keys, Find, a
+		// click on the bar's track), and only updateRequest, with the
+		// distance in dy, tells of those scrolls
 		connect(m_panes[i]->verticalScrollBar(), &QScrollBar::valueChanged,
-			this, [this, i](int value) { syncScroll(i, value); });
+			this, [this, i]() { paneScrolled(i); });
+		connect(m_panes[i], &QPlainTextEdit::updateRequest,
+			this, [this, i](const QRect &, int dy) {
+				if (dy != 0)
+					paneScrolled(i);
+			});
 		connect(m_panes[i]->horizontalScrollBar(), &QScrollBar::valueChanged,
 			this, [this, i](int value) { syncHScroll(i, value); });
 		connect(m_panes[i], &QPlainTextEdit::cursorPositionChanged,
@@ -543,7 +554,8 @@ FileCompareView::FileCompareView(QWidget *parent)
 				m_redoOrder.clear();
 			});
 	}
-	connect(m_panes[0]->verticalScrollBar(), &QScrollBar::valueChanged,
+	// the marker's height is the lines that fit in the first pane
+	connect(m_panes[0], &DiffTextEdit::resized,
 		this, [this]() { updateLocationViewport(); });
 
 	// WinMerge's diff pane: the current difference's content, one row per
@@ -625,6 +637,8 @@ void FileCompareView::applyZoom(qreal pointSize)
 		font.setPointSizeF(qMax<qreal>(6.0, pointSize - 1));
 		m_diffPaneEdits[i]->setFont(font);
 	}
+	// another text size, other lines in the view
+	updateLocationViewport();
 	QSettings().setValue(QStringLiteral("FileCompare/FontPointSize"), pointSize);
 }
 
@@ -3129,6 +3143,17 @@ QStringList FileCompareView::shownLinesForTest(int side) const
 		if (block.isVisible() && !isGhostBlock(block))
 			lines.append(block.text());
 	return lines;
+}
+
+/** A pane scrolled vertically, whatever moved it: the other panes follow
+    it, as WinMerge's UpdateSiblingScrollPos has them, and the location
+    pane's marker shows where the first pane now is, as the view itself
+    tells WinMerge's location pane (UpdateLocationViewPosition). */
+void FileCompareView::paneScrolled(int pane)
+{
+	syncScroll(pane, m_panes[pane]->verticalScrollBar()->value());
+	if (pane == 0)
+		updateLocationViewport();
 }
 
 void FileCompareView::syncScroll(int pane, int value)

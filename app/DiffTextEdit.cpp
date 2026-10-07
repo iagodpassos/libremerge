@@ -625,6 +625,7 @@ void DiffTextEdit::resizeEvent(QResizeEvent *event)
 	QPlainTextEdit::resizeEvent(event);
 	const QRect cr = contentsRect();
 	m_gutter->setGeometry(QRect(cr.left(), cr.top(), gutterWidth(), cr.height()));
+	emit resized();
 }
 
 void DiffTextEdit::paintGutter(QPaintEvent *event)

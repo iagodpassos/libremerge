@@ -235,6 +235,7 @@ public:
 	QStringList shownLinesForTest(int side) const;
 	int currentDiffForTest() const { return m_current; }
 	DiffTextEdit *paneForTest(int side) const { return m_panes[side]; }
+	LocationPane *locationPaneForTest() const { return m_locationPane; }
 
 signals:
 	/** A recompare asked for by the user is about to run: WinMerge's
@@ -334,6 +335,7 @@ private:
 	void changeSideFile(int side, const QString &path);
 	SaveResult saveSide(int side, QString *error);
 	void setSideModified(int side, bool modified);
+	void paneScrolled(int pane);
 	void syncScroll(int pane, int value);
 	void syncHScroll(int pane, int value);
 	void hideLines();

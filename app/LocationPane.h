@@ -27,6 +27,9 @@ public:
 	void setPaneCount(int count);
 	void setBands(std::vector<Band> bands, int totalLines);
 	void setViewport(int firstVisibleLine, int visibleLines);
+	/** The lines the marker stands for (for tests). */
+	int viewFirstForTest() const { return m_viewFirst; }
+	int viewCountForTest() const { return m_viewCount; }
 
 signals:
 	void jumpRequested(int line);

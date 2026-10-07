@@ -106,6 +106,10 @@ public:
 	int firstVisibleLine() const;
 	int visibleLineCount() const;
 
+signals:
+	/** The view changed size, and with it the lines that fit in it. */
+	void resized();
+
 protected:
 	bool event(QEvent *event) override;
 	void paintEvent(QPaintEvent *event) override;

@@ -52,6 +52,7 @@ done
 run_one selftest-undo-rescan
 run_one selftest-undo-ghosts
 run_one selftest-last-line
+run_one selftest-scroll-sync
 run_one selftest-open-enter
 run_one selftest-archive
 run_one selftest-archive-mixed

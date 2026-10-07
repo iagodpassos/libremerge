@@ -32,6 +32,7 @@
 #include <QFileSystemModel>
 #include <QImage>
 #include <QPushButton>
+#include <QScrollBar>
 #include <QTableView>
 #include <QTabWidget>
 #include <QTreeWidget>
@@ -39,6 +40,7 @@
 #include <cstdlib>
 #include <cstring>
 #include "DiffTextEdit.h"
+#include "LocationPane.h"
 #include "ImagePane.h"
 #include "MessageBoxes.h"
 #include <QTextBrowser>
@@ -305,6 +307,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestMerge3Opt(QStringLiteral("selftest-merge3"),
 		QStringLiteral("3-way: merge left into middle, then middle into right, and verify (for testing)"));
 	parser.addOption(selftestMerge3Opt);
+	QCommandLineOption selftestScrollSyncOpt(QStringLiteral("selftest-scroll-sync"),
+		QStringLiteral("Scroll a file comparison every way and verify the panes and the location pane follow (for testing)"));
+	parser.addOption(selftestScrollSyncOpt);
 	QCommandLineOption selftestLastLineOpt(QStringLiteral("selftest-last-line"),
 		QStringLiteral("Compare files whose last lines differ and verify what is a difference (for testing)"));
 	parser.addOption(selftestLastLineOpt);
@@ -7941,6 +7946,194 @@ int main(int argc, char *argv[])
 		printf("selector closed: %d, comparisons open: %lld\n",
 			selectorClosed, static_cast<long long>(comparisons));
 		return (selectorClosed && comparisons == 1) ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestScrollSyncOpt))
+	{
+		// however a pane scrolls, the other panes follow it and the
+		// location pane's marker stands for the lines the first one shows
+		// (issue #9). Up to Qt 6.5.0, the AppImage's 6.4 among them, a
+		// QPlainTextEdit scrolls by itself with its scroll bar's signals
+		// blocked: a click on the location pane left the marker behind,
+		// and Find, Page Down, the cursor keys and a click on the bar's
+		// track moved one pane alone. The marker also kept its height
+		// when the view changed size or the text size changed.
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		// 400 lines, every 60th different on the right
+		QByteArray leftText, rightText;
+		for (int i = 1; i <= 400; ++i)
+		{
+			const QByteArray line = "line " + QByteArray::number(i) + " of the text\n";
+			leftText += line;
+			rightText += i % 60 == 0 ? "line " + QByteArray::number(i) + " CHANGED\n" : line;
+		}
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString middle = dir.filePath(QStringLiteral("middle.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		write(left, leftText);
+		write(middle, leftText);
+		write(right, rightText);
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		// a key as the pane gets it
+		const auto press = [](QWidget *pane, const QKeyCombination &key)
+		{
+			QKeyEvent event(QEvent::KeyPress, key.key(), key.keyboardModifiers());
+			QApplication::sendEvent(pane, &event);
+		};
+
+		FileCompareView view;
+		QString error;
+		if (!view.compare(QStringList{ left, right }, &error))
+		{
+			printf("compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		view.resize(1000, 640);
+		view.show();
+		settle();
+		DiffTextEdit *const panes[2] = { view.paneForTest(0), view.paneForTest(1) };
+		LocationPane *const map = view.locationPaneForTest();
+		// the panes on one line, at least the given one, and the marker
+		// on the lines the first pane shows
+		const auto followed = [&](const char *what, int atLeast)
+		{
+			settle();
+			const int first = panes[0]->firstVisibleLine();
+			printf("  panes at lines %d and %d, marker at %d for %d lines, the pane shows %d\n",
+				first + 1, panes[1]->firstVisibleLine() + 1, map->viewFirstForTest() + 1,
+				map->viewCountForTest(), panes[0]->visibleLineCount());
+			check(first >= atLeast && panes[1]->firstVisibleLine() == first
+				&& panes[1]->verticalScrollBar()->value() == panes[0]->verticalScrollBar()->value()
+				&& map->viewFirstForTest() == first
+				&& map->viewCountForTest() == panes[0]->visibleLineCount(), what);
+		};
+		const auto toTop = [&]()
+		{
+			for (DiffTextEdit *pane : panes)
+			{
+				pane->setTextCursor(QTextCursor(pane->document()->firstBlock()));
+				pane->verticalScrollBar()->setValue(0);
+			}
+			settle();
+		};
+
+		toTop();
+		{
+			const QPointF at(map->width() / 2.0, map->height() * 0.75);
+			QMouseEvent click(QEvent::MouseButtonPress, at, map->mapToGlobal(at),
+				Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+			QApplication::sendEvent(map, &click);
+		}
+		followed("a click on the location pane: the panes and the marker go there", 200);
+
+		toTop();
+		view.gotoFirstDiff();
+		view.gotoNextDiff();
+		view.gotoNextDiff();
+		followed("the next difference: the panes and the marker go there", 120);
+
+		toTop();
+		press(panes[0], QKeySequence(QKeySequence::MoveToNextPage)[0]);
+		followed("Page Down in the left pane: the right pane and the marker follow", 1);
+
+		toTop();
+		for (int i = panes[0]->visibleLineCount() + 5; i > 0; --i)
+			press(panes[0], QKeyCombination(Qt::Key_Down));
+		followed("the Down key past the bottom of the view: the right pane and the marker follow", 1);
+
+		toTop();
+		press(panes[1], QKeySequence(QKeySequence::MoveToEndOfDocument)[0]);
+		followed("the end of the text by keyboard in the right pane: the left pane and the marker follow",
+			300);
+
+		toTop();
+		panes[0]->verticalScrollBar()->triggerAction(QAbstractSlider::SliderPageStepAdd);
+		followed("a click on the scroll bar's track: the right pane and the marker follow", 1);
+
+		toTop();
+		{
+			const QPointF at(50, 50);
+			QWheelEvent wheel(at, panes[0]->viewport()->mapToGlobal(at), QPoint(), QPoint(0, -360),
+				Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+			QApplication::sendEvent(panes[0]->viewport(), &wheel);
+		}
+		followed("the mouse wheel: the right pane and the marker follow", 1);
+
+		toTop();
+		panes[0]->verticalScrollBar()->setValue(150);
+		followed("the scroll bar's handle: the right pane and the marker follow", 150);
+
+		// Find, from the left pane, a line out of view (the find bar that
+		// opens takes room from the panes, and the marker refits)
+		toTop();
+		view.setCursorViewLineForTest(0, 0);
+		QLineEdit *findField = nullptr;
+		for (QLineEdit *edit : view.findChildren<QLineEdit *>())
+			if (edit->placeholderText() == FileCompareView::tr("Find"))
+				findField = edit;
+		if (findField == nullptr)
+			return 1;
+		view.showFindBar();
+		findField->setText(QStringLiteral("line 377 of"));
+		view.findNext(false);
+		followed("Find, the match out of view: both panes and the marker go to it", 300);
+
+		view.resize(1000, 900);
+		followed("a taller window: the marker fits the lines the pane now shows", 300);
+
+		view.zoomIn();
+		view.zoomIn();
+		followed("a larger text: the marker fits the lines the pane now shows", 300);
+		view.zoomReset();
+
+		// three panes, Page Down in the middle one
+		{
+			FileCompareView three;
+			if (!three.compare(QStringList{ left, middle, right }, &error))
+			{
+				printf("compare failed: %s\n", qPrintable(error));
+				return 2;
+			}
+			three.resize(1200, 640);
+			three.show();
+			settle();
+			DiffTextEdit *const p[3] = { three.paneForTest(0), three.paneForTest(1),
+				three.paneForTest(2) };
+			press(p[1], QKeySequence(QKeySequence::MoveToNextPage)[0]);
+			settle();
+			const int first = p[0]->firstVisibleLine();
+			printf("  panes at lines %d, %d and %d, marker at %d\n", first + 1,
+				p[1]->firstVisibleLine() + 1, p[2]->firstVisibleLine() + 1,
+				three.locationPaneForTest()->viewFirstForTest() + 1);
+			check(first > 0 && p[1]->firstVisibleLine() == first && p[2]->firstVisibleLine() == first
+				&& three.locationPaneForTest()->viewFirstForTest() == first,
+				"3-way, Page Down in the middle pane: the outer panes and the marker follow");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
 	}
 
 	if (parser.isSet(selftestLastLineOpt))
