@@ -17,13 +17,13 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - **Diff pane** showing the current difference per file, **location pane** minimap, per-pane headers and status bars (line/column, encoding, EOL)
 - **CSV/TSV table comparison** as side-by-side grids: cell-level difference highlighting, delimiter auto-detection (`,` `;` tab `|`), quoted fields, first-row headers
 - **Image comparison** (2-way and 3-way) with WinMerge's own image-diff engine: block-level pixel differences with adjustable block size and color-distance threshold, insertion/deletion detection for shifted rows/columns, XOR and alpha-blend overlays, blink mode, wipe and rectangle-select dragging, multi-page navigation (animated GIF, multi-page TIFF), rotation/flips, copy between sides with undo, and a clickable difference minimap
-- **Line filters** (regular expressions that mark matching differences as trivial) and **moved block detection**
+- **WinMerge's filters**: Tools > Filters with its three pages, file filters (one global folder filter with masks, expressions and presets, picked from the selection screen and built with the "=" helper menu), line filters (regular expressions that mark matching differences as trivial) and substitution filters; a **display filter bar** in the folder window (by comparison result, or per column) and in the file and table windows (hide the lines a text or a line expression does not match, with the "=" menu to build one); and **moved block detection**
 - **Find and replace** in the compare panes (⌘F, wrap-around, match case)
 - **Syntax highlighting** for 47 languages, via WinMerge's own parsers
 - **Light and dark themes** for the whole window, or follow the system (on Linux, the dark style of GNOME and KDE, picked up as you switch it), chosen under Options > General; **English, Spanish, Catalan, German and Brazilian Portuguese** interface following the system language
 - Drag & drop files or folders onto the window or the Dock icon; a WinMerge-style "Select Files or Folders" screen with history, paths verified as you type, auto completion, read-only flags and swap; a single file opens against a snapshot of itself, to review your own edits
 - Comparison options carried over from WinMerge: ignore whitespace/case/blank lines/EOL/numbers, diff algorithm selection (Myers, minimal, patience, histogram)
-- An **Options dialog laid out like WinMerge's**, with its General settings (close with Esc, preserve file times on save, verify paths, auto completion) and its Message Boxes page, where the "files are identical" notices can be hidden and brought back
+- An **Options dialog laid out like WinMerge's**, with its General settings (close with Esc, preserve file times on save, verify paths, auto completion, reload of files changed by other applications), its Compare page (whitespace, case, blank lines, EOL, numbers, codepage and comment differences, moved blocks, indent heuristic, diff algorithm) and its Message Boxes page, where the "files are identical" notices can be hidden and brought back
 
 | Dark theme | Folder comparison |
 | --- | --- |
@@ -68,7 +68,7 @@ Dependencies: a C++17 compiler, CMake ≥ 3.21, Ninja, Qt 6, POCO, ICU, Boost (h
 ```sh
 cmake -S . -B build -G Ninja
 cmake --build build
-ctest --test-dir build        # engine test suite (383 tests)
+ctest --test-dir build        # engine test suite (394 tests)
 ./build/app/LibreMerge        # (on macOS: build/app/LibreMerge.app)
 ```
 
