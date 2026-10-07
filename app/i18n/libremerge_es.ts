@@ -2908,9 +2908,9 @@ Comprobando la identidad binaria...</translation>
         <translation>Mayús+Supr en la lista desplegada elimina la ruta reciente resaltada</translation>
     </message>
     <message>
-        <source>Type a path, pick a recent one, drop a file here or browse…</source>
+        <source>Type a path or drop a file or folder here</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Escriba una ruta, elija una reciente, suelte un archivo aquí o examine…</translation>
+        <translation>Escriba una ruta o suelte aquí un archivo o una carpeta</translation>
     </message>
     <message>
         <source>Read-only</source>

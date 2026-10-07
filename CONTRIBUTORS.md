@@ -12,13 +12,13 @@ Every one of these contributions shaped a release.
 * [@evpix](https://github.com/evpix): image comparison ([#2](https://github.com/iagodpassos/libremerge/issues/2))
 * [@voidray](https://github.com/voidray): insertion marker for text present on one side only ([#6](https://github.com/iagodpassos/libremerge/issues/6))
 * [@ta7mid](https://github.com/ta7mid): Homebrew on Linux, installing the AppImage through the cask ([homebrew-tap#1](https://github.com/iagodpassos/homebrew-tap/pull/1))
-* [@KrokusPokus](https://github.com/KrokusPokus): folder compare methods and View menu filters, and the Full Contents fix they led to ([#7](https://github.com/iagodpassos/libremerge/issues/7))
+* [@KrokusPokus](https://github.com/KrokusPokus): folder compare methods and View menu filters, and the Full Contents fix they led to ([#7](https://github.com/iagodpassos/libremerge/issues/7)), the location pane and the panes following every scroll ([#9](https://github.com/iagodpassos/libremerge/issues/9))
 
 ## Translations
 
 * Brazilian Portuguese: Iago Passos
 * Catalan: the WinMerge translation (Jordi Vilar, Pere Orga), completed where it stops short and extended to LibreMerge's own texts
-* German: the WinMerge translation (maintained by Tim Gerundt; René Nicolaus, Winfried Peter, Jörg Schneider), extended to LibreMerge's own texts
+* German: the WinMerge translation (maintained by Tim Gerundt; René Nicolaus, Winfried Peter, Jörg Schneider), extended to LibreMerge's own texts, reviewed by [@KrokusPokus](https://github.com/KrokusPokus) ([#8](https://github.com/iagodpassos/libremerge/issues/8))
 * Spanish: the WinMerge translation (Dean Grimm, Jesús M. Delgado 'MacK', Mario Angel, Nelson Ariza, P0rsche-911), extended to LibreMerge's own texts
 * Native speakers reviewing other languages are very welcome, see [issue #5](https://github.com/iagodpassos/libremerge/issues/5)
 

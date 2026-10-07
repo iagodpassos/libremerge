@@ -3185,9 +3185,9 @@ S&apos;està comprovant la identitat binària...</translation>
         <translation>Maj+Supr a la llista desplegada elimina el camí recent ressaltat</translation>
     </message>
     <message>
-        <source>Type a path, pick a recent one, drop a file here or browse…</source>
+        <source>Type a path or drop a file or folder here</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Escriviu un camí, trieu-ne un de recent, deixeu-hi anar un fitxer o navegueu…</translation>
+        <translation>Escriviu un camí o deixeu anar aquí un fitxer o una carpeta</translation>
     </message>
     <message>
         <source>Read-only</source>

@@ -2673,10 +2673,6 @@ Checando identidade binária...</translation>
         <translation>Shift+Delete na lista aberta remove o caminho recente destacado</translation>
     </message>
     <message>
-        <source>Type a path, pick a recent one, drop a file here or browse…</source>
-        <translation>Digite um caminho, escolha um recente, arraste um arquivo para cá ou procure…</translation>
-    </message>
-    <message>
         <source>Read-only</source>
         <translation>Somente leitura</translation>
     </message>
@@ -2711,6 +2707,10 @@ Checando identidade binária...</translation>
     <message>
         <source>Cancel</source>
         <translation>Cancelar</translation>
+    </message>
+    <message>
+        <source>Type a path or drop a file or folder here</source>
+        <translation>Digite um caminho ou arraste um arquivo ou pasta para cá</translation>
     </message>
     <message>
         <source>Select two (or three) folders/files to compare.</source>

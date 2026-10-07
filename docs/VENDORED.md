@@ -57,17 +57,23 @@ comment, which Qt Linguist shows next to it:
   ones a native speaker's review matters most for;
 - `WinMerge's catalog leaves this text in English: translated for
   LibreMerge.` marks a text WinMerge has but its translators have not
-  reached. The Catalan catalog has many of them.
+  reached. The Catalan catalog has many of them;
+- `Changed in a native speaker's review; WinMerge's is "…".` marks a
+  text of WinMerge's that a native speaker's review replaced, and an own
+  text a review reworded says so in its note.
 
-| Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream |
-|---|---|---|---|---|
-| German | 491 | 140 | 155 | 0 |
-| Spanish | 487 | 147 | 158 | 0 |
-| Catalan | 200 | 142 | 158 | 292 |
+| Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
+|---|---|---|---|---|---|
+| German | 491 | 140 | 160 | 0 | 1 |
+| Spanish | 487 | 147 | 158 | 0 | 0 |
+| Catalan | 200 | 142 | 158 | 292 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
-otherwise.
+otherwise. The German catalog was reviewed by @KrokusPokus in issue #8:
+the Defaults button of the Options takes "Voreinstellungen", KDE's word
+and Qt's own for the button that restores defaults, and the hint of the
+path fields on the selection screen became shorter in every language.
 
 ## Deliberately excluded (and why)
 

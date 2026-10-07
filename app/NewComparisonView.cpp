@@ -127,8 +127,10 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 		m_slots[i].path->setToolTip(tr("Shift+Delete on the open list "
 			"removes the highlighted recent path"));
 		m_slots[i].path->setCurrentText(QString());
+		// what the field itself takes: the list and the Browse button
+		// speak for themselves (the German review, issue #8)
 		m_slots[i].path->lineEdit()->setPlaceholderText(
-			tr("Type a path, pick a recent one, drop a file here or browse\xE2\x80\xA6"));
+			tr("Type a path or drop a file or folder here"));
 		// the editable combo's line edit must not swallow drops: it would
 		// paste the raw "file://" URI (evpix's report on Linux, #2); with
 		// drops off the event reaches our dropEvent, which resolves the

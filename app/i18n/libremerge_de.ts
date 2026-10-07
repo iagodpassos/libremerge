@@ -2905,9 +2905,9 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <translation>Umschalt+Entf entfernt in der geöffneten Liste den hervorgehobenen kürzlichen Pfad</translation>
     </message>
     <message>
-        <source>Type a path, pick a recent one, drop a file here or browse…</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Pfad eingeben, einen kürzlichen wählen, eine Datei hierher ziehen oder suchen…</translation>
+        <source>Type a path or drop a file or folder here</source>
+        <translatorcomment>LibreMerge&apos;s own text, worded in a native speaker&apos;s review.</translatorcomment>
+        <translation>Pfad eingeben oder Datei/Ordner hierher ziehen</translation>
     </message>
     <message>
         <source>Read-only</source>
@@ -3121,7 +3121,8 @@ Die binäre Übereinstimmung wird geprüft...</translation>
     </message>
     <message>
         <source>Defaults</source>
-        <translation>Vorgaben</translation>
+        <translatorcomment>Changed in a native speaker&apos;s review; WinMerge&apos;s is &quot;Vorgaben&quot;.</translatorcomment>
+        <translation>Voreinstellungen</translation>
     </message>
     <message>
         <source>Options (%1)</source>
