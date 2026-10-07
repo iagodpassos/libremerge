@@ -2883,6 +2883,10 @@ Comprobando la identidad binaria...</translation>
         <translation>Seleccionar...</translation>
     </message>
     <message>
+        <source>e.g. %1</source>
+        <translation>ejemplo %1</translation>
+    </message>
+    <message>
         <source>Options...</source>
         <translatorcomment>After WinMerge&apos;s &quot;Options&quot;.</translatorcomment>
         <translation>Opciones...</translation>

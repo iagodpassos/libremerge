@@ -3856,6 +3856,21 @@ int main(int argc, char *argv[])
 				&& field->mask() == QStringLiteral("*.cpp;*.h")
 				&& field->itemText(0) == QStringLiteral("*.cpp;*.h"),
 				"selection: the field shows the filter in use");
+			check(field->lineEdit()->placeholderText() == NewComparisonView::tr("e.g. %1")
+					.arg(QStringLiteral("*.txt|fe:Size > 100KB")),
+				"selection: WinMerge's example while the field is empty");
+			const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+			if (!shots.isEmpty())
+			{
+				// the example, with the field emptied for a moment
+				window.resize(1100, 700);
+				window.show();
+				field->lineEdit()->clear();
+				settle();
+				window.grab().save(shots + QStringLiteral("/selection-filter-example.png"));
+				field->setMask(QStringLiteral("*.cpp;*.h"), false);
+				settle();
+			}
 
 			// shown while it may be a folder comparison, usable once it is
 			const auto state = [&](const QStringList &paths) {

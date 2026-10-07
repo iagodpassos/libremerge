@@ -2701,6 +2701,10 @@ Checando identidade binária...</translation>
         <translation>Selecionar...</translation>
     </message>
     <message>
+        <source>e.g. %1</source>
+        <translation>p.ex. %1</translation>
+    </message>
+    <message>
         <source>Compare</source>
         <translation>Comparar</translation>
     </message>

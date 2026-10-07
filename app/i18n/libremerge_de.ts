@@ -2872,6 +2872,10 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <translation>Auswählen...</translation>
     </message>
     <message>
+        <source>e.g. %1</source>
+        <translation>z. B. %1</translation>
+    </message>
+    <message>
         <source>Compare</source>
         <translation>Vergleichen</translation>
     </message>

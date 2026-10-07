@@ -187,6 +187,10 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	});
 	// the filter in use, put on top of the list when it is not there
 	m_filterCombo->setMask(lm::fileFilterMask(), true);
+	// and WinMerge's example while the field is empty (the cue banner of
+	// COpenView::OnInitialUpdate)
+	m_filterCombo->lineEdit()->setPlaceholderText(
+		tr("e.g. %1").arg(QStringLiteral("*.txt|fe:Size > 100KB")));
 	filterRow->addWidget(m_filterCombo, 1);
 	// a split button, as upstream's: the button opens Tools > Filters, its
 	// arrow the menu of ready-made changes to the field's mask

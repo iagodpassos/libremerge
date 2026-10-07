@@ -3160,6 +3160,11 @@ S&apos;està comprovant la identitat binària...</translation>
         <translation>Tria...</translation>
     </message>
     <message>
+        <source>e.g. %1</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>p. ex. %1</translation>
+    </message>
+    <message>
         <source>Options...</source>
         <translatorcomment>After WinMerge&apos;s &quot;Options&quot;.</translatorcomment>
         <translation>Opcions...</translation>
