@@ -48,6 +48,9 @@
 #include "NewComparisonView.h"
 #include "ProjectLinks.h"
 #include "StarPrompt.h"
+#ifdef Q_OS_MACOS
+#include "MacServices.h"
+#endif
 
 // engine
 #include "OptionsMgr.h"
@@ -685,6 +688,7 @@ MainWindow::MainWindow(QWidget *parent)
 		[this]() { showFilters(); });
 
 	QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
+	m_helpMenu = helpMenu;
 	// the project's pages, opened in the browser: LibreMerge's own items
 	// (WinMerge's Help menu has links of its kind, Release Notes and
 	// Translations, to pages of its site)
@@ -706,6 +710,21 @@ MainWindow::MainWindow(QWidget *parent)
 	});
 
 	disableMenuRoleHeuristics(menuBar());
+#ifdef Q_OS_MACOS
+	// macOS tops the Help menu with its search field over every menu
+	lm::setHelpMenu(m_helpMenu);
+#endif
+}
+
+/** On macOS the window in front lends the application its menus: its Help
+    menu is the one macOS searches from. */
+void MainWindow::changeEvent(QEvent *event)
+{
+	QMainWindow::changeEvent(event);
+#ifdef Q_OS_MACOS
+	if (event->type() == QEvent::ActivationChange && isActiveWindow())
+		lm::setHelpMenu(m_helpMenu);
+#endif
 }
 
 bool MainWindow::isFolderLike(const QString &path)

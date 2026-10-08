@@ -99,6 +99,7 @@ protected:
 	    or a scan) closes the tab or the window, per the options. */
 	void keyPressEvent(QKeyEvent *event) override;
 	bool eventFilter(QObject *watched, QEvent *event) override;
+	void changeEvent(QEvent *event) override;
 
 private slots:
 	void newComparison();
@@ -140,6 +141,7 @@ private:
 	void reopenComparison(const QStringList &paths);
 
 	QTabWidget *m_tabs;
+	QMenu *m_helpMenu = nullptr;
 	QFileSystemWatcher *m_fileWatcher;
 	QTimer *m_watchTimer;     // gathers a burst of change notifications
 	QTimer *m_fileCheckTimer; // the posted check

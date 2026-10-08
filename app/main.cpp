@@ -7334,6 +7334,12 @@ int main(int argc, char *argv[])
 		const QStringList items = lm::appMenuItemsForTest();
 		bool ok = !items.isEmpty()
 			&& items.first().endsWith(QLatin1String("\t0"));
+		// the Help menu is handed to macOS, which tops it with its search
+		// field over every menu, whatever its title in the language in use
+		const QString helpTitle = MainWindow::tr("&Help").remove(QLatin1Char('&'));
+		const QString helpMenu = lm::helpMenuTitleForTest();
+		printf("help menu macOS searches from: %s\n", qPrintable(helpMenu));
+		ok = ok && !helpTitle.isEmpty() && helpMenu == helpTitle;
 		// (Qt's own name for the entry, in the language in use: held in
 		// variables so lupdate leaves it to Qt's catalog)
 		const char *appMenuContext = "MAC_APPLICATION_MENU";

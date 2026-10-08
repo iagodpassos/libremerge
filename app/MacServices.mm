@@ -4,6 +4,7 @@
 // Info.plist) and routes it into the main window.
 #include "MacServices.h"
 
+#include <QMenu>
 #include <QMetaObject>
 #include <QPointer>
 #include <QString>
@@ -75,6 +76,19 @@ void installMacServices(MainWindow *window)
 	static LmServicesProvider *provider = [[LmServicesProvider alloc] init];
 	provider->window = window;
 	[NSApp setServicesProvider:provider];
+}
+
+void setHelpMenu(QMenu *menu)
+{
+	NSMenu *native = menu != nullptr ? menu->toNSMenu() : nil;
+	if (native != nil)
+		[NSApp setHelpMenu:native];
+}
+
+QString helpMenuTitleForTest()
+{
+	NSMenu *help = [NSApp helpMenu];
+	return help != nil ? QString::fromNSString([help title]) : QString();
 }
 
 void activateAppForTest()
