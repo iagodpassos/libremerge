@@ -24,6 +24,7 @@ class DiffTextEdit;
 class DisplayFilterBar;
 class LineFilterHelper;
 class LocationPane;
+class PaneSearch;
 class SyntaxHighlighter;
 
 /**
@@ -171,8 +172,15 @@ public:
 	void zoomIn();
 	void zoomOut();
 	void zoomReset();
-	void showFindBar();
-	void findNext(bool backward);
+	/** Edit > Find... and Edit > Replace..., for the active pane: upstream's
+	    dialogs (CFindTextDlg, CEditReplaceDlg), each pane with its own. */
+	void showFind();
+	void showReplace();
+	/** F3 and its Shift and Ctrl variants (OnEditRepeat), in the active
+	    pane. */
+	void findRepeat(bool control, bool shift);
+	/** Replace is for an editable pane only (OnUpdateEditReplace). */
+	bool activePaneEditable() const;
 	/** WinMerge's Go To dialog (CMergeEditView::OnWMGoto), opened from a
 	    pane, the active one when none is given: a line of a file, or a
 	    difference by its number. */
@@ -246,6 +254,7 @@ public:
 	DiffTextEdit *paneForTest(int side) const { return m_panes[side]; }
 	LocationPane *locationPaneForTest() const { return m_locationPane; }
 	int activePaneForTest() const { return m_activePane; }
+	PaneSearch *paneSearchForTest(int side) const { return m_search[side]; }
 
 signals:
 	/** A recompare asked for by the user is about to run: WinMerge's
@@ -338,8 +347,6 @@ private:
 		const QList<bool> &flagsBefore, const QList<bool> &flagsAfter);
 	void resetUndoHistory();
 	void refreshAfterUndoRedo(const int countsBefore[3]);
-	void replaceOne();
-	void replaceAll();
 	void showHeaderMenu(int side);
 	void editCaption(int side);
 	void changeSideFile(int side, const QString &path);
@@ -360,8 +367,6 @@ private:
 	bool blockFiltered(int blockIndex) const;
 	bool hasInvisibleLines() const;
 	void updateLocationViewport();
-	bool findInPane(DiffTextEdit *pane, const QString &needle,
-		QTextDocument::FindFlags flags);
 	void ensureFilterBar();
 	void hideFilterBar();
 	void closeDisplayFilterBar();
@@ -425,9 +430,5 @@ private:
 	QAction *m_actDiffPane = nullptr;
 	QWidget *m_diffPaneWidget = nullptr;
 	QPlainTextEdit *m_diffPaneEdits[3] = {};
-	QWidget *m_findBar = nullptr;
-	QLineEdit *m_findEdit = nullptr;
-	QLineEdit *m_replaceEdit = nullptr;
-	QCheckBox *m_findCase = nullptr;
-	QLabel *m_findStatus = nullptr;
+	PaneSearch *m_search[3] = {};
 };

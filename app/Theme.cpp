@@ -196,4 +196,9 @@ const DiffColors &diffColors()
 	return Theme::instance()->dark() ? dark : light;
 }
 
+QColor searchMarkerColor()
+{
+	return Theme::instance()->dark() ? QColor(0x58, 0x6e, 0x75) : QColor(255, 255, 127);
+}
+
 } // namespace lm

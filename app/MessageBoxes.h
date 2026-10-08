@@ -55,6 +55,10 @@ void resetHiddenMessages();
 void showIdenticalMessage(QWidget *parent, const QStringList &paths,
 	bool exactCheck);
 
+/** CEditReplaceDlg::OnEditReplaceAll's message: how many strings Replace
+    All replaced. "Don't display this message again" hides it. */
+void showNumReplaced(QWidget *parent, int count);
+
 /** A plain information box, window-modal (sheets on macOS). */
 void showInformation(QWidget *parent, const QString &text);
 /** The same with the warning icon (MB_OK | MB_ICONEXCLAMATION). */

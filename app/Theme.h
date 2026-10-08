@@ -65,4 +65,9 @@ struct DiffColors
 
 const DiffColors &diffColors();
 
+/** The background of what the search marker marks (upstream's
+    COLORINDEX_MARKERBKGND0): WinMerge's default in light mode, the one of
+    its "VS Dark" color scheme otherwise. */
+QColor searchMarkerColor();
+
 } // namespace lm

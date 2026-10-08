@@ -123,6 +123,69 @@
     </message>
 </context>
 <context>
+    <name>EditReplaceDialog</name>
+    <message>
+        <source>Replace</source>
+        <translation>Substituir</translation>
+    </message>
+    <message>
+        <source>Fi&amp;nd what:</source>
+        <translation>E&amp;ncontrar o quê:</translation>
+    </message>
+    <message>
+        <source>Re&amp;place with:</source>
+        <translation>Su&amp;bstituir por:</translation>
+    </message>
+    <message>
+        <source>Match &amp;whole word only</source>
+        <translation>C&amp;orresponder apenas palavras inteiras</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Corresponder maiúsculas/minúsculas</translation>
+    </message>
+    <message>
+        <source>Regular &amp;expression</source>
+        <translation>Expressão &amp;regular</translation>
+    </message>
+    <message>
+        <source>&amp;Don&apos;t wrap at end of file</source>
+        <translation>Não &amp;quebrar no final do arquivo</translation>
+    </message>
+    <message>
+        <source>Replace in</source>
+        <translation>Substituir em</translation>
+    </message>
+    <message>
+        <source>&amp;Selection</source>
+        <translation>&amp;Seleção</translation>
+    </message>
+    <message>
+        <source>Wh&amp;ole file</source>
+        <translation>O &amp;arquivo inteiro</translation>
+    </message>
+    <message>
+        <source>&amp;Find Next</source>
+        <translation>&amp;Encontrar a Próxima</translation>
+    </message>
+    <message>
+        <source>Find Pre&amp;v</source>
+        <translation>Encontrar a An&amp;terior</translation>
+    </message>
+    <message>
+        <source>&amp;Replace</source>
+        <translation>S&amp;ubstituir</translation>
+    </message>
+    <message>
+        <source>Replace &amp;All</source>
+        <translation>Subst&amp;ituir Tudo</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+</context>
+<context>
     <name>FileCompareView</name>
     <message>
         <source>First Difference</source>
@@ -182,35 +245,11 @@
     </message>
     <message>
         <source>Find</source>
-        <translation>Localizar</translation>
+        <translation>Encontrar</translation>
     </message>
     <message>
         <source>Comparison Options</source>
         <translation>Opções de Comparação</translation>
-    </message>
-    <message>
-        <source>Previous</source>
-        <translation>Anterior</translation>
-    </message>
-    <message>
-        <source>Next</source>
-        <translation>Próxima</translation>
-    </message>
-    <message>
-        <source>Match case</source>
-        <translation>Diferenciar maiúsculas</translation>
-    </message>
-    <message>
-        <source>Replace with</source>
-        <translation>Substituir por</translation>
-    </message>
-    <message>
-        <source>Replace</source>
-        <translation>Substituir</translation>
-    </message>
-    <message>
-        <source>Replace All</source>
-        <translation>Substituir Tudo</translation>
     </message>
     <message>
         <source>Pane options</source>
@@ -352,25 +391,6 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     <message>
         <source>Swapping reloads both files. Discard unsaved changes?</source>
         <translation>Trocar os painéis recarrega os dois arquivos. Descartar as alterações não salvas?</translation>
-    </message>
-    <message>
-        <source>Search wrapped</source>
-        <translation>A busca recomeçou do início</translation>
-    </message>
-    <message>
-        <source>Not found</source>
-        <translation>Não encontrado</translation>
-    </message>
-    <message>
-        <source>This pane is read-only.</source>
-        <translation>Este painel é somente leitura.</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n replacement(s)</source>
-        <translation>
-            <numerusform>%n substituição</numerusform>
-            <numerusform>%n substituições</numerusform>
-        </translation>
     </message>
     <message>
         <source>Save As</source>
@@ -1305,6 +1325,49 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>&lt;Edit here&gt;</source>
         <translation>&lt;Editar aqui&gt;</translation>
+    </message>
+</context>
+<context>
+    <name>FindTextDialog</name>
+    <message>
+        <source>Find</source>
+        <translation>Encontrar</translation>
+    </message>
+    <message>
+        <source>Fi&amp;nd what:</source>
+        <translation>E&amp;ncontrar o quê:</translation>
+    </message>
+    <message>
+        <source>Match &amp;whole word only</source>
+        <translation>C&amp;orresponder apenas palavras inteiras</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Corresponder maiúsculas/minúsculas</translation>
+    </message>
+    <message>
+        <source>Regular &amp;expression</source>
+        <translation>Expressão &amp;regular</translation>
+    </message>
+    <message>
+        <source>D&amp;on&apos;t wrap end of file</source>
+        <translation>Não &amp;quebrar final de arquivo</translation>
+    </message>
+    <message>
+        <source>&amp;Don&apos;t close this dialog</source>
+        <translation>Não &amp;fechar esta caixa de diálogo</translation>
+    </message>
+    <message>
+        <source>&amp;Find Next</source>
+        <translation>&amp;Encontrar a Próxima</translation>
+    </message>
+    <message>
+        <source>Find &amp;Prev</source>
+        <translation>Encontrar a &amp;Anterior</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
     </message>
 </context>
 <context>
@@ -2249,18 +2312,6 @@ O arquivo pode ser somente leitura.</translation>
         <translation>&amp;Refazer</translation>
     </message>
     <message>
-        <source>&amp;Find...</source>
-        <translation>&amp;Localizar...</translation>
-    </message>
-    <message>
-        <source>Find &amp;Next</source>
-        <translation>Localizar &amp;Próxima</translation>
-    </message>
-    <message>
-        <source>Find &amp;Previous</source>
-        <translation>Localizar &amp;Anterior</translation>
-    </message>
-    <message>
         <source>&amp;Go to...</source>
         <translation>&amp;Ir para...</translation>
     </message>
@@ -2616,6 +2667,14 @@ O arquivo pode ser somente leitura.</translation>
         <source>Displa&amp;y Filter Bar</source>
         <translation>E&amp;xibir Barra de Filtros</translation>
     </message>
+    <message>
+        <source>F&amp;ind...</source>
+        <translation>&amp;Encontrar...</translation>
+    </message>
+    <message>
+        <source>Repla&amp;ce...</source>
+        <translation>S&amp;ubstituir...</translation>
+    </message>
 </context>
 <context>
     <name>MatchInsideDialog</name>
@@ -2685,6 +2744,10 @@ Select &apos;No&apos; to refresh later.</source>
         <translation>Filtros atualizados. Atualizar todas as comparações de pastas abertas?
 
 Selecione &apos;Não&apos; para atualizar mais tarde.</translation>
+    </message>
+    <message>
+        <source>Replaced %1 string(s).</source>
+        <translation>Substituiu %1 string(s).</translation>
     </message>
     <message>
         <source>Don&apos;t ask this question again.</source>
@@ -3109,6 +3172,13 @@ Checando identidade binária...</translation>
     <message>
         <source>The status bar of a folder comparison shows the method in use; click it to switch and recompare.</source>
         <translation>A barra de status de uma comparação de pastas mostra o método em uso; clique nele para trocar e recomparar.</translation>
+    </message>
+</context>
+<context>
+    <name>PaneSearch</name>
+    <message>
+        <source>Cannot find string &quot;%1&quot;.</source>
+        <translation>Não é possível encontrar a string “%1”.</translation>
     </message>
 </context>
 <context>

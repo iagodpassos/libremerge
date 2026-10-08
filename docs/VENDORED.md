@@ -51,7 +51,8 @@ comment, which Qt Linguist shows next to it:
   fitted to a LibreMerge label that differs from it in the accelerator,
   the ending or the shortcut, or naming LibreMerge where WinMerge's
   translators named their application; a few accelerators moved to a
-  letter that is free in the LibreMerge menu the label sits in;
+  letter that is free in the LibreMerge menu or dialog the label sits
+  in;
 - `LibreMerge's own text: not in WinMerge's catalog.` marks a text
   translated for LibreMerge, in WinMerge's vocabulary. These are the
   ones a native speaker's review matters most for;
@@ -64,9 +65,9 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 505 | 145 | 160 | 0 | 1 |
-| Spanish | 500 | 152 | 158 | 1 | 0 |
-| Catalan | 211 | 147 | 158 | 295 | 0 |
+| German | 528 | 145 | 153 | 0 | 1 |
+| Spanish | 520 | 155 | 151 | 1 | 0 |
+| Catalan | 232 | 149 | 151 | 295 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says

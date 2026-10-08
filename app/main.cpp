@@ -42,6 +42,9 @@
 #include <cstring>
 #include "DiffTextEdit.h"
 #include "GoToDialog.h"
+#include "FindDialogs.h"
+#include "FindText.h"
+#include "PaneSearch.h"
 #include "OptionsMgr.h"
 #include "LocationPane.h"
 #include "ImagePane.h"
@@ -313,6 +316,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestLocationPaneOpt(QStringLiteral("selftest-location-pane"),
 		QStringLiteral("Click, drag and right-click the location pane, and use its Go To dialog (for testing)"));
 	parser.addOption(selftestLocationPaneOpt);
+	QCommandLineOption selftestFindReplaceOpt(QStringLiteral("selftest-find-replace"),
+		QStringLiteral("Find and replace through WinMerge's dialogs, F3 and the search marker (for testing)"));
+	parser.addOption(selftestFindReplaceOpt);
 	QCommandLineOption selftestScrollSyncOpt(QStringLiteral("selftest-scroll-sync"),
 		QStringLiteral("Scroll a file comparison every way and verify the panes and the location pane follow (for testing)"));
 	parser.addOption(selftestScrollSyncOpt);
@@ -666,6 +672,28 @@ int main(int argc, char *argv[])
 			});
 			view.showGoTo(0);
 			GoToDialog::setPresenterForTest({});
+			// the Find and Replace dialogs
+			const auto dialogLabels = [](QDialog *dialog) {
+				QList<QAction *> labels;
+				for (QWidget *widget : dialog->findChildren<QWidget *>())
+				{
+					QString text;
+					if (auto *label = qobject_cast<QLabel *>(widget))
+						text = label->text();
+					else if (auto *button = qobject_cast<QAbstractButton *>(widget))
+						text = button->text();
+					if (!text.isEmpty())
+						labels.append(new QAction(text, dialog));
+				}
+				return labels;
+			};
+			PaneSearch *search = view.paneSearchForTest(0);
+			search->editFind();
+			report(QStringLiteral("Find dialog"), dialogLabels(search->findDialog()), true);
+			search->findDialog()->hide();
+			search->editReplace();
+			report(QStringLiteral("Replace dialog"), dialogLabels(search->replaceDialog()), true);
+			search->replaceDialog()->hide();
 		}
 		printf("menus: %d, letters shared: %d (and %d noted in the filter popups)\n",
 			menus, shared, noted);
@@ -1919,10 +1947,14 @@ int main(int argc, char *argv[])
 			// which the drop-down turns into No
 			OptionsDialog dialog;
 			const auto rows = dialog.messageBoxesForTest();
-			bool fine = rows.size() == 3 && rows.at(2).second
-				&& dialog.messageBoxAnswerForTest(2) == lm::answerText(lm::AnswerYes)
+			int row = 0; // the question's, in upstream's order
+			const QList<lm::HideableMessage> listed = lm::hideableMessages();
+			while (row < listed.size() && listed.at(row).key != key)
+				++row;
+			bool fine = rows.size() == listed.size() && row < rows.size() && rows.at(row).second
+				&& dialog.messageBoxAnswerForTest(row) == lm::answerText(lm::AnswerYes)
 				&& dialog.messageBoxAnswerForTest(0).isEmpty();
-			dialog.setMessageBoxAnswerForTest(2, 1);
+			dialog.setMessageBoxAnswerForTest(row, 1);
 			dialog.setMessageBoxHiddenForTest(0, true);
 			fine = fine && dialog.messageBoxAnswerForTest(0) == lm::answerText(lm::AnswerOk);
 			dialog.setMessageBoxHiddenForTest(0, false);
@@ -1937,7 +1969,7 @@ int main(int argc, char *argv[])
 			window.applicationActivated();
 			settle();
 			check(lm::rememberedAnswer(key) == lm::NoAnswer && asked.size() == 2
-				&& dialog.messageBoxAnswerForTest(2).isEmpty()
+				&& dialog.messageBoxAnswerForTest(row).isEmpty()
 				&& view->realLinesForTest(1).size() == 4, "Reset asks again");
 		}
 
@@ -2297,7 +2329,8 @@ int main(int argc, char *argv[])
 			const bool saved = lm::messageHidden(QStringLiteral("FilesSame"));
 			shown.clear();
 			dialog.resetMessageBoxesForTest();
-			check(rows.size() == 3 && !rows.at(0).second && saved
+			check(rows.size() == lm::hideableMessages().size() && rows.size() == 4
+				&& !rows.at(0).second && saved
 				&& !lm::messageHidden(QStringLiteral("FilesSame"))
 				&& !dialog.messageBoxesForTest().at(0).second,
 				"Message Boxes page: hide, save and reset");
@@ -5694,28 +5727,27 @@ int main(int argc, char *argv[])
 				&& view.realLinesForTest(0) == before,
 				"Paste: over the lines that show, in one undo step");
 
-			QLineEdit *findField = nullptr;
-			QLineEdit *replaceField = nullptr;
-			for (QLineEdit *edit : view.findChildren<QLineEdit *>())
-			{
-				if (edit->placeholderText() == FileCompareView::tr("Find"))
-					findField = edit;
-				else if (edit->placeholderText() == FileCompareView::tr("Replace with"))
-					replaceField = edit;
-			}
-			QPushButton *replaceAll = nullptr;
-			for (QPushButton *button : view.findChildren<QPushButton *>())
-				if (button->text() == FileCompareView::tr("Replace All"))
-					replaceAll = button;
-			if (findField == nullptr || replaceField == nullptr || replaceAll == nullptr)
+			// Replace All, from the top: what the hidden lines hold stays
+			view.setCursorViewLineForTest(0, 0);
+			PaneSearch *search = view.paneSearchForTest(0);
+			search->editReplace();
+			EditReplaceDialog *replace = search->replaceDialog();
+			if (replace == nullptr)
 				return 1;
-			view.showFindBar();
-			findField->setText(QStringLiteral("e"));
-			replaceField->setText(QStringLiteral("#"));
-			replaceAll->click();
+			const auto typeInto = [](QComboBox *field, const QString &text) {
+				field->lineEdit()->setText(text);
+				emit field->lineEdit()->textEdited(text);
+			};
+			typeInto(replace->findTextForTest(), QStringLiteral("e"));
+			typeInto(replace->replaceTextForTest(), QStringLiteral("#"));
+			messages.clear();
+			replace->replaceAllForTest()->click();
+			replace->reject();
 			say("after replacing every e, left", view.realLinesForTest(0));
 			check(view.realLinesForTest(0) == list({ "alpha", "#RROR on#", "beta", "gamma",
-					"#RROR two", "delta", "epsilon" }),
+					"#RROR two", "delta", "epsilon" })
+					&& messages == QStringList{ QCoreApplication::translate("MessageBoxes",
+						"Replaced %1 string(s).").arg(3) },
 				"Replace All: what the hidden lines hold stays");
 
 			// the menu of a right click, handed over in place of being opened
@@ -5746,21 +5778,25 @@ int main(int argc, char *argv[])
 			FileCompareView view;
 			open(view);
 			apply(view, QStringLiteral("extra"));
-			QLineEdit *findField = nullptr;
-			for (QLineEdit *edit : view.findChildren<QLineEdit *>())
-				if (edit->placeholderText() == FileCompareView::tr("Find"))
-					findField = edit;
-			if (findField == nullptr)
-				return 1;
-			view.showFindBar();
 			view.setCursorViewLineForTest(1, 7);
-			findField->setText(QStringLiteral("zeta"));
-			view.findNext(false);
+			PaneSearch *search = view.paneSearchForTest(1);
+			search->editFind();
+			FindTextDialog *find = search->findDialog();
+			if (find == nullptr)
+				return 1;
+			const auto typeInto = [](QComboBox *field, const QString &text) {
+				field->lineEdit()->setText(text);
+				emit field->lineEdit()->textEdited(text);
+			};
+			messages.clear();
+			typeInto(find->findTextForTest(), QStringLiteral("zeta"));
+			find->findNextForTest()->click();
 			const int afterHidden = view.cursorViewLineForTest(1);
-			findField->setText(QStringLiteral("error"));
-			view.findNext(false);
+			typeInto(find->findTextForTest(), QStringLiteral("error"));
+			find->findNextForTest()->click();
 			const int afterShown = view.cursorViewLineForTest(1);
-			check(afterHidden == 7 && afterShown == 7
+			find->reject();
+			check(afterHidden == 7 && afterShown == 7 && messages.size() == 1
 				&& view.paneForTest(1)->textCursor().selectedText() == QStringLiteral("error"),
 				"find: what a hidden line holds is not found");
 
@@ -6919,36 +6955,19 @@ int main(int argc, char *argv[])
 				return folder != nullptr ? folder->findChild<QTreeWidget *>() : nullptr;
 			});
 
-		// the find bar keeps its own Esc: it closes, the tab stays. That Esc
-		// is a shortcut, and shortcuts answer in the active window only: a
-		// run whose windows cannot come to the front (another application
-		// holds it, on a real desktop) has nothing to check here
+		// the Find dialog has its own Esc: it closes, the tab stays
 		{
 			MainWindow window;
 			window.show();
 			window.openFileComparison({ left, right });
 			auto *view = window.findChild<FileCompareView *>();
-			view->showFindBar();
-			for (int i = 0; i < 40 && !window.isActiveWindow(); ++i)
-			{
-				QThread::msleep(25);
-				QCoreApplication::processEvents();
-			}
-			QPointer<QLineEdit> findEdit;
-			for (QLineEdit *edit : view->findChildren<QLineEdit *>())
-				if (edit->isVisible())
-					findEdit = edit;
-			if (!window.isActiveWindow())
-			{
-				printf("Esc closes the find bar only: skipped, the window is not active\n");
-			}
-			else
-			{
-				const int before = tabCount(window);
-				pressEsc(findEdit);
-				check(findEdit != nullptr && !findEdit->isVisible()
-					&& tabCount(window) == before, "Esc closes the find bar only");
-			}
+			view->showFind();
+			FindTextDialog *find = view->paneSearchForTest(view->activePaneForTest())->findDialog();
+			const int before = tabCount(window);
+			if (find != nullptr)
+				pressEsc(find->findTextForTest()->lineEdit());
+			check(find != nullptr && !find->isVisible() && tabCount(window) == before,
+				"Esc closes the Find dialog only");
 		}
 
 		// a running folder comparison: Esc stops it and the tab stays
@@ -8469,6 +8488,400 @@ int main(int argc, char *argv[])
 		return ok ? 0 : 1;
 	}
 
+	if (parser.isSet(selftestFindReplaceOpt))
+	{
+		// WinMerge's Find and Replace dialogs (CFindTextDlg, CEditReplaceDlg),
+		// F3 and its variants, and the marker of the text searched for
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+		const QString language = qEnvironmentVariable("LIBREMERGE_LANGUAGE", QStringLiteral("en"));
+		const auto shoot = [&shots, &language](QWidget *widget, const char *name)
+		{
+			if (!shots.isEmpty())
+				widget->grab().save(QStringLiteral("%1/fr-%2-%3.png").arg(shots, language,
+					QLatin1String(name)));
+		};
+		// a text typed in a field, as the keyboard would
+		const auto typeInto = [](QComboBox *field, const QString &text)
+		{
+			field->lineEdit()->setText(text);
+			emit field->lineEdit()->textEdited(text);
+		};
+		QStringList told;
+		lm::setMessageSinkForTest([&told](const QString &text) { told.append(text); });
+		const auto notFound = [](const QString &text) {
+			return PaneSearch::tr("Cannot find string \"%1\".").arg(text);
+		};
+		const auto numReplaced = [](int count) {
+			return QCoreApplication::translate("MessageBoxes", "Replaced %1 string(s).").arg(count);
+		};
+		// where a pane's selection starts (column, line), and what it holds
+		const auto startOf = [](DiffTextEdit *pane) {
+			QTextCursor start(pane->document());
+			start.setPosition(pane->textCursor().selectionStart());
+			return QPoint(start.positionInBlock(), start.blockNumber());
+		};
+		const auto put = [](FileCompareView &view, int side, int line, int column) {
+			view.setCursorViewLineForTest(side, line);
+			DiffTextEdit *pane = view.paneForTest(side);
+			QTextCursor cursor = pane->textCursor();
+			cursor.setPosition(cursor.block().position() + column);
+			pane->setTextCursor(cursor);
+		};
+
+		const QByteArray leftText =
+			"alpha beta gamma\n"
+			"foobar foo barfoo\n"
+			"Here is here and there\n"
+			"one two three\n"
+			"CamelCase camelcase CAMELCASE\n"
+			"x1 x2 x3\n"
+			"last line\n";
+		QByteArray rightText = leftText;
+		rightText.replace("one two three", "one 2 three");
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		write(left, leftText);
+		write(right, rightText);
+		FileCompareView view;
+		QString error;
+		if (!view.compare(QStringList{ left, right }, &error))
+		{
+			printf("compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		view.resize(1000, 600);
+		view.show();
+		settle();
+		DiffTextEdit *pane = view.paneForTest(0);
+		PaneSearch *search = view.paneSearchForTest(0);
+		const auto at = [&]() { return startOf(pane); };
+		const auto selected = [&]() { return pane->textCursor().selectedText(); };
+
+		// --- the Find dialog ---
+		put(view, 0, 0, 7); // in "beta"
+		search->editFind();
+		FindTextDialog *find = search->findDialog();
+		if (find == nullptr)
+			return 1;
+		settle();
+		shoot(find, "find");
+		check(find->isVisible() && find->windowTitle() == FindTextDialog::tr("Find")
+				&& find->findTextForTest()->currentText() == QStringLiteral("beta")
+				&& find->noCloseForTest()->isChecked() && !find->matchCaseForTest()->isChecked()
+				&& !find->wholeWordForTest()->isChecked() && !find->regExpForTest()->isChecked()
+				&& !find->noWrapForTest()->isChecked() && find->findNextForTest()->isDefault(),
+			"Find: the word at the cursor, \"Don't close this dialog\" ticked, Find Next the default");
+		typeInto(find->findTextForTest(), QString());
+		const bool emptyOff = !find->findNextForTest()->isEnabled()
+			&& !find->findPrevForTest()->isEnabled();
+		typeInto(find->findTextForTest(), QStringLiteral("foo"));
+		check(emptyOff && find->findNextForTest()->isEnabled() && find->findPrevForTest()->isEnabled(),
+			"Find: Find Next and Find Prev need a text");
+
+		QList<QPoint> places;
+		for (int i = 0; i < 4; ++i)
+		{
+			find->findNextForTest()->click();
+			places.append(at());
+		}
+		check(places == QList<QPoint>{ QPoint(0, 1), QPoint(7, 1), QPoint(14, 1), QPoint(0, 1) }
+				&& selected() == QStringLiteral("foo") && find->isVisible() && told.isEmpty(),
+			"Find Next: on from the cursor and round the end of the file, the dialog left open");
+		find->findPrevForTest()->click();
+		check(at() == QPoint(14, 1) && selected() == QStringLiteral("foo")
+				&& pane->textCursor().position() == pane->textCursor().selectionStart(),
+			"Find Prev: the one before, round the start, the cursor on its left");
+
+		put(view, 0, 0, 0);
+		find->wholeWordForTest()->click();
+		find->findNextForTest()->click();
+		const QPoint wholeWord = at();
+		find->findNextForTest()->click();
+		check(wholeWord == QPoint(7, 1) && at() == QPoint(7, 1),
+			"Match whole word only: \"foo\" on its own, not in \"foobar\" or \"barfoo\"");
+		find->wholeWordForTest()->click();
+
+		put(view, 0, 4, 0);
+		typeInto(find->findTextForTest(), QStringLiteral("camelcase"));
+		find->matchCaseForTest()->click();
+		find->findNextForTest()->click();
+		check(at() == QPoint(10, 4) && selected() == QStringLiteral("camelcase"),
+			"Match case: the text as typed only");
+		find->matchCaseForTest()->click();
+
+		find->regExpForTest()->click();
+		const bool noWholeWord = !find->wholeWordForTest()->isEnabled()
+			&& !find->wholeWordForTest()->isChecked();
+		put(view, 0, 5, 0);
+		typeInto(find->findTextForTest(), QStringLiteral("x[23]"));
+		find->findNextForTest()->click();
+		const bool expression = selected() == QStringLiteral("x2") && at() == QPoint(3, 5);
+		put(view, 0, 0, 0);
+		typeInto(find->findTextForTest(), QStringLiteral("three\\nCamel"));
+		find->findNextForTest()->click();
+		check(noWholeWord && expression && at() == QPoint(8, 3)
+				&& selected() == QStringLiteral("three") + QChar(QChar::ParagraphSeparator)
+					+ QStringLiteral("Camel"),
+			"Regular expression: no whole word with it, and a line break in it takes the next line in");
+		find->regExpForTest()->click();
+
+		const QPoint before = at();
+		typeInto(find->findTextForTest(), QStringLiteral("zzz"));
+		find->findNextForTest()->click();
+		check(told == QStringList{ notFound(QStringLiteral("zzz")) } && at() == before
+				&& find->isVisible(),
+			"not found: told so, the selection left where it was");
+		told.clear();
+
+		find->noWrapForTest()->click();
+		put(view, 0, 6, 0);
+		typeInto(find->findTextForTest(), QStringLiteral("alpha"));
+		find->findNextForTest()->click();
+		const bool stopped = told == QStringList{ notFound(QStringLiteral("alpha")) };
+		told.clear();
+		find->noWrapForTest()->click();
+		find->findNextForTest()->click();
+		check(stopped && told.isEmpty() && at() == QPoint(0, 0),
+			"\"Don't wrap end of file\": the search stops at the end of the file");
+
+		find->noCloseForTest()->click();
+		find->findNextForTest()->click();
+		check(!find->isVisible() && told.isEmpty(),
+			"\"Don't close this dialog\" off: what is found closes it");
+		const unsigned savedFlags = QSettings().value(QStringLiteral("Editor/FindFlags")).toUInt();
+		const QStringList history = QSettings().value(QStringLiteral("Editor/FindText")).toStringList();
+		printf("  history: %s\n", qPrintable(history.join(QStringLiteral(" | "))));
+		check(savedFlags == 0 && history.value(0) == QStringLiteral("alpha")
+				&& history.contains(QStringLiteral("zzz"))
+				&& history.indexOf(QStringLiteral("foo")) > history.indexOf(QStringLiteral("camelcase")),
+			"the settings: the flags of the last search that found, the texts newest first");
+
+		search->editFind();
+		const bool reopened = find->isVisible()
+			&& find->findTextForTest()->currentText() == QStringLiteral("alpha")
+			&& !find->noCloseForTest()->isChecked();
+		typeInto(find->findTextForTest(), QStringLiteral("ALPHA"));
+		find->findNextForTest()->click();
+		const QStringList again = QSettings().value(QStringLiteral("Editor/FindText")).toStringList();
+		check(reopened && again.value(0) == QStringLiteral("ALPHA")
+				&& !again.contains(QStringLiteral("alpha"))
+				&& find->findTextForTest()->count() == again.size(),
+			"the history: one text the same but for case, the newest");
+
+		// --- F3 (OnEditRepeat) ---
+		put(view, 0, 1, 0);
+		search->editFind();
+		find->noCloseForTest()->click();
+		typeInto(find->findTextForTest(), QStringLiteral("foo"));
+		find->findNextForTest()->click();
+		find->reject();
+		view.findRepeat(false, false);
+		const QPoint next = at();
+		view.findRepeat(false, true);
+		check(next == QPoint(7, 1) && at() == QPoint(0, 1),
+			"F3 and Shift+F3: the last search again, either way");
+		put(view, 0, 2, 9); // in the second "here"
+		view.findRepeat(true, false);
+		check(selected() == QStringLiteral("here") && at() == QPoint(18, 2),
+			"Ctrl+F3: the word at the cursor, searched for from there");
+		view.setCursorViewLineForTest(1, 0);
+		view.findRepeat(false, false);
+		FindTextDialog *rightFind = view.paneSearchForTest(1)->findDialog();
+		check(rightFind != nullptr && rightFind != find && rightFind->isVisible(),
+			"F3 where nothing was searched for yet: that pane's own Find dialog");
+		if (rightFind != nullptr)
+			rightFind->reject();
+
+		// --- the marker: the text last searched for, in every pane ---
+		settle();
+		const QStringList markedLeft = pane->markedTextsForTest();
+		const QStringList markedRight = view.paneForTest(1)->markedTextsForTest();
+		lm::SearchMarker::instance()->clearForTest();
+		settle();
+		printf("  marked: %s\n", qPrintable(markedLeft.join(QStringLiteral(" | "))));
+		check(markedLeft == QStringList{ QStringLiteral("Here"), QStringLiteral("here"),
+					QStringLiteral("here") }
+				&& markedRight == markedLeft && pane->markedTextsForTest().isEmpty(),
+			"the marker: every occurrence of the text searched for, in both panes");
+
+		// --- the Replace dialog ---
+		{
+			FileCompareView readOnly;
+			readOnly.setReadOnlySides({ false, true });
+			if (!readOnly.compare(QStringList{ left, right }, &error))
+				return 2;
+			readOnly.setCursorViewLineForTest(1, 0);
+			readOnly.showReplace();
+			check(!readOnly.activePaneEditable()
+					&& readOnly.paneSearchForTest(1)->replaceDialog() == nullptr,
+				"Replace: none for a read-only pane");
+		}
+		const QString editLeft = dir.filePath(QStringLiteral("edit-left.txt"));
+		const QString editRight = dir.filePath(QStringLiteral("edit-right.txt"));
+		write(editLeft, "Here is here and there\nx1 x2 x3\nx4 x5\nmail ana@site bob@host\nend x\n");
+		write(editRight, "Here is here and there\nx1 x2 x3\nx4 x5\nmail ana@site bob@host\nEND\n");
+		FileCompareView edit;
+		if (!edit.compare(QStringList{ editLeft, editRight }, &error))
+			return 2;
+		edit.resize(1000, 600);
+		edit.show();
+		settle();
+		DiffTextEdit *editPane = edit.paneForTest(0);
+		PaneSearch *editSearch = edit.paneSearchForTest(0);
+		const auto line = [&](int number) {
+			return editPane->document()->findBlockByNumber(number).text();
+		};
+		const auto editAt = [&]() { return startOf(editPane); };
+
+		put(edit, 0, 0, 1); // in "Here"
+		editSearch->editReplace();
+		EditReplaceDialog *replace = editSearch->replaceDialog();
+		if (replace == nullptr)
+			return 1;
+		settle();
+		shoot(replace, "replace");
+		check(replace->isVisible() && replace->windowTitle() == EditReplaceDialog::tr("Replace")
+				&& replace->findTextForTest()->currentText() == QStringLiteral("Here")
+				&& replace->replaceTextForTest()->currentText().isEmpty()
+				&& replace->wholeFileScopeForTest()->isChecked()
+				&& !replace->selectionScopeForTest()->isEnabled()
+				&& replace->findNextForTest()->isDefault() && replace->replaceForTest()->isEnabled(),
+			"Replace: the word at the cursor, the whole file without a selection, Find Next the default");
+
+		typeInto(replace->findTextForTest(), QStringLiteral("here"));
+		typeInto(replace->replaceTextForTest(), QStringLiteral("THERE"));
+		replace->replaceForTest()->click();
+		const bool firstFound = editPane->textCursor().selectedText() == QStringLiteral("here")
+			&& editAt() == QPoint(8, 0) && replace->replaceForTest()->isDefault();
+		replace->replaceForTest()->click();
+		check(firstFound && line(0) == QStringLiteral("Here is THERE and there")
+				&& editPane->textCursor().selectedText() == QStringLiteral("here")
+				&& editAt() == QPoint(19, 0),
+			"Replace: the first press finds, the next puts the text in and finds the next one");
+		{
+			QKeyEvent press(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+			QCoreApplication::sendEvent(replace->findTextForTest()->lineEdit(), &press);
+			QKeyEvent release(QEvent::KeyRelease, Qt::Key_Return, Qt::NoModifier);
+			QCoreApplication::sendEvent(replace->findTextForTest()->lineEdit(), &release);
+		}
+		check(line(0) == QStringLiteral("Here is THERE and tTHERE") && editAt() == QPoint(0, 0),
+			"Enter: the default button, Replace once something is found");
+		replace->reject();
+
+		put(edit, 0, 2, 0);
+		editSearch->editReplace();
+		replace = editSearch->replaceDialog();
+		typeInto(replace->findTextForTest(), QStringLiteral("x"));
+		typeInto(replace->replaceTextForTest(), QStringLiteral("xx"));
+		told.clear();
+		replace->replaceAllForTest()->click();
+		check(line(1) == QStringLiteral("xx1 xx2 xx3") && line(2) == QStringLiteral("xx4 xx5")
+				&& line(4) == QStringLiteral("end xx")
+				&& told == QStringList{ numReplaced(6) },
+			"Replace All: from the cursor, round the file, each one once though the new text has it, and the count told");
+		edit.undoActive();
+		check(line(1) == QStringLiteral("x1 x2 x3") && line(2) == QStringLiteral("x4 x5")
+				&& line(4) == QStringLiteral("end x"),
+			"Replace All: one undo step");
+
+		replace->regExpForTest()->click();
+		typeInto(replace->findTextForTest(), QStringLiteral("(\\w+)@(\\w+)"));
+		typeInto(replace->replaceTextForTest(), QStringLiteral("\\2 at \\U\\1"));
+		told.clear();
+		replace->replaceAllForTest()->click();
+		check(line(3) == QStringLiteral("mail site at ANA host at BOB")
+				&& told == QStringList{ numReplaced(2) }
+				&& !replace->wholeWordForTest()->isEnabled(),
+			"regular expression: its groups and \\U in the new text");
+		replace->reject();
+
+		// lines 1 and 2 selected: where to replace
+		{
+			QTextCursor lines(editPane->document());
+			lines.setPosition(editPane->document()->findBlockByNumber(1).position());
+			const QTextBlock second = editPane->document()->findBlockByNumber(2);
+			lines.setPosition(second.position() + second.length() - 1, QTextCursor::KeepAnchor);
+			editPane->setTextCursor(lines);
+		}
+		editSearch->editReplace();
+		replace = editSearch->replaceDialog();
+		const bool scoped = replace->selectionScopeForTest()->isChecked()
+			&& replace->selectionScopeForTest()->isEnabled()
+			&& !replace->replaceForTest()->isEnabled() && replace->regExpForTest()->isChecked();
+		replace->regExpForTest()->click();
+		typeInto(replace->findTextForTest(), QStringLiteral("x"));
+		typeInto(replace->replaceTextForTest(), QStringLiteral("y"));
+		told.clear();
+		replace->replaceAllForTest()->click();
+		const bool inside = line(1) == QStringLiteral("y1 y2 y3") && line(2) == QStringLiteral("y4 y5")
+			&& line(4) == QStringLiteral("end x") && told == QStringList{ numReplaced(5) };
+		replace->wholeFileScopeForTest()->click();
+		const bool replaceBack = replace->replaceForTest()->isEnabled();
+		replace->reject();
+		const QTextCursor after = editPane->textCursor();
+		check(scoped && inside && replaceBack && after.hasSelection() && editAt() == QPoint(0, 1)
+				&& after.selectionEnd() == editPane->document()->findBlockByNumber(2).position() + 5,
+			"Selection: Replace All in it only, Replace off there; Cancel brings the selection back");
+
+		QStringList keys;
+		for (const lm::HideableMessage &message : lm::hideableMessages())
+			keys.append(message.key);
+		check(keys.indexOf(QStringLiteral("NumReplaced")) == keys.indexOf(QStringLiteral("FileToItself")) + 1
+				&& keys.indexOf(QStringLiteral("FileChangedRescan"))
+					== keys.indexOf(QStringLiteral("NumReplaced")) + 1,
+			"Replace All's count: a message that can be hidden, listed where upstream lists it");
+
+		// --- the Edit menu ---
+		{
+			MainWindow window;
+			auto *findAction = window.findChild<QAction *>(QStringLiteral("editFind"));
+			auto *replaceAction = window.findChild<QAction *>(QStringLiteral("editReplace"));
+			auto *repeat = window.findChild<QAction *>(QStringLiteral("editFindNext"));
+			auto *repeatBack = window.findChild<QAction *>(QStringLiteral("editFindPrevious"));
+			QMenu *editMenu = nullptr;
+			for (QAction *title : window.menuBar()->actions())
+				if (title->menu() != nullptr && title->menu()->actions().contains(findAction))
+					editMenu = title->menu();
+			check(findAction != nullptr && replaceAction != nullptr && repeat != nullptr
+					&& repeatBack != nullptr && editMenu != nullptr
+					&& findAction->text() == MainWindow::tr("F&ind...")
+					&& replaceAction->text() == MainWindow::tr("Repla&ce...")
+					&& editMenu->actions().contains(replaceAction)
+					&& !editMenu->actions().contains(repeat)
+					&& repeat->shortcuts().contains(QKeySequence(Qt::Key_F3))
+					&& repeatBack->shortcuts().contains(QKeySequence(Qt::SHIFT | Qt::Key_F3)),
+				"Edit: Find... and Replace..., and F3 with Shift without an item, as upstream");
+		}
+
+		lm::setMessageSinkForTest([](const QString &) {});
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
 	if (parser.isSet(selftestScrollSyncOpt))
 	{
 		// however a pane scrolls, the other panes follow it and the
@@ -8606,19 +9019,21 @@ int main(int argc, char *argv[])
 		panes[0]->verticalScrollBar()->setValue(150);
 		followed("the scroll bar's handle: the right pane and the marker follow", 150);
 
-		// Find, from the left pane, a line out of view (the find bar that
-		// opens takes room from the panes, and the marker refits)
+		// Find, from the left pane, a line out of view: it comes to the
+		// middle of the panes
 		toTop();
 		view.setCursorViewLineForTest(0, 0);
-		QLineEdit *findField = nullptr;
-		for (QLineEdit *edit : view.findChildren<QLineEdit *>())
-			if (edit->placeholderText() == FileCompareView::tr("Find"))
-				findField = edit;
-		if (findField == nullptr)
-			return 1;
-		view.showFindBar();
-		findField->setText(QStringLiteral("line 377 of"));
-		view.findNext(false);
+		{
+			PaneSearch *search = view.paneSearchForTest(0);
+			search->editFind();
+			FindTextDialog *find = search->findDialog();
+			if (find == nullptr)
+				return 1;
+			find->findTextForTest()->lineEdit()->setText(QStringLiteral("line 377 of"));
+			emit find->findTextForTest()->lineEdit()->textEdited(QStringLiteral("line 377 of"));
+			find->findNextForTest()->click();
+			find->reject();
+		}
 		followed("Find, the match out of view: both panes and the marker go to it", 300);
 
 		view.resize(1000, 900);

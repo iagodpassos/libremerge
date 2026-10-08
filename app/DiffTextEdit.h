@@ -6,6 +6,8 @@
 #include <QHash>
 #include <QList>
 #include <QPlainTextEdit>
+#include <QStringList>
+#include <QTextEdit>
 #include <QTextBlock>
 
 /**
@@ -42,6 +44,15 @@ public:
 	explicit DiffTextEdit(QWidget *parent = nullptr);
 
 	void setGutterLineColors(const QHash<int, QColor> &colors);
+
+	/** The pane's highlights (the differences, line and word), under
+	    which the search marker's stretches are drawn: upstream draws the
+	    marker over the differences' colors, the selection over both. The
+	    marker is worked out for the lines on screen only, as upstream
+	    draws it line by line. */
+	void setHighlightSelections(const QList<QTextEdit::ExtraSelection> &selections);
+	/** What the search marker marks on screen (for tests). */
+	QStringList markedTextsForTest() const;
 
 	/** numbers[viewLine] = 1-based real line number, or -1 for ghost
 	    lines (no number drawn). Empty list falls back to 1:1 numbering. */
@@ -91,6 +102,8 @@ public:
 	void setHiddenLines(const QList<bool> &hidden);
 	bool hasHiddenLines() const { return m_hasHiddenLines; }
 	bool isLineHidden(int viewLine) const;
+	/** Whether a hidden line lies between two positions. */
+	bool rangeSpansHiddenLine(int from, int to) const { return spansHiddenLine(from, to); }
 	/** Where a shown line ends in the viewport, -1 for a hidden one (for
 	    tests of what is drawn under it). */
 	int lineBottomForTest(int viewLine) const;
@@ -128,9 +141,14 @@ private slots:
 	void updateGutterWidth();
 	void updateGutter(const QRect &rect, int dy);
 	void keepCursorOnShownLine();
+	/** The search marker again, for the lines on screen: when they are
+	    others (a scroll), or whatever they are (forced). */
+	void refreshMarkers(bool force);
+	void scheduleMarkerRefresh();
 
 private:
 	bool spansHiddenLine(int from, int to) const;
+	QList<QTextEdit::ExtraSelection> markerSelections();
 	bool endsShownStretch(const QTextBlock &block) const;
 	bool selectionSpansHiddenLine() const;
 	void removeSelectionKeepingHidden();
@@ -143,6 +161,10 @@ private:
 	QHash<int, QColor> m_lineColors;
 	QList<int> m_lineNumbers;
 	QList<InsertionMarker> m_markers;
+	QList<QTextEdit::ExtraSelection> m_baseSelections;
+	QList<QTextEdit::ExtraSelection> m_markerSelections;
+	int m_markerFirst = -1; // the first line the marker was worked out for
+	bool m_markerRefreshPending = false;
 	std::function<void(int)> m_doubleClickHook;
 	std::function<void(const QString &)> m_fileDropHook;
 };

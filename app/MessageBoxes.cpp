@@ -15,6 +15,7 @@ namespace
 const QString kGroup = QStringLiteral("MessageBoxes/");
 const QString kFilesSame = QStringLiteral("FilesSame");         // IDS_FILESSAME
 const QString kFileToItself = QStringLiteral("FileToItself");   // IDS_FILE_TO_ITSELF
+const QString kNumReplaced = QStringLiteral("NumReplaced");     // IDS_NUM_REPLACED
 const QString kFileChangedRescan = QStringLiteral("FileChangedRescan"); // IDS_FILECHANGED_RESCAN
 
 std::function<void(const QString &)> &sink()
@@ -37,6 +38,11 @@ QString filesSameText()
 QString fileToItselfText()
 {
 	return QCoreApplication::translate("MessageBoxes", "Same file is opened in both panes.");
+}
+
+QString numReplacedText()
+{
+	return QCoreApplication::translate("MessageBoxes", "Replaced %1 string(s).");
 }
 
 QString fileChangedRescanText()
@@ -175,6 +181,7 @@ QList<HideableMessage> hideableMessages()
 	return {
 		{ kFilesSame, filesSameText(), { AnswerOk } },
 		{ kFileToItself, fileToItselfText(), { AnswerOk } },
+		{ kNumReplaced, numReplacedText(), { AnswerOk } },
 		{ kFileChangedRescan, fileChangedRescanText(), { AnswerYes, AnswerNo } },
 	};
 }
@@ -252,6 +259,12 @@ void showIdenticalMessage(QWidget *parent, const QStringList &paths,
 	showHideable(parent, kFilesSame,
 		QCoreApplication::translate("MessageBoxes", "Selected files are identical (with current settings).\n"
 			"Checking binary identity..."), &check);
+}
+
+void showNumReplaced(QWidget *parent, int count)
+{
+	if (!messageHidden(kNumReplaced))
+		showHideable(parent, kNumReplaced, numReplacedText().arg(count));
 }
 
 void showInformation(QWidget *parent, const QString &text)

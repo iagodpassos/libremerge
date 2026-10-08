@@ -44,6 +44,7 @@
 #include "FileFilters.h"
 #include "Icons.h"
 #include "GoToDialog.h"
+#include "PaneSearch.h"
 #include "LocationPane.h"
 #include "SyntaxHighlighter.h"
 #include "FileOps.h"
@@ -365,62 +366,10 @@ FileCompareView::FileCompareView(QWidget *parent)
 		updateDiffPane();
 	});
 	addToolAction(lm::Icon::Find, tr("Find"), QString::fromUtf8("\xE2\x8C\x98""F"),
-		[this]() { showFindBar(); });
+		[this]() { showFind(); });
 	addToolAction(lm::Icon::Options, tr("Comparison Options"), QString(),
 		[this]() { emit optionsRequested(); });
 	layout->addWidget(toolbar);
-
-	// find/replace bar, hidden until requested
-	m_findBar = new QWidget(this);
-	auto *findLayout = new QHBoxLayout(m_findBar);
-	findLayout->setContentsMargins(6, 3, 6, 3);
-	findLayout->setSpacing(6);
-	m_findEdit = new QLineEdit(m_findBar);
-	m_findEdit->setPlaceholderText(tr("Find"));
-	m_findEdit->setMaximumWidth(260);
-	connect(m_findEdit, &QLineEdit::returnPressed,
-		this, [this]() { findNext(false); });
-	findLayout->addWidget(m_findEdit);
-	auto *prevButton = new QPushButton(tr("Previous"), m_findBar);
-	connect(prevButton, &QPushButton::clicked, this, [this]() { findNext(true); });
-	findLayout->addWidget(prevButton);
-	auto *nextButton = new QPushButton(tr("Next"), m_findBar);
-	nextButton->setDefault(false);
-	connect(nextButton, &QPushButton::clicked, this, [this]() { findNext(false); });
-	findLayout->addWidget(nextButton);
-	m_findCase = new QCheckBox(tr("Match case"), m_findBar);
-	findLayout->addWidget(m_findCase);
-	findLayout->addSpacing(12);
-	m_replaceEdit = new QLineEdit(m_findBar);
-	m_replaceEdit->setPlaceholderText(tr("Replace with"));
-	m_replaceEdit->setMaximumWidth(220);
-	findLayout->addWidget(m_replaceEdit);
-	auto *replaceButton = new QPushButton(tr("Replace"), m_findBar);
-	connect(replaceButton, &QPushButton::clicked, this, [this]() { replaceOne(); });
-	findLayout->addWidget(replaceButton);
-	auto *replaceAllButton = new QPushButton(tr("Replace All"), m_findBar);
-	connect(replaceAllButton, &QPushButton::clicked, this, [this]() { replaceAll(); });
-	findLayout->addWidget(replaceAllButton);
-	m_findStatus = new QLabel(m_findBar);
-	findLayout->addWidget(m_findStatus, 1);
-	auto *closeButton = new QToolButton(m_findBar);
-	closeButton->setText(QString::fromUtf8("\xE2\x9C\x95"));
-	closeButton->setAutoRaise(true);
-	connect(closeButton, &QToolButton::clicked, this, [this]() {
-		m_findBar->hide();
-		m_panes[m_activePane]->setFocus();
-	});
-	findLayout->addWidget(closeButton);
-	auto *escapeAction = new QAction(m_findBar);
-	escapeAction->setShortcut(QKeySequence(Qt::Key_Escape));
-	escapeAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
-	m_findBar->addAction(escapeAction);
-	connect(escapeAction, &QAction::triggered, this, [this]() {
-		m_findBar->hide();
-		m_panes[m_activePane]->setFocus();
-	});
-	m_findBar->hide();
-	layout->addWidget(m_findBar);
 
 	auto *panes = new QHBoxLayout;
 	panes->setContentsMargins(0, 0, 0, 0);
@@ -561,6 +510,16 @@ FileCompareView::FileCompareView(QWidget *parent)
 				m_redoOrder.clear();
 			});
 	}
+	// each pane's Find and Replace (upstream's views have their own)
+	for (int i = 0; i < 3; ++i)
+	{
+		PaneSearch::Context context;
+		context.eol = [this, i]() { return m_sides[i].eol; };
+		context.editable = [this, i]() { return !m_readOnly[i]; };
+		context.shownLine = [this](int viewLine) { return shownLineOfView(viewLine); };
+		m_search[i] = new PaneSearch(m_panes[i], std::move(context), this);
+	}
+
 	// the marker's height is the lines that fit in the first pane
 	connect(m_panes[0], &DiffTextEdit::resized,
 		this, [this]() { updateLocationViewport(); });
@@ -1517,7 +1476,7 @@ void FileCompareView::applyHighlights()
 			selections.append(selection);
 		}
 		m_panes[side]->setInsertionMarkers(markers);
-		m_panes[side]->setExtraSelections(selections);
+		m_panes[side]->setHighlightSelections(selections);
 		m_panes[side]->setGutterLineColors(gutterColors);
 	}
 
@@ -2712,121 +2671,24 @@ void FileCompareView::selectDiffAtViewLine(int viewLine)
 	}
 }
 
-void FileCompareView::showFindBar()
+void FileCompareView::showFind()
 {
-	m_findBar->show();
-	const QString selected = m_panes[m_activePane]->textCursor().selectedText();
-	if (!selected.isEmpty() && !selected.contains(QChar(0x2029)))
-		m_findEdit->setText(selected);
-	m_findStatus->clear();
-	m_findEdit->selectAll();
-	m_findEdit->setFocus();
+	m_search[m_activePane]->editFind();
 }
 
-void FileCompareView::findNext(bool backward)
+void FileCompareView::showReplace()
 {
-	if (m_findBar->isHidden())
-	{
-		showFindBar();
-		return;
-	}
-	const QString needle = m_findEdit->text();
-	if (needle.isEmpty())
-		return;
-	QTextDocument::FindFlags flags;
-	if (backward)
-		flags |= QTextDocument::FindBackward;
-	if (m_findCase->isChecked())
-		flags |= QTextDocument::FindCaseSensitively;
-
-	DiffTextEdit *pane = m_panes[m_activePane];
-	if (findInPane(pane, needle, flags))
-	{
-		m_findStatus->clear();
-		return;
-	}
-	// wrap around
-	QTextCursor cursor = pane->textCursor();
-	cursor.movePosition(backward ? QTextCursor::End : QTextCursor::Start);
-	pane->setTextCursor(cursor);
-	m_findStatus->setText(findInPane(pane, needle, flags)
-		? tr("Search wrapped") : tr("Not found"));
+	m_search[m_activePane]->editReplace();
 }
 
-/** Find from the pane's cursor on, past what a hidden line holds
-    (CCrystalTextView::FindText skips the invisible lines). */
-bool FileCompareView::findInPane(DiffTextEdit *pane, const QString &needle,
-	QTextDocument::FindFlags flags)
+void FileCompareView::findRepeat(bool control, bool shift)
 {
-	QTextDocument *doc = pane->document();
-	QTextCursor from = pane->textCursor();
-	for (;;)
-	{
-		const QTextCursor match = doc->find(needle, from, flags);
-		if (match.isNull())
-			return false;
-		if (doc->findBlock(match.selectionStart()).isVisible())
-		{
-			pane->setTextCursor(match);
-			return true;
-		}
-		from = match;
-	}
+	m_search[m_activePane]->editRepeat(control, shift);
 }
 
-void FileCompareView::replaceOne()
+bool FileCompareView::activePaneEditable() const
 {
-	if (m_readOnly[m_activePane])
-	{
-		m_findStatus->setText(tr("This pane is read-only."));
-		return;
-	}
-	DiffTextEdit *pane = m_panes[m_activePane];
-	const QString needle = m_findEdit->text();
-	if (needle.isEmpty())
-		return;
-	QTextCursor cursor = pane->textCursor();
-	const Qt::CaseSensitivity cs = m_findCase->isChecked()
-		? Qt::CaseSensitive : Qt::CaseInsensitive;
-	if (cursor.hasSelection()
-		&& QString::compare(cursor.selectedText(), needle, cs) == 0)
-		cursor.insertText(m_replaceEdit->text());
-	findNext(false);
-}
-
-void FileCompareView::replaceAll()
-{
-	if (m_readOnly[m_activePane])
-	{
-		m_findStatus->setText(tr("This pane is read-only."));
-		return;
-	}
-	DiffTextEdit *pane = m_panes[m_activePane];
-	const QString needle = m_findEdit->text();
-	if (needle.isEmpty())
-		return;
-	QTextDocument::FindFlags flags;
-	if (m_findCase->isChecked())
-		flags |= QTextDocument::FindCaseSensitively;
-
-	QTextCursor cursor(pane->document());
-	cursor.beginEditBlock();
-	int count = 0;
-	QTextCursor match = pane->document()->find(needle, 0, flags);
-	while (!match.isNull())
-	{
-		// (what a hidden line holds is not found, so not replaced)
-		if (pane->document()->findBlock(match.selectionStart()).isVisible())
-		{
-			match.insertText(m_replaceEdit->text());
-			++count;
-		}
-		// continue after the replacement (safe even when it contains
-		// the search text)
-		match = pane->document()->find(needle, match.position(), flags);
-	}
-	cursor.endEditBlock();
-	m_findStatus->setText(tr("%n replacement(s)", nullptr, count));
+	return !m_readOnly[m_activePane];
 }
 
 void FileCompareView::setReadOnlySides(const QList<bool> &readOnly)

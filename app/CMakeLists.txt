@@ -45,6 +45,9 @@ qt_add_executable(LibreMerge
   DesktopIntegration.cpp
   FileOps.cpp
   GoToDialog.cpp
+  FindText.cpp
+  PaneSearch.cpp
+  FindDialogs.cpp
   EngineOptions.cpp
 )
 

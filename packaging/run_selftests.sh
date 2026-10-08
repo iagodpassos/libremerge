@@ -54,6 +54,7 @@ run_one selftest-undo-ghosts
 run_one selftest-last-line
 run_one selftest-scroll-sync
 run_one selftest-location-pane
+run_one selftest-find-replace
 run_one selftest-open-enter
 run_one selftest-archive
 run_one selftest-archive-mixed

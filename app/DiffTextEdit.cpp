@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "DiffTextEdit.h"
 
+#include "FindText.h"
+#include "Theme.h"
+
 #include <QAction>
 #include <QContextMenuEvent>
 #include <QDragMoveEvent>
@@ -72,6 +75,18 @@ DiffTextEdit::DiffTextEdit(QWidget *parent)
 		this, &DiffTextEdit::updateGutter);
 	connect(this, &QPlainTextEdit::cursorPositionChanged,
 		this, &DiffTextEdit::keepCursorOnShownLine);
+	// the search marker follows the lines on screen, what they hold, the
+	// text searched for and the theme's colors
+	connect(this, &QPlainTextEdit::updateRequest, this, [this](const QRect &, int dy) {
+		if (dy != 0)
+			refreshMarkers(false);
+	});
+	connect(document(), &QTextDocument::contentsChange,
+		this, &DiffTextEdit::scheduleMarkerRefresh);
+	connect(lm::SearchMarker::instance(), &lm::SearchMarker::changed,
+		this, &DiffTextEdit::scheduleMarkerRefresh);
+	connect(lm::Theme::instance(), &lm::Theme::changed,
+		this, &DiffTextEdit::scheduleMarkerRefresh);
 	updateGutterWidth();
 }
 
@@ -520,6 +535,82 @@ void DiffTextEdit::mouseDoubleClickEvent(QMouseEvent *event)
 	QPlainTextEdit::mouseDoubleClickEvent(event);
 }
 
+// --- the search marker ---
+
+void DiffTextEdit::setHighlightSelections(const QList<QTextEdit::ExtraSelection> &selections)
+{
+	m_baseSelections = selections;
+	m_markerSelections = markerSelections();
+	QPlainTextEdit::setExtraSelections(m_baseSelections + m_markerSelections);
+}
+
+/** GetMarkerTextBlocks for every line on screen that shows. */
+QList<QTextEdit::ExtraSelection> DiffTextEdit::markerSelections()
+{
+	QList<QTextEdit::ExtraSelection> selections;
+	QTextBlock block = firstVisibleBlock();
+	m_markerFirst = block.isValid() ? block.blockNumber() : -1;
+	const lm::SearchMarker *marker = lm::SearchMarker::instance();
+	const qreal bottom = viewport()->height();
+	qreal top = block.isValid()
+		? blockBoundingGeometry(block).translated(contentOffset()).top() : 0;
+	const QColor color = lm::searchMarkerColor();
+	for (; block.isValid() && top <= bottom; block = block.next())
+	{
+		if (!block.isVisible())
+			continue;
+		top += blockBoundingRect(block).height();
+		if (!marker->isSet())
+			continue;
+		for (const QPair<int, int> &stretch : marker->stretches(block.text()))
+		{
+			QTextEdit::ExtraSelection selection;
+			selection.format.setBackground(color);
+			selection.cursor = QTextCursor(block);
+			selection.cursor.setPosition(block.position() + stretch.first);
+			selection.cursor.setPosition(block.position() + stretch.first + stretch.second,
+				QTextCursor::KeepAnchor);
+			selections.append(selection);
+		}
+	}
+	return selections;
+}
+
+void DiffTextEdit::refreshMarkers(bool force)
+{
+	if (force)
+		m_markerRefreshPending = false;
+	const QTextBlock first = firstVisibleBlock();
+	if (!force && first.isValid() && first.blockNumber() == m_markerFirst)
+		return;
+	const QList<QTextEdit::ExtraSelection> selections = markerSelections();
+	if (selections.isEmpty() && m_markerSelections.isEmpty())
+		return;
+	m_markerSelections = selections;
+	QPlainTextEdit::setExtraSelections(m_baseSelections + m_markerSelections);
+}
+
+/** After the event at hand: a Replace All edits the text many times over,
+    the marker follows once. */
+void DiffTextEdit::scheduleMarkerRefresh()
+{
+	if (m_markerRefreshPending)
+		return;
+	m_markerRefreshPending = true;
+	QTimer::singleShot(0, this, [this]() {
+		if (m_markerRefreshPending)
+			refreshMarkers(true);
+	});
+}
+
+QStringList DiffTextEdit::markedTextsForTest() const
+{
+	QStringList texts;
+	for (const QTextEdit::ExtraSelection &selection : m_markerSelections)
+		texts.append(selection.cursor.selectedText());
+	return texts;
+}
+
 int DiffTextEdit::firstVisibleLine() const
 {
 	return firstVisibleBlock().blockNumber();
@@ -622,6 +713,7 @@ void DiffTextEdit::updateGutter(const QRect &rect, int dy)
 
 void DiffTextEdit::resizeEvent(QResizeEvent *event)
 {
+	scheduleMarkerRefresh();
 	QPlainTextEdit::resizeEvent(event);
 	const QRect cr = contentsRect();
 	m_gutter->setGeometry(QRect(cr.left(), cr.top(), gutterWidth(), cr.height()));

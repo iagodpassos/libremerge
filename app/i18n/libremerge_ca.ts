@@ -145,6 +145,72 @@
     </message>
 </context>
 <context>
+    <name>EditReplaceDialog</name>
+    <message>
+        <source>Replace</source>
+        <translation>Substitueix</translation>
+    </message>
+    <message>
+        <source>Fi&amp;nd what:</source>
+        <translation>Text a &amp;cercar:</translation>
+    </message>
+    <message>
+        <source>Re&amp;place with:</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Re&amp;place with:&quot;.</translatorcomment>
+        <translation>Substitueix-ho &amp;per:</translation>
+    </message>
+    <message>
+        <source>Match &amp;whole word only</source>
+        <translation>N&amp;omés paraules senceres</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Distingeix entre majúscules i minúscules</translation>
+    </message>
+    <message>
+        <source>Regular &amp;expression</source>
+        <translation>&amp;Expressió regular</translation>
+    </message>
+    <message>
+        <source>&amp;Don&apos;t wrap at end of file</source>
+        <translation>No facis la &amp;volta al final del fitxer</translation>
+    </message>
+    <message>
+        <source>Replace in</source>
+        <translation>Substitueix a</translation>
+    </message>
+    <message>
+        <source>&amp;Selection</source>
+        <translation>&amp;Selecció</translation>
+    </message>
+    <message>
+        <source>Wh&amp;ole file</source>
+        <translation>&amp;Fitxer sencer</translation>
+    </message>
+    <message>
+        <source>&amp;Find Next</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Find Next&quot;.</translatorcomment>
+        <translation>Se&amp;güent</translation>
+    </message>
+    <message>
+        <source>Find Pre&amp;v</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Find Pre&amp;v&quot;.</translatorcomment>
+        <translation>Ante&amp;rior</translation>
+    </message>
+    <message>
+        <source>&amp;Replace</source>
+        <translation>S&amp;ubstitueix-ho</translation>
+    </message>
+    <message>
+        <source>Replace &amp;All</source>
+        <translation>Su&amp;bstitueix-ho tot</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancel·la</translation>
+    </message>
+</context>
+<context>
     <name>FileCompareView</name>
     <message>
         <source>First Difference</source>
@@ -222,34 +288,6 @@
         <source>Comparison Options</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Opcions de comparació</translation>
-    </message>
-    <message>
-        <source>Previous</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Anterior</translation>
-    </message>
-    <message>
-        <source>Next</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Següent</translation>
-    </message>
-    <message>
-        <source>Match case</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Match &amp;case&quot;.</translatorcomment>
-        <translation>Distingeix entre majúscules i minúscules</translation>
-    </message>
-    <message>
-        <source>Replace with</source>
-        <translation>Substitueix-ho per</translation>
-    </message>
-    <message>
-        <source>Replace</source>
-        <translation>Substitueix</translation>
-    </message>
-    <message>
-        <source>Replace All</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Replace &amp;All&quot;.</translatorcomment>
-        <translation>Substitueix-ho tot</translation>
     </message>
     <message>
         <source>Pane options</source>
@@ -421,29 +459,6 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <source>Swapping reloads both files. Discard unsaved changes?</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>En intercanviar es tornen a carregar els dos fitxers. Voleu descartar els canvis sense desar?</translation>
-    </message>
-    <message>
-        <source>Search wrapped</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>La cerca ha tornat a començar</translation>
-    </message>
-    <message>
-        <source>Not found</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>No s&apos;ha trobat</translation>
-    </message>
-    <message>
-        <source>This pane is read-only.</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Aquesta subfinestra és de només lectura.</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n replacement(s)</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>
-            <numerusform>%n substitució</numerusform>
-            <numerusform>%n substitucions</numerusform>
-        </translation>
     </message>
     <message>
         <source>Save As</source>
@@ -1572,6 +1587,49 @@ Potser el fitxer és només de lectura?</translation>
     </message>
 </context>
 <context>
+    <name>FindTextDialog</name>
+    <message>
+        <source>Find</source>
+        <translation>Cerca</translation>
+    </message>
+    <message>
+        <source>Fi&amp;nd what:</source>
+        <translation>Text a &amp;cercar:</translation>
+    </message>
+    <message>
+        <source>Match &amp;whole word only</source>
+        <translation>N&amp;omés paraules senceres</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Distingeix entre majúscules i minúscules</translation>
+    </message>
+    <message>
+        <source>Regular &amp;expression</source>
+        <translation>&amp;Expressió regular</translation>
+    </message>
+    <message>
+        <source>D&amp;on&apos;t wrap end of file</source>
+        <translation>No facis la &amp;volta al final del fitxer</translation>
+    </message>
+    <message>
+        <source>&amp;Don&apos;t close this dialog</source>
+        <translation>No &amp;tanquis aquesta finestra</translation>
+    </message>
+    <message>
+        <source>&amp;Find Next</source>
+        <translation>&amp;Següent</translation>
+    </message>
+    <message>
+        <source>Find &amp;Prev</source>
+        <translation>&amp;Anterior</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancel·la</translation>
+    </message>
+</context>
+<context>
     <name>FolderCompareView</name>
     <message>
         <source>Recompare</source>
@@ -2646,6 +2704,16 @@ Potser el fitxer és només de lectura?</translation>
         <translation>Superp&amp;osició</translation>
     </message>
     <message>
+        <source>F&amp;ind...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;F&amp;ind...\tCtrl+F&quot;.</translatorcomment>
+        <translation>&amp;Cerca...</translation>
+    </message>
+    <message>
+        <source>Repla&amp;ce...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Repla&amp;ce...\tCtrl+H&quot;.</translatorcomment>
+        <translation>Subst&amp;itueix...</translation>
+    </message>
+    <message>
         <source>&amp;New</source>
         <translation>&amp;Nou</translation>
     </message>
@@ -2699,21 +2767,6 @@ Potser el fitxer és només de lectura?</translation>
     <message>
         <source>&amp;Redo</source>
         <translation>Re&amp;fés</translation>
-    </message>
-    <message>
-        <source>&amp;Find...</source>
-        <translatorcomment>After WinMerge&apos;s &quot;F&amp;ind...\tCtrl+F&quot;.</translatorcomment>
-        <translation>&amp;Cerca...</translation>
-    </message>
-    <message>
-        <source>Find &amp;Next</source>
-        <translatorcomment>After WinMerge&apos;s &quot;&amp;Find Next&quot;.</translatorcomment>
-        <translation>&amp;Següent</translation>
-    </message>
-    <message>
-        <source>Find &amp;Previous</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Cerca l&apos;&amp;anterior</translation>
     </message>
     <message>
         <source>&amp;Go to...</source>
@@ -3174,6 +3227,10 @@ Select &apos;No&apos; to refresh later.</source>
         <translation>Filtres actualitzats. Voleu tornar a analitzar totes les comparacions de directori obertes?
 
 Si no voleu tornar-los a analitzar ara, podeu seleccionar &apos;No&apos; i fer-ho més tard.</translation>
+    </message>
+    <message>
+        <source>Replaced %1 string(s).</source>
+        <translation>S&apos;ha(n) substituït %1 cadena(es).</translation>
     </message>
     <message>
         <source>Selected files are identical.</source>
@@ -3661,6 +3718,14 @@ S&apos;està comprovant la identitat binària...</translation>
         <source>The backup is written next to the original file, with the .bak extension.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>La còpia de seguretat es desa al costat del fitxer original, amb l&apos;extensió .bak.</translation>
+    </message>
+</context>
+<context>
+    <name>PaneSearch</name>
+    <message>
+        <source>Cannot find string &quot;%1&quot;.</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Cannot find string &quot;%s&quot;.&quot;.</translatorcomment>
+        <translation>No s&apos;ha trobat la cadena &quot;%1&quot;.</translation>
     </message>
 </context>
 <context>

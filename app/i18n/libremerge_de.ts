@@ -130,6 +130,70 @@
     </message>
 </context>
 <context>
+    <name>EditReplaceDialog</name>
+    <message>
+        <source>Replace</source>
+        <translation>Ersetzen</translation>
+    </message>
+    <message>
+        <source>Fi&amp;nd what:</source>
+        <translation>&amp;Suchen nach:</translation>
+    </message>
+    <message>
+        <source>Re&amp;place with:</source>
+        <translation>&amp;Ersetzen durch:</translation>
+    </message>
+    <message>
+        <source>Match &amp;whole word only</source>
+        <translation>&amp;Nur ganze Wörter</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Groß-/Kleinschreibung beachten</translation>
+    </message>
+    <message>
+        <source>Regular &amp;expression</source>
+        <translation>&amp;Reguläre Ausdrücke</translation>
+    </message>
+    <message>
+        <source>&amp;Don&apos;t wrap at end of file</source>
+        <translation>Am Dateiende nicht von vorn &amp;beginnen</translation>
+    </message>
+    <message>
+        <source>Replace in</source>
+        <translation>Ersetzen in</translation>
+    </message>
+    <message>
+        <source>&amp;Selection</source>
+        <translation>&amp;Auswahl</translation>
+    </message>
+    <message>
+        <source>Wh&amp;ole file</source>
+        <translation>Ganzer &amp;Datei</translation>
+    </message>
+    <message>
+        <source>&amp;Find Next</source>
+        <translation>&amp;Weitersuchen</translation>
+    </message>
+    <message>
+        <source>Find Pre&amp;v</source>
+        <translation>R&amp;ückwärtssuchen</translation>
+    </message>
+    <message>
+        <source>&amp;Replace</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Replace&quot;.</translatorcomment>
+        <translation>Erse&amp;tzen</translation>
+    </message>
+    <message>
+        <source>Replace &amp;All</source>
+        <translation>A&amp;lle ersetzen</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+</context>
+<context>
     <name>FileCompareView</name>
     <message>
         <source>First Difference</source>
@@ -207,34 +271,6 @@
         <source>Comparison Options</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Vergleichseinstellungen</translation>
-    </message>
-    <message>
-        <source>Previous</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Vorherige</translation>
-    </message>
-    <message>
-        <source>Next</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Nächste</translation>
-    </message>
-    <message>
-        <source>Match case</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Match &amp;case&quot;.</translatorcomment>
-        <translation>Groß-/Kleinschreibung beachten</translation>
-    </message>
-    <message>
-        <source>Replace with</source>
-        <translation>Ersetzen durch</translation>
-    </message>
-    <message>
-        <source>Replace</source>
-        <translation>Ersetzen</translation>
-    </message>
-    <message>
-        <source>Replace All</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Replace &amp;All&quot;.</translatorcomment>
-        <translation>Alle ersetzen</translation>
     </message>
     <message>
         <source>Pane options</source>
@@ -406,29 +442,6 @@ Bitte löschen Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so 
         <source>Swapping reloads both files. Discard unsaved changes?</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Beim Vertauschen werden beide Dateien neu geladen. Ungespeicherte Änderungen verwerfen?</translation>
-    </message>
-    <message>
-        <source>Search wrapped</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Suche neu begonnen</translation>
-    </message>
-    <message>
-        <source>Not found</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Nicht gefunden</translation>
-    </message>
-    <message>
-        <source>This pane is read-only.</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Dieser Ausschnitt ist schreibgeschützt.</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n replacement(s)</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>
-            <numerusform>%n Ersetzung</numerusform>
-            <numerusform>%n Ersetzungen</numerusform>
-        </translation>
     </message>
     <message>
         <source>Save As</source>
@@ -1385,6 +1398,49 @@ Patches sind nicht betroffen.</translation>
     <message>
         <source>&lt;Edit here&gt;</source>
         <translation>&lt;Hier bearbeiten&gt;</translation>
+    </message>
+</context>
+<context>
+    <name>FindTextDialog</name>
+    <message>
+        <source>Find</source>
+        <translation>Suchen</translation>
+    </message>
+    <message>
+        <source>Fi&amp;nd what:</source>
+        <translation>&amp;Suchen nach:</translation>
+    </message>
+    <message>
+        <source>Match &amp;whole word only</source>
+        <translation>&amp;Nur ganze Wörter</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Groß-/Kleinschreibung beachten</translation>
+    </message>
+    <message>
+        <source>Regular &amp;expression</source>
+        <translation>&amp;Reguläre Ausdrücke</translation>
+    </message>
+    <message>
+        <source>D&amp;on&apos;t wrap end of file</source>
+        <translation>Am Dateiende nicht von vorn &amp;beginnen</translation>
+    </message>
+    <message>
+        <source>&amp;Don&apos;t close this dialog</source>
+        <translation>Dieses &amp;Dialogfenster nicht schließen</translation>
+    </message>
+    <message>
+        <source>&amp;Find Next</source>
+        <translation>&amp;Weitersuchen</translation>
+    </message>
+    <message>
+        <source>Find &amp;Prev</source>
+        <translation>R&amp;ückwärtssuchen</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
     </message>
 </context>
 <context>
@@ -2357,6 +2413,16 @@ Patches sind nicht betroffen.</translation>
         <translation>Filterleiste a&amp;nzeigen</translation>
     </message>
     <message>
+        <source>F&amp;ind...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;F&amp;ind...\tCtrl+F&quot;.</translatorcomment>
+        <translation>&amp;Suchen...</translation>
+    </message>
+    <message>
+        <source>Repla&amp;ce...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Repla&amp;ce...\tCtrl+H&quot;.</translatorcomment>
+        <translation>Erse&amp;tzen...</translation>
+    </message>
+    <message>
         <source>&amp;File</source>
         <translation>&amp;Datei</translation>
     </message>
@@ -2414,21 +2480,6 @@ Patches sind nicht betroffen.</translation>
     <message>
         <source>&amp;Redo</source>
         <translation>&amp;Wiederherstellen</translation>
-    </message>
-    <message>
-        <source>&amp;Find...</source>
-        <translatorcomment>After WinMerge&apos;s &quot;F&amp;ind...\tCtrl+F&quot;.</translatorcomment>
-        <translation>&amp;Suchen...</translation>
-    </message>
-    <message>
-        <source>Find &amp;Next</source>
-        <translatorcomment>After WinMerge&apos;s &quot;&amp;Find Next&quot;.</translatorcomment>
-        <translation>W&amp;eitersuchen</translation>
-    </message>
-    <message>
-        <source>Find &amp;Previous</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>R&amp;ückwärtssuchen</translation>
     </message>
     <message>
         <source>&amp;Go to...</source>
@@ -2893,6 +2944,10 @@ Select &apos;No&apos; to refresh later.</source>
         <translation>Filter wurden aktualisiert. Wollen Sie alle geöffneten Ordnervergleiche aktualisieren?
 
 Wenn Sie jetzt nicht alle Vergleiche aktualisieren möchten, können Sie &apos;Nein&apos; wählen und die Vergleiche später aktualisieren.</translation>
+    </message>
+    <message>
+        <source>Replaced %1 string(s).</source>
+        <translation>%1 Vorkommen ersetzt.</translation>
     </message>
     <message>
         <source>Selected files are identical.</source>
@@ -3379,6 +3434,14 @@ Drücken Sie &apos;Zurücksetzen&apos;, um alle Meldungen wieder sichtbar zu sch
         <source>The backup is written next to the original file, with the .bak extension.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Die Sicherungsdatei wird neben der Originaldatei mit der Erweiterung .bak gespeichert.</translation>
+    </message>
+</context>
+<context>
+    <name>PaneSearch</name>
+    <message>
+        <source>Cannot find string &quot;%1&quot;.</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Cannot find string &quot;%s&quot;.&quot;.</translatorcomment>
+        <translation>Kann &quot;%1&quot; nicht finden.</translation>
     </message>
 </context>
 <context>

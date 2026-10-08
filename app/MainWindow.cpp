@@ -295,34 +295,68 @@ MainWindow::MainWindow(QWidget *parent)
 				image->redo();
 		});
 	editMenu->addSeparator();
-	addMenuAction(editMenu, tr("&Find..."), QKeySequence::Find, [fileView]() {
-		if (auto *view = fileView())
-			view->showFindBar();
-	});
-	QAction *findNextAction = addMenuAction(editMenu, tr("Find &Next"),
-		QKeySequence::FindNext, [fileView]() {
-			if (auto *view = fileView())
-				view->findNext(false);
-		});
-	addMenuAction(editMenu, tr("Find &Previous"), QKeySequence::FindPrevious,
+	// WinMerge's Edit > Find... (Ctrl+F) and Replace... (Ctrl+H), the
+	// dialogs of the active pane. On the Mac, Command+H hides the
+	// application: Replace takes Option+Command+F there, the Mac's own
+	QAction *findAction = addMenuAction(editMenu, tr("F&ind..."), QKeySequence::Find,
 		[fileView]() {
 			if (auto *view = fileView())
-				view->findNext(true);
+				view->showFind();
 		});
+	findAction->setObjectName(QStringLiteral("editFind"));
+#ifdef Q_OS_MACOS
+	const QKeySequence replaceShortcut(Qt::CTRL | Qt::ALT | Qt::Key_F);
+#else
+	const QKeySequence replaceShortcut(Qt::CTRL | Qt::Key_H);
+#endif
+	QAction *replaceAction = addMenuAction(editMenu, tr("Repla&ce..."), replaceShortcut,
+		[fileView]() {
+			if (auto *view = fileView(); view != nullptr && view->activePaneEditable())
+				view->showReplace();
+		});
+	replaceAction->setObjectName(QStringLiteral("editReplace"));
+	// greyed out over a read-only pane (OnUpdateEditReplace) while the menu
+	// shows; its shortcut does nothing there either
+	connect(editMenu, &QMenu::aboutToShow, this, [fileView, replaceAction]() {
+		const FileCompareView *view = fileView();
+		replaceAction->setEnabled(view == nullptr || view->activePaneEditable());
+	});
+	connect(editMenu, &QMenu::aboutToHide, this,
+		[replaceAction]() { replaceAction->setEnabled(true); });
+	// F3 is upstream's: no menu item, the last search again; Shift goes the
+	// other way, Ctrl takes the selection or the word at the cursor
+	// (ID_EDIT_REPEAT). The Mac also has its Command+G
+	const auto addRepeat = [this, fileView](const char *name, bool control, bool shift,
+		QList<QKeySequence> keys) {
+		auto *action = new QAction(this);
+		action->setObjectName(QLatin1String(name));
+		action->setShortcuts(keys);
+		connect(action, &QAction::triggered, this, [fileView, control, shift]() {
+			if (auto *view = fileView())
+				view->findRepeat(control, shift);
+		});
+		addAction(action);
+	};
+	QList<QKeySequence> findNextKeys{ QKeySequence(Qt::Key_F3) };
+	QList<QKeySequence> findPreviousKeys{ QKeySequence(Qt::SHIFT | Qt::Key_F3) };
+#ifdef Q_OS_MACOS
+	findNextKeys += QKeySequence::keyBindings(QKeySequence::FindNext);
+	findPreviousKeys += QKeySequence::keyBindings(QKeySequence::FindPrevious);
+#endif
+	addRepeat("editFindNext", false, false, findNextKeys);
+	addRepeat("editFindPrevious", false, true, findPreviousKeys);
+	addRepeat("editFindSelectedNext", true, false, { QKeySequence(Qt::CTRL | Qt::Key_F3) });
+	addRepeat("editFindSelectedPrevious", true, true,
+		{ QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_F3) });
 	editMenu->addSeparator();
-	// WinMerge's Edit > Go to... (Ctrl+G), which finds the next match with
-	// F3: where the platform gives Find Next the same keys, they stay with
-	// Go to
+	// WinMerge's Edit > Go to... (Ctrl+G); on the Mac with Control, as
+	// Command+G finds the next match there
 	QAction *gotoAction = addMenuAction(editMenu, tr("&Go to..."),
 		FileCompareView::goToShortcut(), [fileView]() {
 			if (auto *view = fileView())
 				view->showGoTo();
 		});
 	gotoAction->setObjectName(QStringLiteral("editGoto"));
-	QList<QKeySequence> findNextKeys = QKeySequence::keyBindings(QKeySequence::FindNext);
-	findNextKeys.removeAll(FileCompareView::goToShortcut());
-	findNextAction->setShortcuts(findNextKeys);
-	findNextAction->setObjectName(QStringLiteral("editFindNext"));
 	editMenu->addSeparator();
 #ifdef Q_OS_MACOS
 	// relocated to the application menu (LibreMerge > Settings...)
