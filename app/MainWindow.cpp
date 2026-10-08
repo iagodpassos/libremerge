@@ -296,15 +296,30 @@ MainWindow::MainWindow(QWidget *parent)
 		if (auto *view = fileView())
 			view->showFindBar();
 	});
-	addMenuAction(editMenu, tr("Find &Next"), QKeySequence::FindNext, [fileView]() {
-		if (auto *view = fileView())
-			view->findNext(false);
-	});
+	QAction *findNextAction = addMenuAction(editMenu, tr("Find &Next"),
+		QKeySequence::FindNext, [fileView]() {
+			if (auto *view = fileView())
+				view->findNext(false);
+		});
 	addMenuAction(editMenu, tr("Find &Previous"), QKeySequence::FindPrevious,
 		[fileView]() {
 			if (auto *view = fileView())
 				view->findNext(true);
 		});
+	editMenu->addSeparator();
+	// WinMerge's Edit > Go to... (Ctrl+G), which finds the next match with
+	// F3: where the platform gives Find Next the same keys, they stay with
+	// Go to
+	QAction *gotoAction = addMenuAction(editMenu, tr("&Go to..."),
+		FileCompareView::goToShortcut(), [fileView]() {
+			if (auto *view = fileView())
+				view->showGoTo();
+		});
+	gotoAction->setObjectName(QStringLiteral("editGoto"));
+	QList<QKeySequence> findNextKeys = QKeySequence::keyBindings(QKeySequence::FindNext);
+	findNextKeys.removeAll(FileCompareView::goToShortcut());
+	findNextAction->setShortcuts(findNextKeys);
+	findNextAction->setObjectName(QStringLiteral("editFindNext"));
 	editMenu->addSeparator();
 #ifdef Q_OS_MACOS
 	// relocated to the application menu (LibreMerge > Settings...)

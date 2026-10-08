@@ -457,6 +457,33 @@ Borre el filtro de visualización o ajuste la configuración del filtro para mos
         <source>Add to &amp;Display Filter</source>
         <translation>Aña&amp;dir al filtro de visualización</translation>
     </message>
+    <message>
+        <source>G&amp;o to Line %1</source>
+        <translation>Ir a &amp;línea %1</translation>
+    </message>
+    <message>
+        <source>&amp;Go to...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Go to...\tCtrl+G&quot;.</translatorcomment>
+        <translation>Ir &amp;a...</translation>
+    </message>
+    <message>
+        <source>Go to &amp;Definition</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Ir a la &amp;definición</translation>
+    </message>
+    <message>
+        <source>Move Cursor on &amp;Click</source>
+        <translation>Mover el cursor al hacer &amp;clic</translation>
+    </message>
+    <message>
+        <source>&amp;No Moved Blocks</source>
+        <translation>&amp;No mostrar bloques desplazados</translation>
+    </message>
+    <message>
+        <source>&amp;All Moved Blocks</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;All Moved Blocks&quot;.</translatorcomment>
+        <translation>&amp;Todos los bloques desplazados</translation>
+    </message>
 </context>
 <context>
     <name>FileFilterMenu</name>
@@ -1557,6 +1584,55 @@ El archivo puede ser de solo lectura.</translation>
     </message>
 </context>
 <context>
+    <name>GoToDialog</name>
+    <message>
+        <source>Go to</source>
+        <translation>Ir a</translation>
+    </message>
+    <message>
+        <source>G&amp;o to:</source>
+        <translation>I&amp;r a:</translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation>Archivo</translation>
+    </message>
+    <message>
+        <source>&amp;Left</source>
+        <translation>&amp;Izquierdo</translation>
+    </message>
+    <message>
+        <source>&amp;Middle</source>
+        <translation>&amp;Central</translation>
+    </message>
+    <message>
+        <source>&amp;Right</source>
+        <translation>&amp;Derecho</translation>
+    </message>
+    <message>
+        <source>Go to what</source>
+        <translation>Ir a la</translation>
+    </message>
+    <message>
+        <source>Li&amp;ne</source>
+        <translation>Lí&amp;nea</translation>
+    </message>
+    <message>
+        <source>&amp;Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Difference&quot;.</translatorcomment>
+        <translation>Di&amp;ferencia</translation>
+    </message>
+    <message>
+        <source>&amp;Go to</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Go to&quot;.</translatorcomment>
+        <translation>Ir &amp;a</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+</context>
+<context>
     <name>ImageCompareView</name>
     <message>
         <source>First Difference</source>
@@ -2368,6 +2444,11 @@ El archivo puede ser de solo lectura.</translation>
         <source>Find &amp;Previous</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Buscar an&amp;terior</translation>
+    </message>
+    <message>
+        <source>&amp;Go to...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Go to...\tCtrl+G&quot;.</translatorcomment>
+        <translation>Ir &amp;a...</translation>
     </message>
     <message>
         <source>Settings...</source>

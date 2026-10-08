@@ -2,6 +2,8 @@
 #pragma once
 
 #include <memory>
+#include <QHash>
+#include <QKeySequence>
 #include <QSet>
 #include <QStringList>
 #include <QTextDocument>
@@ -171,6 +173,13 @@ public:
 	void zoomReset();
 	void showFindBar();
 	void findNext(bool backward);
+	/** WinMerge's Go To dialog (CMergeEditView::OnWMGoto), opened from a
+	    pane, the active one when none is given: a line of a file, or a
+	    difference by its number. */
+	void showGoTo(int fromPane = -1);
+	/** Go to's shortcut, upstream's Ctrl+G; on the Mac the Control key,
+	    as Command+G finds the next match there. */
+	static QKeySequence goToShortcut();
 	void recompare();
 	/** Recompare asked for by the user (F5, the Recompare button),
 	    followed by rescanned(): WinMerge's OnRefresh, which reports
@@ -236,6 +245,7 @@ public:
 	int currentDiffForTest() const { return m_current; }
 	DiffTextEdit *paneForTest(int side) const { return m_panes[side]; }
 	LocationPane *locationPaneForTest() const { return m_locationPane; }
+	int activePaneForTest() const { return m_activePane; }
 
 signals:
 	/** A recompare asked for by the user is about to run: WinMerge's
@@ -336,6 +346,13 @@ private:
 	SaveResult saveSide(int side, QString *error);
 	void setSideModified(int side, bool modified);
 	void paneScrolled(int pane);
+	void gotoLine(int line, bool realLine, int pane, bool moveAnchor);
+	void centerShownLine(int shownLine);
+	void showLocationMenu(const QPoint &globalPos, int side, int line);
+	void setMovedBlocks(bool detect);
+	int viewLineOfShown(int shownLine) const;
+	int shownLineOfView(int viewLine) const;
+	int realLineOfView(int side, int viewLine) const;
 	void syncScroll(int pane, int value);
 	void syncHScroll(int pane, int value);
 	void hideLines();
@@ -365,6 +382,7 @@ private:
 	std::vector<WordSpan> m_wordSpans;
 	QStringList m_realLines[3];      // side's real lines as of the last diff run
 	QSet<int> m_movedLines[3];       // real lines inside moved blocks
+	QHash<int, int> m_movedRight;    // the first file's moved lines -> the second's
 	std::vector<int> m_realToView[3]; // real line -> view line, ditto
 	QList<int> m_lineNumbers[3];      // view line -> 1-based real number, -1 ghost
 	struct UndoRef

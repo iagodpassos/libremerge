@@ -457,6 +457,33 @@ Bitte löschen Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so 
         <source>Add to &amp;Display Filter</source>
         <translation>Zum &amp;Anzeigefilter hinzufügen</translation>
     </message>
+    <message>
+        <source>G&amp;o to Line %1</source>
+        <translation>Gehe zu &amp;Zeile %1</translation>
+    </message>
+    <message>
+        <source>&amp;Go to...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Go to...\tCtrl+G&quot;.</translatorcomment>
+        <translation>&amp;Gehe zu...</translation>
+    </message>
+    <message>
+        <source>Go to &amp;Definition</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Go to &amp;Definition\tF12&quot;.</translatorcomment>
+        <translation>Zu &amp;Definition wechseln</translation>
+    </message>
+    <message>
+        <source>Move Cursor on &amp;Click</source>
+        <translation>Cursor bei &amp;Klick bewegen</translation>
+    </message>
+    <message>
+        <source>&amp;No Moved Blocks</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;No Moved Blocks&quot;.</translatorcomment>
+        <translation>Keine &amp;verschobenen Blöcke</translation>
+    </message>
+    <message>
+        <source>&amp;All Moved Blocks</source>
+        <translation>&amp;Alle verschobenen Blöcke</translation>
+    </message>
 </context>
 <context>
     <name>FileFilterMenu</name>
@@ -1558,6 +1585,54 @@ Patches sind nicht betroffen.</translation>
     </message>
 </context>
 <context>
+    <name>GoToDialog</name>
+    <message>
+        <source>Go to</source>
+        <translation>Gehe zu</translation>
+    </message>
+    <message>
+        <source>G&amp;o to:</source>
+        <translatorcomment>After WinMerge&apos;s &quot;G&amp;o to:&quot;.</translatorcomment>
+        <translation>Zeile/Unter&amp;schied:</translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation>Datei</translation>
+    </message>
+    <message>
+        <source>&amp;Left</source>
+        <translation>&amp;Links</translation>
+    </message>
+    <message>
+        <source>&amp;Middle</source>
+        <translation>&amp;Mitte</translation>
+    </message>
+    <message>
+        <source>&amp;Right</source>
+        <translation>&amp;Rechts</translation>
+    </message>
+    <message>
+        <source>Go to what</source>
+        <translation>Ziel</translation>
+    </message>
+    <message>
+        <source>Li&amp;ne</source>
+        <translation>&amp;Zeile</translation>
+    </message>
+    <message>
+        <source>&amp;Difference</source>
+        <translation>&amp;Unterschied</translation>
+    </message>
+    <message>
+        <source>&amp;Go to</source>
+        <translation>&amp;OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+</context>
+<context>
     <name>ImageCompareView</name>
     <message>
         <source>First Difference</source>
@@ -2354,6 +2429,11 @@ Patches sind nicht betroffen.</translation>
         <source>Find &amp;Previous</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>R&amp;ückwärtssuchen</translation>
+    </message>
+    <message>
+        <source>&amp;Go to...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Go to...\tCtrl+G&quot;.</translatorcomment>
+        <translation>&amp;Gehe zu...</translation>
     </message>
     <message>
         <source>Settings...</source>

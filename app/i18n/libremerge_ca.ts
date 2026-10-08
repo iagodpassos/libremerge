@@ -474,6 +474,34 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>Afegeix al filtre de &amp;visualització</translation>
     </message>
+    <message>
+        <source>G&amp;o to Line %1</source>
+        <translatorcomment>After WinMerge&apos;s &quot;G&amp;o to Line %1&quot;.</translatorcomment>
+        <translation>Ves a la &amp;línia %1</translation>
+    </message>
+    <message>
+        <source>&amp;Go to...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Go to...\tCtrl+G&quot;.</translatorcomment>
+        <translation>&amp;Ves a...</translation>
+    </message>
+    <message>
+        <source>Go to &amp;Definition</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Ves a la &amp;definició</translation>
+    </message>
+    <message>
+        <source>Move Cursor on &amp;Click</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Mou el cursor en fer &amp;clic</translation>
+    </message>
+    <message>
+        <source>&amp;No Moved Blocks</source>
+        <translation>Blocs &amp;no moguts</translation>
+    </message>
+    <message>
+        <source>&amp;All Moved Blocks</source>
+        <translation>&amp;Tots els blocs moguts</translation>
+    </message>
 </context>
 <context>
     <name>FileFilterMenu</name>
@@ -1741,6 +1769,55 @@ Potser el fitxer és només de lectura?</translation>
     </message>
 </context>
 <context>
+    <name>GoToDialog</name>
+    <message>
+        <source>Go to</source>
+        <translation>Ves a</translation>
+    </message>
+    <message>
+        <source>G&amp;o to:</source>
+        <translation>&amp;Ves a:</translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation>Fitxer</translation>
+    </message>
+    <message>
+        <source>&amp;Left</source>
+        <translation>l&apos;&amp;esquerra</translation>
+    </message>
+    <message>
+        <source>&amp;Middle</source>
+        <translation>al &amp;mig</translation>
+    </message>
+    <message>
+        <source>&amp;Right</source>
+        <translation>la &amp;dreta</translation>
+    </message>
+    <message>
+        <source>Go to what</source>
+        <translation>Anar a on</translation>
+    </message>
+    <message>
+        <source>Li&amp;ne</source>
+        <translation>&amp;Línia</translation>
+    </message>
+    <message>
+        <source>&amp;Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Difference&quot;.</translatorcomment>
+        <translation>Di&amp;ferència</translation>
+    </message>
+    <message>
+        <source>&amp;Go to</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Go to&quot;.</translatorcomment>
+        <translation>Ve&amp;s a</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancel·la</translation>
+    </message>
+</context>
+<context>
     <name>ImageCompareView</name>
     <message>
         <source>First Difference</source>
@@ -2637,6 +2714,11 @@ Potser el fitxer és només de lectura?</translation>
         <source>Find &amp;Previous</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Cerca l&apos;&amp;anterior</translation>
+    </message>
+    <message>
+        <source>&amp;Go to...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Go to...\tCtrl+G&quot;.</translatorcomment>
+        <translation>&amp;Ves a...</translation>
     </message>
     <message>
         <source>Settings...</source>

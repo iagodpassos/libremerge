@@ -44,6 +44,7 @@ qt_add_executable(LibreMerge
   StarPrompt.cpp
   DesktopIntegration.cpp
   FileOps.cpp
+  GoToDialog.cpp
   EngineOptions.cpp
 )
 

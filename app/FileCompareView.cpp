@@ -4,6 +4,8 @@
 #include "FileCompareView.h"
 
 #include <QAction>
+#include <climits>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
@@ -22,6 +24,7 @@
 #include "Dialogs.h"
 #include <QProcess>
 #include <QScrollBar>
+#include <QWheelEvent>
 #include <QSettings>
 #include <QSplitter>
 #include <QStringList>
@@ -40,6 +43,7 @@
 #include "FileFilterCombo.h"
 #include "FileFilters.h"
 #include "Icons.h"
+#include "GoToDialog.h"
 #include "LocationPane.h"
 #include "SyntaxHighlighter.h"
 #include "FileOps.h"
@@ -424,23 +428,26 @@ FileCompareView::FileCompareView(QWidget *parent)
 
 	m_locationPane = new LocationPane(this);
 	panes->addWidget(m_locationPane);
-	connect(m_locationPane, &LocationPane::jumpRequested, this, [this](int line) {
-		// the pane counts the lines that show: back to a view line
-		if (!m_shownBefore.empty())
-		{
-			const auto it = std::upper_bound(m_shownBefore.begin(), m_shownBefore.end(), line);
-			line = qMax(0, static_cast<int>(it - m_shownBefore.begin()) - 1);
-		}
-		for (int side = 0; side < m_paneCount; ++side)
-		{
-			QTextCursor cursor(m_panes[side]->document()->findBlockByNumber(
-				qMin(line, m_panes[side]->document()->blockCount() - 1)));
-			m_syncing = true;
-			m_panes[side]->setTextCursor(cursor);
-			m_panes[side]->centerCursor();
-			m_syncing = false;
-		}
+	// upstream's location pane: the cursor to a line (GotoLocation), the
+	// panes to a line (its press and drag), the wheel to the active pane,
+	// and its menu
+	connect(m_locationPane, &LocationPane::gotoRequested, this,
+		[this](int line, int side, bool moveAnchor) {
+			if (side < m_paneCount)
+				gotoLine(viewLineOfShown(line), false, side, moveAnchor);
+		});
+	connect(m_locationPane, &LocationPane::centerRequested, this,
+		&FileCompareView::centerShownLine);
+	connect(m_locationPane, &LocationPane::wheelTurned, this, [this](QWheelEvent *event) {
+		QWidget *target = m_panes[m_activePane]->viewport();
+		const QPointF at(target->width() / 2.0, target->height() / 2.0);
+		QWheelEvent forwarded(at, target->mapToGlobal(at), event->pixelDelta(),
+			event->angleDelta(), event->buttons(), event->modifiers(), event->phase(),
+			event->inverted());
+		QApplication::sendEvent(target, &forwarded);
 	});
+	connect(m_locationPane, &LocationPane::contextMenuRequested, this,
+		&FileCompareView::showLocationMenu);
 
 	const QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
 	for (int i = 0; i < 3; ++i)
@@ -950,9 +957,10 @@ bool FileCompareView::runDiff(QString *error)
 	}
 
 	// like upstream's FlagMovedLines: remember which real lines belong
-	// to moved blocks, per side
+	// to moved blocks, per side, and where the first file's went
 	for (int side = 0; side < 3; ++side)
 		m_movedLines[side].clear();
+	m_movedRight.clear();
 	if (detectMoved)
 	{
 		for (int side = 0; side < 2; ++side)
@@ -963,8 +971,14 @@ bool FileCompareView::runDiff(QString *error)
 			const MovedLines::SIDE other = side == 0
 				? MovedLines::SIDE::RIGHT : MovedLines::SIDE::LEFT;
 			for (int line = 0; line < m_realLines[side].size(); ++line)
-				if (moved->LineInBlock(line, other) != -1)
-					m_movedLines[side].insert(line);
+			{
+				const int there = moved->LineInBlock(line, other);
+				if (there == -1)
+					continue;
+				m_movedLines[side].insert(line);
+				if (side == 0)
+					m_movedRight.insert(line, there);
+			}
 		}
 	}
 
@@ -1507,60 +1521,112 @@ void FileCompareView::applyHighlights()
 		m_panes[side]->setGutterLineColors(gutterColors);
 	}
 
-	// location pane: real content and ghost filler get separate bands
+	// location pane: upstream's blocks (CLocationView::CalculateBlocks and
+	// OnDraw). It draws the significant differences only, cut where the
+	// lines of a file give way to filler, each part in the colors its first
+	// line has on every file; with moved blocks on, a moved part of the
+	// first file is joined to where it went on the second. Upstream leaves
+	// the last line of a difference at the very end out; not here.
 	std::vector<LocationPane::Band> bands;
+	std::vector<LocationPane::Ribbon> ribbons;
+	COptionsMgr *mgr = GetOptionsMgr();
+	const bool showMoved = mgr != nullptr && mgr->GetBool(OPT_CMP_MOVED_BLOCKS)
+		&& m_paneCount == 2 && !m_diffStale;
+	const int viewLines = m_panes[0]->document()->blockCount();
+	// the lines that show, when the display filter hides some
+	const auto shownOf = [this](int viewLine) {
+		if (m_shownBefore.empty())
+			return viewLine;
+		return m_shownBefore[qBound(0, viewLine, static_cast<int>(m_shownBefore.size()) - 1)];
+	};
 	for (size_t b = 0; b < m_blocks.size(); ++b)
 	{
 		const Block &block = m_blocks[b];
+		if (block.trivial || block.viewEnd < block.viewBegin)
+			continue;
 		const bool current = (static_cast<int>(b) == m_current);
+		const int rows = block.viewEnd - block.viewBegin + 1;
+		int len[3] = {};
+		int firstBlank = INT_MAX;
+		int lastBlank = -1;
 		for (int side = 0; side < m_paneCount; ++side)
 		{
-			const int len = qMax(0, block.end[side] - block.begin[side] + 1);
-			if (len > 0 && !block.resolved)
+			len[side] = qMax(0, block.end[side] - block.begin[side] + 1);
+			if (len[side] < rows)
 			{
-				LocationPane::Band band;
-				band.side = side;
-				band.firstLine = block.viewBegin;
-				band.lastLine = block.viewBegin + len - 1;
-				band.color = block.trivial ? C.trivial
-					: (current ? C.selDiff : C.diff);
-				bands.push_back(band);
-			}
-			if (len <= block.viewEnd - block.viewBegin)
-			{
-				LocationPane::Band band;
-				band.side = side;
-				band.firstLine = block.viewBegin + len;
-				band.lastLine = block.viewEnd;
-				band.color = block.trivial || block.resolved
-					? C.trivialDeleted
-					: (current ? C.selDiffDeleted : C.diffDeleted);
-				bands.push_back(band);
+				firstBlank = qMin(firstBlank, block.viewBegin + len[side]);
+				lastBlank = qMax(lastBlank, block.viewBegin + len[side]);
 			}
 		}
-	}
-	int totalLines = m_panes[0]->document()->blockCount();
-	if (!m_shownBefore.empty())
-	{
-		// hidden lines take no room in the location pane, which upstream
-		// draws by the lines its views show: a band keeps the lines of it
-		// that show, and goes when none does
-		const int lines = static_cast<int>(m_shownBefore.size()) - 1;
-		std::vector<LocationPane::Band> shown;
-		for (LocationPane::Band band : bands)
+		std::vector<int> cuts{ block.viewBegin };
+		for (const int cut : { firstBlank, lastBlank })
+			if (cut > cuts.back() && cut <= block.viewEnd)
+				cuts.push_back(cut);
+		cuts.push_back(qMin(block.viewEnd + 1, viewLines));
+		for (size_t c = 0; c + 1 < cuts.size(); ++c)
 		{
-			const int first = qBound(0, band.firstLine, lines);
-			const int last = qBound(0, band.lastLine + 1, lines);
-			if (m_shownBefore[last] <= m_shownBefore[first])
+			const int top = cuts[c];
+			const int end = cuts[c + 1];
+			if (end <= top)
 				continue;
-			band.firstLine = m_shownBefore[first];
-			band.lastLine = m_shownBefore[last] - 1;
-			shown.push_back(band);
+			for (int side = 0; side < m_paneCount; ++side)
+			{
+				const bool ghost = (top - block.viewBegin) >= len[side];
+				QColor color;
+				if (block.resolved)
+				{
+					if (!ghost)
+						continue; // merged: real lines look like common text
+					color = C.trivialDeleted;
+				}
+				else if (!ghost && m_movedLines[side].contains(
+					block.begin[side] + (top - block.viewBegin)))
+					color = current ? C.selMoved : C.moved;
+				else if (current)
+					color = ghost ? C.selDiffDeleted : C.selDiff;
+				else
+					color = ghost ? C.diffDeleted : C.diff;
+				const int first = shownOf(top);
+				const int last = shownOf(end) - 1;
+				if (last >= first)
+					bands.push_back(LocationPane::Band{ side, first, last, color });
+			}
+			// (upstream's RightLineInMovedBlock, asked of the part's
+			// first line on the first file)
+			if (!showMoved || block.resolved || (top - block.viewBegin) >= len[0])
+				continue;
+			const auto there = m_movedRight.constFind(block.begin[0] + (top - block.viewBegin));
+			if (there == m_movedRight.cend() || there.value() < 0
+				|| there.value() >= static_cast<int>(m_realToView[1].size()))
+				continue;
+			const int otherView = m_realToView[1][there.value()];
+			const int lines = shownOf(end) - shownOf(top);
+			if (lines <= 0)
+				continue;
+			bool onCurrent = current;
+			if (m_current >= 0 && m_current < static_cast<int>(m_blocks.size()))
+				onCurrent = onCurrent || (m_blocks[m_current].viewBegin <= otherView
+					&& otherView <= m_blocks[m_current].viewEnd);
+			LocationPane::Ribbon ribbon{ 0, shownOf(top), shownOf(otherView), lines, onCurrent };
+			// a part that goes on from the last one makes one ribbon with it
+			if (!ribbons.empty())
+			{
+				LocationPane::Ribbon &previous = ribbons.back();
+				if (previous.firstLine + previous.lines == ribbon.firstLine
+					&& previous.otherFirstLine + previous.lines == ribbon.otherFirstLine)
+				{
+					previous.lines += ribbon.lines;
+					previous.current = previous.current || ribbon.current;
+					continue;
+				}
+			}
+			ribbons.push_back(ribbon);
 		}
-		bands = std::move(shown);
-		totalLines = m_shownBefore[lines];
 	}
+	const int totalLines = m_shownBefore.empty() ? viewLines
+		: m_shownBefore[static_cast<int>(m_shownBefore.size()) - 1];
 	m_locationPane->setBands(std::move(bands), qMax(1, totalLines));
+	m_locationPane->setRibbons(std::move(ribbons), C.moved, C.selMoved);
 	updateLocationViewport();
 
 	updateDiffPane();
@@ -3143,6 +3209,192 @@ QStringList FileCompareView::shownLinesForTest(int side) const
 		if (block.isVisible() && !isGhostBlock(block))
 			lines.append(block.text());
 	return lines;
+}
+
+/** The lines of the location pane are the lines that show: a view line
+    from one, and one from a view line. */
+int FileCompareView::viewLineOfShown(int shownLine) const
+{
+	if (m_shownBefore.empty())
+		return shownLine;
+	const auto it = std::upper_bound(m_shownBefore.begin(), m_shownBefore.end(), shownLine);
+	return qMax(0, static_cast<int>(it - m_shownBefore.begin()) - 1);
+}
+
+int FileCompareView::shownLineOfView(int viewLine) const
+{
+	if (m_shownBefore.empty())
+		return viewLine;
+	return m_shownBefore[qBound(0, viewLine, static_cast<int>(m_shownBefore.size()) - 1)];
+}
+
+/** The file's line at a view line (ComputeRealLine): a filler line stands
+    for the file's next line. Upstream gives the filler after a file's
+    end the line past it, a line the file does not have ("Go to Line 101"
+    over a file of 100); here it is the file's last line. */
+int FileCompareView::realLineOfView(int side, int viewLine) const
+{
+	const QList<int> &numbers = m_lineNumbers[side];
+	for (int v = qMax(0, viewLine); v < numbers.size(); ++v)
+		if (numbers[v] > 0)
+			return numbers[v] - 1;
+	return qMax(0, static_cast<int>(m_realToView[side].size()) - 1);
+}
+
+/** WinMerge's GotoLine: a line of a file, a real one or a line of the
+    views, in the middle of the panes, and the cursor on it in every pane,
+    with no selection but in the file's own pane when its anchor is to
+    stay (Shift held), which becomes the active pane. */
+void FileCompareView::gotoLine(int line, bool realLine, int pane, bool moveAnchor)
+{
+	if (pane < 0 || pane >= m_paneCount)
+		return;
+	int viewLine = line;
+	if (realLine)
+	{
+		const int count = static_cast<int>(m_realToView[pane].size());
+		viewLine = count > 0 ? m_realToView[pane][qBound(0, line, count - 1)] : 0;
+	}
+	const int top = qMax(0, shownLineOfView(viewLine) - m_panes[pane]->visibleLineCount() / 2);
+	m_syncing = true;
+	for (int p = 0; p < m_paneCount; ++p)
+	{
+		DiffTextEdit *edit = m_panes[p];
+		edit->verticalScrollBar()->setValue(top);
+		const QTextBlock block = edit->document()->findBlockByNumber(
+			qBound(0, viewLine, edit->document()->blockCount() - 1));
+		QTextCursor cursor = edit->textCursor();
+		cursor.setPosition(block.position(), moveAnchor || p != pane
+			? QTextCursor::MoveAnchor : QTextCursor::KeepAnchor);
+		edit->setTextCursor(cursor);
+	}
+	m_syncing = false;
+	m_activePane = pane;
+	m_panes[pane]->setFocus();
+	updateHeaderStyles();
+}
+
+/** The location pane's press and drag (CLocationView::OnMouseMove): a line
+    of it in the middle of the panes, their scroll range keeping it in. */
+void FileCompareView::centerShownLine(int shownLine)
+{
+	m_panes[0]->verticalScrollBar()->setValue(
+		qMax(0, shownLine - m_panes[0]->visibleLineCount() / 2));
+}
+
+QKeySequence FileCompareView::goToShortcut()
+{
+#ifdef Q_OS_MACOS
+	return QKeySequence(Qt::META | Qt::Key_G);
+#else
+	return QKeySequence(Qt::CTRL | Qt::Key_G);
+#endif
+}
+
+/** Upstream's location pane menu (CLocationView::OnContextMenu over its
+    IDR_POPUP_LOCATIONBAR), and what its items do. */
+void FileCompareView::showLocationMenu(const QPoint &globalPos, int side, int line)
+{
+	QMenu menu(this);
+	// "Go to Diff" becomes "Go to Line" and the line under the pointer, of
+	// the file whose bar it is over (the first one between the bars); off
+	// the bars' height it has no number and is grey
+	const int realLine = side >= 0 && side < m_paneCount
+		? realLineOfView(side, viewLineOfShown(line)) : -1;
+	QAction *gotoLineAction = menu.addAction(tr("G&o to Line %1")
+		.arg(realLine >= 0 ? QString::number(realLine + 1) : QString()));
+	gotoLineAction->setObjectName(QStringLiteral("locationGotoLine"));
+	gotoLineAction->setEnabled(realLine >= 0);
+	QAction *gotoAction = menu.addAction(tr("&Go to..."));
+	gotoAction->setObjectName(QStringLiteral("locationGoto"));
+	gotoAction->setShortcut(goToShortcut());
+	// upstream finds a definition with its Tree-sitter parsers, which are
+	// not here (and its own item in this menu has no handler)
+	QAction *definitionAction = menu.addAction(tr("Go to &Definition"));
+	definitionAction->setObjectName(QStringLiteral("locationGotoDefinition"));
+	definitionAction->setShortcut(QKeySequence(Qt::Key_F12));
+	definitionAction->setEnabled(false);
+	menu.addSeparator();
+	QAction *moveCursorAction = menu.addAction(tr("Move Cursor on &Click"));
+	moveCursorAction->setObjectName(QStringLiteral("locationMoveCursor"));
+	moveCursorAction->setCheckable(true);
+	moveCursorAction->setChecked(LocationPane::moveCursorOnClick());
+	menu.addSeparator();
+	COptionsMgr *mgr = GetOptionsMgr();
+	const bool moved = mgr != nullptr && mgr->GetBool(OPT_CMP_MOVED_BLOCKS);
+	auto *movedGroup = new QActionGroup(&menu);
+	QAction *noMovedAction = menu.addAction(tr("&No Moved Blocks"));
+	noMovedAction->setObjectName(QStringLiteral("locationNoMovedBlocks"));
+	QAction *allMovedAction = menu.addAction(tr("&All Moved Blocks"));
+	allMovedAction->setObjectName(QStringLiteral("locationAllMovedBlocks"));
+	for (QAction *action : { noMovedAction, allMovedAction })
+	{
+		action->setCheckable(true);
+		movedGroup->addAction(action);
+	}
+	noMovedAction->setChecked(!moved);
+	allMovedAction->setChecked(moved);
+
+	QAction *chosen = LocationPane::execMenu(&menu, globalPos);
+	if (chosen == nullptr)
+		return;
+	if (chosen == gotoLineAction)
+		gotoLine(realLine, true, side, true);
+	else if (chosen == gotoAction)
+		showGoTo(0); // upstream opens it from the first file's view
+	else if (chosen == moveCursorAction)
+		LocationPane::setMoveCursorOnClick(!LocationPane::moveCursorOnClick());
+	else if (chosen == noMovedAction)
+		setMovedBlocks(false);
+	else if (chosen == allMovedAction)
+		setMovedBlocks(true);
+}
+
+/** "No Moved Blocks" and "All Moved Blocks" (CMergeDoc::SetDetectMovedBlocks):
+    moved blocks are looked for, or not, from now on, and this comparison
+    is made again. */
+void FileCompareView::setMovedBlocks(bool detect)
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr || mgr->GetBool(OPT_CMP_MOVED_BLOCKS) == detect)
+		return;
+	mgr->SaveOption(OPT_CMP_MOVED_BLOCKS, detect);
+	recompare();
+}
+
+/** WinMerge's Go To (CMergeEditView::OnWMGoto): the dialog opens on the
+    pane's line and file, and goes to a line of the file chosen or to a
+    difference by its place in the list, every difference counted. */
+void FileCompareView::showGoTo(int fromPane)
+{
+	if (fromPane < 0 || fromPane >= m_paneCount)
+		fromPane = m_activePane;
+	int lastLine[3] = { -1, -1, -1 }; // the last real line of each file
+	for (int p = 0; p < m_paneCount; ++p)
+		lastLine[p] = static_cast<int>(m_realToView[p].size()) - 1;
+	const bool twoWay = m_paneCount < 3;
+	GoToDialog dialog(this);
+	dialog.init(QString::number(realLineOfView(fromPane,
+			m_panes[fromPane]->textCursor().blockNumber()) + 1),
+		twoWay ? (fromPane == 1 ? 2 : 0) : fromPane, m_paneCount,
+		{ lastLine[0] + 1, twoWay ? -1 : lastLine[1] + 1,
+			twoWay ? lastLine[1] + 1 : lastLine[2] + 1 },
+		static_cast<int>(m_blocks.size()));
+	if (!GoToDialog::run(&dialog))
+		return;
+	const int number = dialog.number() - 1;
+	if (dialog.goesToLine())
+	{
+		const int pane = twoWay ? (dialog.file() == 2 ? 1 : 0) : dialog.file();
+		const bool shift = QGuiApplication::queryKeyboardModifiers() & Qt::ShiftModifier;
+		gotoLine(qBound(0, number, qMax(0, lastLine[pane])), true, pane, !shift);
+	}
+	else
+	{
+		const int diff = qBound(0, number, static_cast<int>(m_blocks.size()) - 1);
+		if (diff >= 0)
+			gotoDiff(diff, true);
+	}
 }
 
 /** A pane scrolled vertically, whatever moved it: the other panes follow

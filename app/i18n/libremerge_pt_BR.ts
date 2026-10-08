@@ -396,6 +396,30 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
         <source>Add to &amp;Display Filter</source>
         <translation>Adicionar ao Filtro &amp;de Exibição</translation>
     </message>
+    <message>
+        <source>G&amp;o to Line %1</source>
+        <translation>I&amp;r para a Linha %1</translation>
+    </message>
+    <message>
+        <source>&amp;Go to...</source>
+        <translation>&amp;Ir para...</translation>
+    </message>
+    <message>
+        <source>Go to &amp;Definition</source>
+        <translation>Ir para &amp;Definição</translation>
+    </message>
+    <message>
+        <source>Move Cursor on &amp;Click</source>
+        <translation>Mover Cursor ao &amp;Clicar</translation>
+    </message>
+    <message>
+        <source>&amp;No Moved Blocks</source>
+        <translation>&amp;Nenhum dos Blocos Movidos</translation>
+    </message>
+    <message>
+        <source>&amp;All Moved Blocks</source>
+        <translation>&amp;Todos os Blocos Movidos</translation>
+    </message>
 </context>
 <context>
     <name>FileFilterMenu</name>
@@ -1447,6 +1471,53 @@ O arquivo pode ser somente leitura.</translation>
     </message>
 </context>
 <context>
+    <name>GoToDialog</name>
+    <message>
+        <source>Go to</source>
+        <translation>Ir para</translation>
+    </message>
+    <message>
+        <source>G&amp;o to:</source>
+        <translation>I&amp;r para:</translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation>Arquivo</translation>
+    </message>
+    <message>
+        <source>&amp;Left</source>
+        <translation>&amp;Esquerda</translation>
+    </message>
+    <message>
+        <source>&amp;Middle</source>
+        <translation>&amp;Meio</translation>
+    </message>
+    <message>
+        <source>&amp;Right</source>
+        <translation>&amp;Direita</translation>
+    </message>
+    <message>
+        <source>Go to what</source>
+        <translation>Ir para o quê</translation>
+    </message>
+    <message>
+        <source>Li&amp;ne</source>
+        <translation>Li&amp;nha</translation>
+    </message>
+    <message>
+        <source>&amp;Difference</source>
+        <translation>Di&amp;ferença</translation>
+    </message>
+    <message>
+        <source>&amp;Go to</source>
+        <translation>&amp;Ir para</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+</context>
+<context>
     <name>ImageCompareView</name>
     <message>
         <source>First Difference</source>
@@ -2188,6 +2259,10 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>Find &amp;Previous</source>
         <translation>Localizar &amp;Anterior</translation>
+    </message>
+    <message>
+        <source>&amp;Go to...</source>
+        <translation>&amp;Ir para...</translation>
     </message>
     <message>
         <source>&amp;View</source>

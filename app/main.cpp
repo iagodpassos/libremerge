@@ -36,10 +36,13 @@
 #include <QTableView>
 #include <QTabWidget>
 #include <QTreeWidget>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include "DiffTextEdit.h"
+#include "GoToDialog.h"
+#include "OptionsMgr.h"
 #include "LocationPane.h"
 #include "ImagePane.h"
 #include "MessageBoxes.h"
@@ -307,6 +310,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestMerge3Opt(QStringLiteral("selftest-merge3"),
 		QStringLiteral("3-way: merge left into middle, then middle into right, and verify (for testing)"));
 	parser.addOption(selftestMerge3Opt);
+	QCommandLineOption selftestLocationPaneOpt(QStringLiteral("selftest-location-pane"),
+		QStringLiteral("Click, drag and right-click the location pane, and use its Go To dialog (for testing)"));
+	parser.addOption(selftestLocationPaneOpt);
 	QCommandLineOption selftestScrollSyncOpt(QStringLiteral("selftest-scroll-sync"),
 		QStringLiteral("Scroll a file comparison every way and verify the panes and the location pane follow (for testing)"));
 	parser.addOption(selftestScrollSyncOpt);
@@ -617,6 +623,49 @@ int main(int argc, char *argv[])
 		{
 			LineFilterMenu menu;
 			walk(&menu, QStringLiteral("line filter menu"), false);
+		}
+		// the location pane's menu and the Go To dialog, upstream's own,
+		// whose translations shared letters too
+		{
+			QTemporaryDir dir;
+			const QString file = dir.filePath(QStringLiteral("a.txt"));
+			QFile f(file);
+			if (!f.open(QIODevice::WriteOnly))
+				return 2;
+			f.write("a\nb\n");
+			f.close();
+			FileCompareView view;
+			QString error;
+			if (!view.compare(QStringList{ file, file }, &error))
+				return 2;
+			view.resize(800, 600);
+			view.show();
+			QCoreApplication::processEvents();
+			LocationPane::setMenuPresenterForTest([&](QMenu *menu) -> QAction * {
+				report(QStringLiteral("location pane menu"), menu->actions(), true);
+				return nullptr;
+			});
+			QContextMenuEvent event(QContextMenuEvent::Keyboard, QPoint(), QPoint());
+			QApplication::sendEvent(view.locationPaneForTest(), &event);
+			LocationPane::setMenuPresenterForTest({});
+			GoToDialog::setPresenterForTest([&](GoToDialog *dialog) {
+				// the dialog's labels and buttons, as actions of one menu
+				QList<QAction *> labels;
+				for (QWidget *widget : dialog->findChildren<QWidget *>())
+				{
+					QString text;
+					if (auto *label = qobject_cast<QLabel *>(widget))
+						text = label->text();
+					else if (auto *button = qobject_cast<QAbstractButton *>(widget))
+						text = button->text();
+					if (!text.isEmpty())
+						labels.append(new QAction(text, dialog));
+				}
+				report(QStringLiteral("Go To dialog"), labels, true);
+				return false;
+			});
+			view.showGoTo(0);
+			GoToDialog::setPresenterForTest({});
 		}
 		printf("menus: %d, letters shared: %d (and %d noted in the filter popups)\n",
 			menus, shared, noted);
@@ -7961,6 +8010,457 @@ int main(int argc, char *argv[])
 		printf("selector closed: %d, comparisons open: %lld\n",
 			selectorClosed, static_cast<long long>(comparisons));
 		return (selectorClosed && comparisons == 1) ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestLocationPaneOpt))
+	{
+		// WinMerge's location pane (CLocationView): its bars, the line under
+		// the pointer, the press, the drag, the double click, the wheel, its
+		// menu, and the Go To dialog (WMGotoDlg) the menu and Edit open
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		// 400 lines, every 60th different on the right
+		QByteArray leftText, rightText, shortText;
+		for (int i = 1; i <= 400; ++i)
+		{
+			const QByteArray line = "line " + QByteArray::number(i) + " of the text\n";
+			leftText += line;
+			rightText += i % 60 == 0 ? "line " + QByteArray::number(i) + " CHANGED\n" : line;
+			if (i <= 20)
+				shortText += line;
+		}
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		const QString same = dir.filePath(QStringLiteral("same.txt"));
+		const QString shortFile = dir.filePath(QStringLiteral("short.txt"));
+		write(left, leftText);
+		write(right, rightText);
+		write(same, leftText);
+		write(shortFile, shortText);
+
+		FileCompareView view;
+		QString error;
+		if (!view.compare(QStringList{ left, right }, &error))
+		{
+			printf("compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		view.resize(1000, 640);
+		view.show();
+		settle();
+		DiffTextEdit *const panes[2] = { view.paneForTest(0), view.paneForTest(1) };
+		LocationPane *const map = view.locationPaneForTest();
+		const int lines = panes[0]->document()->blockCount();
+		// upstream's scale: a line at most 4 pixels, 5 pixels above and below
+		const double lineInPix = qMin(4.0, (map->height() - 10.0) / lines);
+		// a height on the line (the pixel a line starts on can read as the
+		// line before, in upstream's arithmetic as in this)
+		const auto yOf = [&](int line) {
+			int y = static_cast<int>(5 + (line + 0.5) * lineInPix);
+			while (map->lineAt(y) < line)
+				++y;
+			while (y > 0 && map->lineAt(y) > line)
+				--y;
+			return y;
+		};
+		const QRect bars[2] = { map->barForTest(0), map->barForTest(1) };
+		const auto xOf = [&](int side) { return bars[side].center().x(); };
+		const auto mouse = [&](QEvent::Type type, int side, int line,
+			Qt::MouseButtons held, Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+		{
+			const QPointF at(side < 0 ? 2 : xOf(side), yOf(line));
+			QMouseEvent event(type, at, map->mapToGlobal(at),
+				type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton, held, modifiers);
+			QApplication::sendEvent(map, &event);
+		};
+		const auto click = [&](int side, int line, Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+		{
+			mouse(QEvent::MouseButtonPress, side, line, Qt::LeftButton, modifiers);
+			mouse(QEvent::MouseButtonRelease, side, line, Qt::NoButton, modifiers);
+			settle();
+		};
+		const auto cursorLine = [&](int side) { return panes[side]->textCursor().blockNumber(); };
+		const auto centeredOn = [&](int line) {
+			const int top = qMax(0, line - panes[0]->visibleLineCount() / 2);
+			return panes[0]->firstVisibleLine() == top && panes[1]->firstVisibleLine() == top
+				&& map->viewFirstForTest() == top;
+		};
+		const auto toTop = [&]()
+		{
+			for (DiffTextEdit *pane : panes)
+			{
+				pane->setTextCursor(QTextCursor(pane->document()->firstBlock()));
+				pane->verticalScrollBar()->setValue(0);
+			}
+			settle();
+		};
+		const auto say = [&](const char *when)
+		{
+			printf("  %s: panes at %d and %d, marker at %d, cursors on %d and %d, %d lines show\n",
+				when, panes[0]->firstVisibleLine(), panes[1]->firstVisibleLine(),
+				map->viewFirstForTest(), cursorLine(0), cursorLine(1), panes[0]->visibleLineCount());
+		};
+
+		// --- the bars (CalculateBars) ---
+		{
+			const int bottom = static_cast<int>(lineInPix * lines + 6);
+			check(map->width() == 40 && bars[0].left() == 6 && bars[0].width() == 10
+				&& bars[1].left() == 22 && bars[1].width() == 10 && bars[0].top() == 4
+				&& bars[0].bottom() + 1 == bottom,
+				"a bar per file, as wide as the room around it, a line at most 4 pixels");
+			// (the middle of line 300, by the scale alone: a line is more
+			// than a pixel high here)
+			const int middle = static_cast<int>(std::lround(5 + 300.5 * lineInPix));
+			check(lineInPix > 1 && map->lineAt(middle) == 300,
+				"the line under the pointer is the one meant (upstream takes the one above)");
+		}
+
+		// --- a press: the panes to the line, the cursor too ---
+		toTop();
+		click(1, 300);
+		check(cursorLine(1) == 300 && cursorLine(0) == 300 && view.activePaneForTest() == 1
+			&& !panes[1]->textCursor().hasSelection() && centeredOn(300),
+			"a press on a bar: that file's pane takes the cursor, on the line, in the middle");
+
+		// --- Shift keeps the anchor of the file's own pane ---
+		toTop();
+		view.setCursorViewLineForTest(0, 10);
+		click(0, 200, Qt::ShiftModifier);
+		{
+			const QTextCursor own = panes[0]->textCursor();
+			const QTextCursor other = panes[1]->textCursor();
+			check(panes[0]->document()->findBlock(own.anchor()).blockNumber() == 10
+				&& own.block().blockNumber() == 200 && !other.hasSelection()
+				&& other.block().blockNumber() == 200,
+				"Shift and a press: the selection grows to the line in that file's pane");
+		}
+
+		// --- a drag keeps the panes on the line under the pointer ---
+		toTop();
+		mouse(QEvent::MouseButtonPress, 0, 100, Qt::LeftButton);
+		mouse(QEvent::MouseMove, 0, 220, Qt::LeftButton);
+		mouse(QEvent::MouseMove, 0, 350, Qt::LeftButton);
+		mouse(QEvent::MouseButtonRelease, 0, 350, Qt::NoButton);
+		settle();
+		say("after the drag");
+		{
+			const bool dragged = centeredOn(350) && cursorLine(0) == 100;
+			mouse(QEvent::MouseMove, 0, 30, Qt::NoButton);
+			settle();
+			check(dragged && centeredOn(350),
+				"a drag: the panes follow the pointer, the cursor stays where the press put it");
+		}
+
+		// --- Move Cursor on Click off: the press only scrolls ---
+		LocationPane::setMoveCursorOnClick(false);
+		toTop();
+		view.setCursorViewLineForTest(0, 5);
+		click(0, 250);
+		check(cursorLine(0) == 5 && centeredOn(250),
+			"Move Cursor on Click off: a press scrolls, the cursor stays");
+
+		// --- a double click puts the cursor there all the same, no drag after ---
+		toTop();
+		mouse(QEvent::MouseButtonPress, 1, 120, Qt::LeftButton);
+		mouse(QEvent::MouseButtonRelease, 1, 120, Qt::NoButton);
+		mouse(QEvent::MouseButtonDblClick, 1, 120, Qt::LeftButton);
+		settle();
+		say("after the double click");
+		{
+			const bool there = cursorLine(1) == 120 && view.activePaneForTest() == 1;
+			mouse(QEvent::MouseMove, 1, 380, Qt::LeftButton);
+			mouse(QEvent::MouseButtonRelease, 1, 380, Qt::NoButton);
+			settle();
+			check(there && centeredOn(120),
+				"a double click: the cursor goes there whatever the option, and nothing drags");
+		}
+		LocationPane::setMoveCursorOnClick(true);
+
+		// --- the wheel scrolls the active pane ---
+		toTop();
+		view.setCursorViewLineForTest(1, 0);
+		{
+			const QPointF at(xOf(0), yOf(10));
+			QWheelEvent wheel(at, map->mapToGlobal(at), QPoint(), QPoint(0, -360),
+				Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+			QApplication::sendEvent(map, &wheel);
+			settle();
+			check(panes[1]->firstVisibleLine() > 0
+				&& panes[0]->firstVisibleLine() == panes[1]->firstVisibleLine(),
+				"the wheel over the pane scrolls the active pane, the other follows");
+		}
+
+		// --- the menu (IDR_POPUP_LOCATIONBAR) ---
+		QStringList offered;
+		std::function<QAction *(QMenu *)> pick;
+		LocationPane::setMenuPresenterForTest([&](QMenu *menu) -> QAction * {
+			offered.clear();
+			for (QAction *action : menu->actions())
+				offered.append(action->isSeparator() ? QStringLiteral("-")
+					: QStringLiteral("%1|%2|%3|%4").arg(action->objectName(),
+						action->isEnabled() ? QStringLiteral("on") : QStringLiteral("off"),
+						action->isCheckable() ? (action->isChecked() ? QStringLiteral("checked")
+							: QStringLiteral("unchecked")) : QString(),
+						action->shortcut().toString()));
+			return pick ? pick(menu) : nullptr;
+		});
+		const auto named = [](QMenu *menu, const char *name) -> QAction * {
+			for (QAction *action : menu->actions())
+				if (action->objectName() == QLatin1String(name))
+					return action;
+			return nullptr;
+		};
+		QString gotoLineText;
+		const auto menuAt = [&](FileCompareView &target, QPoint point,
+			QContextMenuEvent::Reason reason = QContextMenuEvent::Mouse)
+		{
+			LocationPane *pane = target.locationPaneForTest();
+			QContextMenuEvent event(reason, point, pane->mapToGlobal(point));
+			QApplication::sendEvent(pane, &event);
+			settle();
+		};
+		toTop();
+		pick = [&](QMenu *menu) {
+			QAction *action = named(menu, "locationGotoLine");
+			gotoLineText = action != nullptr ? action->text() : QString();
+			return action;
+		};
+		menuAt(view, QPoint(xOf(1), yOf(150)));
+		say("after Go to Line");
+		printf("  Go to Line text: %s\n", qPrintable(gotoLineText));
+		check(offered == QStringList{
+				QStringLiteral("locationGotoLine|on||"),
+				QStringLiteral("locationGoto|on||") + FileCompareView::goToShortcut().toString(),
+				QStringLiteral("locationGotoDefinition|off||F12"), QStringLiteral("-"),
+				QStringLiteral("locationMoveCursor|on|checked|"), QStringLiteral("-"),
+				QStringLiteral("locationNoMovedBlocks|on|checked|"),
+				QStringLiteral("locationAllMovedBlocks|on|unchecked|") },
+			"the menu: Go to Line, Go to, Go to Definition, Move Cursor on Click, moved blocks");
+		for (const QString &item : offered)
+			printf("  %s\n", qPrintable(item));
+		check(gotoLineText == FileCompareView::tr("G&o to Line %1").arg(151)
+				&& cursorLine(1) == 150 && view.activePaneForTest() == 1 && centeredOn(150),
+			"Go to Line: the line under the pointer, of the bar's file, which takes the cursor");
+
+		// off the bars' height the item is grey and has no number; from the
+		// keyboard the menu is for the corner
+		{
+			FileCompareView shortView;
+			if (!shortView.compare(QStringList{ shortFile, shortFile }, &error))
+				return 2;
+			shortView.resize(1000, 640);
+			shortView.show();
+			settle();
+			pick = nullptr;
+			menuAt(shortView, QPoint(20, 400));
+			const QString below = offered.value(0);
+			menuAt(shortView, QPoint(), QContextMenuEvent::Keyboard);
+			const QString corner = offered.value(0);
+			pick = [&](QMenu *menu) {
+				QAction *action = named(menu, "locationGotoLine");
+				gotoLineText = action != nullptr ? action->text() : QString();
+				return nullptr;
+			};
+			menuAt(shortView, QPoint(), QContextMenuEvent::Keyboard);
+			check(below == QStringLiteral("locationGotoLine|off||")
+					&& corner == QStringLiteral("locationGotoLine|on||")
+					&& gotoLineText == FileCompareView::tr("G&o to Line %1").arg(1),
+				"below the bars Go to Line is grey; from the keyboard it is for the first line");
+		}
+
+		// Move Cursor on Click, from the menu, kept
+		pick = [&](QMenu *menu) { return named(menu, "locationMoveCursor"); };
+		menuAt(view, QPoint(xOf(0), yOf(20)));
+		const bool off = !LocationPane::moveCursorOnClick();
+		menuAt(view, QPoint(xOf(0), yOf(20)));
+		check(off && LocationPane::moveCursorOnClick()
+				&& QSettings().value(QStringLiteral("Settings/LocBarMoveCursorOnClick")).toBool(),
+			"Move Cursor on Click: the item switches the option, kept in the settings");
+
+		// --- Go to... (WMGotoDlg), from the menu: the first file's line ---
+		QStringList dialogSeen;
+		std::function<bool(GoToDialog *)> answer;
+		GoToDialog::setPresenterForTest([&](GoToDialog *dialog) {
+			dialogSeen = QStringList{ dialog->numberFieldForTest()->text(),
+				QString::number(dialog->file()),
+				dialog->fileButtonForTest(1)->isEnabled() ? QStringLiteral("middle")
+					: QStringLiteral("no middle"),
+				dialog->goesToLine() ? QStringLiteral("line") : QStringLiteral("difference"),
+				dialog->differenceButtonForTest()->isEnabled() ? QStringLiteral("differences")
+					: QStringLiteral("no differences"),
+				dialog->rangeLabelForTest()->text(),
+				dialog->goButtonForTest()->isEnabled() ? QStringLiteral("go") : QStringLiteral("no go") };
+			return answer ? answer(dialog) : false;
+		});
+		toTop();
+		view.setCursorViewLineForTest(0, 33);
+		answer = [](GoToDialog *dialog) {
+			dialog->numberFieldForTest()->setText(QStringLiteral("77"));
+			return true;
+		};
+		pick = [&](QMenu *menu) { return named(menu, "locationGoto"); };
+		menuAt(view, QPoint(xOf(1), yOf(20)));
+		check(dialogSeen == QStringList{ QStringLiteral("34"), QStringLiteral("0"),
+				QStringLiteral("no middle"), QStringLiteral("line"), QStringLiteral("differences"),
+				QStringLiteral("(1-400)"), QStringLiteral("go") }
+				&& cursorLine(0) == 76 && view.activePaneForTest() == 0 && centeredOn(76),
+			"Go to... from the menu: the first file's line, the line typed gone to");
+		printf("  dialog: %s\n", qPrintable(dialogSeen.join(QStringLiteral(" | "))));
+
+		// --- Go to from the right pane: a difference by its number ---
+		toTop();
+		view.setCursorViewLineForTest(1, 41);
+		{
+			QStringList rules;
+			answer = [&](GoToDialog *dialog) {
+				dialog->differenceButtonForTest()->click();
+				rules.append(dialog->rangeLabelForTest()->text());
+				for (const char *typed : { "0", "7", "2" })
+				{
+					dialog->numberFieldForTest()->setText(QLatin1String(typed));
+					rules.append(dialog->goButtonForTest()->isEnabled() ? QStringLiteral("go")
+						: QStringLiteral("no go"));
+				}
+				dialog->lineButtonForTest()->click();
+				rules.append(dialog->rangeLabelForTest()->text());
+				dialog->differenceButtonForTest()->click();
+				return true;
+			};
+			view.showGoTo();
+			check(dialogSeen.value(0) == QStringLiteral("42") && dialogSeen.value(1) == QStringLiteral("2")
+					&& rules == QStringList{ QStringLiteral("(1-6)"), QStringLiteral("no go"),
+						QStringLiteral("no go"), QStringLiteral("go"), QStringLiteral("(1-400)") }
+					&& view.currentDiffForTest() == 1,
+				"Go to from the right pane: its line, the range of what is chosen, the difference");
+			printf("  rules: %s\n", qPrintable(rules.join(QStringLiteral(" | "))));
+		}
+
+		// no differences to go to between identical files; a middle file in 3-way
+		{
+			FileCompareView identical;
+			if (!identical.compare(QStringList{ left, same }, &error))
+				return 2;
+			answer = nullptr;
+			identical.showGoTo(0);
+			const QString noDifferences = dialogSeen.value(4);
+			FileCompareView three;
+			if (!three.compare(QStringList{ left, same, right }, &error))
+				return 2;
+			three.showGoTo(1);
+			check(noDifferences == QStringLiteral("no differences")
+					&& dialogSeen.value(2) == QStringLiteral("middle")
+					&& dialogSeen.value(1) == QStringLiteral("1"),
+				"Go to: no differences between identical files, the middle file in 3-way");
+		}
+
+		// --- moved blocks from the menu: looked for, and drawn joined ---
+		{
+			const QString movedLeft = dir.filePath(QStringLiteral("movedLeft.txt"));
+			const QString movedRight = dir.filePath(QStringLiteral("movedRight.txt"));
+			write(movedLeft, "one\ntwo\nthree\nfour\nfive\nsix\n\nmoved block line 1\n"
+				"moved block line 2\nmoved block line 3\nseven\n");
+			write(movedRight, "moved block line 1\nmoved block line 2\nmoved block line 3\none\ntwo\n"
+				"three\nfour\nfive\nsix\nseven\n");
+			lm::setCompareFlagForTest(OPT_CMP_IGNORE_BLANKLINES, true);
+			FileCompareView moved;
+			if (!moved.compare(QStringList{ movedLeft, movedRight }, &error))
+				return 2;
+			moved.resize(1000, 640);
+			moved.show();
+			settle();
+			pick = [&](QMenu *menu) { return named(menu, "locationAllMovedBlocks"); };
+			menuAt(moved, QPoint(20, 20));
+			settle();
+			const std::vector<LocationPane::Ribbon> ribbons = moved.locationPaneForTest()->ribbonsForTest();
+			bool trivialDrawn = false;
+			for (const LocationPane::Band &band : moved.locationPaneForTest()->bandsForTest())
+				trivialDrawn = trivialDrawn || band.color == lm::diffColors().trivial
+					|| band.color == lm::diffColors().trivialDeleted;
+			const DiffTextEdit *movedLeftPane = moved.paneForTest(0);
+			const DiffTextEdit *movedRightPane = moved.paneForTest(1);
+			const auto viewOf = [](const DiffTextEdit *pane, const char *text) {
+				for (QTextBlock b = pane->document()->begin(); b.isValid(); b = b.next())
+					if (b.text() == QLatin1String(text))
+						return b.blockNumber();
+				return -1;
+			};
+			const bool joined = ribbons.size() == 1 && ribbons[0].side == 0 && ribbons[0].lines == 3
+				&& ribbons[0].firstLine == viewOf(movedLeftPane, "moved block line 1")
+				&& ribbons[0].otherFirstLine == viewOf(movedRightPane, "moved block line 1");
+			const bool saved = GetOptionsMgr()->GetBool(OPT_CMP_MOVED_BLOCKS);
+			const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+			if (!shots.isEmpty())
+			{
+				// the bars, the moved block joined, and the menu
+				const QString language = qEnvironmentVariable("LIBREMERGE_LANGUAGE",
+					QStringLiteral("en"));
+				moved.grab().save(QStringLiteral("%1/location-%2-moved.png").arg(shots, language));
+				pick = [&](QMenu *menu) {
+					menu->ensurePolished();
+					menu->adjustSize();
+					menu->grab().save(QStringLiteral("%1/location-%2-menu.png").arg(shots, language));
+					return nullptr;
+				};
+				menuAt(moved, QPoint(20, 20));
+				GoToDialog::setPresenterForTest([&](GoToDialog *dialog) {
+					dialog->adjustSize();
+					dialog->grab().save(QStringLiteral("%1/location-%2-goto.png").arg(shots, language));
+					return false;
+				});
+				moved.showGoTo(0);
+				GoToDialog::setPresenterForTest({});
+			}
+			pick = [&](QMenu *menu) { return named(menu, "locationNoMovedBlocks"); };
+			menuAt(moved, QPoint(20, 20));
+			settle();
+			check(joined && saved && !trivialDrawn
+					&& moved.locationPaneForTest()->ribbonsForTest().empty()
+					&& !GetOptionsMgr()->GetBool(OPT_CMP_MOVED_BLOCKS),
+				"All Moved Blocks: the moved block joined to where it went; No Moved Blocks: gone");
+			printf("  ribbons: %d, first on %d to %d for %d lines\n", static_cast<int>(ribbons.size()),
+				ribbons.empty() ? -1 : ribbons[0].firstLine, ribbons.empty() ? -1 : ribbons[0].otherFirstLine,
+				ribbons.empty() ? -1 : ribbons[0].lines);
+			lm::setCompareFlagForTest(OPT_CMP_IGNORE_BLANKLINES, false);
+		}
+		LocationPane::setMenuPresenterForTest({});
+		GoToDialog::setPresenterForTest({});
+
+		// --- Edit > Go to... with its shortcut, not shared with Find Next ---
+		{
+			MainWindow window;
+			auto *gotoAction = window.findChild<QAction *>(QStringLiteral("editGoto"));
+			auto *findNext = window.findChild<QAction *>(QStringLiteral("editFindNext"));
+			check(gotoAction != nullptr && findNext != nullptr
+					&& gotoAction->shortcut() == FileCompareView::goToShortcut()
+					&& !findNext->shortcuts().contains(FileCompareView::goToShortcut())
+					&& !findNext->shortcuts().isEmpty(),
+				"Edit > Go to... has its shortcut, which Find Next does not take");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
 	}
 
 	if (parser.isSet(selftestScrollSyncOpt))
