@@ -83,7 +83,7 @@ DiffTextEdit::DiffTextEdit(QWidget *parent)
 	});
 	connect(document(), &QTextDocument::contentsChange,
 		this, &DiffTextEdit::scheduleMarkerRefresh);
-	connect(lm::SearchMarker::instance(), &lm::SearchMarker::changed,
+	connect(lm::TextMarkers::instance(), &lm::TextMarkers::changed,
 		this, &DiffTextEdit::scheduleMarkerRefresh);
 	connect(lm::Theme::instance(), &lm::Theme::changed,
 		this, &DiffTextEdit::scheduleMarkerRefresh);
@@ -550,25 +550,24 @@ QList<QTextEdit::ExtraSelection> DiffTextEdit::markerSelections()
 	QList<QTextEdit::ExtraSelection> selections;
 	QTextBlock block = firstVisibleBlock();
 	m_markerFirst = block.isValid() ? block.blockNumber() : -1;
-	const lm::SearchMarker *marker = lm::SearchMarker::instance();
+	const lm::TextMarkers *markers = lm::TextMarkers::instance();
+	if (!markers->enabled())
+		return selections;
 	const qreal bottom = viewport()->height();
 	qreal top = block.isValid()
 		? blockBoundingGeometry(block).translated(contentOffset()).top() : 0;
-	const QColor color = lm::searchMarkerColor();
 	for (; block.isValid() && top <= bottom; block = block.next())
 	{
 		if (!block.isVisible())
 			continue;
 		top += blockBoundingRect(block).height();
-		if (!marker->isSet())
-			continue;
-		for (const QPair<int, int> &stretch : marker->stretches(block.text()))
+		for (const lm::TextMarkers::Stretch &stretch : markers->stretches(block.text()))
 		{
 			QTextEdit::ExtraSelection selection;
-			selection.format.setBackground(color);
+			selection.format.setBackground(lm::markerColor(stretch.color));
 			selection.cursor = QTextCursor(block);
-			selection.cursor.setPosition(block.position() + stretch.first);
-			selection.cursor.setPosition(block.position() + stretch.first + stretch.second,
+			selection.cursor.setPosition(block.position() + stretch.start);
+			selection.cursor.setPosition(block.position() + stretch.start + stretch.length,
 				QTextCursor::KeepAnchor);
 			selections.append(selection);
 		}
@@ -609,6 +608,14 @@ QStringList DiffTextEdit::markedTextsForTest() const
 	for (const QTextEdit::ExtraSelection &selection : m_markerSelections)
 		texts.append(selection.cursor.selectedText());
 	return texts;
+}
+
+QList<QColor> DiffTextEdit::markedColorsForTest() const
+{
+	QList<QColor> colors;
+	for (const QTextEdit::ExtraSelection &selection : m_markerSelections)
+		colors.append(selection.format.background().color());
+	return colors;
 }
 
 int DiffTextEdit::firstVisibleLine() const

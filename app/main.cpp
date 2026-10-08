@@ -19,6 +19,7 @@
 #include <QMenuBar>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPointer>
 #include <QToolButton>
@@ -45,6 +46,7 @@
 #include "FindDialogs.h"
 #include "FindText.h"
 #include "PaneSearch.h"
+#include "TextMarkerDialog.h"
 #include "OptionsMgr.h"
 #include "LocationPane.h"
 #include "ImagePane.h"
@@ -319,6 +321,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFindReplaceOpt(QStringLiteral("selftest-find-replace"),
 		QStringLiteral("Find and replace through WinMerge's dialogs, F3 and the search marker (for testing)"));
 	parser.addOption(selftestFindReplaceOpt);
+	QCommandLineOption selftestMarkersOpt(QStringLiteral("selftest-markers"),
+		QStringLiteral("Use WinMerge's Marker dialog and verify what the panes mark (for testing)"));
+	parser.addOption(selftestMarkersOpt);
 	QCommandLineOption selftestScrollSyncOpt(QStringLiteral("selftest-scroll-sync"),
 		QStringLiteral("Scroll a file comparison every way and verify the panes and the location pane follow (for testing)"));
 	parser.addOption(selftestScrollSyncOpt);
@@ -694,6 +699,12 @@ int main(int argc, char *argv[])
 			search->editReplace();
 			report(QStringLiteral("Replace dialog"), dialogLabels(search->replaceDialog()), true);
 			search->replaceDialog()->hide();
+			TextMarkerDialog::setPresenterForTest([&](TextMarkerDialog *dialog) {
+				report(QStringLiteral("Marker dialog"), dialogLabels(dialog), true);
+				return false;
+			});
+			search->editMark();
+			TextMarkerDialog::setPresenterForTest({});
 		}
 		printf("menus: %d, letters shared: %d (and %d noted in the filter popups)\n",
 			menus, shared, noted);
@@ -8720,7 +8731,7 @@ int main(int argc, char *argv[])
 		settle();
 		const QStringList markedLeft = pane->markedTextsForTest();
 		const QStringList markedRight = view.paneForTest(1)->markedTextsForTest();
-		lm::SearchMarker::instance()->clearForTest();
+		lm::TextMarkers::instance()->deleteMarker(lm::TextMarkers::searchKey());
 		settle();
 		printf("  marked: %s\n", qPrintable(markedLeft.join(QStringLiteral(" | "))));
 		check(markedLeft == QStringList{ QStringLiteral("Here"), QStringLiteral("here"),
@@ -8878,6 +8889,249 @@ int main(int argc, char *argv[])
 		}
 
 		lm::setMessageSinkForTest([](const QString &) {});
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestMarkersOpt))
+	{
+		// WinMerge's Marker dialog (CTextMarkerDlg, Edit > Marker...) and the
+		// markers the panes draw
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+		const QString language = qEnvironmentVariable("LIBREMERGE_LANGUAGE", QStringLiteral("en"));
+		const auto shoot = [&shots, &language](QWidget *widget, const char *name)
+		{
+			if (!shots.isEmpty())
+				widget->grab().save(QStringLiteral("%1/mk-%2-%3.png").arg(shots, language,
+					QLatin1String(name)));
+		};
+		const auto typeInto = [](QComboBox *field, const QString &text)
+		{
+			field->lineEdit()->setText(text);
+			emit field->lineEdit()->textEdited(text);
+		};
+		// the list as it shows: each marker's text, "(off)" when unticked
+		const auto listed = [](TextMarkerDialog *dialog) {
+			QStringList texts;
+			QListWidget *list = dialog->listForTest();
+			for (int i = 0; i < list->count(); ++i)
+				texts.append(list->item(i)->text()
+					+ (list->item(i)->checkState() == Qt::Checked ? QString() : QStringLiteral(" (off)")));
+			return texts;
+		};
+		const auto put = [](FileCompareView &view, int line, int column) {
+			view.setCursorViewLineForTest(0, line);
+			DiffTextEdit *pane = view.paneForTest(0);
+			QTextCursor cursor = pane->textCursor();
+			cursor.setPosition(cursor.block().position() + column);
+			pane->setTextCursor(cursor);
+		};
+		lm::TextMarkers *markers = lm::TextMarkers::instance();
+
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		write(left, "apple banana cherry\nbanana split apple\nCherry pie\n");
+		write(right, "apple banana cherry\nbanana split apple\ncherry pie\n");
+		FileCompareView view;
+		QString error;
+		if (!view.compare(QStringList{ left, right }, &error))
+		{
+			printf("compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		view.resize(1000, 600);
+		view.show();
+		settle();
+		DiffTextEdit *const panes[2] = { view.paneForTest(0), view.paneForTest(1) };
+		const QColor color1 = lm::markerColor(lm::TextMarkers::MarkerColor1);
+		const QColor color3 = lm::markerColor(lm::TextMarkers::MarkerColor3);
+
+		// --- opened over a word: it comes as a new marker ---
+		QStringList first, afterNew, named, afterDelete, applied, unticked, switchedOff;
+		QList<QColor> appliedColors;
+		QStringList rightApplied;
+		bool firstShown = false, newShown = false, backToFirst = false, kept = false;
+		bool lastChosen = false, noWholeWord = false;
+		put(view, 0, 1); // in "apple"
+		TextMarkerDialog::setPresenterForTest([&](TextMarkerDialog *dialog) {
+			shoot(dialog, "markers");
+			first = listed(dialog);
+			firstShown = dialog->windowTitle() == TextMarkerDialog::tr("Markers")
+				&& dialog->findWhatForTest()->currentText() == QStringLiteral("apple")
+				&& dialog->colorForTest()->currentIndex() == 0
+				&& dialog->enabledForTest()->isChecked()
+				&& dialog->listForTest()->currentRow() == 0;
+			dialog->newForTest()->click();
+			afterNew = listed(dialog);
+			newShown = dialog->findWhatForTest()->currentText() == TextMarkerDialog::tr("New Pattern")
+				&& dialog->colorForTest()->currentIndex() == 1
+				&& dialog->listForTest()->currentRow() == 1;
+			typeInto(dialog->findWhatForTest(), QStringLiteral("banana"));
+			dialog->colorForTest()->setCurrentIndex(2);
+			named = listed(dialog);
+			dialog->listForTest()->setCurrentRow(0);
+			backToFirst = dialog->findWhatForTest()->currentText() == QStringLiteral("apple")
+				&& dialog->colorForTest()->currentIndex() == 0;
+			for (const auto &entry : dialog->markersForTest())
+				kept = kept || (entry.second.findWhat == QStringLiteral("banana")
+					&& entry.second.color == lm::TextMarkers::MarkerColor3);
+			dialog->newForTest()->click();
+			typeInto(dialog->findWhatForTest(), QStringLiteral("pie"));
+			dialog->deleteForTest()->click();
+			afterDelete = listed(dialog);
+			lastChosen = dialog->listForTest()->currentRow() == 1
+				&& dialog->findWhatForTest()->currentText() == QStringLiteral("banana");
+			dialog->wholeWordForTest()->click();
+			dialog->regExpForTest()->click();
+			noWholeWord = !dialog->wholeWordForTest()->isEnabled()
+				&& !dialog->wholeWordForTest()->isChecked();
+			dialog->regExpForTest()->click();
+			dialog->applyForTest()->click();
+			settle();
+			applied = panes[0]->markedTextsForTest();
+			appliedColors = panes[0]->markedColorsForTest();
+			shoot(&view, "panes");
+			rightApplied = panes[1]->markedTextsForTest();
+			dialog->listForTest()->item(0)->setCheckState(Qt::Unchecked);
+			dialog->applyForTest()->click();
+			settle();
+			unticked = panes[0]->markedTextsForTest();
+			dialog->enabledForTest()->setChecked(false);
+			dialog->applyForTest()->click();
+			settle();
+			switchedOff = panes[0]->markedTextsForTest();
+			dialog->enabledForTest()->setChecked(true);
+			dialog->matchCaseForTest()->click();
+			dialog->accept();
+			return true;
+		});
+		view.showMarker();
+		TextMarkerDialog::setPresenterForTest({});
+		settle();
+		printf("  listed: %s, then %s, %s, %s\n", qPrintable(first.join(QStringLiteral(" | "))),
+			qPrintable(afterNew.join(QStringLiteral(" | "))), qPrintable(named.join(QStringLiteral(" | "))),
+			qPrintable(afterDelete.join(QStringLiteral(" | "))));
+		check(first == QStringList{ QStringLiteral("apple") } && firstShown,
+			"Marker...: the word at the cursor as a new marker, ticked and chosen, markers on");
+		check(afterNew == QStringList{ QStringLiteral("apple"), TextMarkerDialog::tr("New Pattern") }
+				&& newShown && named == QStringList{ QStringLiteral("apple"), QStringLiteral("banana") },
+			"New: \"New Pattern\" in the next color, renamed in the list as it is typed");
+		check(backToFirst && kept, "choosing another marker: its values, the one left keeps what was typed");
+		check(afterDelete == QStringList{ QStringLiteral("apple"), QStringLiteral("banana") } && lastChosen,
+			"Delete: the chosen marker goes, the last one is chosen");
+		check(noWholeWord, "Regular expression: no whole word with it");
+		printf("  applied: %s\n", qPrintable(applied.join(QStringLiteral(" | "))));
+		check(applied == QStringList{ QStringLiteral("apple"), QStringLiteral("banana"),
+					QStringLiteral("apple"), QStringLiteral("banana") }
+				&& appliedColors == QList<QColor>{ color1, color3, color1, color3 }
+				&& rightApplied == applied,
+			"Apply: every pane marks each text in its marker's color");
+		check(unticked == QStringList{ QStringLiteral("banana"), QStringLiteral("banana") }
+				&& switchedOff.isEmpty(),
+			"an unticked marker is not drawn, and with markers off none is");
+		const QStringList afterOk = panes[0]->markedTextsForTest();
+		check(afterOk == QStringList{ QStringLiteral("banana"), QStringLiteral("banana") }
+				&& markers->enabled()
+				&& QSettings().value(QStringLiteral("Editor/MarkerFlags")).toUInt() == lm::FindMatchCase,
+			"OK: applied and closed, the flags it was left with kept");
+
+		// the settings: the user's markers, each as it was, and the switch
+		markers->setMarkers({}, false);
+		markers->load();
+		QStringList reloaded;
+		for (const auto &entry : markers->markers())
+			reloaded.append(entry.second.findWhat + QStringLiteral("/%1/%2/%3").arg(entry.second.color)
+				.arg(entry.second.flags).arg(entry.second.visible ? QStringLiteral("on") : QStringLiteral("off")));
+		printf("  reloaded: %s\n", qPrintable(reloaded.join(QStringLiteral(" | "))));
+		check(markers->enabled() && reloaded == QStringList{ QStringLiteral("apple/1/0/off"),
+					QStringLiteral("banana/3/1/on") },
+			"the settings: the markers come back as they were, an unticked one unticked");
+
+		// Cancel: what was not applied does not count
+		bool selectionAsNew = false;
+		{
+			QTextCursor split(panes[0]->document());
+			const QTextBlock line = panes[0]->document()->findBlockByNumber(1);
+			split.setPosition(line.position() + 7);
+			split.setPosition(line.position() + 12, QTextCursor::KeepAnchor);
+			panes[0]->setTextCursor(split);
+		}
+		TextMarkerDialog::setPresenterForTest([&](TextMarkerDialog *dialog) {
+			// the third marker, in the third color: one each so far
+			selectionAsNew = listed(dialog).value(2) == QStringLiteral("split")
+				&& dialog->colorForTest()->currentIndex() == 2;
+			dialog->enabledForTest()->setChecked(false);
+			return false;
+		});
+		view.showMarker();
+		TextMarkerDialog::setPresenterForTest({});
+		settle();
+		check(selectionAsNew && markers->enabled() && markers->markers().size() == 2
+				&& panes[0]->markedTextsForTest() == afterOk,
+			"the selection within a line as a new marker; Cancel leaves what was applied");
+
+		// the search's marker: drawn first, under the user's; markers off
+		// take it away too; it counts for the next marker's color
+		markers->setMarker(lm::TextMarkers::searchKey(), QStringLiteral("ban"), 0,
+			lm::TextMarkers::SearchColor, false);
+		QStringList order;
+		for (const lm::TextMarkers::Stretch &stretch : markers->stretches(QStringLiteral("banana pie")))
+			order.append(QStringLiteral("%1+%2:%3").arg(stretch.start).arg(stretch.length).arg(stretch.color));
+		printf("  over \"banana pie\": %s\n", qPrintable(order.join(QStringLiteral(" "))));
+		bool searchOff = false;
+		bool countsSearch = false;
+		put(view, 2, 1); // in "Cherry"
+		TextMarkerDialog::setPresenterForTest([&](TextMarkerDialog *dialog) {
+			countsSearch = listed(dialog).value(2) == QStringLiteral("Cherry")
+				&& dialog->colorForTest()->currentIndex() == 0;
+			dialog->enabledForTest()->setChecked(false);
+			dialog->applyForTest()->click();
+			settle();
+			searchOff = panes[0]->markedTextsForTest().isEmpty();
+			dialog->enabledForTest()->setChecked(true);
+			dialog->listForTest()->item(2)->setCheckState(Qt::Unchecked);
+			dialog->applyForTest()->click();
+			return false;
+		});
+		view.showMarker();
+		TextMarkerDialog::setPresenterForTest({});
+		check(order == QStringList{ QStringLiteral("0+3:0"), QStringLiteral("0+6:3") }
+				&& searchOff && countsSearch,
+			"the search's marker: under the user's, off with them, and counted for the next color");
+
+		// --- the Edit menu ---
+		{
+			MainWindow window;
+			auto *markAction = window.findChild<QAction *>(QStringLiteral("editMark"));
+			check(markAction != nullptr && markAction->text() == MainWindow::tr("&Marker...")
+					&& markAction->shortcut() == QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_M),
+				"Edit: Marker... with Ctrl+Shift+M, as upstream");
+		}
+
 		printf("ok: %d\n", ok);
 		return ok ? 0 : 1;
 	}

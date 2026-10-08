@@ -2423,6 +2423,11 @@ Patches sind nicht betroffen.</translation>
         <translation>Erse&amp;tzen...</translation>
     </message>
     <message>
+        <source>&amp;Marker...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Marker...\tCtrl+Shift+M&quot;.</translatorcomment>
+        <translation>&amp;Markierungen...</translation>
+    </message>
+    <message>
         <source>&amp;File</source>
         <translation>&amp;Datei</translation>
     </message>
@@ -3802,6 +3807,66 @@ Bitte löschen Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so 
         <source>cannot write %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>%1 kann nicht geschrieben werden</translation>
+    </message>
+</context>
+<context>
+    <name>TextMarkerDialog</name>
+    <message>
+        <source>Markers</source>
+        <translation>Markierungen</translation>
+    </message>
+    <message>
+        <source>New Pattern</source>
+        <translation>Neues Muster</translation>
+    </message>
+    <message>
+        <source>Enable &amp;markers</source>
+        <translation>&amp;Markierungen aktivieren</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>Neu</translation>
+    </message>
+    <message>
+        <source>&amp;Delete</source>
+        <translation>L&amp;öschen</translation>
+    </message>
+    <message>
+        <source>Fi&amp;nd what:</source>
+        <translation>&amp;Suchen nach:</translation>
+    </message>
+    <message>
+        <source>&amp;Background color:</source>
+        <translation>&amp;Hintergrundfarbe:</translation>
+    </message>
+    <message>
+        <source>Marker Color %1</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Marker Color %d&quot;.</translatorcomment>
+        <translation>Markierungsfarbe %1</translation>
+    </message>
+    <message>
+        <source>Match &amp;whole word only</source>
+        <translation>&amp;Nur ganze Wörter</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Groß-/Kleinschreibung beachten</translation>
+    </message>
+    <message>
+        <source>Regular &amp;expression</source>
+        <translation>&amp;Reguläre Ausdrücke</translation>
+    </message>
+    <message>
+        <source>&amp;Ok</source>
+        <translation>&amp;OK</translation>
+    </message>
+    <message>
+        <source>&amp;Apply</source>
+        <translation>An&amp;wenden</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
     </message>
 </context>
 </TS>

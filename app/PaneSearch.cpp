@@ -10,12 +10,14 @@
 #include "DiffTextEdit.h"
 #include "FindDialogs.h"
 #include "MessageBoxes.h"
+#include "TextMarkerDialog.h"
 
 namespace
 {
 
 const QString kFindFlags = QStringLiteral("Editor/FindFlags");
 const QString kReplaceFlags = QStringLiteral("Editor/ReplaceFlags");
+const QString kMarkerFlags = QStringLiteral("Editor/MarkerFlags");
 
 } // namespace
 
@@ -172,7 +174,8 @@ lm::TextPoint PaneSearch::pointInJoined(const QString &joined, int offset, int f
 bool PaneSearch::findText(const QString &what, lm::TextPoint start, unsigned flags,
 	bool wrap, lm::TextPoint *found)
 {
-	lm::SearchMarker::instance()->setMarker(what, flags);
+	lm::TextMarkers::instance()->setMarker(lm::TextMarkers::searchKey(), what, flags,
+		lm::TextMarkers::SearchColor, false);
 	const int lines = lineCount();
 	return findTextInBlock(what, start, { 0, 0 },
 		{ lineLength(lines - 1), lines - 1 }, flags, wrap, found);
@@ -512,6 +515,25 @@ void PaneSearch::editReplace()
 	m_replaceDialog->show();
 	m_replaceDialog->raise();
 	m_replaceDialog->activateWindow();
+}
+
+void PaneSearch::editMark()
+{
+	const unsigned flags = QSettings().value(kMarkerFlags, 0u).toUInt();
+	QString pattern;
+	if (isSelection())
+	{
+		const auto [start, end] = selection();
+		if (start.y == end.y)
+			pattern = text(start, end);
+	}
+	else
+		pattern = wordAtCursor();
+	TextMarkerDialog dialog(pattern, flags, m_pane->window());
+	if (!TextMarkerDialog::run(&dialog))
+		return;
+	QSettings().setValue(kMarkerFlags, dialog.lastSearchFlags());
+	lm::TextMarkers::instance()->save();
 }
 
 // --- replacing ---

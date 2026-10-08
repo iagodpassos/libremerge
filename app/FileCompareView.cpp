@@ -2681,6 +2681,11 @@ void FileCompareView::showReplace()
 	m_search[m_activePane]->editReplace();
 }
 
+void FileCompareView::showMarker()
+{
+	m_search[m_activePane]->editMark();
+}
+
 void FileCompareView::findRepeat(bool control, bool shift)
 {
 	m_search[m_activePane]->editRepeat(control, shift);

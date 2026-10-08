@@ -48,6 +48,7 @@ qt_add_executable(LibreMerge
   FindText.cpp
   PaneSearch.cpp
   FindDialogs.cpp
+  TextMarkerDialog.cpp
   EngineOptions.cpp
 )
 

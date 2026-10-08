@@ -7,13 +7,14 @@
 #include <QRegularExpressionMatch>
 #include <QString>
 #include <QStringList>
+#include <map>
 
 /**
  * WinMerge's text search, as its editor does it: Crystal Edit's
  * FindTextHelper (how a line is searched, the regular expressions and
  * their replacements), the history of the search fields (CMemComboBox)
- * and the marker that shows every occurrence of the text last searched
- * for (CCrystalTextMarkers' "EDITOR_MARKER").
+ * and the markers that show where texts are (CCrystalTextMarkers): the
+ * text last searched for and the user's own.
  */
 namespace lm
 {
@@ -111,33 +112,76 @@ void saveSearchHistory();
 void resetSearchHistoryForTest();
 
 /**
- * The text last searched for, marked wherever it shows in every pane of
- * every file window: every search sets it, found or not, with the
- * search's flags. Upstream's marker dialog (Edit > Marker...), which
- * turns markers off and clears them, is not here.
+ * The markers (CCrystalTextMarkers): texts marked wherever they show, in
+ * every pane of every file window. Every search sets the one of the text
+ * searched for ("EDITOR_MARKER"), found or not, with the search's flags;
+ * the Marker dialog keeps the user's own, each with one of three colors,
+ * shown or not, and the switch that turns them all off, the search's
+ * too. A marker is drawn over the differences' colors, the user's over
+ * the search's, each over those made before it.
  */
-class SearchMarker : public QObject
+class TextMarkers : public QObject
 {
 	Q_OBJECT
 public:
-	static SearchMarker *instance();
+	/** The marker colors, upstream's COLORINDEX_MARKERBKGND0 to 3: the
+	    search's, then the three the Marker dialog offers. */
+	enum Color
+	{
+		SearchColor = 0,
+		MarkerColor1,
+		MarkerColor2,
+		MarkerColor3,
+	};
+	struct Marker
+	{
+		QString findWhat;
+		unsigned flags = 0;
+		int color = SearchColor;
+		bool userDefined = false;
+		bool visible = false;
+	};
+	/** By key, in the order they are drawn in (std::map, as upstream's). */
+	using Map = std::map<QString, Marker>;
+	/** A stretch of a line a marker marks, in the marker's color. */
+	struct Stretch
+	{
+		int start = 0;
+		int length = 0;
+		int color = SearchColor;
+	};
 
-	void setMarker(const QString &text, unsigned flags);
-	QString text() const { return m_text; }
-	unsigned flags() const { return m_flags; }
-	bool isSet() const { return !m_text.isEmpty(); }
-	/** What it marks in a line (GetMarkerTextBlocks): the start and the
-	    length of each stretch. */
-	QList<QPair<int, int>> stretches(const QString &line) const;
-	void clearForTest();
+	static TextMarkers *instance();
+	/** The key of the search's marker. */
+	static QString searchKey();
+	/** MakeNewId: "MARKER" and the next number, four wide. */
+	static QString makeNewId(const Map &markers);
+
+	/** SetMarker; the views are told only when the markers are on. */
+	void setMarker(const QString &key, const QString &findWhat, unsigned flags,
+		int color, bool userDefined = true, bool visible = true);
+	void deleteMarker(const QString &key);
+	const Map &markers() const { return m_markers; }
+	bool enabled() const { return m_enabled; }
+	/** The Marker dialog's Apply: its markers, and whether they show. */
+	void setMarkers(const Map &markers, bool enabled);
+	/** GetMarkerTextBlocks: what the markers that show mark in a line, in
+	    the order they are drawn; nothing when they are off. */
+	QList<Stretch> stretches(const QString &line) const;
+
+	/** SaveToRegistry and LoadFromRegistry: the user's markers and the
+	    switch, in the settings. */
+	void save() const;
+	void load();
 
 signals:
+	/** UpdateViews: the panes draw the markers again. */
 	void changed();
 
 private:
-	SearchMarker() = default;
-	QString m_text;
-	unsigned m_flags = 0;
+	TextMarkers();
+	Map m_markers;
+	bool m_enabled = true;
 };
 
 } // namespace lm

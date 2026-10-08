@@ -176,6 +176,8 @@ public:
 	    dialogs (CFindTextDlg, CEditReplaceDlg), each pane with its own. */
 	void showFind();
 	void showReplace();
+	/** Edit > Marker..., from the active pane (OnEditMark). */
+	void showMarker();
 	/** F3 and its Shift and Ctrl variants (OnEditRepeat), in the active
 	    pane. */
 	void findRepeat(bool control, bool shift);

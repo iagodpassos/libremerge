@@ -323,6 +323,13 @@ MainWindow::MainWindow(QWidget *parent)
 	});
 	connect(editMenu, &QMenu::aboutToHide, this,
 		[replaceAction]() { replaceAction->setEnabled(true); });
+	// Edit > Marker... (Ctrl+Shift+M): the markers of every pane
+	QAction *markAction = addMenuAction(editMenu, tr("&Marker..."),
+		QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_M), [fileView]() {
+			if (auto *view = fileView())
+				view->showMarker();
+		});
+	markAction->setObjectName(QStringLiteral("editMark"));
 	// F3 is upstream's: no menu item, the last search again; Shift goes the
 	// other way, Ctrl takes the selection or the word at the cursor
 	// (ID_EDIT_REPEAT). The Mac also has its Command+G

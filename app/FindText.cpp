@@ -317,43 +317,140 @@ void resetSearchHistoryForTest()
 	settings.remove(kSection + QStringLiteral("ReplaceText"));
 }
 
-SearchMarker *SearchMarker::instance()
+TextMarkers::TextMarkers()
 {
-	static SearchMarker *marker = new SearchMarker;
-	return marker;
+	load();
 }
 
-void SearchMarker::setMarker(const QString &text, unsigned flags)
+TextMarkers *TextMarkers::instance()
 {
-	if (text == m_text && flags == m_flags)
+	static TextMarkers *markers = new TextMarkers;
+	return markers;
+}
+
+QString TextMarkers::searchKey()
+{
+	return QStringLiteral("EDITOR_MARKER");
+}
+
+QString TextMarkers::makeNewId(const Map &markers)
+{
+	// the number after "MARKER" (what follows "EDITOR" reads as none)
+	int last = 0;
+	for (const auto &entry : markers)
+	{
+		if (entry.first.size() > 6)
+			last = qMax(last, entry.first.mid(6).trimmed().toInt());
+	}
+	return QStringLiteral("MARKER%1").arg(last + 1, 4);
+}
+
+void TextMarkers::setMarker(const QString &key, const QString &findWhat, unsigned flags,
+	int color, bool userDefined, bool visible)
+{
+	Marker marker;
+	marker.findWhat = findWhat;
+	marker.flags = flags;
+	marker.color = color;
+	marker.userDefined = userDefined;
+	marker.visible = visible;
+	const auto it = m_markers.find(key);
+	const bool same = it != m_markers.end() && it->second.findWhat == findWhat
+		&& it->second.flags == flags && it->second.color == color
+		&& it->second.userDefined == userDefined && it->second.visible == visible;
+	if (same)
 		return;
-	m_text = text;
-	m_flags = flags;
+	m_markers.insert_or_assign(key, marker);
+	if (m_enabled)
+		emit changed();
+}
+
+void TextMarkers::deleteMarker(const QString &key)
+{
+	if (m_markers.erase(key) > 0)
+		emit changed();
+}
+
+void TextMarkers::setMarkers(const Map &markers, bool enabled)
+{
+	m_markers = markers;
+	m_enabled = enabled;
 	emit changed();
 }
 
-QList<QPair<int, int>> SearchMarker::stretches(const QString &line) const
+QList<TextMarkers::Stretch> TextMarkers::stretches(const QString &line) const
 {
-	QList<QPair<int, int>> found;
-	if (!isSet())
+	QList<Stretch> found;
+	if (!m_enabled)
 		return found;
-	for (int at = 0; at < line.size();)
+	for (const auto &entry : m_markers)
 	{
-		int length = 0;
-		const int pos = findStringHelper(line, at, m_text, m_flags | FindNoWrap, &length);
-		if (pos < 0)
-			break;
-		const int shown = qMin(length, static_cast<int>(line.size()) - pos);
-		if (shown > 0)
-			found.append({ pos, shown });
-		at = pos + (length == 0 ? 1 : length);
+		const Marker &marker = entry.second;
+		if (!marker.visible || marker.findWhat.isEmpty())
+			continue;
+		for (int at = 0; at < line.size();)
+		{
+			int length = 0;
+			const int pos = findStringHelper(line, at, marker.findWhat,
+				marker.flags | FindNoWrap, &length);
+			if (pos < 0)
+				break;
+			const int shown = qMin(length, static_cast<int>(line.size()) - pos);
+			if (shown > 0)
+				found.append({ pos, shown, marker.color });
+			at = pos + (length == 0 ? 1 : length);
+		}
 	}
 	return found;
 }
 
-void SearchMarker::clearForTest()
+/** Upstream writes them in one text, which reads every marker back as
+    shown; here each keeps whether it shows. */
+void TextMarkers::save() const
 {
-	setMarker(QString(), 0);
+	QSettings settings;
+	settings.setValue(kSection + QStringLiteral("MarkersEnabled"), m_enabled);
+	settings.remove(kSection + QStringLiteral("Markers"));
+	settings.beginWriteArray(kSection + QStringLiteral("Markers"));
+	int index = 0;
+	for (const auto &entry : m_markers)
+	{
+		if (!entry.second.userDefined)
+			continue;
+		settings.setArrayIndex(index++);
+		settings.setValue(QStringLiteral("Key"), entry.first);
+		settings.setValue(QStringLiteral("FindWhat"), entry.second.findWhat);
+		settings.setValue(QStringLiteral("Flags"), entry.second.flags);
+		settings.setValue(QStringLiteral("Color"), entry.second.color);
+		settings.setValue(QStringLiteral("Visible"), entry.second.visible);
+	}
+	settings.endArray();
+}
+
+void TextMarkers::load()
+{
+	for (auto it = m_markers.begin(); it != m_markers.end();)
+		it = it->second.userDefined ? m_markers.erase(it) : std::next(it);
+	QSettings settings;
+	m_enabled = settings.value(kSection + QStringLiteral("MarkersEnabled"), true).toBool();
+	const int count = settings.beginReadArray(kSection + QStringLiteral("Markers"));
+	for (int i = 0; i < count; ++i)
+	{
+		settings.setArrayIndex(i);
+		Marker marker;
+		marker.findWhat = settings.value(QStringLiteral("FindWhat")).toString();
+		marker.flags = settings.value(QStringLiteral("Flags")).toUInt();
+		marker.color = qBound(static_cast<int>(MarkerColor1),
+			settings.value(QStringLiteral("Color"), static_cast<int>(MarkerColor1)).toInt(),
+			static_cast<int>(MarkerColor3));
+		marker.userDefined = true;
+		marker.visible = settings.value(QStringLiteral("Visible"), true).toBool();
+		const QString key = settings.value(QStringLiteral("Key")).toString();
+		if (!key.isEmpty())
+			m_markers.insert_or_assign(key, marker);
+	}
+	settings.endArray();
+	emit changed();
 }
 
 } // namespace lm

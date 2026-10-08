@@ -2445,6 +2445,11 @@ El archivo puede ser de solo lectura.</translation>
         <translation>Sus&amp;tituir...</translation>
     </message>
     <message>
+        <source>&amp;Marker...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Marker...\tCtrl+Shift+M&quot;.</translatorcomment>
+        <translation>&amp;Marcador...</translation>
+    </message>
+    <message>
         <source>&amp;New</source>
         <translation>&amp;Nuevo</translation>
     </message>
@@ -3807,6 +3812,68 @@ Borre el filtro de visualización o ajuste la configuración del filtro para mos
         <source>cannot write %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>no se puede escribir %1</translation>
+    </message>
+</context>
+<context>
+    <name>TextMarkerDialog</name>
+    <message>
+        <source>Markers</source>
+        <translation>Marcadores</translation>
+    </message>
+    <message>
+        <source>New Pattern</source>
+        <translation>Nuevo patrón</translation>
+    </message>
+    <message>
+        <source>Enable &amp;markers</source>
+        <translation>Habilitar &amp;marcadores</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>Nuevo</translation>
+    </message>
+    <message>
+        <source>&amp;Delete</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Delete&quot;.</translatorcomment>
+        <translation>E&amp;liminar</translation>
+    </message>
+    <message>
+        <source>Fi&amp;nd what:</source>
+        <translation>Qué &amp;buscar:</translation>
+    </message>
+    <message>
+        <source>&amp;Background color:</source>
+        <translation>Color de &amp;fondo:</translation>
+    </message>
+    <message>
+        <source>Marker Color %1</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Marker Color %d&quot;.</translatorcomment>
+        <translation>Color del marcador %1</translation>
+    </message>
+    <message>
+        <source>Match &amp;whole word only</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Match &amp;whole word only&quot;.</translatorcomment>
+        <translation>&amp;Solo palabras completas</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Coincidir MAYÚSCULAS/minúsculas</translation>
+    </message>
+    <message>
+        <source>Regular &amp;expression</source>
+        <translation>&amp;Expresión regular</translation>
+    </message>
+    <message>
+        <source>&amp;Ok</source>
+        <translation>Ace&amp;ptar</translation>
+    </message>
+    <message>
+        <source>&amp;Apply</source>
+        <translation>&amp;Aplicar</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
     </message>
 </context>
 </TS>

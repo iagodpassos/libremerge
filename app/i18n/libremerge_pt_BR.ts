@@ -2675,6 +2675,10 @@ O arquivo pode ser somente leitura.</translation>
         <source>Repla&amp;ce...</source>
         <translation>S&amp;ubstituir...</translation>
     </message>
+    <message>
+        <source>&amp;Marker...</source>
+        <translation>&amp;Marcador...</translation>
+    </message>
 </context>
 <context>
     <name>MatchInsideDialog</name>
@@ -3500,6 +3504,65 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     <message>
         <source>cannot write %1</source>
         <translation>não foi possível gravar %1</translation>
+    </message>
+</context>
+<context>
+    <name>TextMarkerDialog</name>
+    <message>
+        <source>Markers</source>
+        <translation>Marcadores</translation>
+    </message>
+    <message>
+        <source>New Pattern</source>
+        <translation>Novo Padrão</translation>
+    </message>
+    <message>
+        <source>Enable &amp;markers</source>
+        <translation>Habilitar &amp;marcadores</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>Novo</translation>
+    </message>
+    <message>
+        <source>&amp;Delete</source>
+        <translation>&amp;Excluir</translation>
+    </message>
+    <message>
+        <source>Fi&amp;nd what:</source>
+        <translation>E&amp;ncontrar o quê:</translation>
+    </message>
+    <message>
+        <source>&amp;Background color:</source>
+        <translation>Cor do &amp;plano de fundo:</translation>
+    </message>
+    <message>
+        <source>Marker Color %1</source>
+        <translation>Cor do Marcador %1</translation>
+    </message>
+    <message>
+        <source>Match &amp;whole word only</source>
+        <translation>Corresponder apenas palavras &amp;inteiras</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Corresponder maiúsculas/minúsculas</translation>
+    </message>
+    <message>
+        <source>Regular &amp;expression</source>
+        <translation>Expressão &amp;regular</translation>
+    </message>
+    <message>
+        <source>&amp;Ok</source>
+        <translation>&amp;Ok</translation>
+    </message>
+    <message>
+        <source>&amp;Apply</source>
+        <translation>&amp;Aplicar</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
     </message>
 </context>
 </TS>

@@ -91,6 +91,10 @@ public:
 	void editRepeat(bool control, bool shift);
 	/** Edit > Replace... (OnEditReplace), for an editable pane only. */
 	void editReplace();
+	/** Edit > Marker... (OnEditMark): the Marker dialog, the selection
+	    within a line or the word at the cursor in it as a new marker. OK
+	    keeps the markers and the flags in the settings. */
+	void editMark();
 
 	// --- replacing ---
 	/** SaveLastSearch: the Replace dialog's settings, for its next use and

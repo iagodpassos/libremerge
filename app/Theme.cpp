@@ -196,9 +196,16 @@ const DiffColors &diffColors()
 	return Theme::instance()->dark() ? dark : light;
 }
 
-QColor searchMarkerColor()
+QColor markerColor(int color)
 {
-	return Theme::instance()->dark() ? QColor(0x58, 0x6e, 0x75) : QColor(255, 255, 127);
+	static const QColor light[4] = {
+		QColor(255, 255, 127), QColor(127, 255, 127), QColor(255, 127, 127), QColor(127, 127, 255),
+	};
+	static const QColor dark[4] = {
+		QColor(88, 110, 117), QColor(42, 161, 152), QColor(211, 54, 130), QColor(108, 113, 196),
+	};
+	const int index = qBound(0, color, 3);
+	return Theme::instance()->dark() ? dark[index] : light[index];
 }
 
 } // namespace lm

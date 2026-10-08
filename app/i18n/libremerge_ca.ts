@@ -2714,6 +2714,11 @@ Potser el fitxer és només de lectura?</translation>
         <translation>Subst&amp;itueix...</translation>
     </message>
     <message>
+        <source>&amp;Marker...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Marker...\tCtrl+Shift+M&quot;.</translatorcomment>
+        <translation>&amp;Marcadors...</translation>
+    </message>
+    <message>
         <source>&amp;New</source>
         <translation>&amp;Nou</translation>
     </message>
@@ -4095,6 +4100,69 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <source>cannot write %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>no es pot escriure %1</translation>
+    </message>
+</context>
+<context>
+    <name>TextMarkerDialog</name>
+    <message>
+        <source>Markers</source>
+        <translation>Marques</translation>
+    </message>
+    <message>
+        <source>New Pattern</source>
+        <translation>Patró nou</translation>
+    </message>
+    <message>
+        <source>Enable &amp;markers</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Enable &amp;markers&quot;.</translatorcomment>
+        <translation>Habilita les &amp;marques</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>Nova</translation>
+    </message>
+    <message>
+        <source>&amp;Delete</source>
+        <translation>&amp;Suprimeix</translation>
+    </message>
+    <message>
+        <source>Fi&amp;nd what:</source>
+        <translation>Text a &amp;cercar:</translation>
+    </message>
+    <message>
+        <source>&amp;Background color:</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Background color:&quot;.</translatorcomment>
+        <translation>Color de &amp;fons:</translation>
+    </message>
+    <message>
+        <source>Marker Color %1</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Marker Color %d&quot;.</translatorcomment>
+        <translation>Color de marca %1</translation>
+    </message>
+    <message>
+        <source>Match &amp;whole word only</source>
+        <translation>N&amp;omés paraules senceres</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Distingeix entre majúscules i minúscules</translation>
+    </message>
+    <message>
+        <source>Regular &amp;expression</source>
+        <translation>&amp;Expressió regular</translation>
+    </message>
+    <message>
+        <source>&amp;Ok</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Ok&quot;.</translatorcomment>
+        <translation>D&apos;aco&amp;rd</translation>
+    </message>
+    <message>
+        <source>&amp;Apply</source>
+        <translation>&amp;Aplica</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancel·la</translation>
     </message>
 </context>
 </TS>

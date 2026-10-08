@@ -46,13 +46,15 @@ public:
 	void setGutterLineColors(const QHash<int, QColor> &colors);
 
 	/** The pane's highlights (the differences, line and word), under
-	    which the search marker's stretches are drawn: upstream draws the
-	    marker over the differences' colors, the selection over both. The
-	    marker is worked out for the lines on screen only, as upstream
-	    draws it line by line. */
+	    which the markers' stretches are drawn: upstream draws the markers
+	    over the differences' colors, the selection over both. They are
+	    worked out for the lines on screen only, as upstream draws them
+	    line by line. */
 	void setHighlightSelections(const QList<QTextEdit::ExtraSelection> &selections);
-	/** What the search marker marks on screen (for tests). */
+	/** What the markers mark on screen, and in which colors, in the
+	    order they are drawn (for tests). */
 	QStringList markedTextsForTest() const;
+	QList<QColor> markedColorsForTest() const;
 
 	/** numbers[viewLine] = 1-based real line number, or -1 for ghost
 	    lines (no number drawn). Empty list falls back to 1:1 numbering. */
@@ -141,8 +143,8 @@ private slots:
 	void updateGutterWidth();
 	void updateGutter(const QRect &rect, int dy);
 	void keepCursorOnShownLine();
-	/** The search marker again, for the lines on screen: when they are
-	    others (a scroll), or whatever they are (forced). */
+	/** The markers again, for the lines on screen: when they are others
+	    (a scroll), or whatever they are (forced). */
 	void refreshMarkers(bool force);
 	void scheduleMarkerRefresh();
 
