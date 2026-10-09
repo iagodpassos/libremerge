@@ -9123,6 +9123,30 @@ int main(int argc, char *argv[])
 				&& searchOff && countsSearch,
 			"the search's marker: under the user's, off with them, and counted for the next color");
 
+		// the dark theme: the match found (the selection's blue) apart from
+		// the other occurrences (green) and the third color (purple)
+		lm::Theme::instance()->setMode(lm::ThemeMode::Dark);
+		{
+			lm::LastSearchInfos search;
+			search.text = QStringLiteral("cherry");
+			put(view, 0, 0);
+			view.paneSearchForTest(0)->findText(search);
+		}
+		settle();
+		shoot(&view, "panes-dark");
+		QStringList darkMarks;
+		const QStringList darkTexts = panes[0]->markedTextsForTest();
+		const QList<QColor> darkColors = panes[0]->markedColorsForTest();
+		for (int i = 0; i < darkTexts.size(); ++i)
+			darkMarks.append(darkTexts.at(i) + QLatin1Char('/') + darkColors.value(i).name());
+		printf("  dark: %s\n", qPrintable(darkMarks.join(QStringLiteral(" "))));
+		check(darkMarks.contains(QStringLiteral("cherry/#287034"))
+				&& darkMarks.contains(QStringLiteral("Cherry/#287034"))
+				&& darkMarks.contains(QStringLiteral("banana/#885094"))
+				&& panes[0]->textCursor().selectedText() == QStringLiteral("cherry"),
+			"the dark theme: the search's marker green, the third color purple, the match found in the selection's blue");
+		lm::Theme::instance()->setMode(lm::ThemeMode::System);
+
 		// --- the Edit menu ---
 		{
 			MainWindow window;

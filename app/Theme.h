@@ -67,8 +67,9 @@ const DiffColors &diffColors();
 
 /** The background of what a marker marks (upstream's
     COLORINDEX_MARKERBKGND0 to 3: the search's, then the Marker dialog's
-    three): WinMerge's defaults in light mode, those of its "VS Dark"
-    color scheme otherwise. */
+    three): WinMerge's defaults in light mode; in dark mode the first two
+    of the Marker dialog's from its "VS Dark" color scheme, the search's
+    and the third LibreMerge's own, apart from the selection's blue. */
 QColor markerColor(int color);
 
 } // namespace lm

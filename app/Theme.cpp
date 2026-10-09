@@ -201,8 +201,14 @@ QColor markerColor(int color)
 	static const QColor light[4] = {
 		QColor(255, 255, 127), QColor(127, 255, 127), QColor(255, 127, 127), QColor(127, 127, 255),
 	};
+	// "VS Dark" has the search's gray-blue and a blue-violet third color,
+	// next to its selection's blue: the match found was hard to tell from
+	// the others. The search's is a dark green here (where upstream's light
+	// yellow would be one with the differences' gold) and the third color a
+	// purple, both as far from the selection and the differences as
+	// WinMerge's light colors are from its own
 	static const QColor dark[4] = {
-		QColor(88, 110, 117), QColor(42, 161, 152), QColor(211, 54, 130), QColor(108, 113, 196),
+		QColor(40, 112, 52), QColor(42, 161, 152), QColor(211, 54, 130), QColor(136, 80, 148),
 	};
 	const int index = qBound(0, color, 3);
 	return Theme::instance()->dark() ? dark[index] : light[index];
