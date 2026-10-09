@@ -1,6 +1,6 @@
 pkgbase = libremerge
 	pkgdesc = Diff and merge tool for files, folders and CSV tables - a Qt port of the WinMerge engine
-	pkgver = 0.9.8
+	pkgver = 0.9.9
 	pkgrel = 1
 	url = https://github.com/iagodpassos/libremerge
 	arch = x86_64
@@ -19,7 +19,7 @@ pkgbase = libremerge
 	depends = icu
 	depends = libarchive
 	depends = hicolor-icon-theme
-	source = libremerge-0.9.8.tar.gz::https://github.com/iagodpassos/libremerge/archive/refs/tags/v0.9.8.tar.gz
-	sha256sums = 344852f6c04357e40b3907e41b4a37e1b5a1637f6025e26084b467d6e76c5d93
+	source = libremerge-0.9.9.tar.gz::https://github.com/iagodpassos/libremerge/archive/refs/tags/v0.9.9.tar.gz
+	sha256sums = f2d9a93a745874c23677fd6f07460dfa1b86238bad5e863d617f5b7d0ab689ff
 
 pkgname = libremerge
