@@ -468,7 +468,8 @@ int main(int argc, char *argv[])
 			QDir().mkpath(root);
 			const auto put = [&root](const char *name, const char *content) {
 				QFile f(root + QLatin1Char('/') + QLatin1String(name));
-				f.open(QIODevice::WriteOnly);
+				if (!f.open(QIODevice::WriteOnly))
+					std::exit(2);
 				f.write(content);
 			};
 			put("same.txt", "same\n");
@@ -1172,7 +1173,8 @@ int main(int argc, char *argv[])
 		bool ok = lm::installDesktopIntegration(home, launcher, &written, &error);
 		const QString desktopFile = home + QStringLiteral("/applications/libremerge.desktop");
 		QFile file(desktopFile);
-		file.open(QIODevice::ReadOnly);
+		if (!file.open(QIODevice::ReadOnly))
+			std::exit(2);
 		const QString entry = QString::fromUtf8(file.readAll());
 		file.close();
 		const QString expectedExec = QStringLiteral(
@@ -1197,7 +1199,8 @@ int main(int argc, char *argv[])
 		// an entry LibreMerge did not write is left alone
 		QDir().mkpath(home + QStringLiteral("/applications"));
 		QFile foreign(desktopFile);
-		foreign.open(QIODevice::WriteOnly);
+		if (!foreign.open(QIODevice::WriteOnly))
+			std::exit(2);
 		foreign.write("[Desktop Entry]\nName=Mine\nExec=libremerge\n");
 		foreign.close();
 		const bool refused = !lm::removeDesktopIntegration(home, nullptr, &error)
@@ -1621,7 +1624,8 @@ int main(int argc, char *argv[])
 		{
 			const QDateTime before = QFileInfo(path).lastModified();
 			QFile f(path);
-			f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
 			f.write(bytes);
 			if (before.isValid())
 				f.setFileTime(before.addSecs(3), QFileDevice::FileModificationTime);
@@ -1629,7 +1633,8 @@ int main(int argc, char *argv[])
 		const auto read = [](const QString &path)
 		{
 			QFile f(path);
-			f.open(QIODevice::ReadOnly);
+			if (!f.open(QIODevice::ReadOnly))
+				std::exit(2);
 			return f.readAll();
 		};
 		const auto setMode = [](OptionsDialog::AutoReload mode)
@@ -1673,13 +1678,15 @@ int main(int argc, char *argv[])
 			bool fine = lm::fileChangedOnDisk(b, stamp) == lm::FileChange::NoChange;
 			{
 				QFile f(b);
-				f.open(QIODevice::Append);
+				if (!f.open(QIODevice::Append))
+					std::exit(2);
 				f.setFileTime(stamp.modified.addSecs(-90), QFileDevice::FileModificationTime);
 			}
 			fine = fine && lm::fileChangedOnDisk(b, stamp) == lm::FileChange::Changed;
 			{
 				QFile f(b);
-				f.open(QIODevice::Append);
+				if (!f.open(QIODevice::Append))
+					std::exit(2);
 				f.write("four\n");
 				f.setFileTime(stamp.modified, QFileDevice::FileModificationTime);
 			}
@@ -2132,7 +2139,8 @@ int main(int argc, char *argv[])
 			picture.fill(color);
 			picture.save(path);
 			QFile f(path);
-			f.open(QIODevice::Append);
+			if (!f.open(QIODevice::Append))
+				std::exit(2);
 			f.setFileTime(before.addSecs(3), QFileDevice::FileModificationTime);
 		};
 		{
@@ -2194,7 +2202,8 @@ int main(int argc, char *argv[])
 		const auto write = [](const QString &path, const QByteArray &bytes)
 		{
 			QFile f(path);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write(bytes);
 		};
 		const auto message = [](const char *text) {
@@ -2371,7 +2380,8 @@ int main(int argc, char *argv[])
 		{
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			QFile f(path);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write(bytes);
 		};
 		const auto settle = []()
@@ -2823,7 +2833,8 @@ int main(int argc, char *argv[])
 		{
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			QFile f(path);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write(bytes);
 		};
 		const auto settle = []()
@@ -3452,7 +3463,8 @@ int main(int argc, char *argv[])
 		{
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			QFile f(path);
-			f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
 			f.write(bytes);
 		};
 		const auto settle = []()
@@ -3679,7 +3691,8 @@ int main(int argc, char *argv[])
 			click(&dialog, "newFileFilter");
 			const QString minePath = QDir(userDir).filePath(QStringLiteral("mine.flt"));
 			QFile mineFile(minePath);
-			mineFile.open(QIODevice::ReadOnly);
+			if (!mineFile.open(QIODevice::ReadOnly))
+				std::exit(2);
 			const QByteArray mineText = mineFile.readAll();
 			mineFile.close();
 			QTreeWidgetItem *mine = row(QStringLiteral("mine"));
@@ -3735,12 +3748,14 @@ int main(int argc, char *argv[])
 			answer = false;
 			click(&dialog, "installFileFilter");
 			QFile kept(theirsPath);
-			kept.open(QIODevice::ReadOnly);
+			if (!kept.open(QIODevice::ReadOnly))
+				std::exit(2);
 			const bool keptOld = kept.readAll().contains("from elsewhere");
 			kept.close();
 			answer = true;
 			click(&dialog, "installFileFilter");
-			kept.open(QIODevice::ReadOnly);
+			if (!kept.open(QIODevice::ReadOnly))
+				std::exit(2);
 			const bool tookNew = kept.readAll().contains("a newer one");
 			kept.close();
 			check(asked == QStringList{ FiltersDialog::tr("Filter file exists. Overwrite?"),
@@ -4378,7 +4393,8 @@ int main(int argc, char *argv[])
 		{
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			QFile f(path);
-			f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
 			f.write(bytes);
 			f.flush();
 			if (when.isValid())
@@ -4549,7 +4565,8 @@ int main(int argc, char *argv[])
 		{
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			QFile f(path);
-			f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
 			f.write(bytes);
 		};
 		const auto settle = []()
@@ -5363,7 +5380,8 @@ int main(int argc, char *argv[])
 		{
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			QFile f(path);
-			f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
 			f.write(bytes);
 		};
 		const auto settle = []()
@@ -6874,7 +6892,8 @@ int main(int argc, char *argv[])
 		const auto write = [](const QString &path, const QByteArray &bytes)
 		{
 			QFile f(path);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write(bytes);
 		};
 		const QString left = dir.filePath(QStringLiteral("left.txt"));
@@ -7095,7 +7114,8 @@ int main(int argc, char *argv[])
 			const auto read = [](const QString &path)
 			{
 				QFile f(path);
-				f.open(QIODevice::ReadOnly);
+				if (!f.open(QIODevice::ReadOnly))
+					std::exit(2);
 				return f.readAll();
 			};
 			QList<int> answers; // one per prompt: 0 cancels, 1 saves, 2 discards
@@ -7148,7 +7168,8 @@ int main(int argc, char *argv[])
 			write(left, "a\n");
 			{
 				QFile f(left);
-				f.open(QIODevice::Append);
+				if (!f.open(QIODevice::Append))
+					std::exit(2);
 				f.setFileTime(older, QFileDevice::FileModificationTime);
 			}
 			FileCompareView view;
@@ -7431,7 +7452,8 @@ int main(int argc, char *argv[])
 			const QString path = roots[side] + QLatin1Char('/') + rel;
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			QFile f(path);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write(content);
 		};
 		for (int i = 0; i < 3; ++i)
@@ -7471,7 +7493,8 @@ int main(int argc, char *argv[])
 		expect(QStringLiteral("a.txt"), Item::NotCompared, "after copy");
 		{
 			QFile fa(roots[1] + QStringLiteral("/a.txt"));
-			fa.open(QIODevice::ReadOnly);
+			if (!fa.open(QIODevice::ReadOnly))
+				std::exit(2);
 			if (fa.readAll() != "0\n")
 			{
 				fprintf(stderr, "copy did not reach the middle\n");
@@ -7517,12 +7540,14 @@ int main(int argc, char *argv[])
 		QDir().mkpath(rightDir);
 		{
 			QFile f(leftDir + QStringLiteral("/a.txt"));
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("x\n");
 		}
 		{
 			QFile f(rightDir + QStringLiteral("/a.txt"));
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("y\n");
 		}
 		MainWindow window;
@@ -7576,7 +7601,8 @@ int main(int argc, char *argv[])
 		const auto write = [](const QString &path, const QByteArray &bytes)
 		{
 			QFile f(path);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write(bytes);
 		};
 		const QByteArray big = QByteArray("line of text\n").repeated(400000);
@@ -7641,7 +7667,8 @@ int main(int argc, char *argv[])
 			const QDateTime &mtime)
 		{
 			QFile f(path);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write(bytes);
 			f.flush(); // or closing would write, and date, again
 			f.setFileTime(mtime, QFileDevice::FileModificationTime);
@@ -7711,7 +7738,8 @@ int main(int argc, char *argv[])
 		{
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			QFile f(path);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write(bytes);
 		};
 		const QString a = dir.filePath(QStringLiteral("A"));
@@ -7823,12 +7851,14 @@ int main(int argc, char *argv[])
 		const QString rightPath = dir.filePath(QStringLiteral("r.txt"));
 		{
 			QFile f(leftPath);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("this is a test\nword only here\n");
 		}
 		{
 			QFile f(rightPath);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("this is test\nword here\n");
 		}
 		FileCompareView view;
@@ -7862,12 +7892,14 @@ int main(int argc, char *argv[])
 		const QString rightPath = dir.filePath(QStringLiteral("b.txt"));
 		{
 			QFile f(leftPath);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("x\n");
 		}
 		{
 			QFile f(rightPath);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("y\n");
 		}
 		MainWindow window;
@@ -7900,7 +7932,8 @@ int main(int argc, char *argv[])
 			const QString path = roots[side] + QLatin1Char('/') + rel;
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			QFile f(path);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write(content);
 		};
 		for (int i = 0; i < 3; ++i)
@@ -8017,12 +8050,14 @@ int main(int argc, char *argv[])
 		const QString rightPath = dir.filePath(QStringLiteral("right.txt"));
 		{
 			QFile f(leftPath);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("a\nb\n");
 		}
 		{
 			QFile f(rightPath);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("a\nc\n");
 		}
 		MainWindow window;
@@ -9450,12 +9485,14 @@ int main(int argc, char *argv[])
 		const QString rightPath = dir.filePath(QStringLiteral("right.txt"));
 		{
 			QFile f(leftPath);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("a\np\nq\nb\n");
 		}
 		{
 			QFile f(rightPath);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("a\nb\n");
 		}
 		FileCompareView view;
@@ -9499,12 +9536,14 @@ int main(int argc, char *argv[])
 		const QString rightPath = dir.filePath(QStringLiteral("right.txt"));
 		{
 			QFile f(leftPath);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("a\nx\ny\nb\n");
 		}
 		{
 			QFile f(rightPath);
-			f.open(QIODevice::WriteOnly);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
 			f.write("a\nb\n");
 		}
 		FileCompareView view;
@@ -9611,8 +9650,10 @@ int main(int argc, char *argv[])
 			return 2;
 		}
 		QFile leftFile(files.at(0)), rightFile(files.at(1));
-		leftFile.open(QIODevice::ReadOnly);
-		rightFile.open(QIODevice::ReadOnly);
+		if (!leftFile.open(QIODevice::ReadOnly))
+			std::exit(2);
+		if (!rightFile.open(QIODevice::ReadOnly))
+			std::exit(2);
 		const bool equal = leftFile.readAll() == rightFile.readAll();
 		printf("initial: %d, merged: %d, undone: %d, redone: %d, "
 			"files equal: %d\n", initial, merged, undone, redone, equal);
@@ -9636,7 +9677,8 @@ int main(int argc, char *argv[])
 		const QString copied = QGuiApplication::clipboard()->text();
 
 		QFile leftFile(files.at(0));
-		leftFile.open(QIODevice::ReadOnly);
+		if (!leftFile.open(QIODevice::ReadOnly))
+			std::exit(2);
 		QString expected = QString::fromUtf8(leftFile.readAll());
 		expected.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
 		while (expected.endsWith(QChar('\n')))
@@ -9733,7 +9775,8 @@ int main(int argc, char *argv[])
 		if (files.size() != 2)
 			return 2;
 		QFile rightBefore(files.at(1));
-		rightBefore.open(QIODevice::ReadOnly);
+		if (!rightBefore.open(QIODevice::ReadOnly))
+			std::exit(2);
 		const QByteArray originalRight = rightBefore.readAll();
 		rightBefore.close();
 
@@ -9752,8 +9795,10 @@ int main(int argc, char *argv[])
 		}
 		QFile leftFile(files.at(0)), rightFile(files.at(1));
 		QFile backupFile(files.at(1) + QStringLiteral(".bak"));
-		leftFile.open(QIODevice::ReadOnly);
-		rightFile.open(QIODevice::ReadOnly);
+		if (!leftFile.open(QIODevice::ReadOnly))
+			std::exit(2);
+		if (!rightFile.open(QIODevice::ReadOnly))
+			std::exit(2);
 		const bool merged = leftFile.readAll() == rightFile.readAll();
 		bool backupOk = backupFile.open(QIODevice::ReadOnly)
 			&& backupFile.readAll() == originalRight;
