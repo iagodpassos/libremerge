@@ -406,8 +406,8 @@ LibreMerge vergleicht Textdateien; der Binärvergleich wird noch nicht unterstü
     </message>
     <message>
         <source>Recent Files</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Kürzliche Dateien</translation>
+        <translatorcomment>LibreMerge&apos;s own text, worded in a native speaker&apos;s review.</translatorcomment>
+        <translation>Kürzlich verwendete Dateien</translation>
     </message>
     <message>
         <source>Caption for this pane (leave empty to show the file path):</source>
@@ -2441,8 +2441,8 @@ Patches sind nicht betroffen.</translation>
     </message>
     <message>
         <source>Recent Files or Folders</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Recent F&amp;iles or Folders&quot;.</translatorcomment>
-        <translation>Kürzliche Dateien oder Ordner</translation>
+        <translatorcomment>Changed in a native speaker&apos;s review; WinMerge&apos;s is &quot;Kürzlich&amp;e Dateien oder Ordner&quot;.</translatorcomment>
+        <translation>Kürzlich verwendet</translation>
     </message>
     <message>
         <source>(empty)</source>

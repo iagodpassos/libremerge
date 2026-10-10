@@ -65,7 +65,7 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 541 | 147 | 153 | 0 | 1 |
+| German | 541 | 146 | 153 | 0 | 2 |
 | Spanish | 531 | 159 | 151 | 1 | 0 |
 | Catalan | 242 | 154 | 151 | 295 | 0 |
 
@@ -73,8 +73,11 @@ The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
 otherwise. The German catalog was reviewed by @KrokusPokus in issue #8:
 the Defaults button of the Options takes "Voreinstellungen", KDE's word
-and Qt's own for the button that restores defaults, and the hint of the
-path fields on the selection screen became shorter in every language.
+and Qt's own for the button that restores defaults; the hint of the
+path fields on the selection screen became shorter in every language;
+and File > Recent Files or Folders reads "Kürzlich verwendet", where
+WinMerge's "Kürzliche Dateien oder Ordner" reads oddly, the panes'
+"Recent Files" menu likewise "Kürzlich verwendete Dateien".
 
 ## Deliberately excluded (and why)
 
