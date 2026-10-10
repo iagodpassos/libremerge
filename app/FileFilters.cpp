@@ -105,7 +105,9 @@ QString sharedFiltersDir()
 {
 	if (!sharedDirOverride().isEmpty())
 		return sharedDirOverride();
-	const QDir appDir(QCoreApplication::applicationDirPath());
+	// the binary's own folder: started through a symlink (the AppImage's
+	// AppRun.wrapped), Qt 6.12 gives the link's folder on Linux
+	const QDir appDir(QFileInfo(QCoreApplication::applicationFilePath()).canonicalPath());
 #ifdef Q_OS_MACOS
 	// the bundle's Contents/Resources/Filters
 	const QStringList candidates = { appDir.filePath(QStringLiteral("../Resources/Filters")) };
