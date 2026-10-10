@@ -12,9 +12,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: brew install ninja qt poco boost icu4c googletest re2c lemon libarchive
+        run: brew install ninja poco boost icu4c googletest re2c lemon libarchive
+      # the Qt the dmg ships (official binaries, as packaging/build_deps.sh
+      # takes them), not Homebrew's latest
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.12.0'
+          modules: 'qtimageformats'
+          cache: true
+          # an aqtinstall that knows Qt 6.12's repository
+          aqtversion: '==3.3.*'
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
       - name: Build
         run: cmake --build build
       - name: Test
@@ -31,10 +41,22 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build libpoco-dev libboost-dev \
-            libicu-dev re2c lemon qt6-base-dev libgl1-mesa-dev libarchive-dev \
-            qt6-translations-l10n appstream dbus python3-dbus python3-gi
+            libicu-dev re2c lemon libgl1-mesa-dev libegl1 libxkbcommon0 \
+            libxkbcommon-x11-0 libxcb-cursor0 libarchive-dev \
+            appstream dbus python3-dbus python3-gi
+      # the Qt version the AppImage ships; the AppImage's own Qt is built
+      # on Debian 12 (packaging/linux/build_qt.sh), Qt's official binaries
+      # need the glibc 2.38 this runner has
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.12.0'
+          modules: 'qtimageformats'
+          cache: true
+          # an aqtinstall that knows Qt 6.12's repository
+          aqtversion: '==3.3.*'
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
       - name: Build
         run: cmake --build build
       - name: Test
