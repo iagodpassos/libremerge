@@ -134,6 +134,15 @@ else()
       $<TARGET_FILE_DIR:LibreMerge>/Filters)
 endif()
 
+# the macOS the bundle needs (LSMinimumSystemVersion): the deployment
+# target of a release build, Qt 6.12's 14.4 otherwise, so that an older
+# macOS says so instead of the app failing to start
+if(CMAKE_OSX_DEPLOYMENT_TARGET)
+  set(LM_MACOS_MINIMUM "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+else()
+  set(LM_MACOS_MINIMUM "14.4")
+endif()
+
 set_target_properties(LibreMerge PROPERTIES
   MACOSX_BUNDLE TRUE
   MACOSX_BUNDLE_GUI_IDENTIFIER org.libremerge.LibreMerge

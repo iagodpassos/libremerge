@@ -1,9 +1,10 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Build universal (arm64 + x86_64) ICU and Poco with a macOS 12 floor,
-# for the distributable universal bundle. Homebrew's bottles are
-# arm64-only and target the host OS, which is why the release toolchain
-# builds these two itself. One-time; results land in deps/.
+# The release toolchain of the universal (arm64 + x86_64) dmg: Qt's official
+# universal binaries, through aqt, and ICU, Poco, xz, zstd and libarchive
+# built here universal, since Homebrew's bottles are arm64-only and target
+# the host OS. One-time; results land in deps/. The app's floor is Qt's,
+# macOS 14.4 for Qt 6.12; the libraries here keep their older one.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,6 +18,7 @@ POCO_VER="1.13.3"
 XZ_VER="5.8.1"
 ZSTD_VER="1.5.7"
 LIBARCHIVE_VER="3.8.1"
+QT_VER="6.12.0"
 JOBS="$(sysctl -n hw.ncpu)"
 
 mkdir -p "$WORK"
@@ -159,15 +161,17 @@ if [ ! -f "$DEPS/libarchive/lib/libarchive.dylib" ]; then
   echo "    libarchive ok: $(lipo -info "$DEPS"/libarchive/lib/libarchive.*.dylib | tail -1)"
 fi
 
-# --- Qt patch (QTBUG-136184) -------------------------------------------------
-# Qt 6.8's FindWrapOpenGL links AGL, but recent SDKs removed it (only an
-# empty shell remains under /System/Library/Frameworks, which fools
-# find_library but fails at link time). Qt 6.9 dropped AGL entirely; do the
-# same in our vendored copy.
-WRAP="$DEPS/qt/6.8.3/macos/lib/cmake/Qt6/FindWrapOpenGL.cmake"
-if [ -f "$WRAP" ] && rg -q 'WrapOpenGL_AGL' "$WRAP"; then
-  echo "==> Patch QTBUG-136184 (AGL) no Qt"
-  perl -0pi -e 's/[ \t]*find_library\(WrapOpenGL_AGL.*?INTERFACE \$\{__opengl_fw_path\}\)\n[ \t]*target_link_libraries\(WrapOpenGL::WrapOpenGL INTERFACE \$\{__opengl_agl_fw_path\}\)/        target_link_libraries(WrapOpenGL::WrapOpenGL INTERFACE \${__opengl_fw_path})/s' "$WRAP"
+# --- Qt (official universal binaries) ----------------------------------------
+# qtbase with its tools (macdeployqt) and Qt's own translations come with
+# the default archives; qtimageformats adds TIFF, WebP and the rest the
+# image comparison opens. aqt is installed with pipx (pipx install
+# aqtinstall).
+if [ ! -x "$DEPS/qt/$QT_VER/macos/bin/macdeployqt" ]; then
+  echo "==> Qt $QT_VER"
+  # (from deps/: aqt leaves its own log in the current folder)
+  (cd "$DEPS" && "${AQT:-aqt}" install-qt mac desktop "$QT_VER" clang_64 \
+    -m qtimageformats -O "$DEPS/qt" > "$DEPS/aqt-qt.log" 2>&1)
+  echo "    Qt ok: $(lipo -archs "$DEPS/qt/$QT_VER/macos/lib/QtCore.framework/QtCore")"
 fi
 
 echo "==> deps prontos em $DEPS"

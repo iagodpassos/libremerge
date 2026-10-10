@@ -14,20 +14,21 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="0.9.9"
 DMG="$ROOT/LibreMerge-$VERSION.dmg"
 
-# Universal (arm64 + x86_64, macOS 12+) toolchain: official Qt + ICU/Poco
-# built by packaging/build_deps.sh. Falls back to the Homebrew toolchain
-# (arm64-only, host-OS floor) when deps/ is absent.
-QT_DEPS="$ROOT/deps/qt/6.8.3/macos"
+# Universal (arm64 + x86_64) toolchain: official Qt + ICU/Poco/libarchive
+# built by packaging/build_deps.sh. Its floor is Qt 6.12's, macOS 14.4.
+# Falls back to the Homebrew toolchain (arm64-only, host-OS floor) when
+# deps/ is absent.
+QT_DEPS="$ROOT/deps/qt/6.12.0/macos"
 if [ -d "$QT_DEPS" ] && [ -d "$ROOT/deps/icu" ] && [ -d "$ROOT/deps/poco" ] \
     && [ -d "$ROOT/deps/libarchive" ]; then
-  echo "==> Release build (universal, macOS 12+)"
+  echo "==> Release build (universal, macOS 14.4+)"
   BUILD="$ROOT/build-universal"
   QT_BIN="$QT_DEPS/bin"
   QT_TRANSLATIONS="$QT_DEPS/translations"
   cmake -S "$ROOT" -B "$BUILD" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=14.4 \
     -DCMAKE_PREFIX_PATH="$QT_DEPS;$ROOT/deps/icu;$ROOT/deps/poco;$ROOT/deps/libarchive" \
     -DCMAKE_DISABLE_FIND_PACKAGE_GTest=ON > /dev/null
 else
@@ -57,6 +58,7 @@ rm -rf "$PLUGINS/virtualkeyboard" "$PLUGINS/qmltooling" \
   "$PLUGINS/platforminputcontexts" "$PLUGINS/networkinformation" \
   "$PLUGINS/tls" "$PLUGINS/imageformats/libqpdf.dylib" \
   "$PLUGINS/imageformats/libqsvg.dylib" "$PLUGINS/iconengines/libqsvgicon.dylib"
+rmdir "$PLUGINS/iconengines" 2> /dev/null || true
 
 # fail loudly if a remaining binary still wants a removed framework
 while read -r binary; do
