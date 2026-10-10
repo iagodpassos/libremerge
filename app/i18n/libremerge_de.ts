@@ -2440,9 +2440,9 @@ Patches sind nicht betroffen.</translation>
         <translation>&amp;Öffnen...</translation>
     </message>
     <message>
-        <source>Recent Files or Folders</source>
+        <source>Recent F&amp;iles or Folders</source>
         <translatorcomment>Changed in a native speaker&apos;s review; WinMerge&apos;s is &quot;Kürzlich&amp;e Dateien oder Ordner&quot;.</translatorcomment>
-        <translation>Kürzlich verwendet</translation>
+        <translation>&amp;Kürzlich verwendet</translation>
     </message>
     <message>
         <source>(empty)</source>

@@ -2727,9 +2727,8 @@ Potser el fitxer és només de lectura?</translation>
         <translation>&amp;Obre...</translation>
     </message>
     <message>
-        <source>Recent Files or Folders</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Recent F&amp;iles or Folders&quot;.</translatorcomment>
-        <translation>Fitxers i carpetes recents</translation>
+        <source>Recent F&amp;iles or Folders</source>
+        <translation>Fitxers i &amp;carpetes recents</translation>
     </message>
     <message>
         <source>(empty)</source>

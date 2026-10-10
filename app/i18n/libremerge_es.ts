@@ -2458,9 +2458,8 @@ El archivo puede ser de solo lectura.</translation>
         <translation>&amp;Abrir...</translation>
     </message>
     <message>
-        <source>Recent Files or Folders</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Recent F&amp;iles or Folders&quot;.</translatorcomment>
-        <translation>Archivos o carpetas recientes</translation>
+        <source>Recent F&amp;iles or Folders</source>
+        <translation>Arch&amp;ivos o carpetas recientes</translation>
     </message>
     <message>
         <source>(empty)</source>

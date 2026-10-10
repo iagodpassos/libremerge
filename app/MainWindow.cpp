@@ -204,7 +204,7 @@ MainWindow::MainWindow(QWidget *parent)
 		[this]() { newComparison(); });
 	// WinMerge's File > Recent Files or Folders: each entry is a whole
 	// comparison, rebuilt from settings every time the menu opens
-	QMenu *recentMenu = fileMenu->addMenu(tr("Recent Files or Folders"));
+	QMenu *recentMenu = fileMenu->addMenu(tr("Recent F&iles or Folders"));
 	connect(recentMenu, &QMenu::aboutToShow, this, [this, recentMenu]() {
 		recentMenu->clear();
 		const QStringList entries = QSettings()

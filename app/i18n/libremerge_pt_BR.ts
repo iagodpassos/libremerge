@@ -2272,10 +2272,6 @@ O arquivo pode ser somente leitura.</translation>
         <translation>&amp;Abrir...</translation>
     </message>
     <message>
-        <source>Recent Files or Folders</source>
-        <translation>Arquivos ou Pastas Recentes</translation>
-    </message>
-    <message>
         <source>(empty)</source>
         <translation>(vazio)</translation>
     </message>
@@ -2580,6 +2576,10 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>None</source>
         <translation>Nenhum</translation>
+    </message>
+    <message>
+        <source>Recent F&amp;iles or Folders</source>
+        <translation>Arqu&amp;ivos ou Pastas Recentes</translation>
     </message>
     <message>
         <source>Settings...</source>
