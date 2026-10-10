@@ -10,14 +10,22 @@
 # Produces <work-dir>/LibreMerge-<version>-<arch>.AppImage with Qt, ICU,
 # Poco, libarchive and the wayland+xcb platform plugins bundled (the .deb
 # lesson: platform plugins are dlopen'd and easy to miss), plus Qt's own
-# translations. Besides the app's build dependencies the container needs
-# qt6-translations-l10n, and zlib1g-dev, libbz2-dev, liblzma-dev and
-# libzstd-dev for libarchive (built here, see below).
+# translations. Qt is the one packaging/linux/build_qt.sh builds, unpacked
+# at $QT_PREFIX (/opt/qt by default); packaging/appimage_in_docker.sh sets
+# all of this up. Besides the app's build dependencies the container needs
+# zlib1g-dev, libbz2-dev, liblzma-dev and libzstd-dev for libarchive
+# (built here, see below).
 set -euo pipefail
 
 SRC="${1:?usage: make_appimage.sh <source-dir> <work-dir>}"
 WORK="${2:?usage: make_appimage.sh <source-dir> <work-dir>}"
 ARCH="$(uname -m)"
+QT_PREFIX="${QT_PREFIX:-/opt/qt}"
+QMAKE="$QT_PREFIX/bin/qmake"
+if [ ! -x "$QMAKE" ]; then
+  echo "ERROR: no Qt at $QT_PREFIX (see packaging/linux/build_qt.sh)" >&2
+  exit 1
+fi
 export VERSION="0.9.9"
 
 mkdir -p "$WORK"
@@ -58,11 +66,12 @@ for codec in libz.so libbz2.so liblzma.so libzstd.so; do
     exit 1
   fi
 done
-# linuxdeploy resolves the app's libarchive here, not in the system
-export LD_LIBRARY_PATH="$LIBARCHIVE/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# linuxdeploy resolves the app's libarchive and Qt here, not in the system
+export LD_LIBRARY_PATH="$LIBARCHIVE/lib:$QT_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 cmake -S "$SRC" -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX=/usr \
+  -DCMAKE_PREFIX_PATH="$QT_PREFIX" \
   -DLibArchive_INCLUDE_DIR="$LIBARCHIVE/include" \
   -DLibArchive_LIBRARY="$LIBARCHIVE/lib/libarchive.so"
 cmake --build build --target LibreMerge
@@ -72,10 +81,11 @@ DESTDIR="$PWD/AppDir" cmake --install build
 # linuxdeploy's qt plugin does not know the client buffer integration
 # category, so the wayland platform came up bufferless on GNOME
 # ("Failed to load client buffer integration: wayland-egl"). Pre-place
-# the plugins in the AppDir; linuxdeploy then bundles their deps and
-# patches their rpaths like any other ELF it finds. vulkan-server is
-# skipped to keep the Vulkan loader out of the dependency set.
-QT_PLUGIN_DIR="$(/usr/bin/qmake6 -query QT_INSTALL_PLUGINS)"
+# the plugins in the AppDir and have linuxdeploy bundle their deps
+# (--deploy-deps-only below: it only looks through usr/bin by itself).
+# vulkan-server is skipped to keep the Vulkan loader out of the
+# dependency set.
+QT_PLUGIN_DIR="$("$QMAKE" -query QT_INSTALL_PLUGINS)"
 mkdir -p AppDir/usr/plugins/wayland-graphics-integration-client
 for plugin in libqt-plugin-wayland-egl.so libshm-emulation-server.so \
               libdrm-egl-server.so libdmabuf-server.so; do
@@ -95,30 +105,34 @@ for tool in linuxdeploy linuxdeploy-plugin-qt; do
   fi
 done
 
-# no FUSE inside containers; qmake6 is Debian's Qt 6 qmake
+# no FUSE inside containers; the qt plugin takes its Qt from QMAKE
 export APPIMAGE_EXTRACT_AND_RUN=1
-export QMAKE=/usr/bin/qmake6
+export QMAKE
 # wayland+xcb for real sessions, offscreen so the selftest suite can run
 # headless against the AppImage itself (CI, containers)
-export EXTRA_PLATFORM_PLUGINS="libqwayland-generic.so;libqwayland-egl.so;libqoffscreen.so"
-# the wayland platform plugin dlopens its own helpers: client buffer
-# integrations (wayland-egl), the xdg-shell integration and the window
-# decorations - without them the window comes up bufferless and
-# borderless on a pure Wayland session (GNOME)
-export EXTRA_QT_PLUGINS="wayland-decoration-client;wayland-graphics-integration-client;wayland-shell-integration"
+# (one wayland platform plugin since Qt 6.10, which moved the Wayland
+# client into qtbase). The wayland platform plugin dlopens its own
+# helpers: client buffer integrations (wayland-egl, pre-placed above),
+# the xdg-shell integration and the window decorations - without them the
+# window comes up bufferless and borderless on a pure Wayland session
+# (GNOME). The qt plugin deploys the last two along with the platform.
+export EXTRA_PLATFORM_PLUGINS="libqwayland.so;libqoffscreen.so"
 # deploy first (generates an AppRun that sources apprun-hooks/*.sh at
 # runtime), then add our hook, then pack
-./linuxdeploy-"$ARCH".AppImage --appdir AppDir --plugin qt
+./linuxdeploy-"$ARCH".AppImage --appdir AppDir --plugin qt \
+  --deploy-deps-only AppDir/usr/plugins/wayland-graphics-integration-client
+# no platform theme, as with Debian's Qt: Qt loads the desktop portal's
+# only inside Flatpak and Snap, or when QT_QPA_PLATFORMTHEME asks for it
+rm -rf AppDir/usr/plugins/platformthemes
 
 # Qt's own strings (dialog buttons, text-field context menus) come from
-# qtbase_<lang>.qm. The qt plugin deploys them into usr/translations
-# (where its qt.conf, Prefix=../, points Qt) only when Debian's
-# qt6-translations-l10n is installed; the 0.9.4 containers lacked it and
-# the AppImages showed "Cancel" and "Paste" in English to pt-BR users.
-# Guard the app's languages (fail loudly if the package goes missing) and
-# drop the rest, like the dmg: a UI language LibreMerge is not
-# translated to stays English throughout instead of half-translated.
-QT_TRANSLATIONS="$(/usr/bin/qmake6 -query QT_INSTALL_TRANSLATIONS)"
+# qtbase_<lang>.qm, which build_qt.sh compiles into the Qt prefix; the
+# 0.9.4 AppImages lacked them and showed "Cancel" and "Paste" in English
+# to pt-BR users. Copy the app's languages into usr/translations (where
+# the qt plugin's qt.conf, Prefix=../, points Qt), failing loudly when one
+# is missing, and drop the rest, like the dmg: a UI language LibreMerge is
+# not translated to stays English throughout instead of half-translated.
+QT_TRANSLATIONS="$("$QMAKE" -query QT_INSTALL_TRANSLATIONS)"
 mkdir -p AppDir/usr/translations
 keep=""
 for ts in "$SRC"/app/i18n/libremerge_*.ts; do
@@ -126,7 +140,7 @@ for ts in "$SRC"/app/i18n/libremerge_*.ts; do
   lang="${lang#libremerge_}"
   qm="$QT_TRANSLATIONS/qtbase_$lang.qm"
   if [ ! -f "$qm" ]; then
-    echo "ERROR: $qm not found (install qt6-translations-l10n)" >&2
+    echo "ERROR: $qm not found (see packaging/linux/build_qt.sh)" >&2
     exit 1
   fi
   cp "$qm" AppDir/usr/translations/
@@ -139,10 +153,11 @@ for qm in AppDir/usr/translations/*.qm; do
   esac
 done
 
-# the bundled Qt (Debian 12's 6.4) cannot position windows on a native
-# Wayland session, so dialogs land in a screen corner instead of being
-# centered on the application window; prefer XWayland until the bundle
-# moves to a newer Qt. QT_QPA_PLATFORM set by the user still wins.
+# Debian 12's Qt 6.4, which the AppImage used to bundle, could not place
+# dialogs on a native Wayland session (they landed in a screen corner
+# instead of over the window), so the AppImage prefers XWayland. It stays
+# so until Qt 6.12's Wayland session is checked on a real desktop;
+# QT_QPA_PLATFORM set by the user still wins.
 mkdir -p AppDir/apprun-hooks
 cat > AppDir/apprun-hooks/00-libremerge-platform.sh <<'EOF'
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
