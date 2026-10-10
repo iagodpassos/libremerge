@@ -65,10 +65,12 @@ jobs:
         run: ./packaging/run_selftests.sh build/app/libremerge
       - name: Desktop portal color scheme
         # System theme follows GNOME/KDE's dark setting, read and watched
-        # through the portal (current ReadOne and the older Read)
+        # through the portal (current ReadOne and the older Read). The
+        # system's Python, which has python3-dbus: install-qt-action puts
+        # its own first in PATH
         run: |
           for mode in "" --legacy; do
-            QT_QPA_PLATFORM=offscreen dbus-run-session -- python3 \
+            QT_QPA_PLATFORM=offscreen dbus-run-session -- /usr/bin/python3 \
               packaging/fake_portal.py $mode -- build/app/libremerge --selftest-portal
           done
       - name: AppStream metadata
