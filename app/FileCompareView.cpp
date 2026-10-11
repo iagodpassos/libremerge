@@ -467,6 +467,9 @@ FileCompareView::FileCompareView(QWidget *parent)
 		// like WinMerge's OnLButtonDblClk
 		m_panes[i]->setDoubleClickHook(
 			[this](int viewLine) { selectDiffAtViewLine(viewLine); });
+		// and a click outside it leaves none current, like OnLButtonUp
+		m_panes[i]->setMouseReleaseHook(
+			[this, i]() { deselectDiffIfCursorNotInCurrentDiff(i); });
 		m_panes[i]->setFileDropHook(
 			[this, i](const QString &path) { changeSideFile(i, path); });
 		m_panes[i]->setContextMenuHook(
@@ -1999,52 +2002,94 @@ void FileCompareView::gotoDiff(int blockIndex, bool center)
 	updateStatus();
 }
 
+/** Upstream's Next/PrevSignificantDiffFromLine, past the differences
+    nextActive skips: the first to stop at that starts at the line or
+    after it (direction +1), or ends at it or before it (-1). */
+int FileCompareView::nextActiveFromLine(int viewLine, int direction) const
+{
+	const int count = static_cast<int>(m_blocks.size());
+	for (int b = direction > 0 ? 0 : count - 1; b >= 0 && b < count; b += direction)
+	{
+		const Block &block = m_blocks[b];
+		if (block.trivial || block.resolved || blockFiltered(b))
+			continue;
+		if (direction > 0 ? block.viewBegin >= viewLine : block.viewEnd <= viewLine)
+			return b;
+	}
+	return -1;
+}
+
+/** Upstream's LineToDiff for a significant difference: the one the view
+    line is in, -1 when it is in none. */
+int FileCompareView::activeDiffAtLine(int viewLine) const
+{
+	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+	{
+		const Block &block = m_blocks[b];
+		if (!block.trivial && !block.resolved
+			&& viewLine >= block.viewBegin && viewLine <= block.viewEnd)
+			return b;
+	}
+	return -1;
+}
+
+/** The line a search for the next or previous difference starts from:
+    the active pane's cursor line, moved by the offset; the first line on
+    screen when that is no line of the file (upstream's IsValidTextPosY
+    and m_nTopLine). */
+int FileCompareView::searchLine(int offset) const
+{
+	const DiffTextEdit *pane = m_panes[m_activePane];
+	const int line = pane->textCursor().blockNumber() + offset;
+	if (line < 0 || line >= pane->document()->blockCount())
+		return pane->firstVisibleLine();
+	return line;
+}
+
+/** Upstream's DeselectDiffIfCursorNotInCurrentDiff, on releasing the
+    mouse button: a click outside the current difference leaves none
+    current, so that the next and previous ones are those of the cursor. */
+void FileCompareView::deselectDiffIfCursorNotInCurrentDiff(int side)
+{
+	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
+		return;
+	const int line = m_panes[side]->textCursor().blockNumber();
+	if (line >= m_blocks[m_current].viewBegin && line <= m_blocks[m_current].viewEnd)
+		return;
+	m_current = -1;
+	applyHighlights();
+	updateStatus();
+}
+
+/** Upstream's OnNextdiff (FindNextNonFilteredDiff): the difference after
+    the current one while that one is on screen; otherwise the next from
+    the cursor, past the first line of the difference it may be in. */
 void FileCompareView::gotoNextDiff()
 {
 	if (m_diffStale)
 		recompare();
 	int next = -1;
-	if (m_current >= 0)
+	if (m_current >= 0 && m_panes[m_activePane]->linesOnScreen(
+			m_blocks[m_current].viewBegin, m_blocks[m_current].viewEnd))
 		next = nextActive(m_current, +1);
 	else
-	{
-		// no selected diff: search from the cursor, like upstream's
-		// DiffList::NextSignificantDiffFromLine
-		const int line = m_panes[m_activePane]->textCursor().blockNumber();
-		for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
-		{
-			if (!m_blocks[b].trivial && !m_blocks[b].resolved
-				&& m_blocks[b].viewBegin >= line && !blockFiltered(b))
-			{
-				next = b;
-				break;
-			}
-		}
-	}
+		next = nextActiveFromLine(searchLine(m_current >= 0 ? 1 : 0), +1);
 	if (next >= 0)
 		gotoDiff(next);
 }
 
+/** Upstream's OnPrevdiff, the same way back: past the last line of the
+    difference the cursor may be in. */
 void FileCompareView::gotoPrevDiff()
 {
 	if (m_diffStale)
 		recompare();
 	int prev = -1;
-	if (m_current >= 0)
+	if (m_current >= 0 && m_panes[m_activePane]->linesOnScreen(
+			m_blocks[m_current].viewBegin, m_blocks[m_current].viewEnd))
 		prev = nextActive(m_current, -1);
 	else
-	{
-		const int line = m_panes[m_activePane]->textCursor().blockNumber();
-		for (int b = static_cast<int>(m_blocks.size()) - 1; b >= 0; --b)
-		{
-			if (!m_blocks[b].trivial && !m_blocks[b].resolved
-				&& m_blocks[b].viewEnd <= line && !blockFiltered(b))
-			{
-				prev = b;
-				break;
-			}
-		}
-	}
+		prev = nextActiveFromLine(searchLine(m_current >= 0 ? -1 : 0), -1);
 	if (prev >= 0)
 		gotoDiff(prev);
 }
@@ -2277,8 +2322,10 @@ void FileCompareView::copyCurrentDiff(int sourceSide, int targetSide, bool advan
 	if (sourceSide >= m_paneCount || targetSide >= m_paneCount
 		|| sourceSide == targetSide)
 		return;
+	// upstream's OnX2Y: with no current difference, the one the cursor is
+	// in, and none when it is in none
 	if (m_current < 0)
-		m_current = nextActive(-1, +1);
+		m_current = activeDiffAtLine(m_panes[m_activePane]->textCursor().blockNumber());
 	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
 		return;
 	if (m_blocks[m_current].trivial || m_blocks[m_current].resolved)
@@ -2658,17 +2705,9 @@ void FileCompareView::focusNextPane()
     line, mirroring upstream's OnCurdiff after a merge undo. */
 void FileCompareView::selectDiffAtViewLine(int viewLine)
 {
-	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
-	{
-		const Block &block = m_blocks[b];
-		if (block.trivial || block.resolved)
-			continue;
-		if (viewLine >= block.viewBegin && viewLine <= block.viewEnd)
-		{
-			gotoDiff(b, false);
-			return;
-		}
-	}
+	const int b = activeDiffAtLine(viewLine);
+	if (b >= 0)
+		gotoDiff(b, false);
 }
 
 void FileCompareView::showFind()

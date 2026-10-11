@@ -407,6 +407,15 @@ public:
 		endResetModel();
 	}
 
+	/** The backgrounds again, for another current difference: no reset,
+	    so the grid keeps its current cell. */
+	void recolor()
+	{
+		if (rowCount() > 0 && m_columns > 0)
+			emit dataChanged(index(0, 0), index(rowCount() - 1, m_columns - 1),
+				{ Qt::BackgroundRole });
+	}
+
 private:
 	int toViewRow(int modelRow) const
 	{
@@ -526,6 +535,11 @@ TableCompareView::TableCompareView(QWidget *parent)
 			this, [this](const QModelIndex &index) {
 				// select the difference under the double-clicked row
 				selectDiffAtModelRow(index.row());
+			});
+		// and a click outside it leaves none current, like OnLButtonUp
+		connect(m_tables[i], &QTableView::clicked,
+			this, [this](const QModelIndex &index) {
+				deselectDiffIfCursorNotInCurrentDiff(index.row());
 			});
 		// upstream's menu of a right click on the headers
 		QHeaderView *header = m_tables[i]->horizontalHeader();
@@ -1067,20 +1081,117 @@ void TableCompareView::gotoDiff(int blockIndex)
 			QAbstractItemView::PositionAtCenter);
 	m_models[0]->refresh(m_models[0]->columnCount());
 	m_models[1]->refresh(m_models[1]->columnCount());
+	// upstream's SelectDiff puts the cursor at the start of the difference,
+	// nothing selected
+	for (int i = 0; i < 2 && modelRow >= 0; ++i)
+	{
+		m_tables[i]->selectionModel()->clearSelection();
+		m_tables[i]->selectionModel()->setCurrentIndex(
+			m_models[i]->index(modelRow, 0), QItemSelectionModel::NoUpdate);
+	}
 	updateStatus();
 }
 
+int TableCompareView::activeSide() const
+{
+	return m_tables[1]->hasFocus() ? 1 : 0;
+}
+
+/** Upstream's Next/PrevSignificantDiffFromLine, past the differences
+    nextActive skips: the first to stop at that starts at the view row or
+    after it (direction +1), or ends at it or before it (-1). */
+int TableCompareView::nextActiveFromRow(int viewRow, int direction) const
+{
+	const int count = static_cast<int>(m_blocks.size());
+	for (int b = direction > 0 ? 0 : count - 1; b >= 0 && b < count; b += direction)
+	{
+		const Block &block = m_blocks[b];
+		if (block.trivial || blockFiltered(b))
+			continue;
+		if (direction > 0 ? block.viewBegin >= viewRow : block.viewEnd <= viewRow)
+			return b;
+	}
+	return -1;
+}
+
+/** Upstream's LineToDiff for a significant difference: the one the view
+    row is in, -1 when it is in none. */
+int TableCompareView::diffAtRow(int viewRow) const
+{
+	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+		if (!m_blocks[b].trivial && viewRow >= m_blocks[b].viewBegin
+			&& viewRow <= m_blocks[b].viewEnd)
+			return b;
+	return -1;
+}
+
+/** The view row of the active grid's current cell (the first row before
+    there is one), moved by the offset; the first row on screen when that
+    is no row (upstream's IsValidTextPosY and m_nTopLine). */
+int TableCompareView::searchRow(int offset) const
+{
+	const QTableView *table = m_tables[activeSide()];
+	const QModelIndex index = table->currentIndex();
+	const int viewRow = (index.isValid() ? m_modelRows.value(index.row(), 0) : 0) + offset;
+	if (viewRow < 0 || viewRow >= m_viewToReal[0].size())
+		return m_modelRows.value(qMax(0, table->rowAt(0)), 0);
+	return viewRow;
+}
+
+/** Upstream's IsDiffVisible on the active grid: the shown rows of the
+    difference all on screen, and fewer than the screen holds. */
+bool TableCompareView::diffOnScreen(int blockIndex) const
+{
+	const Block &block = m_blocks[blockIndex];
+	const auto first = std::lower_bound(m_modelRows.cbegin(), m_modelRows.cend(), block.viewBegin);
+	const auto last = std::upper_bound(m_modelRows.cbegin(), m_modelRows.cend(), block.viewEnd);
+	if (first >= last)
+		return false;
+	const QTableView *table = m_tables[activeSide()];
+	const int lastRow = static_cast<int>(last - m_modelRows.cbegin()) - 1;
+	const int top = table->rowViewportPosition(static_cast<int>(first - m_modelRows.cbegin()));
+	const int bottom = table->rowViewportPosition(lastRow) + table->rowHeight(lastRow);
+	const int screen = table->viewport()->height();
+	return top >= 0 && bottom <= screen && bottom - top < screen;
+}
+
+/** Upstream's DeselectDiffIfCursorNotInCurrentDiff, on a click: a cell
+    outside the current difference leaves none current. */
+void TableCompareView::deselectDiffIfCursorNotInCurrentDiff(int modelRow)
+{
+	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
+		return;
+	const int viewRow = m_modelRows.value(modelRow, -1);
+	if (viewRow >= m_blocks[m_current].viewBegin && viewRow <= m_blocks[m_current].viewEnd)
+		return;
+	m_current = -1;
+	m_models[0]->recolor();
+	m_models[1]->recolor();
+	updateStatus();
+}
+
+/** Upstream's OnNextdiff (FindNextNonFilteredDiff): the difference after
+    the current one while that one is on screen; otherwise the next from
+    the cursor, past the first row of the difference it may be in. */
 void TableCompareView::gotoNextDiff()
 {
-	const int next = nextActive(m_current, +1);
+	int next = -1;
+	if (m_current >= 0 && diffOnScreen(m_current))
+		next = nextActive(m_current, +1);
+	else
+		next = nextActiveFromRow(searchRow(m_current >= 0 ? 1 : 0), +1);
 	if (next >= 0)
 		gotoDiff(next);
 }
 
+/** Upstream's OnPrevdiff, the same way back. */
 void TableCompareView::gotoPrevDiff()
 {
-	const int prev = nextActive(
-		m_current < 0 ? static_cast<int>(m_blocks.size()) : m_current, -1);
+	int prev = -1;
+	if (m_current >= 0 && diffOnScreen(m_current))
+		prev = nextActive(m_current, -1);
+	else
+		prev = nextActiveFromRow(searchRow(m_current >= 0 ? -1 : 0), -1);
 	if (prev >= 0)
 		gotoDiff(prev);
 }
@@ -1219,8 +1330,14 @@ void TableCompareView::focusNextPane()
 
 void TableCompareView::copyCurrentDiff(int sourceSide)
 {
+	// upstream's OnX2Y: with no current difference, the one the cursor is
+	// in, and none when it is in none
 	if (m_current < 0)
-		m_current = nextActive(-1, +1);
+	{
+		const QModelIndex index = m_tables[activeSide()]->currentIndex();
+		if (index.isValid())
+			m_current = diffAtRow(m_modelRows.value(index.row(), -1));
+	}
 	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
 		return;
 	const Block block = m_blocks[m_current];

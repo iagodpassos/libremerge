@@ -79,6 +79,14 @@ public:
 		m_doubleClickHook = std::move(hook);
 	}
 
+	/** Called when the left mouse button is released over the text, after
+	    the cursor has moved (the compare view lets go of the current
+	    difference there, like WinMerge's OnLButtonUp). */
+	void setMouseReleaseHook(std::function<void()> hook)
+	{
+		m_mouseReleaseHook = std::move(hook);
+	}
+
 	/** Called when a local file is dropped or pasted onto the pane; the
 	    compare view loads it into this side instead of inserting the
 	    URL as text, like WinMerge. */
@@ -120,6 +128,9 @@ public:
 
 	int firstVisibleLine() const;
 	int visibleLineCount() const;
+	/** Upstream's IsDiffVisible: the shown lines from first to last are
+	    all on screen, and take less than the screen. */
+	bool linesOnScreen(int first, int last) const;
 
 signals:
 	/** The view changed size, and with it the lines that fit in it. */
@@ -129,6 +140,7 @@ protected:
 	bool event(QEvent *event) override;
 	void paintEvent(QPaintEvent *event) override;
 	void mouseDoubleClickEvent(QMouseEvent *event) override;
+	void mouseReleaseEvent(QMouseEvent *event) override;
 	void resizeEvent(QResizeEvent *event) override;
 	void keyPressEvent(QKeyEvent *event) override;
 	void inputMethodEvent(QInputMethodEvent *event) override;
@@ -168,5 +180,6 @@ private:
 	int m_markerFirst = -1; // the first line the marker was worked out for
 	bool m_markerRefreshPending = false;
 	std::function<void(int)> m_doubleClickHook;
+	std::function<void()> m_mouseReleaseHook;
 	std::function<void(const QString &)> m_fileDropHook;
 };

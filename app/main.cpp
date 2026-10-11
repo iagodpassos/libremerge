@@ -327,6 +327,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestScrollSyncOpt(QStringLiteral("selftest-scroll-sync"),
 		QStringLiteral("Scroll a file comparison every way and verify the panes and the location pane follow (for testing)"));
 	parser.addOption(selftestScrollSyncOpt);
+	QCommandLineOption selftestDiffFromCursorOpt(QStringLiteral("selftest-diff-from-cursor"),
+		QStringLiteral("Go to the next and previous difference from where the cursor is and verify it (for testing)"));
+	parser.addOption(selftestDiffFromCursorOpt);
 	QCommandLineOption selftestLastLineOpt(QStringLiteral("selftest-last-line"),
 		QStringLiteral("Compare files whose last lines differ and verify what is a difference (for testing)"));
 	parser.addOption(selftestLastLineOpt);
@@ -9195,6 +9198,229 @@ int main(int argc, char *argv[])
 		return ok ? 0 : 1;
 	}
 
+	if (parser.isSet(selftestDiffFromCursorOpt))
+	{
+		// WinMerge's Next and Previous Difference go from the cursor when
+		// no difference is current or the current one is out of sight, a
+		// click outside the current difference leaves none current, and
+		// the copy commands then take the difference the cursor is in
+		// (issue #10): LibreMerge went from the current difference, and
+		// copied the first difference of the file when none was current.
+		// The text and the table views alike.
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		// a left click, pressed and released, at a point of the widget
+		const auto click = [&settle](QWidget *widget, const QPoint &at)
+		{
+			const QPointF point(at);
+			QMouseEvent press(QEvent::MouseButtonPress, point, widget->mapToGlobal(point),
+				Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+			QApplication::sendEvent(widget, &press);
+			QMouseEvent release(QEvent::MouseButtonRelease, point, widget->mapToGlobal(point),
+				Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+			QApplication::sendEvent(widget, &release);
+			settle();
+		};
+		// 400 lines, every 60th different on the right: differences 0 to 5
+		// at lines 60, 120, 180, 240, 300 and 360; the tables have a
+		// header row above the same rows
+		QByteArray leftText, rightText;
+		QByteArray leftCsv = "id,value\n", rightCsv = "id,value\n";
+		for (int i = 1; i <= 400; ++i)
+		{
+			const QByteArray number = QByteArray::number(i);
+			leftText += "line " + number + " of the text\n";
+			rightText += i % 60 == 0 ? "line " + number + " CHANGED\n"
+				: "line " + number + " of the text\n";
+			leftCsv += number + ",same\n";
+			rightCsv += number + (i % 60 == 0 ? ",changed\n" : ",same\n");
+		}
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		const QString leftTable = dir.filePath(QStringLiteral("left.csv"));
+		const QString rightTable = dir.filePath(QStringLiteral("right.csv"));
+		write(left, leftText);
+		write(right, rightText);
+		write(leftTable, leftCsv);
+		write(rightTable, rightCsv);
+
+		// --- the text view ---
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(QStringList{ left, right }, &error))
+			{
+				printf("compare failed: %s\n", qPrintable(error));
+				return 2;
+			}
+			view.resize(1000, 640);
+			view.show();
+			settle();
+			DiffTextEdit *const pane = view.paneForTest(0);
+			// line n of the file is view line n - 1
+			const auto clickLine = [&](int line)
+			{
+				const QTextCursor at(pane->document()->findBlockByNumber(line - 1));
+				click(pane->viewport(), pane->cursorRect(at).center());
+			};
+			// the panes scrolled to show the line at the top, the current
+			// difference left where it is
+			const auto scrollTo = [&](int line)
+			{
+				pane->verticalScrollBar()->setValue(line - 1);
+				settle();
+			};
+			const auto cursorLine = [&]() { return pane->textCursor().blockNumber() + 1; };
+
+			view.gotoFirstDiff();
+			view.gotoNextDiff();
+			check(view.currentDiffForTest() == 1,
+				"the current difference on screen: Next goes to the one after it");
+			view.gotoPrevDiff();
+			check(view.currentDiffForTest() == 0, "and Previous to the one before it");
+
+			// the issue's steps: scroll, click by the difference wanted,
+			// then Next or Previous
+			scrollTo(230);
+			clickLine(250);
+			check(view.currentDiffForTest() == -1 && cursorLine() == 250,
+				"a click outside the current difference leaves none current");
+			view.gotoNextDiff();
+			printf("  Next from line 250 went to difference %d\n", view.currentDiffForTest());
+			check(view.currentDiffForTest() == 4, "Next goes to the first difference below the cursor");
+			scrollTo(230);
+			clickLine(250);
+			view.gotoPrevDiff();
+			printf("  Previous from line 250 went to difference %d\n", view.currentDiffForTest());
+			check(view.currentDiffForTest() == 3, "Previous goes to the first difference above the cursor");
+
+			// the current difference out of sight, the cursor moved by
+			// keyboard (no click): Next and Previous go from the cursor too
+			view.gotoFirstDiff();
+			pane->setTextCursor(QTextCursor(pane->document()->findBlockByNumber(249)));
+			scrollTo(230);
+			check(view.currentDiffForTest() == 0, "the cursor moved by keyboard: the difference stays current");
+			view.gotoNextDiff();
+			check(view.currentDiffForTest() == 4,
+				"the current difference out of sight: Next goes from the cursor");
+			view.gotoFirstDiff();
+			pane->setTextCursor(QTextCursor(pane->document()->findBlockByNumber(249)));
+			scrollTo(230);
+			view.gotoPrevDiff();
+			check(view.currentDiffForTest() == 3,
+				"the current difference out of sight: Previous goes from the cursor");
+
+			// a click inside the current difference keeps it
+			view.gotoFirstDiff();
+			view.gotoNextDiff();
+			view.gotoNextDiff();
+			clickLine(180);
+			check(view.currentDiffForTest() == 2, "a click inside the current difference keeps it current");
+
+			// the copy commands with none current: the difference the
+			// cursor is in, and nothing when it is in none
+			view.gotoFirstDiff();
+			scrollTo(160);
+			clickLine(180);
+			check(view.currentDiffForTest() == -1, "a click in another difference leaves none current");
+			view.copyToRight();
+			QStringList rightLines = view.realLinesForTest(1);
+			check(rightLines.value(179) == QStringLiteral("line 180 of the text")
+					&& rightLines.value(59) == QStringLiteral("line 60 CHANGED"),
+				"Copy to Right takes the difference the cursor is in, not the first one");
+			scrollTo(230);
+			clickLine(250);
+			view.copyToRight();
+			check(view.realLinesForTest(1) == rightLines,
+				"Copy to Right with the cursor in no difference copies nothing");
+		}
+
+		// --- the table view ---
+		{
+			TableCompareView view;
+			QString error;
+			if (!view.compare(leftTable, rightTable, &error))
+			{
+				printf("compare failed: %s\n", qPrintable(error));
+				return 2;
+			}
+			view.resize(1000, 640);
+			view.show();
+			settle();
+			QList<QTableView *> grids = view.findChildren<QTableView *>();
+			std::sort(grids.begin(), grids.end(), [&view](QTableView *a, QTableView *b) {
+				return a->mapTo(&view, QPoint()).x() < b->mapTo(&view, QPoint()).x();
+			});
+			if (grids.size() < 2)
+				return 2;
+			QTableView *const grid = grids.first();
+			// data row n is model row n - 1 (the header row is not a row)
+			const auto clickRow = [&](int row)
+			{
+				const QModelIndex index = grid->model()->index(row - 1, 0);
+				grid->scrollTo(index, QAbstractItemView::PositionAtCenter);
+				settle();
+				click(grid->viewport(), grid->visualRect(index).center());
+			};
+			const auto rowOfDiff = [&](int diff) {
+				const QList<int> rows = view.diffRowsForTest();
+				return rows.value(diff, -1);
+			};
+
+			view.gotoFirstDiff();
+			check(view.currentDiffForTest() == 0 && grid->currentIndex().row() == 59,
+				"table: the cursor at the start of the difference gone to");
+			clickRow(250);
+			check(view.currentDiffForTest() == -1, "table: a click outside the current difference leaves none current");
+			view.gotoNextDiff();
+			check(view.currentDiffForTest() == 4, "table: Next goes to the first difference below the cursor");
+			clickRow(250);
+			view.gotoPrevDiff();
+			check(view.currentDiffForTest() == 3, "table: Previous goes to the first difference above the cursor");
+			view.gotoNextDiff();
+			check(view.currentDiffForTest() == 4,
+				"table: the current difference on screen: Next goes to the one after it");
+
+			view.gotoFirstDiff();
+			clickRow(180);
+			check(view.currentDiffForTest() == -1, "table: a click in another difference leaves none current");
+			view.copyCurrentDiff(0);
+			printf("  table differences after the copy: %d, the first at row %d\n", view.diffCount(),
+				rowOfDiff(0));
+			check(view.diffCount() == 5 && !view.diffRowsForTest().contains(180)
+					&& view.diffRowsForTest().contains(60),
+				"table: Copy to Right takes the difference the cursor is in, not the first one");
+			clickRow(250);
+			view.copyCurrentDiff(0);
+			check(view.diffCount() == 5, "table: Copy to Right with the cursor in no difference copies nothing");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
 	if (parser.isSet(selftestScrollSyncOpt))
 	{
 		// however a pane scrolls, the other panes follow it and the
@@ -9756,6 +9982,9 @@ int main(int argc, char *argv[])
 			return 2;
 		}
 		const int initial = view.diffCount();
+		// the first difference current, as the app has it on opening
+		// (a copy with none current takes the one the cursor is in)
+		view.gotoFirstDiff();
 		view.copyCurrentDiff(0);
 		const int afterCopy = view.diffCount();
 		view.undoActive();
@@ -9871,7 +10100,11 @@ int main(int argc, char *argv[])
 		}
 		int guard = 0;
 		while (view.diffCount() > 0 && guard++ < 1000)
+		{
+			// a plain copy leaves none current: the first one again
+			view.gotoFirstDiff();
 			view.copyCurrentDiff(0);
+		}
 		view.recompare();
 		printf("remaining diffs: %d\n", view.diffCount());
 		return view.diffCount() == 0 ? 0 : 1;

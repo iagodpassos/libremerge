@@ -339,6 +339,10 @@ private:
 	void gotoDiff(int blockIndex, bool center = true);
 	void selectDiffAtViewLine(int viewLine);
 	int nextActive(int from, int direction) const;
+	int nextActiveFromLine(int viewLine, int direction) const;
+	int activeDiffAtLine(int viewLine) const;
+	int searchLine(int offset) const;
+	void deselectDiffIfCursorNotInCurrentDiff(int side);
 	void applyBlockCopy(int blockIndex, int sourceSide, int targetSide,
 		bool joinUndo);
 	bool applyAlignmentEdits(int side, const QStringList &oldLines,

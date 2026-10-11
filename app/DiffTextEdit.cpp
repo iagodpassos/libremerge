@@ -535,6 +535,13 @@ void DiffTextEdit::mouseDoubleClickEvent(QMouseEvent *event)
 	QPlainTextEdit::mouseDoubleClickEvent(event);
 }
 
+void DiffTextEdit::mouseReleaseEvent(QMouseEvent *event)
+{
+	QPlainTextEdit::mouseReleaseEvent(event);
+	if (event->button() == Qt::LeftButton && m_mouseReleaseHook)
+		m_mouseReleaseHook();
+}
+
 // --- the search marker ---
 
 void DiffTextEdit::setHighlightSelections(const QList<QTextEdit::ExtraSelection> &selections)
@@ -627,6 +634,24 @@ int DiffTextEdit::visibleLineCount() const
 {
 	const int lineHeight = qMax(1, qRound(blockBoundingRect(firstVisibleBlock()).height()));
 	return viewport()->height() / lineHeight;
+}
+
+bool DiffTextEdit::linesOnScreen(int first, int last) const
+{
+	// the first and the last of them that show (hidden lines take no room)
+	QTextBlock top = document()->findBlockByNumber(first);
+	while (top.isValid() && top.blockNumber() <= last && !top.isVisible())
+		top = top.next();
+	QTextBlock bottom = document()->findBlockByNumber(last);
+	while (bottom.isValid() && bottom.blockNumber() >= first && !bottom.isVisible())
+		bottom = bottom.previous();
+	if (!top.isValid() || !bottom.isValid() || top.blockNumber() > bottom.blockNumber())
+		return false;
+	const qreal begin = blockBoundingGeometry(top).translated(contentOffset()).top();
+	const qreal end = blockBoundingGeometry(bottom).translated(contentOffset()).top()
+		+ blockBoundingRect(bottom).height();
+	const qreal screen = viewport()->height();
+	return begin >= 0 && end <= screen && end - begin < screen;
 }
 
 void DiffTextEdit::setGutterLineColors(const QHash<int, QColor> &colors)

@@ -172,6 +172,14 @@ private:
 	void gotoDiff(int blockIndex);
 	void selectDiffAtModelRow(int modelRow);
 	int nextActive(int from, int direction) const;
+	/** The grid the commands act on: the one with the focus, the left one
+	    otherwise. */
+	int activeSide() const;
+	int nextActiveFromRow(int viewRow, int direction) const;
+	int diffAtRow(int viewRow) const;
+	int searchRow(int offset) const;
+	bool diffOnScreen(int blockIndex) const;
+	void deselectDiffIfCursorNotInCurrentDiff(int modelRow);
 	UndoEntry captureEntry(int side, int viewBegin) const;
 	void applyEntry(const UndoEntry &entry);
 	void pushUndo(const UndoEntry &entry);
