@@ -32,6 +32,7 @@
 
 #include "Icons.h"
 #include "ImagePane.h"
+#include "MessageBoxes.h"
 #include "Theme.h"
 
 #include "ImgMergeBuffer.hpp"
@@ -740,14 +741,20 @@ void ImageCompareView::copyToLeft()
 	copyCurrentDiff(target + 1, target);
 }
 
+/** Upstream's OnAllRight and OnAllLeft (CImgMergeFrame): "Copy all
+    differences to other file?" first. */
 void ImageCompareView::copyAllToRight()
 {
+	if (!lm::askCopyAllDiffs(this))
+		return;
 	const int target = qMin(m_activePane + 1, m_paneCount - 1);
 	copyAllFrom(target - 1, target);
 }
 
 void ImageCompareView::copyAllToLeft()
 {
+	if (!lm::askCopyAllDiffs(this))
+		return;
 	const int target = qMax(m_activePane - 1, 0);
 	copyAllFrom(target + 1, target);
 }

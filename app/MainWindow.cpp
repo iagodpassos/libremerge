@@ -605,7 +605,7 @@ MainWindow::MainWindow(QWidget *parent)
 	addMenuAction(mergeMenu, tr("Copy All to Righ&t"), QKeySequence(),
 		[fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->copyAllToRight();
-			else if (auto *table = tableView()) table->copyAllFrom(0);
+			else if (auto *table = tableView()) table->copyAllToRight();
 			else if (auto *image = imageView()) image->copyAllToRight();
 			else if (auto *hex = hexView()) hex->copyAllToRight();
 		});
@@ -613,7 +613,7 @@ MainWindow::MainWindow(QWidget *parent)
 		[fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->copyAllToLeft();
 			else if (auto *table = tableView())
-				table->copyAllFrom(1);
+				table->copyAllToLeft();
 			else if (auto *image = imageView())
 				image->copyAllToLeft();
 			else if (auto *hex = hexView())

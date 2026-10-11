@@ -2172,7 +2172,9 @@ int main(int argc, char *argv[])
 			settle();
 			check(identical && refreshSilent && asked == QStringList{ reloadQuestion(p2) }
 				&& image->diffCount() > 0, "image: Recompare keeps the loaded images, activation reloads");
-			image->copyAllToRight();
+			lm::setQuestionSinkForTest([](const QString &, bool *) { return true; });
+			image->copyAllToRight(); // after "Copy all differences to other file?"
+			lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
 			savePrompts = 0;
 			saveChoice = 2;
 			window.reloadCurrentComparison();
@@ -9894,6 +9896,65 @@ int main(int argc, char *argv[])
 				"3-way: the middle differs where either side does, a side where the middle does");
 		}
 
+		// --- every comparison asks before Copy All, as WinMerge's ---
+		{
+			const QString question = QCoreApplication::translate("MessageBoxes",
+				"Copy all differences to other file?");
+			QStringList asked;
+			lm::setQuestionSinkForTest([&asked](const QString &text, bool *) {
+				asked << text;
+				return false;
+			});
+			const QString t1 = dir.filePath(QStringLiteral("t1.txt"));
+			const QString t2 = dir.filePath(QStringLiteral("t2.txt"));
+			write(t1, "one\ntwo\n");
+			write(t2, "one\nTWO\n");
+			const QString c1 = dir.filePath(QStringLiteral("c1.csv"));
+			const QString c2 = dir.filePath(QStringLiteral("c2.csv"));
+			write(c1, "a,b\n1,2\n");
+			write(c2, "a,b\n1,3\n");
+			const QString i1 = dir.filePath(QStringLiteral("i1.png"));
+			const QString i2 = dir.filePath(QStringLiteral("i2.png"));
+			QImage white(8, 8, QImage::Format_RGB32);
+			white.fill(Qt::white);
+			white.save(i1);
+			QImage red(8, 8, QImage::Format_RGB32);
+			red.fill(Qt::red);
+			red.save(i2);
+			FileCompareView text;
+			TableCompareView table;
+			ImageCompareView image;
+			QString error;
+			if (!text.compare(QStringList{ t1, t2 }, &error) || !table.compare(c1, c2, &error)
+				|| !image.compare(QStringList{ i1, i2 }, &error))
+			{
+				printf("compare failed: %s\n", qPrintable(error));
+				return 2;
+			}
+			text.copyAllToRight();
+			table.copyAllToRight();
+			image.copyAllToRight();
+			check(asked == QStringList{ question, question, question } && text.diffCount() == 1
+					&& table.diffCount() == 1 && image.diffCount() > 0,
+				"text, table and image ask \"Copy all differences to other file?\"; No copies nothing");
+			lm::setQuestionSinkForTest([&asked](const QString &text, bool *dontAsk) {
+				asked << text;
+				*dontAsk = true;
+				return true;
+			});
+			text.copyAllToRight();
+			text.recompare();
+			lm::setQuestionSinkForTest([&asked](const QString &text, bool *) {
+				asked << text;
+				return false;
+			});
+			table.copyAllToLeft();
+			check(asked.size() == 4 && text.diffCount() == 0 && table.diffCount() == 0,
+				"Yes copies, and with \"Don't ask this question again\" the answer is kept");
+			lm::setRememberedAnswer(QStringLiteral("ConfirmCopyAllDiffs"), lm::NoAnswer);
+			lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
+		}
+
 		// --- what opens it ---
 		{
 			const QString textBin = dir.filePath(QStringLiteral("a.bin"));
@@ -10535,6 +10596,8 @@ int main(int argc, char *argv[])
 			return 2;
 		}
 		const int initial = view.diffCount();
+		// "Copy all differences to other file?": Yes
+		lm::setQuestionSinkForTest([](const QString &, bool *) { return true; });
 		// the user's workflow: with the left pane active, Alt+Right pushes
 		// left->middle; recompare, focus the middle pane, Alt+Right again
 		// pushes middle->right (WinMerge's pane-relative MenuIDtoXY)

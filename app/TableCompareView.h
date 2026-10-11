@@ -60,6 +60,10 @@ public:
 	void selectDiffAtCursor();
 	void copyCurrentDiff(int sourceSide);
 	void copyAllFrom(int sourceSide);
+	/** The Copy All commands: "Copy all differences to other file?"
+	    first, as upstream's table view (its text view) asks. */
+	void copyAllToRight();
+	void copyAllToLeft();
 	void undo();
 	void redo();
 	void swapSides();

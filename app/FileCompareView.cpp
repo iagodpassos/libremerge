@@ -2300,14 +2300,20 @@ void FileCompareView::copyToLeft(bool advance)
 	copyCurrentDiff(target + 1, target, advance);
 }
 
+/** Upstream's OnAllRight and OnAllLeft: "Copy all differences to other
+    file?" first. */
 void FileCompareView::copyAllToRight()
 {
+	if (!lm::askCopyAllDiffs(this))
+		return;
 	const int target = qMin(m_activePane + 1, m_paneCount - 1);
 	copyAllFrom(target - 1, target);
 }
 
 void FileCompareView::copyAllToLeft()
 {
+	if (!lm::askCopyAllDiffs(this))
+		return;
 	const int target = qMax(m_activePane - 1, 0);
 	copyAllFrom(target + 1, target);
 }

@@ -474,9 +474,9 @@ TableCompareView::TableCompareView(QWidget *parent)
 	addToolAction(lm::Icon::CopyLeft, tr("Copy to Left"),
 		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x90"), [this]() { copyCurrentDiff(1); });
 	addToolAction(lm::Icon::CopyAllRight, tr("Copy All to Right"), QString(),
-		[this]() { copyAllFrom(0); });
+		[this]() { copyAllToRight(); });
 	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"), QString(),
-		[this]() { copyAllFrom(1); });
+		[this]() { copyAllToLeft(); });
 	toolbar->addSeparator();
 	m_actUndo = addToolAction(lm::Icon::Undo, tr("Undo"),
 		QString::fromUtf8("\xE2\x8C\x98Z"), [this]() { undo(); });
@@ -1383,6 +1383,18 @@ void TableCompareView::copyCurrentDiff(int sourceSide)
 			return;
 		}
 	updateStatus();
+}
+
+void TableCompareView::copyAllToRight()
+{
+	if (lm::askCopyAllDiffs(this))
+		copyAllFrom(0);
+}
+
+void TableCompareView::copyAllToLeft()
+{
+	if (lm::askCopyAllDiffs(this))
+		copyAllFrom(1);
 }
 
 void TableCompareView::copyAllFrom(int sourceSide)
