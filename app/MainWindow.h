@@ -28,6 +28,8 @@ public:
 	/** Image comparison, 2- or 3-way (WinMerge's image compare). */
 	void openImageComparison(const QStringList &paths,
 		const QList<bool> &readOnly = {});
+	/** WinMerge's binary comparison (CHexMergeDoc), 2 or 3 files. */
+	void openHexComparison(const QStringList &paths, const QList<bool> &readOnly = {});
 	/** Empty, editable comparison (WinMerge's File > New). */
 	void openBlankComparison();
 	void openFolderComparison(const QString &leftDir, const QString &rightDir);

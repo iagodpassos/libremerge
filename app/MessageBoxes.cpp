@@ -17,6 +17,7 @@ const QString kFilesSame = QStringLiteral("FilesSame");         // IDS_FILESSAME
 const QString kFileToItself = QStringLiteral("FileToItself");   // IDS_FILE_TO_ITSELF
 const QString kNumReplaced = QStringLiteral("NumReplaced");     // IDS_NUM_REPLACED
 const QString kFileChangedRescan = QStringLiteral("FileChangedRescan"); // IDS_FILECHANGED_RESCAN
+const QString kConfirmCopyAllDiffs = QStringLiteral("ConfirmCopyAllDiffs"); // IDS_CONFIRM_COPY_ALL_DIFFS
 
 std::function<void(const QString &)> &sink()
 {
@@ -45,6 +46,11 @@ QString numReplacedText()
 	return QCoreApplication::translate("MessageBoxes", "Replaced %1 string(s).");
 }
 
+QString confirmCopyAllDiffsText()
+{
+	return QCoreApplication::translate("MessageBoxes", "Copy all differences to other file?");
+}
+
 QString fileChangedRescanText()
 {
 	return QCoreApplication::translate("MessageBoxes",
@@ -53,8 +59,10 @@ QString fileChangedRescanText()
 
 /** A Yes/No warning box. With a key it carries WinMerge's "Don't ask this
     question again" (MB_DONT_ASK_AGAIN): ticked, the answer given is kept
-    and comes back without asking. */
-bool askYesNo(QWidget *parent, const QString &text, const QString &key = QString())
+    and comes back without asking. No is the default button with
+    defaultNo (MB_DEFBUTTON2). */
+bool askYesNo(QWidget *parent, const QString &text, const QString &key = QString(),
+	bool defaultNo = false)
 {
 	if (!key.isEmpty())
 	{
@@ -73,6 +81,8 @@ bool askYesNo(QWidget *parent, const QString &text, const QString &key = QString
 		QMessageBox box(QMessageBox::Warning, QStringLiteral("LibreMerge"), text,
 			QMessageBox::Yes | QMessageBox::No, parent);
 		box.setWindowModality(Qt::WindowModal);
+		if (defaultNo)
+			box.setDefaultButton(QMessageBox::No);
 		QCheckBox *dontAsk = nullptr;
 		if (!key.isEmpty())
 		{
@@ -183,6 +193,7 @@ QList<HideableMessage> hideableMessages()
 		{ kFileToItself, fileToItselfText(), { AnswerOk } },
 		{ kNumReplaced, numReplacedText(), { AnswerOk } },
 		{ kFileChangedRescan, fileChangedRescanText(), { AnswerYes, AnswerNo } },
+		{ kConfirmCopyAllDiffs, confirmCopyAllDiffsText(), { AnswerYes, AnswerNo } },
 	};
 }
 
@@ -314,6 +325,11 @@ bool askWarning(QWidget *parent, const QString &text)
 bool askReloadChangedFile(QWidget *parent, const QString &path)
 {
 	return askYesNo(parent, fileChangedRescanText().arg(path), kFileChangedRescan);
+}
+
+bool askCopyAllDiffs(QWidget *parent)
+{
+	return askYesNo(parent, confirmCopyAllDiffsText(), kConfirmCopyAllDiffs, true);
 }
 
 bool askOverwriteChangedFile(QWidget *parent, const QString &path)

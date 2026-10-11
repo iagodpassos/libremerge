@@ -73,6 +73,9 @@ bool askWarning(QWidget *parent, const QString &text);
     compared file since it was loaded, reload it? "Don't ask this question
     again" keeps the answer, so Yes reloads silently from then on. */
 bool askReloadChangedFile(QWidget *parent, const QString &path);
+/** WinMerge's question before Copy All (IDS_CONFIRM_COPY_ALL_DIFFS), No
+    the default, with "Don't ask this question again". */
+bool askCopyAllDiffs(QWidget *parent);
 /** CMergeDoc::DoSave's question before writing over a file another
     application changed since it was loaded. */
 bool askOverwriteChangedFile(QWidget *parent, const QString &path);

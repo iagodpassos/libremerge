@@ -83,7 +83,7 @@ WinMerge's "Kürzliche Dateien oder Ordner" reads oddly, the panes'
 
 - **All MFC GUI code** (`*Dlg`, `*Bar`, `*Menu`, `*View`, `*Frm`, `*Doc`, `Src/Common` widgets): MFC is Windows-only and non-redistributable. The UI is rebuilt in Qt.
 - `Src/CompareEngines/ImageCompare.cpp`: thin wrapper around the WinIMerge Win32 DLL. LibreMerge keeps the engine Qt-free with a hook (`ports/image_compare_stub.cpp`) that the Qt app fills in with the ported image core at startup.
-- **frhed** (hex editor): GPL-2.0-**only**, incompatible with GPLv3 distribution.
+- **frhed** (hex editor): GPL-2.0-**only**, incompatible with GPLv3 distribution. The binary comparison (`app/HexView.*`) is LibreMerge's own editor, written after the behavior of the heksedit control WinMerge embeds without taking any of its code; WinMerge's own `CHexMergeDoc`, `CHexMergeView` and `CHexMergeFrame` (GPL-2.0-or-later) are what `app/HexCompareView.*` follows.
 - **7-Zip `Rar*` codecs**: unRAR license restriction is GPL-incompatible (archive support will use libarchive, without RAR).
 - **winwebdiff**: depends on WebView2 (proprietary, Windows-only).
 - `*.vcxitems` / `*.sln`: Visual Studio build files, replaced by CMake.

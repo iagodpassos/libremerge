@@ -3,6 +3,8 @@
 
 #include "FileCompareView.h"
 
+#include "BinaryFiles.h"
+
 #include <QAction>
 #include <climits>
 #include <QActionGroup>
@@ -745,9 +747,8 @@ void FileCompareView::setSideDescription(int side, const QString &description)
 /** Whether loadSide would take the file: it opens, and it is text. */
 bool FileCompareView::canLoad(const QString &path, QString *error)
 {
-	// refuse binary files up front: silently comparing them as text ends
-	// with a misleading "files are identical" (NUL bytes without a
-	// UTF-16/UTF-32 BOM mean binary, the same heuristic diff uses)
+	// binary files go to the binary comparison: silently comparing them
+	// as text ends with a misleading "files are identical"
 	QFile probe(path);
 	if (!probe.open(QIODevice::ReadOnly))
 	{
@@ -755,16 +756,12 @@ bool FileCompareView::canLoad(const QString &path, QString *error)
 			*error = tr("cannot open %1").arg(path);
 		return false;
 	}
-	const QByteArray head = probe.read(8192);
-	const bool utf16or32Bom = head.startsWith("\xFF\xFE")
-		|| head.startsWith("\xFE\xFF")
-		|| head.startsWith(QByteArray("\x00\x00\xFE\xFF", 4));
-	if (!utf16or32Bom && head.contains('\0'))
+	probe.close();
+	if (lm::looksBinary(path))
 	{
 		if (error != nullptr)
-			*error = tr("%1 appears to be a binary file.\n"
-				"LibreMerge compares text files; binary comparison "
-				"is not supported yet.").arg(path);
+			*error = tr("%1 appears to be a binary file: open the files again "
+				"to compare them in a binary comparison.").arg(path);
 		return false;
 	}
 	return true;

@@ -61,6 +61,8 @@
 #include "FileCompareView.h"
 #include "TableCompareView.h"
 #include "ImageCompareView.h"
+#include "HexCompareView.h"
+#include "HexView.h"
 #include "FileOps.h"
 #include "FolderCompareDriver.h"
 #include "FolderCompareView.h"
@@ -330,6 +332,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestDiffFromCursorOpt(QStringLiteral("selftest-diff-from-cursor"),
 		QStringLiteral("Go to the next and previous difference from where the cursor is and verify it (for testing)"));
 	parser.addOption(selftestDiffFromCursorOpt);
+	QCommandLineOption selftestHexOpt(QStringLiteral("selftest-hex"),
+		QStringLiteral("Compare binary files in the hex view and verify it (for testing)"));
+	parser.addOption(selftestHexOpt);
 	QCommandLineOption selftestLastLineOpt(QStringLiteral("selftest-last-line"),
 		QStringLiteral("Compare files whose last lines differ and verify what is a difference (for testing)"));
 	parser.addOption(selftestLastLineOpt);
@@ -2352,7 +2357,9 @@ int main(int argc, char *argv[])
 			const bool saved = lm::messageHidden(QStringLiteral("FilesSame"));
 			shown.clear();
 			dialog.resetMessageBoxesForTest();
-			check(rows.size() == lm::hideableMessages().size() && rows.size() == 4
+			// WinMerge's order: the four answers kept since 0.9.x, then the
+			// question before Copy All (IDS_CONFIRM_COPY_ALL_DIFFS)
+			check(rows.size() == lm::hideableMessages().size() && rows.size() == 5
 				&& !rows.at(0).second && saved
 				&& !lm::messageHidden(QStringLiteral("FilesSame"))
 				&& !dialog.messageBoxesForTest().at(0).second,
@@ -9192,6 +9199,295 @@ int main(int argc, char *argv[])
 			check(markAction != nullptr && markAction->text() == MainWindow::tr("&Marker...")
 					&& markAction->shortcut() == QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_M),
 				"Edit: Marker... with Ctrl+Shift+M, as upstream");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestHexOpt))
+	{
+		// WinMerge's binary comparison: two or three files as hex dumps,
+		// the bytes compared at the same offsets, the runs of differing
+		// bytes stepped through and copied, Frhed's editing, one undo
+		// history for the panes, and the files that open it
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::ReadOnly))
+				std::exit(2);
+			return f.readAll();
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto press = [](QWidget *widget, int key, Qt::KeyboardModifiers mods = Qt::NoModifier,
+			const QString &text = QString()) {
+			QKeyEvent event(QEvent::KeyPress, key, mods, text);
+			QApplication::sendEvent(widget, &event);
+		};
+		const auto type = [&press](QWidget *widget, const QString &text) {
+			for (const QChar ch : text)
+				press(widget, 0, Qt::NoModifier, QString(ch));
+		};
+		// 64 bytes 0..63; the right side differs at 10..12 and 40 and has
+		// four more
+		QByteArray leftBytes;
+		for (int i = 0; i < 64; ++i)
+			leftBytes.append(static_cast<char>(i));
+		QByteArray rightBytes = leftBytes;
+		for (int i = 10; i <= 12; ++i)
+			rightBytes[i] = static_cast<char>(~rightBytes.at(i));
+		rightBytes[40] = 'X';
+		rightBytes.append("TAIL");
+		const QString left = dir.filePath(QStringLiteral("left.dat"));
+		const QString right = dir.filePath(QStringLiteral("right.dat"));
+		write(left, leftBytes);
+		write(right, rightBytes);
+
+		{
+			HexCompareView view;
+			QString error;
+			if (!view.compare(QStringList{ left, right }, &error))
+			{
+				printf("compare failed: %s\n", qPrintable(error));
+				return 2;
+			}
+			view.resize(1000, 600);
+			view.show();
+			settle();
+			HexView *const l = view.paneForTest(0);
+			HexView *const r = view.paneForTest(1);
+			check(view.diffCount() != 0 && !view.isModified() && l->length() == 64 && r->length() == 68,
+				"open: two files, different, unmodified");
+
+			// --- the dump ---
+			const int bpl = l->bytesPerLine();
+			const QString first = l->lineTextForTest(0);
+			printf("  %d bytes per line, the first line: \"%s\"\n", bpl, qPrintable(first));
+			check(bpl >= 4 && l->offsetLength() == 2
+					&& first.startsWith(QStringLiteral("00  00 01 02 03"))
+					&& first.endsWith(QStringLiteral("  ....")) == (bpl == 4),
+				"the line: the offset in as many hex digits as the size takes, two spaces, the bytes");
+			const int endLine = static_cast<int>(64 / bpl);
+			check(l->lineTextForTest(endLine).contains(QStringLiteral("__")),
+				"the end of the data is marked __");
+			check(l->isDiff(10) && l->isDiff(12) && !l->isDiff(13) && l->isDiff(40) && !l->isDiff(63)
+					&& r->isDiff(64) && r->isDiff(67) && !r->isDiff(68),
+				"a byte differs from the other pane's at its offset, or where the other has none");
+
+			// --- the differences ---
+			view.gotoFirstDiff();
+			check(l->hasSelection() && l->selectionLower() == 10 && l->selectionUpper() == 12
+					&& r->hasSelection() && r->selectionLower() == 10 && r->selectionUpper() == 12,
+				"First Difference selects the first run of differing bytes, in both panes");
+			view.gotoNextDiff();
+			check(l->selectionLower() == 40 && l->selectionUpper() == 40, "Next Difference: the next run");
+			view.gotoNextDiff();
+			check(l->selectionLower() == 40,
+				"no difference past the length the panes share (the right side's extra bytes are none)");
+			view.gotoPrevDiff();
+			check(l->selectionLower() == 10 && l->selectionUpper() == 12, "Previous Difference");
+			view.gotoLastDiff();
+			check(l->selectionLower() == 40, "Last Difference");
+
+			// --- copying the selection, and undo across the panes ---
+			view.gotoFirstDiff();
+			l->setFocus();
+			settle();
+			view.copyToRight();
+			check(r->data().mid(10, 3) == leftBytes.mid(10, 3) && r->isModified() && !l->isModified()
+					&& view.isModified() && view.canUndo(),
+				"Copy to Right copies the selected bytes into the right pane");
+			view.undo();
+			check(r->data() == rightBytes && !r->isModified() && view.canRedo(),
+				"Undo takes the copy back");
+			view.redo();
+			check(r->data().mid(10, 3) == leftBytes.mid(10, 3), "Redo copies again");
+			view.undo();
+
+			// --- Copy All asks first ---
+			QStringList asked;
+			bool answer = false;
+			lm::setQuestionSinkForTest([&](const QString &text, bool *) {
+				asked << text;
+				return answer;
+			});
+			view.copyAllToRight();
+			check(asked.size() == 1 && r->data() == rightBytes,
+				"Copy All to Right asks \"Copy all differences to other file?\"; No leaves the pane");
+			answer = true;
+			view.copyAllToRight();
+			check(r->data() == leftBytes + QByteArray("TAIL"),
+				"Yes copies every byte over (upstream's copy_all_from leaves the longer side's tail)");
+			lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
+			view.undo();
+
+			// --- the keyboard ---
+			l->setFocus();
+			settle();
+			press(l, Qt::Key_Home, Qt::ControlModifier);
+			check(!l->hasSelection() && l->caretByte() == 0 && l->caretNibble() == 0,
+				"Ctrl+Home: the caret at the first byte, on its high nibble");
+			press(l, Qt::Key_Right);
+			check(l->caretByte() == 0 && l->caretNibble() == 1, "Right steps a nibble in the hex column");
+			press(l, Qt::Key_Right);
+			check(l->caretByte() == 1 && l->caretNibble() == 0, "and then onto the next byte");
+			press(l, Qt::Key_Left);
+			check(l->caretByte() == 0 && l->caretNibble() == 1, "Left steps back a nibble");
+			press(l, Qt::Key_Down);
+			check(l->caretByte() == bpl, "Down: a line");
+			press(l, Qt::Key_End, Qt::ControlModifier);
+			check(l->caretByte() == 64, "Ctrl+End: past the last byte, where a byte can be added");
+			press(l, Qt::Key_Home, Qt::ControlModifier);
+			press(l, Qt::Key_Right, Qt::ShiftModifier);
+			press(l, Qt::Key_Right, Qt::ShiftModifier);
+			check(l->hasSelection() && l->selectionLower() == 0 && l->selectionUpper() == 2,
+				"Shift with the arrows selects");
+			press(l, Qt::Key_Escape);
+			check(!l->hasSelection() && l->caretByte() == 0, "Escape leaves the caret at the selection's start");
+
+			// --- typing ---
+			type(l, QStringLiteral("ab"));
+			check(static_cast<unsigned char>(l->data().at(0)) == 0xab && l->caretByte() == 1
+					&& l->caretNibble() == 0 && l->length() == 64 && l->isModified(),
+				"hex digits overwrite the byte, nibble by nibble");
+			type(l, QStringLiteral("g"));
+			check(static_cast<unsigned char>(l->data().at(1)) == 1, "a key that is no hex digit types nothing");
+			press(l, Qt::Key_Tab);
+			check(l->area() == HexView::Area::Chars, "Tab: the text column");
+			type(l, QStringLiteral("Z"));
+			check(l->data().at(1) == 'Z' && l->caretByte() == 2, "a character overwrites its byte");
+			press(l, Qt::Key_Insert);
+			check(l->insertMode(), "Insert: insert mode");
+			type(l, QStringLiteral("Q"));
+			check(l->length() == 65 && l->data().at(2) == 'Q' && l->data().at(3) == 2,
+				"in insert mode a character comes in before the caret's byte");
+			press(l, Qt::Key_Backspace);
+			check(l->length() == 64 && l->data().at(2) == 2 && l->caretByte() == 2,
+				"Backspace in insert mode takes the byte before the caret");
+			press(l, Qt::Key_Insert);
+			press(l, Qt::Key_Tab);
+			const QString status = view.statusTextForTest(0);
+			printf("  status: %s\n", qPrintable(status));
+			check(status.contains(QStringLiteral("0x2")) && status.contains(QStringLiteral("00000010"))
+					&& status.contains(QStringLiteral("ANSI")) && status.contains(QStringLiteral(": 64")),
+				"the status bar: the offset, the bits, the values, the mode and the size");
+
+			// one history for both panes: the last edit goes first
+			view.gotoFirstDiff();
+			view.copyToRight();
+			view.undo();
+			check(r->data() == rightBytes && l->data().at(1) == 'Z',
+				"Undo takes back the last edit, in whichever pane it was");
+			int steps = 0;
+			while (view.canUndo() && steps < 20)
+			{
+				view.undo();
+				++steps;
+			}
+			check(steps == 5 && l->data() == leftBytes && !l->isModified(),
+				"each byte typed is a step of its own, back to the file as loaded");
+
+			// --- read-only ---
+			view.setReadOnlySides({ false, true });
+			r->setFocus();
+			type(r, QStringLiteral("ff"));
+			view.gotoFirstDiff();
+			l->setFocus();
+			view.copyToRight();
+			check(r->data() == rightBytes && view.statusTextForTest(1).contains(HexView::tr("READ")),
+				"a read-only pane takes neither typing nor copies");
+			view.setReadOnlySides({ false, false });
+
+			// --- saving ---
+			l->setFocus();
+			press(l, Qt::Key_Home, Qt::ControlModifier);
+			type(l, QStringLiteral("ee"));
+			if (!view.saveModified(&error))
+				printf("save failed: %s\n", qPrintable(error));
+			const QByteArray saved = read(left);
+			check(static_cast<unsigned char>(saved.at(0)) == 0xee && saved.size() == 64
+					&& read(left + QStringLiteral(".bak")) == leftBytes && !view.isModified(),
+				"Save writes the bytes, after a backup of the file");
+
+			// --- identical ---
+			answer = true;
+			lm::setQuestionSinkForTest([](const QString &, bool *) { return true; });
+			r->setFocus();
+			view.copyAllToLeft();
+			lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
+			check(l->data() == r->data(), "Copy All to Left");
+			view.refreshByUser();
+			check(view.diffCount() == 0, "Recompare: the panes hold the same bytes");
+		}
+
+		// --- three files: the middle pane against both ---
+		{
+			QByteArray middleBytes = leftBytes;
+			middleBytes[5] = 'M';
+			QByteArray thirdBytes = leftBytes;
+			thirdBytes[20] = 'R';
+			const QString middle = dir.filePath(QStringLiteral("middle.dat"));
+			const QString third = dir.filePath(QStringLiteral("third.dat"));
+			write(left, leftBytes);
+			write(middle, middleBytes);
+			write(third, thirdBytes);
+			HexCompareView view;
+			QString error;
+			if (!view.compare(QStringList{ left, middle, third }, &error))
+				return 2;
+			HexView *const m = view.paneForTest(1);
+			check(m->isDiff(5) && m->isDiff(20) && !view.paneForTest(0)->isDiff(20)
+					&& view.paneForTest(0)->isDiff(5) && view.paneForTest(2)->isDiff(20),
+				"3-way: the middle differs where either side does, a side where the middle does");
+		}
+
+		// --- what opens it ---
+		{
+			const QString textBin = dir.filePath(QStringLiteral("a.bin"));
+			const QString textBin2 = dir.filePath(QStringLiteral("b.bin"));
+			write(textBin, "plain text\n");
+			write(textBin2, "plain text 2\n");
+			const QString text1 = dir.filePath(QStringLiteral("a.txt"));
+			const QString text2 = dir.filePath(QStringLiteral("b.txt"));
+			write(text1, "one\n");
+			write(text2, "two\n");
+			write(left, leftBytes);
+			write(right, rightBytes);
+			MainWindow window;
+			const auto opens = [&window](const QStringList &paths) {
+				window.openFileComparison(paths);
+				QTabWidget *tabs = window.findChild<QTabWidget *>();
+				return tabs != nullptr ? tabs->currentWidget() : nullptr;
+			};
+			check(qobject_cast<HexCompareView *>(opens({ left, right })) != nullptr,
+				"binary content opens the binary comparison");
+			check(qobject_cast<HexCompareView *>(opens({ textBin, textBin2 })) != nullptr,
+				"so do the binary file patterns (*.bin;*.frx), whatever the content");
+			check(qobject_cast<FileCompareView *>(opens({ text1, text2 })) != nullptr,
+				"text files still open the text comparison");
 		}
 
 		printf("ok: %d\n", ok);

@@ -39,6 +39,9 @@
 #include "FileCompareView.h"
 #include "TableCompareView.h"
 #include "ImageCompareView.h"
+#include "HexCompareView.h"
+#include "HexView.h"
+#include "BinaryFiles.h"
 #include "ImageFormats.h"
 #include "MessageBoxes.h"
 #include "OptionsDialog.h"
@@ -99,6 +102,8 @@ QStringList comparedPaths(QWidget *page)
 		return table->paths();
 	if (auto *image = qobject_cast<ImageCompareView *>(page))
 		return image->paths();
+	if (auto *hex = qobject_cast<HexCompareView *>(page))
+		return hex->paths();
 	return {};
 }
 
@@ -111,6 +116,8 @@ bool hasUnsavedChanges(QWidget *page)
 		return table->isModified();
 	if (auto *image = qobject_cast<ImageCompareView *>(page))
 		return image->isModified();
+	if (auto *hex = qobject_cast<HexCompareView *>(page))
+		return hex->isModified();
 	return false;
 }
 
@@ -186,6 +193,9 @@ MainWindow::MainWindow(QWidget *parent)
 	auto imageView = [this]() {
 		return qobject_cast<ImageCompareView *>(m_tabs->currentWidget());
 	};
+	auto hexView = [this]() {
+		return qobject_cast<HexCompareView *>(m_tabs->currentWidget());
+	};
 	auto addMenuAction = [this](QMenu *menu, const QString &text,
 		const QKeySequence &shortcut, auto slot) -> QAction * {
 		QAction *action = menu->addAction(text);
@@ -250,7 +260,7 @@ MainWindow::MainWindow(QWidget *parent)
 	});
 	fileMenu->addSeparator();
 	addMenuAction(fileMenu, tr("&Save"), QKeySequence::Save,
-		[fileView, tableView, imageView]() {
+		[this, fileView, tableView, imageView, hexView]() {
 			QString error;
 			if (auto *view = fileView())
 				view->saveModified(&error);
@@ -258,6 +268,11 @@ MainWindow::MainWindow(QWidget *parent)
 				table->saveModified(&error);
 			else if (auto *image = imageView())
 				image->saveModified(&error);
+			else if (auto *hex = hexView())
+			{
+				if (!hex->saveModified(&error) && !error.isEmpty())
+					lm::warning(this, tr("LibreMerge"), tr("Could not save:\n%1").arg(error));
+			}
 		});
 	// WinMerge's File > Reload (Ctrl+F5). With the Command key that is
 	// macOS's VoiceOver switch, so Reload takes the platform's own Cmd+R
@@ -277,22 +292,26 @@ MainWindow::MainWindow(QWidget *parent)
 
 	QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
 	addMenuAction(editMenu, tr("&Undo"), QKeySequence::Undo,
-		[fileView, tableView, imageView]() {
+		[fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView())
 				view->undoActive();
 			else if (auto *table = tableView())
 				table->undo();
 			else if (auto *image = imageView())
 				image->undo();
+			else if (auto *hex = hexView())
+				hex->undo();
 		});
 	addMenuAction(editMenu, tr("&Redo"), QKeySequence::Redo,
-		[fileView, tableView, imageView]() {
+		[fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView())
 				view->redoActive();
 			else if (auto *table = tableView())
 				table->redo();
 			else if (auto *image = imageView())
 				image->redo();
+			else if (auto *hex = hexView())
+				hex->redo();
 		});
 	editMenu->addSeparator();
 	// WinMerge's Edit > Find... (Ctrl+F) and Replace... (Ctrl+H), the
@@ -467,60 +486,68 @@ MainWindow::MainWindow(QWidget *parent)
 	syncFilterBarAction();
 	viewMenu->addSeparator();
 	QAction *zoomInAction = addMenuAction(viewMenu, tr("Zoom &In"),
-		QKeySequence::ZoomIn, [fileView, imageView]() {
+		QKeySequence::ZoomIn, [fileView, imageView, hexView]() {
 			if (auto *view = fileView()) view->zoomIn();
 			else if (auto *image = imageView()) image->zoomIn();
+			else if (auto *hex = hexView()) hex->zoomIn();
 		});
 	// pt-BR and US keyboards type "+" as Shift+= — accept Cmd+= too
 	zoomInAction->setShortcuts({ QKeySequence::ZoomIn,
 		QKeySequence(Qt::CTRL | Qt::Key_Equal) });
 	addMenuAction(viewMenu, tr("Zoom &Out"), QKeySequence::ZoomOut,
-		[fileView, imageView]() {
+		[fileView, imageView, hexView]() {
 			if (auto *view = fileView()) view->zoomOut();
 			else if (auto *image = imageView()) image->zoomOut();
+			else if (auto *hex = hexView()) hex->zoomOut();
 		});
 	addMenuAction(viewMenu, tr("&Actual Size"),
-		QKeySequence(Qt::CTRL | Qt::Key_0), [fileView, imageView]() {
+		QKeySequence(Qt::CTRL | Qt::Key_0), [fileView, imageView, hexView]() {
 			if (auto *view = fileView()) view->zoomReset();
 			else if (auto *image = imageView()) image->zoomReset();
+			else if (auto *hex = hexView()) hex->zoomReset();
 		});
 	viewMenu->addSeparator();
 	addMenuAction(viewMenu, tr("Next &Pane"), QKeySequence(Qt::Key_F6),
-		[fileView, tableView, imageView]() {
+		[fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->focusNextPane();
 			else if (auto *table = tableView()) table->focusNextPane();
 			else if (auto *image = imageView()) image->focusNextPane();
+			else if (auto *hex = hexView()) hex->focusNextPane();
 		});
 
 	QMenu *mergeMenu = menuBar()->addMenu(tr("&Merge"));
 	addMenuAction(mergeMenu, tr("&First Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Home), [fileView, tableView, imageView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Home), [fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->gotoFirstDiff();
 			else if (auto *table = tableView()) table->gotoFirstDiff();
 			else if (auto *image = imageView()) image->gotoFirstDiff();
+			else if (auto *hex = hexView()) hex->gotoFirstDiff();
 		});
 	QAction *prevDiffAction = addMenuAction(mergeMenu, tr("&Previous Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Up), [fileView, tableView, imageView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Up), [fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->gotoPrevDiff();
 			else if (auto *table = tableView()) table->gotoPrevDiff();
 			else if (auto *image = imageView()) image->gotoPrevDiff();
+			else if (auto *hex = hexView()) hex->gotoPrevDiff();
 		});
 	// F7/F8 are upstream aliases for previous/next
 	prevDiffAction->setShortcuts({ QKeySequence(Qt::ALT | Qt::Key_Up),
 		QKeySequence(Qt::Key_F7) });
 	QAction *nextDiffAction = addMenuAction(mergeMenu, tr("&Next Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_Down), [fileView, tableView, imageView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Down), [fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->gotoNextDiff();
 			else if (auto *table = tableView()) table->gotoNextDiff();
 			else if (auto *image = imageView()) image->gotoNextDiff();
+			else if (auto *hex = hexView()) hex->gotoNextDiff();
 		});
 	nextDiffAction->setShortcuts({ QKeySequence(Qt::ALT | Qt::Key_Down),
 		QKeySequence(Qt::Key_F8) });
 	addMenuAction(mergeMenu, tr("&Last Difference"),
-		QKeySequence(Qt::ALT | Qt::Key_End), [fileView, tableView, imageView]() {
+		QKeySequence(Qt::ALT | Qt::Key_End), [fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->gotoLastDiff();
 			else if (auto *table = tableView()) table->gotoLastDiff();
 			else if (auto *image = imageView()) image->gotoLastDiff();
+			else if (auto *hex = hexView()) hex->gotoLastDiff();
 		});
 	addMenuAction(mergeMenu, tr("C&urrent Difference"),
 		QKeySequence(Qt::ALT | Qt::Key_Return), [fileView, tableView, imageView]() {
@@ -533,18 +560,21 @@ MainWindow::MainWindow(QWidget *parent)
 	// MenuIDtoXY: from the active pane toward its neighbor, so in 3-way
 	// the middle pane can push into either side
 	addMenuAction(mergeMenu, tr("Copy to &Right"),
-		QKeySequence(Qt::ALT | Qt::Key_Right), [fileView, tableView, imageView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Right), [fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->copyToRight();
 			else if (auto *table = tableView()) table->copyCurrentDiff(0);
 			else if (auto *image = imageView()) image->copyToRight();
+			else if (auto *hex = hexView()) hex->copyToRight();
 		});
 	addMenuAction(mergeMenu, tr("Copy to &Left"),
-		QKeySequence(Qt::ALT | Qt::Key_Left), [fileView, tableView, imageView]() {
+		QKeySequence(Qt::ALT | Qt::Key_Left), [fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->copyToLeft();
 			else if (auto *table = tableView())
 				table->copyCurrentDiff(1);
 			else if (auto *image = imageView())
 				image->copyToLeft();
+			else if (auto *hex = hexView())
+				hex->copyToLeft();
 		});
 	// WinMerge's Ctrl+Alt variants copy and jump to the next difference
 	// (the table copy always lands on the difference below the merge)
@@ -562,18 +592,21 @@ MainWindow::MainWindow(QWidget *parent)
 				table->copyCurrentDiff(1);
 		});
 	addMenuAction(mergeMenu, tr("Copy All to Righ&t"), QKeySequence(),
-		[fileView, tableView, imageView]() {
+		[fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->copyAllToRight();
 			else if (auto *table = tableView()) table->copyAllFrom(0);
 			else if (auto *image = imageView()) image->copyAllToRight();
+			else if (auto *hex = hexView()) hex->copyAllToRight();
 		});
 	addMenuAction(mergeMenu, tr("Copy All to Le&ft"), QKeySequence(),
-		[fileView, tableView, imageView]() {
+		[fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->copyAllToLeft();
 			else if (auto *table = tableView())
 				table->copyAllFrom(1);
 			else if (auto *image = imageView())
 				image->copyAllToLeft();
+			else if (auto *hex = hexView())
+				hex->copyAllToLeft();
 		});
 	mergeMenu->addSeparator();
 	addMenuAction(mergeMenu, tr("S&wap Panes"), QKeySequence(),
@@ -582,13 +615,15 @@ MainWindow::MainWindow(QWidget *parent)
 			else if (auto *table = tableView()) table->swapSides();
 		});
 	addMenuAction(mergeMenu, tr("Re&compare"), QKeySequence(Qt::Key_F5),
-		[this, fileView, tableView, imageView]() {
+		[this, fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView())
 				view->refreshByUser();
 			else if (auto *table = tableView())
 				table->refreshByUser();
 			else if (auto *image = imageView())
 				image->refreshByUser();
+			else if (auto *hex = hexView())
+				hex->refreshByUser();
 			else if (auto *folder = qobject_cast<FolderCompareView *>(
 					m_tabs->currentWidget()))
 				folder->recompare();
@@ -815,6 +850,15 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 		}
 	}
 
+	// WinMerge's binary file patterns open the binary comparison, checked
+	// after the image patterns like upstream (any side matching)
+	if (!forceText && (paths.size() == 2 || paths.size() == 3)
+		&& std::any_of(paths.cbegin(), paths.cend(), lm::matchesBinaryFilePatterns))
+	{
+		openHexComparison(paths, readOnly);
+		return;
+	}
+
 	// CSV/TSV pairs open as side-by-side grids, like WinMerge's table
 	// compare; "Open as Text" in the table view forces the text path
 	if (!forceText && paths.size() == 2)
@@ -827,6 +871,15 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 			openTableComparison(paths.at(0), paths.at(1));
 			return;
 		}
+	}
+
+	// binary content opens the binary comparison too (LibreMerge's own:
+	// WinMerge shows it as text unless the patterns say otherwise)
+	if ((paths.size() == 2 || paths.size() == 3)
+		&& std::any_of(paths.cbegin(), paths.cend(), lm::looksBinary))
+	{
+		openHexComparison(paths, readOnly);
+		return;
 	}
 
 	auto *view = new FileCompareView(this);
@@ -933,6 +986,43 @@ void MainWindow::openImageComparison(const QStringList &paths,
 	watchFiles(view);
 }
 
+void MainWindow::openHexComparison(const QStringList &paths, const QList<bool> &readOnly)
+{
+	auto *view = new HexCompareView(this);
+	QString error;
+	if (!view->compare(paths, &error))
+	{
+		delete view;
+		lm::warning(this, tr("LibreMerge"),
+			tr("Could not compare files:\n%1").arg(error));
+		return;
+	}
+	view->setReadOnlySides(readOnly);
+	auto refreshTab = [this](HexCompareView *v) {
+		const int tabIndex = m_tabs->indexOf(v);
+		if (tabIndex < 0)
+			return;
+		m_tabs->setTabText(tabIndex, (v->isModified()
+			? QString::fromUtf8("\xE2\x80\xA2 ") : QString()) + v->tabTitle());
+		m_tabs->setTabToolTip(tabIndex, v->paths().join(QStringLiteral("\n")));
+	};
+	rememberComparison(view->paths());
+	const int index = m_tabs->addTab(view, view->tabTitle());
+	m_tabs->setTabToolTip(index, view->paths().join(QStringLiteral("\n")));
+	m_tabs->setCurrentIndex(index);
+	connect(view, &HexCompareView::modifiedChanged, this,
+		[view, refreshTab](bool) { refreshTab(view); });
+	connect(view, &HexCompareView::pathsChanged, this,
+		[view, refreshTab]() { refreshTab(view); });
+	view->paneForTest(0)->setFocus();
+
+	// upstream's MoveOnLoad: the first difference when the option asks
+	if (OptionsDialog::scrollToFirstDiff())
+		QTimer::singleShot(0, view, [view]() { view->gotoFirstDiff(); });
+	watchIdentical(view);
+	watchFiles(view);
+}
+
 void MainWindow::openBlankComparison()
 {
 	// WinMerge's File > New: paste or type text on both sides
@@ -1004,6 +1094,11 @@ void MainWindow::watchIdentical(QWidget *page)
 	{
 		connect(image, &ImageCompareView::rescanned, this, [report]() { report(false); });
 	}
+	else if (auto *hex = qobject_cast<HexCompareView *>(page))
+	{
+		// upstream's binary OnRefresh tells, its saving does not
+		connect(hex, &HexCompareView::rescanned, this, [report]() { report(false); });
+	}
 }
 
 void MainWindow::reportIfIdentical(QWidget *page, bool opening)
@@ -1031,6 +1126,12 @@ void MainWindow::reportIfIdentical(QWidget *page, bool opening)
 		paths = image->paths();
 		diffs = image->diffCount();
 		modified = image->isModified();
+	}
+	else if (auto *hex = qobject_cast<HexCompareView *>(page))
+	{
+		paths = hex->paths();
+		diffs = hex->diffCount();
+		modified = hex->isModified();
 	}
 	if (diffs != 0)
 		return;
@@ -1068,6 +1169,10 @@ void MainWindow::watchFiles(QWidget *page)
 	{
 		connect(image, &ImageCompareView::pathsChanged, this, pathsChanged);
 	}
+	else if (auto *hex = qobject_cast<HexCompareView *>(page))
+	{
+		connect(hex, &HexCompareView::pathsChanged, this, pathsChanged);
+	}
 	updateFileWatches();
 }
 
@@ -1095,6 +1200,8 @@ void MainWindow::checkFileChanged(QWidget *page, bool beforeRescan)
 		path = table->changedPathOnDisk();
 	else if (auto *image = qobject_cast<ImageCompareView *>(page))
 		path = image->changedPathOnDisk();
+	else if (auto *hex = qobject_cast<HexCompareView *>(page))
+		path = hex->changedPathOnDisk();
 	if (path.isEmpty())
 		return;
 	// one question at a time: the triggers keep coming while it is open.
@@ -1120,13 +1227,15 @@ bool MainWindow::reloadComparison(QWidget *page, bool reportIdentical)
 	auto *file = qobject_cast<FileCompareView *>(page);
 	auto *table = qobject_cast<TableCompareView *>(page);
 	auto *image = qobject_cast<ImageCompareView *>(page);
-	if (file == nullptr && table == nullptr && image == nullptr)
+	auto *hex = qobject_cast<HexCompareView *>(page);
+	if (file == nullptr && table == nullptr && image == nullptr && hex == nullptr)
 		return false;
 	if (!promptAndSaveIfNeeded(page, false))
 		return false;
 	QString error;
 	const bool reloaded = file != nullptr ? file->reload(&error)
-		: table != nullptr ? table->reload(&error) : image->reload(&error);
+		: table != nullptr ? table->reload(&error)
+		: image != nullptr ? image->reload(&error) : hex->reload(&error);
 	if (!reloaded)
 	{
 		lm::warning(this, tr("LibreMerge"), tr("Could not reload:\n%1").arg(error));
@@ -1175,8 +1284,10 @@ bool MainWindow::promptAndSaveIfNeeded(QWidget *page, bool closing)
 		if (choice == Save)
 		{
 			QString error;
+			auto *hex = qobject_cast<HexCompareView *>(page);
 			const bool saved = table != nullptr ? table->saveModified(&error)
-				: image->saveModified(&error);
+				: image != nullptr ? image->saveModified(&error)
+				: hex->saveModified(&error);
 			if (!saved)
 			{
 				lm::warning(this, tr("LibreMerge"),
@@ -1354,6 +1465,8 @@ void MainWindow::openSelfComparison(const QString &path)
 		table->setSideDescription(0, description);
 	else if (auto *image = qobject_cast<ImageCompareView *>(page))
 		image->setSideDescription(0, description);
+	else if (auto *hex = qobject_cast<HexCompareView *>(page))
+		hex->setSideDescription(0, description);
 	const int index = m_tabs->indexOf(page);
 	if (auto *file = qobject_cast<FileCompareView *>(page))
 		m_tabs->setTabText(index, file->tabTitle());
@@ -1361,6 +1474,8 @@ void MainWindow::openSelfComparison(const QString &path)
 		m_tabs->setTabText(index, table->tabTitle());
 	else if (auto *image = qobject_cast<ImageCompareView *>(page))
 		m_tabs->setTabText(index, image->tabTitle());
+	else if (auto *hex = qobject_cast<HexCompareView *>(page))
+		m_tabs->setTabText(index, hex->tabTitle());
 	m_tabs->setTabToolTip(index, path);
 
 	// the snapshot pair went into the recent list: keep the file instead
@@ -1414,6 +1529,8 @@ void MainWindow::wireFolderRowSync(FolderCompareView *folder)
 		connect(table, &TableCompareView::fileSaved, folder, forward);
 	else if (auto *image = qobject_cast<ImageCompareView *>(tab))
 		connect(image, &ImageCompareView::fileSaved, folder, forward);
+	else if (auto *hex = qobject_cast<HexCompareView *>(tab))
+		connect(hex, &HexCompareView::fileSaved, folder, forward);
 }
 
 void MainWindow::openFolderComparison(const QString &leftDir, const QString &rightDir)
