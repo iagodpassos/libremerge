@@ -117,8 +117,8 @@ export QMAKE
 # window comes up bufferless and borderless on a pure Wayland session
 # (GNOME). The qt plugin deploys the last two along with the platform.
 export EXTRA_PLATFORM_PLUGINS="libqwayland.so;libqoffscreen.so"
-# deploy first (generates an AppRun that sources apprun-hooks/*.sh at
-# runtime), then add our hook, then pack
+# deploy first; the translations and the checks below work on the
+# deployed AppDir, which is packed last
 ./linuxdeploy-"$ARCH".AppImage --appdir AppDir --plugin qt \
   --deploy-deps-only AppDir/usr/plugins/wayland-graphics-integration-client
 # no platform theme, as with Debian's Qt: Qt loads the desktop portal's
@@ -153,15 +153,10 @@ for qm in AppDir/usr/translations/*.qm; do
   esac
 done
 
-# Debian 12's Qt 6.4, which the AppImage used to bundle, could not place
-# dialogs on a native Wayland session (they landed in a screen corner
-# instead of over the window), so the AppImage prefers XWayland. It stays
-# so until Qt 6.12's Wayland session is checked on a real desktop;
-# QT_QPA_PLATFORM set by the user still wins.
-mkdir -p AppDir/apprun-hooks
-cat > AppDir/apprun-hooks/00-libremerge-platform.sh <<'EOF'
-export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
-EOF
+# No platform is forced: Qt takes Wayland on a Wayland session and xcb
+# on X11, and QT_QPA_PLATFORM chooses otherwise. (Debian 12's Qt 6.4,
+# which the AppImage bundled up to 0.9.9, placed dialogs in a screen
+# corner on Wayland, and the AppImage preferred XWayland then.)
 
 # the glibc floor: nothing bundled may need more than 2.35 (Ubuntu 22.04)
 too_new=""
