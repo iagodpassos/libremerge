@@ -427,7 +427,14 @@ private:
 	int m_columns = 0;
 };
 
-TableCompareView::~TableCompareView() = default;
+TableCompareView::~TableCompareView()
+{
+	// the models read the members, which go before QWidget's destructor
+	// hides a view shown as a window, and the grids' headers ask the
+	// models for their texts then: the grids let go of the models first
+	for (QTableView *table : m_tables)
+		table->setModel(nullptr);
+}
 
 TableCompareView::TableCompareView(QWidget *parent)
 	: QWidget(parent)
