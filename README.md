@@ -17,6 +17,7 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - **Diff pane** showing the current difference per file, per-pane headers and status bars (line/column, encoding, EOL), and WinMerge's **location pane**: the whole comparison at a glance, a click or a drag to move through it, and its menu with Go to Line and moved blocks; Edit > Go to (Ctrl+G) reaches a line of any file or a difference by its number
 - **CSV/TSV table comparison** as side-by-side grids: cell-level difference highlighting, delimiter auto-detection (`,` `;` tab `|`), quoted fields, first-row headers
 - **Image comparison** (2-way and 3-way) with WinMerge's own image-diff engine: block-level pixel differences with adjustable block size and color-distance threshold, insertion/deletion detection for shifted rows/columns, XOR and alpha-blend overlays, blink mode, wipe and rectangle-select dragging, multi-page navigation (animated GIF, multi-page TIFF), rotation/flips, copy between sides with undo, and a clickable difference minimap
+- **Binary comparison** (2-way and 3-way), after WinMerge's hex view: the files as hex dumps side by side, each byte that differs at the same offset colored, next and previous difference, the selected bytes or all of them copied across, and the editing of the hex editor WinMerge embeds (overwrite or insert, by hex digit or by character, Cut, Copy and Paste, Find and Replace in Frhed's special syntax, Go to offset) with one undo history for the panes. Binary files and WinMerge's binary file patterns open it, and Options > Compare > Binary holds the editor's settings
 - **WinMerge's filters**: Tools > Filters with its three pages, file filters (one global folder filter with masks, expressions and presets, picked from the selection screen and built with the "=" helper menu), line filters (regular expressions that mark matching differences as trivial) and substitution filters; a **display filter bar** in the folder window (by comparison result, or per column) and in the file and table windows (hide the lines a text or a line expression does not match, with the "=" menu to build one); and **moved block detection**
 - **Find and Replace** in the compare panes with WinMerge's own dialogs: whole word, match case, regular expressions (their groups in the replacement), Replace All in a selection, F3 to search again, every occurrence of the text marked, and the Marker dialog for texts of your own marked in three colors
 - **Syntax highlighting** for 47 languages, via WinMerge's own parsers
@@ -117,7 +118,6 @@ To use it, run `git mergetool` after a conflict: resolve it in the middle pane, 
 
 ## Known limitations
 
-- Binary files are detected and refused — binary/hex comparison is planned, not implemented
 - Archive comparison works on extracted copies: edits are not packed back into the archive (WinMerge behaves the same)
 - Image comparison: animated GIF and multi-page TIFF open and compare, but cannot be saved back (no Qt encoder — Save As offers PNG); SVG/PDF comparison is not supported yet
 - Table comparison copies whole differences (no per-cell editing or undo yet)
@@ -140,6 +140,6 @@ LibreMerge as a whole is distributed under the **GNU GPL v3.0 or later** ([LICEN
 
 ## Roadmap
 
-Binary/hex compare, HTML reports and patch generation, notarized builds, Linux packages (AUR first), and — if it proves itself — offering the portable engine fixes back to WinMerge upstream ([WinMerge/winmerge#141](https://github.com/WinMerge/winmerge/issues/141) tracks the idea of a cross-platform UI).
+HTML reports and patch generation, notarized builds, Linux packages (AUR first), and — if it proves itself — offering the portable engine fixes back to WinMerge upstream ([WinMerge/winmerge#141](https://github.com/WinMerge/winmerge/issues/141) tracks the idea of a cross-platform UI).
 
 Issues and pull requests are welcome. Everyone who helps is credited in [CONTRIBUTORS.md](CONTRIBUTORS.md), which the About box shows too.

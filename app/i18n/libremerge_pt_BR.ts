@@ -276,18 +276,16 @@
         <translation>Sem Título</translation>
     </message>
     <message>
-        <source>%1 appears to be a binary file.
-LibreMerge compares text files; binary comparison is not supported yet.</source>
-        <translation>%1 parece ser um arquivo binário.
-O LibreMerge compara arquivos de texto; comparação binária ainda não é suportada.</translation>
-    </message>
-    <message>
         <source>Ln: %1  Col: %2/%3  Ch: %2/%3</source>
         <translation>Lin: %1  Col: %2/%3  Car: %2/%3</translation>
     </message>
     <message>
         <source>cannot open %1</source>
         <translation>não foi possível abrir %1</translation>
+    </message>
+    <message>
+        <source>%1 appears to be a binary file: open the files again to compare them in a binary comparison.</source>
+        <translation>%1 parece ser um arquivo binário: abra os arquivos de novo para compará-los numa comparação binária.</translation>
     </message>
     <message>
         <source>cannot create temporary file</source>
@@ -1581,6 +1579,583 @@ O arquivo pode ser somente leitura.</translation>
     </message>
 </context>
 <context>
+    <name>HexBinaryModeDialog</name>
+    <message>
+        <source>Binary Mode</source>
+        <translation>Modo Binário</translation>
+    </message>
+    <message>
+        <source>Choose binary mode</source>
+        <translation>Escolha o modo binário</translation>
+    </message>
+    <message>
+        <source>Little-endian (Intel)</source>
+        <translation>Little-endian (Intel)</translation>
+    </message>
+    <message>
+        <source>Big-endian (Motorola)</source>
+        <translation>Big-endian (Motorola)</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+</context>
+<context>
+    <name>HexCharacterSetDialog</name>
+    <message>
+        <source>Character Set</source>
+        <translation>Conjunto de Caracteres</translation>
+    </message>
+    <message>
+        <source>Choose character set</source>
+        <translation>Escolha o conjunto de caracteres</translation>
+    </message>
+    <message>
+        <source>ANSI</source>
+        <translation>ANSI</translation>
+    </message>
+    <message>
+        <source>OEM</source>
+        <translation>OEM</translation>
+    </message>
+    <message>
+        <source>Font size in points:</source>
+        <translation>Tamanho da fonte em pontos:</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+</context>
+<context>
+    <name>HexCompareView</name>
+    <message>
+        <source>First Difference</source>
+        <translation>Primeira Diferença</translation>
+    </message>
+    <message>
+        <source>Previous Difference</source>
+        <translation>Diferença Anterior</translation>
+    </message>
+    <message>
+        <source>Next Difference</source>
+        <translation>Próxima Diferença</translation>
+    </message>
+    <message>
+        <source>Last Difference</source>
+        <translation>Última Diferença</translation>
+    </message>
+    <message>
+        <source>Copy to Right</source>
+        <translation>Copiar para a Direita</translation>
+    </message>
+    <message>
+        <source>Copy to Left</source>
+        <translation>Copiar para a Esquerda</translation>
+    </message>
+    <message>
+        <source>Copy All to Right</source>
+        <translation>Copiar Tudo para a Direita</translation>
+    </message>
+    <message>
+        <source>Copy All to Left</source>
+        <translation>Copiar Tudo para a Esquerda</translation>
+    </message>
+    <message>
+        <source>Undo</source>
+        <translation>Desfazer</translation>
+    </message>
+    <message>
+        <source>Redo</source>
+        <translation>Refazer</translation>
+    </message>
+    <message>
+        <source>Recompare</source>
+        <translation>Recomparar</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>Salvar</translation>
+    </message>
+    <message>
+        <source>cannot open %1</source>
+        <translation>não foi possível abrir %1</translation>
+    </message>
+    <message>
+        <source>expected 2 or 3 files</source>
+        <translation>eram esperados 2 ou 3 arquivos</translation>
+    </message>
+    <message>
+        <source>could not create the backup file %1</source>
+        <translation>não foi possível criar o arquivo de backup %1</translation>
+    </message>
+    <message>
+        <source>cannot write %1</source>
+        <translation>não foi possível gravar %1</translation>
+    </message>
+    <message>
+        <source>Untitled Left</source>
+        <translation>Esquerda Sem Título</translation>
+    </message>
+    <message>
+        <source>Untitled Middle</source>
+        <translation>Meio Sem Título</translation>
+    </message>
+    <message>
+        <source>Untitled Right</source>
+        <translation>Direita Sem Título</translation>
+    </message>
+</context>
+<context>
+    <name>HexFindDialog</name>
+    <message>
+        <source>Find</source>
+        <translation>Encontrar</translation>
+    </message>
+    <message>
+        <source>&amp;Find what:</source>
+        <translation>&amp;Encontrar o quê:</translation>
+    </message>
+    <message>
+        <source>Special syntax: &lt;bh:ff&gt; is the byte ff in hex, \&lt; and \\ are &lt; and \.</source>
+        <translation>Sintaxe especial: &lt;bh:ff&gt; é o byte ff em hexadecimal, \&lt; e \\ são &lt; e \.</translation>
+    </message>
+    <message>
+        <source>Direction</source>
+        <translation>Direção</translation>
+    </message>
+    <message>
+        <source>&amp;Up</source>
+        <translation>&amp;Acima</translation>
+    </message>
+    <message>
+        <source>&amp;Down</source>
+        <translation>A&amp;baixo</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Corresponder maiúsculas/minúsculas</translation>
+    </message>
+    <message>
+        <source>U&amp;nicode</source>
+        <translation>&amp;Unicode</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+    <message>
+        <source>Could not find data.</source>
+        <translation>Não foi possível encontrar os dados.</translation>
+    </message>
+    <message>
+        <source>Findstring is zero bytes long.</source>
+        <translation>O texto a encontrar tem zero bytes.</translation>
+    </message>
+</context>
+<context>
+    <name>HexGoToDialog</name>
+    <message>
+        <source>Go to Offset</source>
+        <translation>Ir para o Deslocamento</translation>
+    </message>
+    <message>
+        <source>Start with &quot;+&quot; or &quot;-&quot; (minus) for relative jump.</source>
+        <translation>Comece com &quot;+&quot; ou &quot;-&quot; (menos) para um salto relativo.</translation>
+    </message>
+    <message>
+        <source>Prefix offset with &quot;x&quot; to indicate hex notation.</source>
+        <translation>Comece o deslocamento com &quot;x&quot; para indicar notação hexadecimal.</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+    <message>
+        <source>Offset not recognized.</source>
+        <translation>Deslocamento não reconhecido.</translation>
+    </message>
+</context>
+<context>
+    <name>HexPasteDialog</name>
+    <message>
+        <source>Paste with dialogue</source>
+        <translation>Colar com Diálogo</translation>
+    </message>
+    <message>
+        <source>Clipboard content (text):</source>
+        <translation>Conteúdo da área de transferência (texto):</translation>
+    </message>
+    <message>
+        <source>Paste mode</source>
+        <translation>Modo de colagem</translation>
+    </message>
+    <message>
+        <source>Overwrite</source>
+        <translation>Sobrescrever</translation>
+    </message>
+    <message>
+        <source>Insert</source>
+        <translation>Inserir</translation>
+    </message>
+    <message>
+        <source>Paste data how many times:</source>
+        <translation>Colar os dados quantas vezes:</translation>
+    </message>
+    <message>
+        <source>Paste coded binary values as text</source>
+        <translation>Colar valores binários codificados como texto</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+    <message>
+        <source>Skip how many bytes between inserts/overwrites</source>
+        <translation>Pular quantos bytes entre inserções/sobrescritas</translation>
+    </message>
+    <message>
+        <source>Number of times to paste must be at least 1.</source>
+        <translation>O número de vezes a colar deve ser pelo menos 1.</translation>
+    </message>
+    <message>
+        <source>Tried to paste zero-length array.</source>
+        <translation>Tentativa de colar dados de tamanho zero.</translation>
+    </message>
+    <message>
+        <source>Not enough space for overwriting.</source>
+        <translation>Não há espaço suficiente para sobrescrever.</translation>
+    </message>
+</context>
+<context>
+    <name>HexRangeDialog</name>
+    <message>
+        <source>Copy</source>
+        <translation>Copiar</translation>
+    </message>
+    <message>
+        <source>Start copying at offset:</source>
+        <translation>Começar a copiar no deslocamento:</translation>
+    </message>
+    <message>
+        <source>Copy how many bytes</source>
+        <translation>Quantos bytes copiar</translation>
+    </message>
+    <message>
+        <source>Copy up to and including offset:</source>
+        <translation>Copiar até o deslocamento, inclusive:</translation>
+    </message>
+    <message>
+        <source>Number of bytes to copy:</source>
+        <translation>Número de bytes a copiar:</translation>
+    </message>
+    <message>
+        <source>Cut</source>
+        <translation>Recortar</translation>
+    </message>
+    <message>
+        <source>Start cutting at offset:</source>
+        <translation>Começar a recortar no deslocamento:</translation>
+    </message>
+    <message>
+        <source>Cut how many bytes</source>
+        <translation>Quantos bytes recortar</translation>
+    </message>
+    <message>
+        <source>Cut up to and including offset:</source>
+        <translation>Recortar até o deslocamento, inclusive:</translation>
+    </message>
+    <message>
+        <source>Number of bytes to cut:</source>
+        <translation>Número de bytes a recortar:</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Excluir</translation>
+    </message>
+    <message>
+        <source>Start deleting at offset:</source>
+        <translation>Começar a excluir no deslocamento:</translation>
+    </message>
+    <message>
+        <source>Delete how many bytes</source>
+        <translation>Quantos bytes excluir</translation>
+    </message>
+    <message>
+        <source>Delete up to and including offset:</source>
+        <translation>Excluir até o deslocamento, inclusive:</translation>
+    </message>
+    <message>
+        <source>Number of bytes to delete:</source>
+        <translation>Número de bytes a excluir:</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+    <message>
+        <source>Start offset not recognized.</source>
+        <translation>Deslocamento inicial não reconhecido.</translation>
+    </message>
+    <message>
+        <source>End offset not recognized.</source>
+        <translation>Deslocamento final não reconhecido.</translation>
+    </message>
+    <message>
+        <source>Number of bytes not recognized.</source>
+        <translation>Número de bytes não reconhecido.</translation>
+    </message>
+    <message>
+        <source>Can&apos;t copy more bytes than are present.</source>
+        <translation>Não é possível copiar mais bytes do que existem.</translation>
+    </message>
+    <message>
+        <source>Can&apos;t cut more bytes than are present.</source>
+        <translation>Não é possível recortar mais bytes do que existem.</translation>
+    </message>
+    <message>
+        <source>Can&apos;t delete more bytes than are present.</source>
+        <translation>Não é possível excluir mais bytes do que existem.</translation>
+    </message>
+</context>
+<context>
+    <name>HexReplaceDialog</name>
+    <message>
+        <source>Replace</source>
+        <translation>Substituir</translation>
+    </message>
+    <message>
+        <source>Find what:</source>
+        <translation>Encontrar o quê:</translation>
+    </message>
+    <message>
+        <source>Find next</source>
+        <translation>Encontrar próxima</translation>
+    </message>
+    <message>
+        <source>Find previous</source>
+        <translation>Encontrar anterior</translation>
+    </message>
+    <message>
+        <source>Match case</source>
+        <translation>Corresponder maiúsculas/minúsculas</translation>
+    </message>
+    <message>
+        <source>Replace with:</source>
+        <translation>Substituir por:</translation>
+    </message>
+    <message>
+        <source>Replace all...</source>
+        <translation>Substituir todas...</translation>
+    </message>
+    <message>
+        <source>... following occurrences</source>
+        <translation>... ocorrências seguintes</translation>
+    </message>
+    <message>
+        <source>... previous occurrences</source>
+        <translation>... ocorrências anteriores</translation>
+    </message>
+    <message>
+        <source>Use special syntax</source>
+        <translation>Usar sintaxe especial</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+    <message>
+        <source>Data to replace must be selected.</source>
+        <translation>Os dados a substituir devem estar selecionados.</translation>
+    </message>
+    <message>
+        <source>Could not find data.</source>
+        <translation>Não foi possível encontrar os dados.</translation>
+    </message>
+    <message>
+        <source>To-replace and replace-with data are same.</source>
+        <translation>Os dados a substituir e os substitutos são iguais.</translation>
+    </message>
+    <message>
+        <source>%1 occurrences replaced.</source>
+        <translation>%1 ocorrências substituídas.</translation>
+    </message>
+</context>
+<context>
+    <name>HexView</name>
+    <message>
+        <source>Could not find any more occurrences.</source>
+        <translation>Não foi possível encontrar mais ocorrências.</translation>
+    </message>
+    <message>
+        <source>String to find not specified.</source>
+        <translation>O texto a encontrar não foi especificado.</translation>
+    </message>
+    <message>
+        <source>Cu&amp;t...</source>
+        <translation>Recor&amp;tar...</translation>
+    </message>
+    <message>
+        <source>&amp;Copy...</source>
+        <translation>&amp;Copiar...</translation>
+    </message>
+    <message>
+        <source>&amp;Paste...</source>
+        <translation>C&amp;olar...</translation>
+    </message>
+    <message>
+        <source>&amp;Delete</source>
+        <translation>&amp;Excluir</translation>
+    </message>
+    <message>
+        <source>&amp;Find...</source>
+        <translation>E&amp;ncontrar...</translation>
+    </message>
+    <message>
+        <source>Replace...</source>
+        <translation>Substituir...</translation>
+    </message>
+    <message>
+        <source>Find next</source>
+        <translation>Encontrar próxima</translation>
+    </message>
+    <message>
+        <source>Find previous</source>
+        <translation>Encontrar anterior</translation>
+    </message>
+    <message>
+        <source>&amp;Go To...</source>
+        <translation>&amp;Ir para...</translation>
+    </message>
+    <message numerus="yes">
+        <source>Selected: Offset %1=0x%2 to %3=0x%4 (%n byte(s))</source>
+        <translation>
+            <numerusform>Selecionado: deslocamento %1=0x%2 a %3=0x%4 (%n byte)</numerusform>
+            <numerusform>Selecionado: deslocamento %1=0x%2 a %3=0x%4 (%n bytes)</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Offset %1=0x%2</source>
+        <translation>Deslocamento %1=0x%2</translation>
+    </message>
+    <message>
+        <source>Bits</source>
+        <translation>Bits</translation>
+    </message>
+    <message>
+        <source>END</source>
+        <translation>FIM</translation>
+    </message>
+    <message>
+        <source>Signed</source>
+        <translation>Com sinal</translation>
+    </message>
+    <message>
+        <source>Unsigned</source>
+        <translation>Sem sinal</translation>
+    </message>
+    <message>
+        <source>B</source>
+        <translation>B</translation>
+    </message>
+    <message>
+        <source>W</source>
+        <translation>W</translation>
+    </message>
+    <message>
+        <source>L</source>
+        <translation>L</translation>
+    </message>
+    <message>
+        <source>READ</source>
+        <translation>READ</translation>
+    </message>
+    <message>
+        <source>INS</source>
+        <translation>INS</translation>
+    </message>
+    <message>
+        <source>OVR</source>
+        <translation>OVR</translation>
+    </message>
+    <message>
+        <source>OEM</source>
+        <translation>OEM</translation>
+    </message>
+    <message>
+        <source>ANSI</source>
+        <translation>ANSI</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Tamanho</translation>
+    </message>
+</context>
+<context>
+    <name>HexViewSettingsDialog</name>
+    <message>
+        <source>View Settings</source>
+        <translation>Visualizar Configurações</translation>
+    </message>
+    <message>
+        <source>Number of bytes to display per line:</source>
+        <translation>Número de bytes a exibir por linha:</translation>
+    </message>
+    <message>
+        <source>Automatically adjust number of bytes per line (uncheck this if you want to use your own choice for bytes per line)</source>
+        <translation>Ajustar automaticamente o número de bytes por linha (desmarque para usar a sua própria escolha de bytes por linha)</translation>
+    </message>
+    <message>
+        <source>Display length of offset in how many characters:</source>
+        <translation>Exibir o deslocamento com quantos caracteres:</translation>
+    </message>
+    <message>
+        <source>Adjust offset length to that of the max offset</source>
+        <translation>Ajustar o tamanho do deslocamento ao do maior deslocamento</translation>
+    </message>
+    <message>
+        <source>Display values at caret position as:</source>
+        <translation>Exibir os valores na posição do cursor como:</translation>
+    </message>
+    <message>
+        <source>unsigned</source>
+        <translation>sem sinal</translation>
+    </message>
+    <message>
+        <source>signed</source>
+        <translation>com sinal</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+</context>
+<context>
     <name>ImageCompareView</name>
     <message>
         <source>First Difference</source>
@@ -2764,6 +3339,10 @@ But differ at the binary level.</source>
 Mas diferem no nível binário.</translation>
     </message>
     <message>
+        <source>Copy all differences to other file?</source>
+        <translation>Copiar todas as diferenças para o outro arquivo?</translation>
+    </message>
+    <message>
         <source>Selected files are identical (with current settings).
 But binary comparison failed.</source>
         <translation>Os arquivos selecionados são idênticos (com as configurações atuais).
@@ -2942,6 +3521,10 @@ Checando identidade binária...</translation>
         <translation>Pasta</translation>
     </message>
     <message>
+        <source>Binary</source>
+        <translation>Binário</translation>
+    </message>
+    <message>
         <source>Message Boxes</source>
         <translation>Caixas de Mensagens</translation>
     </message>
@@ -3040,6 +3623,14 @@ Checando identidade binária...</translation>
     <message>
         <source>Whitespaces</source>
         <translation>Espaços em branco</translation>
+    </message>
+    <message>
+        <source>Binary file &amp;patterns:</source>
+        <translation>&amp;Padrões de arquivo binário:</translation>
+    </message>
+    <message>
+        <source>Hex editor settings</source>
+        <translation>Configurações do editor hexadecimal</translation>
     </message>
     <message>
         <source>Some messages can be hidden by the user. Press Reset to make all messages visible again.</source>
@@ -3156,6 +3747,18 @@ Checando identidade binária...</translation>
     <message>
         <source>none</source>
         <translation>nenhum</translation>
+    </message>
+    <message>
+        <source>View &amp;Settings...</source>
+        <translation>Visualizar &amp;Configurações...</translation>
+    </message>
+    <message>
+        <source>&amp;Binary Mode...</source>
+        <translation>&amp;Modo Binário...</translation>
+    </message>
+    <message>
+        <source>&amp;Character Set...</source>
+        <translation>C&amp;onjunto de Caracteres...</translation>
     </message>
     <message>
         <source>Ignore numbers</source>

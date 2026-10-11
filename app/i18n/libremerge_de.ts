@@ -306,11 +306,9 @@
         <translation>%1 kann nicht geöffnet werden</translation>
     </message>
     <message>
-        <source>%1 appears to be a binary file.
-LibreMerge compares text files; binary comparison is not supported yet.</source>
+        <source>%1 appears to be a binary file: open the files again to compare them in a binary comparison.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>%1 scheint eine Binärdatei zu sein.
-LibreMerge vergleicht Textdateien; der Binärvergleich wird noch nicht unterstützt.</translation>
+        <translation>%1 scheint eine Binärdatei zu sein: Öffnen Sie die Dateien erneut, um sie in einem Binärvergleich zu vergleichen.</translation>
     </message>
     <message>
         <source>cannot create temporary file</source>
@@ -1689,6 +1687,694 @@ Patches sind nicht betroffen.</translation>
     </message>
 </context>
 <context>
+    <name>HexBinaryModeDialog</name>
+    <message>
+        <source>Binary Mode</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Binärmodus...&quot;.</translatorcomment>
+        <translation>Binärmodus</translation>
+    </message>
+    <message>
+        <source>Choose binary mode</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Binärmodus wählen</translation>
+    </message>
+    <message>
+        <source>Little-endian (Intel)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Little-Endian (Intel)</translation>
+    </message>
+    <message>
+        <source>Big-endian (Motorola)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Big-Endian (Motorola)</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+</context>
+<context>
+    <name>HexCharacterSetDialog</name>
+    <message>
+        <source>Character Set</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Zeichensatz...&quot;.</translatorcomment>
+        <translation>Zeichensatz</translation>
+    </message>
+    <message>
+        <source>Choose character set</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Zeichensatz wählen</translation>
+    </message>
+    <message>
+        <source>ANSI</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>ANSI</translation>
+    </message>
+    <message>
+        <source>OEM</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>OEM</translation>
+    </message>
+    <message>
+        <source>Font size in points:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Schriftgröße in Punkt:</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+</context>
+<context>
+    <name>HexCompareView</name>
+    <message>
+        <source>First Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;First Difference\tAlt+Home&quot;.</translatorcomment>
+        <translation>Erster Unterschied</translation>
+    </message>
+    <message>
+        <source>Previous Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Previous Difference\tAlt+Up&quot;.</translatorcomment>
+        <translation>Vorheriger Unterschied</translation>
+    </message>
+    <message>
+        <source>Next Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Next Difference\tAlt+Down&quot;.</translatorcomment>
+        <translation>Nächster Unterschied</translation>
+    </message>
+    <message>
+        <source>Last Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Last Difference\tAlt+End&quot;.</translatorcomment>
+        <translation>Letzter Unterschied</translation>
+    </message>
+    <message>
+        <source>Copy to Right</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right\tAlt+Right&quot;.</translatorcomment>
+        <translation>Nach rechts kopieren</translation>
+    </message>
+    <message>
+        <source>Copy to Left</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Cop&amp;y to Left\tAlt+Left&quot;.</translatorcomment>
+        <translation>Nach links kopieren</translation>
+    </message>
+    <message>
+        <source>Copy All to Right</source>
+        <translatorcomment>After WinMerge&apos;s &quot;\nCopy All to Right&quot;.</translatorcomment>
+        <translation>Alles nach rechts kopieren</translation>
+    </message>
+    <message>
+        <source>Copy All to Left</source>
+        <translatorcomment>After WinMerge&apos;s &quot;\nCopy All to Left&quot;.</translatorcomment>
+        <translation>Alles nach links kopieren</translation>
+    </message>
+    <message>
+        <source>Undo</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Undo&quot;.</translatorcomment>
+        <translation>Rückgängig</translation>
+    </message>
+    <message>
+        <source>Redo</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Redo&quot;.</translatorcomment>
+        <translation>Wiederherstellen</translation>
+    </message>
+    <message>
+        <source>Recompare</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Neu vergleichen</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>Speichern</translation>
+    </message>
+    <message>
+        <source>cannot open %1</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>%1 kann nicht geöffnet werden</translation>
+    </message>
+    <message>
+        <source>expected 2 or 3 files</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>2 oder 3 Dateien erwartet</translation>
+    </message>
+    <message>
+        <source>could not create the backup file %1</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Die Sicherungsdatei %1 konnte nicht erstellt werden</translation>
+    </message>
+    <message>
+        <source>cannot write %1</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>%1 kann nicht geschrieben werden</translation>
+    </message>
+    <message>
+        <source>Untitled Left</source>
+        <translation>Unbenannt links</translation>
+    </message>
+    <message>
+        <source>Untitled Middle</source>
+        <translation>Unbenannt Mitte</translation>
+    </message>
+    <message>
+        <source>Untitled Right</source>
+        <translation>Unbenannt rechts</translation>
+    </message>
+</context>
+<context>
+    <name>HexFindDialog</name>
+    <message>
+        <source>Find</source>
+        <translation>Suchen</translation>
+    </message>
+    <message>
+        <source>&amp;Find what:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Suchen nach:</translation>
+    </message>
+    <message>
+        <source>Special syntax: &lt;bh:ff&gt; is the byte ff in hex, \&lt; and \\ are &lt; and \.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Spezialsyntax: &lt;bh:ff&gt; ist das Byte ff hexadezimal, \&lt; und \\ sind &lt; und \.</translation>
+    </message>
+    <message>
+        <source>Direction</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Richtung</translation>
+    </message>
+    <message>
+        <source>&amp;Up</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Aufwärts</translation>
+    </message>
+    <message>
+        <source>&amp;Down</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>A&amp;bwärts</translation>
+    </message>
+    <message>
+        <source>Match &amp;case</source>
+        <translation>&amp;Groß-/Kleinschreibung beachten</translation>
+    </message>
+    <message>
+        <source>U&amp;nicode</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>U&amp;nicode</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>Could not find data.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Die Daten wurden nicht gefunden.</translation>
+    </message>
+    <message>
+        <source>Findstring is zero bytes long.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Der Suchbegriff ist null Bytes lang.</translation>
+    </message>
+</context>
+<context>
+    <name>HexGoToDialog</name>
+    <message>
+        <source>Go to Offset</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Gehe zu Offset</translation>
+    </message>
+    <message>
+        <source>Start with &quot;+&quot; or &quot;-&quot; (minus) for relative jump.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Mit &quot;+&quot; oder &quot;-&quot; (Minus) beginnen für einen relativen Sprung.</translation>
+    </message>
+    <message>
+        <source>Prefix offset with &quot;x&quot; to indicate hex notation.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Dem Offset ein &quot;x&quot; voranstellen, um hexadezimale Schreibweise anzugeben.</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>Offset not recognized.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Offset nicht erkannt.</translation>
+    </message>
+</context>
+<context>
+    <name>HexPasteDialog</name>
+    <message>
+        <source>Paste with dialogue</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Einfügen mit Dialog</translation>
+    </message>
+    <message>
+        <source>Clipboard content (text):</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Inhalt der Zwischenablage (Text):</translation>
+    </message>
+    <message>
+        <source>Paste mode</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Einfügemodus</translation>
+    </message>
+    <message>
+        <source>Overwrite</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Überschreiben</translation>
+    </message>
+    <message>
+        <source>Insert</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Einfügen</translation>
+    </message>
+    <message>
+        <source>Paste data how many times:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Wie oft einfügen:</translation>
+    </message>
+    <message>
+        <source>Paste coded binary values as text</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Kodierte Binärwerte als Text einfügen</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>Skip how many bytes between inserts/overwrites</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Wie viele Bytes zwischen den Einfügungen überspringen</translation>
+    </message>
+    <message>
+        <source>Number of times to paste must be at least 1.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Es muss mindestens einmal eingefügt werden.</translation>
+    </message>
+    <message>
+        <source>Tried to paste zero-length array.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Es wurde versucht, null Bytes einzufügen.</translation>
+    </message>
+    <message>
+        <source>Not enough space for overwriting.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Nicht genug Platz zum Überschreiben.</translation>
+    </message>
+</context>
+<context>
+    <name>HexRangeDialog</name>
+    <message>
+        <source>Copy</source>
+        <translation>Kopieren</translation>
+    </message>
+    <message>
+        <source>Start copying at offset:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Kopieren ab Offset:</translation>
+    </message>
+    <message>
+        <source>Copy how many bytes</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Wie viele Bytes kopieren</translation>
+    </message>
+    <message>
+        <source>Copy up to and including offset:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Kopieren bis einschließlich Offset:</translation>
+    </message>
+    <message>
+        <source>Number of bytes to copy:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Anzahl kopierender Bytes:</translation>
+    </message>
+    <message>
+        <source>Cut</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Ausschneiden</translation>
+    </message>
+    <message>
+        <source>Start cutting at offset:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Ausschneiden ab Offset:</translation>
+    </message>
+    <message>
+        <source>Cut how many bytes</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Wie viele Bytes ausschneiden</translation>
+    </message>
+    <message>
+        <source>Cut up to and including offset:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Ausschneiden bis einschließlich Offset:</translation>
+    </message>
+    <message>
+        <source>Number of bytes to cut:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Anzahl auszuschneidender Bytes:</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Löschen</translation>
+    </message>
+    <message>
+        <source>Start deleting at offset:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Löschen ab Offset:</translation>
+    </message>
+    <message>
+        <source>Delete how many bytes</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Wie viele Bytes löschen</translation>
+    </message>
+    <message>
+        <source>Delete up to and including offset:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Löschen bis einschließlich Offset:</translation>
+    </message>
+    <message>
+        <source>Number of bytes to delete:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Anzahl zu löschender Bytes:</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>Start offset not recognized.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Startoffset nicht erkannt.</translation>
+    </message>
+    <message>
+        <source>End offset not recognized.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Endoffset nicht erkannt.</translation>
+    </message>
+    <message>
+        <source>Number of bytes not recognized.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Anzahl der Bytes nicht erkannt.</translation>
+    </message>
+    <message>
+        <source>Can&apos;t copy more bytes than are present.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Es können nicht mehr Bytes kopiert werden, als vorhanden sind.</translation>
+    </message>
+    <message>
+        <source>Can&apos;t cut more bytes than are present.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Es können nicht mehr Bytes ausgeschnitten werden, als vorhanden sind.</translation>
+    </message>
+    <message>
+        <source>Can&apos;t delete more bytes than are present.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Es können nicht mehr Bytes gelöscht werden, als vorhanden sind.</translation>
+    </message>
+</context>
+<context>
+    <name>HexReplaceDialog</name>
+    <message>
+        <source>Replace</source>
+        <translation>Ersetzen</translation>
+    </message>
+    <message>
+        <source>Find what:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Suchen nach:</translation>
+    </message>
+    <message>
+        <source>Find next</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Weitersuchen</translation>
+    </message>
+    <message>
+        <source>Find previous</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Rückwärts suchen</translation>
+    </message>
+    <message>
+        <source>Match case</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Match &amp;case&quot;.</translatorcomment>
+        <translation>Groß-/Kleinschreibung beachten</translation>
+    </message>
+    <message>
+        <source>Replace with:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Ersetzen durch:</translation>
+    </message>
+    <message>
+        <source>Replace all...</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Alle ersetzen...</translation>
+    </message>
+    <message>
+        <source>... following occurrences</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>... nachfolgende Vorkommen</translation>
+    </message>
+    <message>
+        <source>... previous occurrences</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>... vorherige Vorkommen</translation>
+    </message>
+    <message>
+        <source>Use special syntax</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Spezialsyntax verwenden</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>Data to replace must be selected.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Die zu ersetzenden Daten müssen markiert sein.</translation>
+    </message>
+    <message>
+        <source>Could not find data.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Die Daten wurden nicht gefunden.</translation>
+    </message>
+    <message>
+        <source>To-replace and replace-with data are same.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Such- und Ersetzungsdaten sind gleich.</translation>
+    </message>
+    <message>
+        <source>%1 occurrences replaced.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>%1 Vorkommen ersetzt.</translation>
+    </message>
+</context>
+<context>
+    <name>HexView</name>
+    <message>
+        <source>Could not find any more occurrences.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Keine weiteren Vorkommen gefunden.</translation>
+    </message>
+    <message>
+        <source>String to find not specified.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Kein Suchbegriff angegeben.</translation>
+    </message>
+    <message>
+        <source>Cu&amp;t...</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>A&amp;usschneiden...</translation>
+    </message>
+    <message>
+        <source>&amp;Copy...</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Kopieren...</translation>
+    </message>
+    <message>
+        <source>&amp;Paste...</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Einfügen...</translation>
+    </message>
+    <message>
+        <source>&amp;Delete</source>
+        <translation>L&amp;öschen</translation>
+    </message>
+    <message>
+        <source>&amp;Find...</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Suchen...</translation>
+    </message>
+    <message>
+        <source>Replace...</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Ersetzen...</translation>
+    </message>
+    <message>
+        <source>Find next</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Weitersuchen</translation>
+    </message>
+    <message>
+        <source>Find previous</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Rückwärts suchen</translation>
+    </message>
+    <message>
+        <source>&amp;Go To...</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Gehe zu...</translation>
+    </message>
+    <message numerus="yes">
+        <source>Selected: Offset %1=0x%2 to %3=0x%4 (%n byte(s))</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>
+            <numerusform>Markiert: Offset %1=0x%2 bis %3=0x%4 (%n Byte)</numerusform>
+            <numerusform>Markiert: Offset %1=0x%2 bis %3=0x%4 (%n Bytes)</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Offset %1=0x%2</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Offset %1=0x%2</translation>
+    </message>
+    <message>
+        <source>Bits</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Bits</translation>
+    </message>
+    <message>
+        <source>END</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>ENDE</translation>
+    </message>
+    <message>
+        <source>Signed</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Mit Vorzeichen</translation>
+    </message>
+    <message>
+        <source>Unsigned</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Ohne Vorzeichen</translation>
+    </message>
+    <message>
+        <source>B</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>B</translation>
+    </message>
+    <message>
+        <source>W</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>W</translation>
+    </message>
+    <message>
+        <source>L</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>L</translation>
+    </message>
+    <message>
+        <source>READ</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>READ</translation>
+    </message>
+    <message>
+        <source>INS</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>INS</translation>
+    </message>
+    <message>
+        <source>OVR</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>OVR</translation>
+    </message>
+    <message>
+        <source>OEM</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>OEM</translation>
+    </message>
+    <message>
+        <source>ANSI</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>ANSI</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Größe</translation>
+    </message>
+</context>
+<context>
+    <name>HexViewSettingsDialog</name>
+    <message>
+        <source>View Settings</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Einstellungen...&quot;.</translatorcomment>
+        <translation>Einstellungen</translation>
+    </message>
+    <message>
+        <source>Number of bytes to display per line:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Anzahl der Bytes pro Zeile:</translation>
+    </message>
+    <message>
+        <source>Automatically adjust number of bytes per line (uncheck this if you want to use your own choice for bytes per line)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Anzahl der Bytes pro Zeile automatisch anpassen (deaktivieren, um eine eigene Anzahl zu verwenden)</translation>
+    </message>
+    <message>
+        <source>Display length of offset in how many characters:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Länge des Offsets in Zeichen:</translation>
+    </message>
+    <message>
+        <source>Adjust offset length to that of the max offset</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Offsetlänge an den größten Offset anpassen</translation>
+    </message>
+    <message>
+        <source>Display values at caret position as:</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Werte an der Cursorposition anzeigen als:</translation>
+    </message>
+    <message>
+        <source>unsigned</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>ohne Vorzeichen</translation>
+    </message>
+    <message>
+        <source>signed</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>mit Vorzeichen</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+</context>
+<context>
     <name>ImageCompareView</name>
     <message>
         <source>First Difference</source>
@@ -2963,6 +3649,10 @@ Wenn Sie jetzt nicht alle Vergleiche aktualisieren möchten, können Sie &apos;N
         <translation>In beiden Bereichen ist die gleiche Datei geöffnet.</translation>
     </message>
     <message>
+        <source>Copy all differences to other file?</source>
+        <translation>Wollen Sie wirklich alle Unterschiede in die andere Datei kopieren?</translation>
+    </message>
+    <message>
         <source>Don&apos;t ask this question again.</source>
         <translatorcomment>After WinMerge&apos;s &quot;Don&apos;t ask this &amp;question again.&quot;.</translatorcomment>
         <translation>Diese Frage nicht erneut stellen.</translation>
@@ -3244,6 +3934,18 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <translation>keine</translation>
     </message>
     <message>
+        <source>View &amp;Settings...</source>
+        <translation>&amp;Einstellungen...</translation>
+    </message>
+    <message>
+        <source>&amp;Binary Mode...</source>
+        <translation>&amp;Binärmodus...</translation>
+    </message>
+    <message>
+        <source>&amp;Character Set...</source>
+        <translation>&amp;Zeichensatz...</translation>
+    </message>
+    <message>
         <source>Options</source>
         <translation>Einstellungen</translation>
     </message>
@@ -3254,6 +3956,10 @@ Die binäre Übereinstimmung wird geprüft...</translation>
     <message>
         <source>Folder</source>
         <translation>Ordner</translation>
+    </message>
+    <message>
+        <source>Binary</source>
+        <translation>Binär</translation>
     </message>
     <message>
         <source>Message Boxes</source>
@@ -3403,6 +4109,15 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <source>The status bar of a folder comparison shows the method in use; click it to switch and recompare.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Die Statusleiste eines Ordnervergleichs zeigt die verwendete Methode; klicken Sie darauf, um sie zu wechseln und neu zu vergleichen.</translation>
+    </message>
+    <message>
+        <source>Binary file &amp;patterns:</source>
+        <translation>Binärdatei&amp;muster:</translation>
+    </message>
+    <message>
+        <source>Hex editor settings</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Hex-Editor-Einstellungen</translation>
     </message>
     <message>
         <source>Some messages can be hidden by the user. Press Reset to make all messages visible again.</source>
