@@ -2,6 +2,9 @@
 #include "HexView.h"
 
 #include <QApplication>
+#include <QClipboard>
+#include <QContextMenuEvent>
+#include <QMenu>
 #include <QFontDatabase>
 #include <QKeyEvent>
 #include <QPainter>
@@ -10,6 +13,8 @@
 #include <QStyleHints>
 #include <QTimer>
 
+#include "HexDialogs.h"
+#include "MessageBoxes.h"
 #include "Theme.h"
 
 namespace
@@ -32,20 +37,6 @@ int hexDigits(qsizetype value)
 	return digits;
 }
 
-/** What the text column shows for a byte: Frhed's ANSI character set
-    shows the printable ASCII and Latin-1 characters and the curly single
-    quotes of Windows-1252 (145 and 146), a dot for the rest. */
-QChar charOf(unsigned char byte)
-{
-	if ((byte >= 32 && byte <= 126) || byte >= 160)
-		return QChar(byte);
-	if (byte == 145)
-		return QChar(0x2018);
-	if (byte == 146)
-		return QChar(0x2019);
-	return QLatin1Char('.');
-}
-
 QChar hexDigit(int value)
 {
 	return QLatin1Char("0123456789abcdef"[value & 0xf]);
@@ -56,7 +47,76 @@ QString fontKey()
 	return QStringLiteral("FileCompare/FontPointSize");
 }
 
+qreal standardPointSize()
+{
+	return QFontDatabase::systemFont(QFontDatabase::FixedFont).pointSizeF();
+}
+
+/** WinMerge's zoom, which its text and binary comparisons share: here the
+    text comparison's size over the standard one. */
+qreal zoomFactor()
+{
+	return QSettings().value(fontKey(), standardPointSize()).toReal() / standardPointSize();
+}
+
+const QString kSettings = QStringLiteral("BinaryCompare/");
+
+std::function<void(QMenu *)> &contextMenuPresenter()
+{
+	static std::function<void(QMenu *)> presenter;
+	return presenter;
+}
+
 } // namespace
+
+// --- HexSettings -------------------------------------------------------------
+
+HexSettings HexSettings::load()
+{
+	const QSettings store;
+	HexSettings settings;
+	settings.automaticBytesPerLine = store.value(kSettings + QStringLiteral("AutomaticBytesPerLine"),
+		settings.automaticBytesPerLine).toBool();
+	settings.bytesPerLine = qMax(1, store.value(kSettings + QStringLiteral("BytesPerLine"),
+		settings.bytesPerLine).toInt());
+	settings.automaticOffsetLength = store.value(kSettings + QStringLiteral("AutomaticOffsetLength"),
+		settings.automaticOffsetLength).toBool();
+	settings.offsetLength = qBound(1, store.value(kSettings + QStringLiteral("OffsetLength"),
+		settings.offsetLength).toInt(), 16);
+	settings.unsignedValues = store.value(kSettings + QStringLiteral("UnsignedValues"),
+		settings.unsignedValues).toBool();
+	settings.bigEndian = store.value(kSettings + QStringLiteral("BigEndian"),
+		settings.bigEndian).toBool();
+	settings.oemCharacterSet = store.value(kSettings + QStringLiteral("OemCharacterSet"),
+		settings.oemCharacterSet).toBool();
+	settings.fontSize = store.value(kSettings + QStringLiteral("FontSize"), settings.fontSize).toReal();
+	return settings;
+}
+
+void HexSettings::save() const
+{
+	QSettings store;
+	store.setValue(kSettings + QStringLiteral("AutomaticBytesPerLine"), automaticBytesPerLine);
+	store.setValue(kSettings + QStringLiteral("BytesPerLine"), bytesPerLine);
+	store.setValue(kSettings + QStringLiteral("AutomaticOffsetLength"), automaticOffsetLength);
+	store.setValue(kSettings + QStringLiteral("OffsetLength"), offsetLength);
+	store.setValue(kSettings + QStringLiteral("UnsignedValues"), unsignedValues);
+	store.setValue(kSettings + QStringLiteral("BigEndian"), bigEndian);
+	store.setValue(kSettings + QStringLiteral("OemCharacterSet"), oemCharacterSet);
+	store.setValue(kSettings + QStringLiteral("FontSize"), fontSize);
+	emit HexSettingsWatch::instance()->changed();
+}
+
+qreal HexSettings::basePointSize() const
+{
+	return fontSize > 0 ? fontSize : standardPointSize();
+}
+
+HexSettingsWatch *HexSettingsWatch::instance()
+{
+	static HexSettingsWatch watch;
+	return &watch;
+}
 
 // --- HexUndoHistory ---------------------------------------------------------
 
@@ -135,9 +195,12 @@ HexView::HexView(QWidget *parent)
 	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 
+	m_settings = HexSettings::load();
 	QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-	font.setPointSizeF(QSettings().value(fontKey(), font.pointSizeF()).toReal());
+	font.setPointSizeF(m_settings.basePointSize() * zoomFactor());
 	setFont(font);
+	connect(HexSettingsWatch::instance(), &HexSettingsWatch::changed, this,
+		[this]() { applySettings(HexSettings::load()); });
 
 	// a press held or dragged becomes a selection (Frhed's mouse operation
 	// delay: the system's drag delay and distance)
@@ -253,9 +316,20 @@ void HexView::relayout()
 	m_ascent = metrics.ascent();
 
 	const qsizetype firstByte = static_cast<qsizetype>(topLine()) * m_bytesPerLine;
+	// the offset's digits: the size's, or at least the settings' when
+	// they do not follow it
 	m_offsetLength = hexDigits(m_data.size());
-	const int room = screenColumns() - m_offsetLength - kByteSpace - kCharSpace;
-	m_bytesPerLine = qMax(1, room / 4);
+	if (!m_settings.automaticOffsetLength)
+		m_offsetLength = qMax(m_offsetLength, m_settings.offsetLength);
+	if (m_settings.automaticBytesPerLine)
+	{
+		const int room = screenColumns() - m_offsetLength - kByteSpace - kCharSpace;
+		m_bytesPerLine = qMax(1, room / 4);
+	}
+	else
+	{
+		m_bytesPerLine = qMax(1, m_settings.bytesPerLine);
+	}
 	updateScrollBars();
 	verticalScrollBar()->setValue(static_cast<int>(firstByte / m_bytesPerLine));
 	viewport()->update();
@@ -284,12 +358,25 @@ void HexView::setFontPointSize(qreal pointSize)
 	relayout();
 }
 
+/** Upstream's ZoomText: a point more or less (two at least), or the
+    settings' size; the zoom is kept as the text comparison's, which it
+    shares. */
 void HexView::zoom(int amount)
 {
-	const qreal standard = QFontDatabase::systemFont(QFontDatabase::FixedFont).pointSizeF();
-	const qreal size = amount == 0 ? standard : font().pointSizeF() + amount;
+	const qreal base = m_settings.basePointSize();
+	const qreal size = amount == 0 ? base : qMax<qreal>(2.0, font().pointSizeF() + amount);
 	setFontPointSize(size);
-	QSettings().setValue(fontKey(), font().pointSizeF());
+	QSettings().setValue(fontKey(), standardPointSize() * size / base);
+}
+
+void HexView::applySettings(const HexSettings &settings)
+{
+	m_settings = settings;
+	QFont font = this->font();
+	font.setPointSizeF(m_settings.basePointSize() * zoomFactor());
+	setFont(font);
+	relayout();
+	changed();
 }
 
 void HexView::resizeEvent(QResizeEvent *event)
@@ -333,7 +420,7 @@ QString HexView::lineTextForTest(int line) const
 			const auto byte = static_cast<unsigned char>(m_data.at(i));
 			text += hexDigit(byte >> 4);
 			text += hexDigit(byte);
-			chars += charOf(byte);
+			chars += lm::hex::displayChar(byte, m_settings.oemCharacterSet);
 		}
 		else
 		{
@@ -344,6 +431,17 @@ QString HexView::lineTextForTest(int line) const
 			text += QLatin1Char(' ');
 	}
 	return text + QString(kCharSpace + 1, QLatin1Char(' ')) + chars;
+}
+
+QPoint HexView::pointForTest(qsizetype byte, int nibble, bool chars) const
+{
+	const int bytesColumn = m_offsetLength + kByteSpace;
+	const int column = chars
+		? bytesColumn + m_bytesPerLine * 3 + kCharSpace + static_cast<int>(byte % m_bytesPerLine)
+		: bytesColumn + static_cast<int>(byte % m_bytesPerLine) * 3 + nibble;
+	const int line = static_cast<int>(byte / m_bytesPerLine) - topLine();
+	return QPoint((column - horizontalScrollBar()->value()) * m_cx + m_cx / 2,
+		line * m_cy + m_cy / 2);
 }
 
 void HexView::paintEvent(QPaintEvent *)
@@ -398,7 +496,7 @@ void HexView::paintEvent(QPaintEvent *)
 			{
 				const auto byte = static_cast<unsigned char>(m_data.at(i));
 				hex = QString(hexDigit(byte >> 4)) + hexDigit(byte);
-				character = QString(charOf(byte));
+				character = QString(lm::hex::displayChar(byte, m_settings.oemCharacterSet));
 			}
 			else
 			{
@@ -723,16 +821,9 @@ void HexView::typeCharacter(const QString &text)
 	}
 	else
 	{
-		// Frhed's ANSI character set: the character's own byte
-		const ushort unicode = ch.unicode();
-		if (unicode == 0x2018)
-			byte = 145;
-		else if (unicode == 0x2019)
-			byte = 146;
-		else if (unicode < 256)
-			byte = static_cast<unsigned char>(unicode);
-		else
-			return;
+		// the character's byte in the character set (ANSI or OEM)
+		const QByteArray bytes = lm::hex::charsetBytes(QString(ch), m_settings.oemCharacterSet);
+		byte = static_cast<unsigned char>(bytes.at(0));
 	}
 
 	qsizetype at = m_curByte;
@@ -798,6 +889,353 @@ void HexView::backspace()
 	}
 }
 
+void HexView::selectFound(qsizetype start, qsizetype length)
+{
+	if (length <= 0)
+		return;
+	m_curByte = start;
+	m_selStart = start;
+	m_selEnd = start + length - 1;
+	m_selected = true;
+	showSelection();
+	changed();
+	syncSiblings(false);
+}
+
+void HexView::placeCaret(qsizetype offset)
+{
+	m_selected = false;
+	m_curByte = qBound<qsizetype>(0, offset, m_data.size());
+	m_curNibble = 0;
+	snapCaret();
+	changed();
+}
+
+/** Upstream's queryCommandEnabled: Copy over a selection or a byte; Cut,
+    Delete and Paste besides not in a read-only pane. */
+bool HexView::canCopy() const
+{
+	return m_selected || m_curByte < m_data.size();
+}
+
+bool HexView::canEdit() const
+{
+	return !m_readOnly;
+}
+
+QString HexView::selectionAsSpecialSyntax() const
+{
+	const qsizetype lower = m_selected ? selectionLower() : m_curByte;
+	const qsizetype upper = m_selected ? selectionUpper() : m_curByte;
+	return lm::hex::bytesToSpecialSyntax(m_data.mid(lower, upper - lower + 1));
+}
+
+/** Copy, Cut and Delete: Frhed's dialog of a start offset and an end or a
+    count, from the selection (the caret's byte without one). */
+void HexView::editRange(int mode)
+{
+	if (!canCopy() || (mode != HexRangeDialog::Copy && !canEdit()))
+		return;
+	const qsizetype lower = m_selected ? selectionLower() : m_curByte;
+	const qsizetype upper = m_selected ? selectionUpper() : m_curByte;
+	HexRangeDialog dialog(static_cast<HexRangeDialog::Mode>(mode), lower, upper,
+		m_data.size(), this);
+	if (!HexRangeDialog::run(&dialog))
+		return;
+	const qsizetype offset = dialog.offset();
+	const qsizetype count = dialog.count();
+	if (mode != HexRangeDialog::Delete)
+	{
+		// the clipboard takes the bytes in the special syntax (CF_TEXT)
+		QGuiApplication::clipboard()->setText(
+			lm::hex::bytesToSpecialSyntax(m_data.mid(offset, count)));
+	}
+	if (mode == HexRangeDialog::Copy)
+		return;
+	m_selected = false;
+	replaceBytes(offset, count, QByteArray());
+	m_curByte = qMax<qsizetype>(0, qMin(offset, m_data.size() - 1));
+	m_curNibble = 0;
+	snapCaret();
+	changed();
+}
+
+void HexView::editCopy()
+{
+	editRange(HexRangeDialog::Copy);
+}
+
+void HexView::editCut()
+{
+	editRange(HexRangeDialog::Cut);
+}
+
+void HexView::editDelete()
+{
+	editRange(HexRangeDialog::Delete);
+}
+
+/** Frhed's "Paste with dialogue": over a selection or in insert mode the
+    bytes come in (the selection going), otherwise they overwrite, as many
+    times as asked, the bytes to skip between them left as they are. */
+void HexView::editPaste()
+{
+	if (!canEdit())
+		return;
+	HexPasteDialog dialog(m_selected, m_insertMode, m_settings.bigEndian,
+		m_settings.oemCharacterSet, this);
+	if (!HexPasteDialog::run(&dialog))
+		return;
+	const QByteArray pattern = dialog.bytes();
+	const qsizetype times = dialog.times();
+	const qsizetype skip = dialog.skip();
+	const qsizetype span = (times - 1) * (pattern.size() + skip) + pattern.size();
+	if (m_selected || dialog.insert())
+	{
+		qsizetype at = m_curByte;
+		qsizetype removed = 0;
+		if (m_selected)
+		{
+			at = selectionLower();
+			removed = selectionUpper() - at + 1;
+			m_selected = false;
+		}
+		// the bytes after the paste point, between the copies
+		const QByteArray rest = m_data.mid(at + removed, (times - 1) * skip);
+		QByteArray region;
+		for (qsizetype k = 0; k < times; ++k)
+		{
+			region += pattern;
+			if (k < times - 1)
+				region += rest.mid(k * skip, skip);
+		}
+		m_curByte = at;
+		replaceBytes(at, removed + rest.size(), region);
+	}
+	else
+	{
+		if (m_data.size() - m_curByte < (skip + pattern.size()) * times)
+		{
+			lm::showError(this, HexPasteDialog::tr("Not enough space for overwriting."));
+			return;
+		}
+		QByteArray region = m_data.mid(m_curByte, span);
+		for (qsizetype k = 0; k < times; ++k)
+			region.replace(k * (skip + pattern.size()), pattern.size(), pattern);
+		replaceBytes(m_curByte, span, region);
+	}
+	snapCaret();
+	changed();
+}
+
+/** Upstream's search from the caret: down from the byte after it, up
+    through the bytes before it and the pattern's length less one, so that
+    a match the caret stands in counts. */
+void HexView::findFromCaret(const QByteArray &pattern, int direction, bool showDialogMessages)
+{
+	qsizetype found = -1;
+	if (direction > 0)
+	{
+		const qsizetype from = m_curByte + 1;
+		if (from <= m_data.size())
+		{
+			const qsizetype at = lm::hex::findBytes(m_data, from, m_data.size() - from, pattern,
+				1, m_findMatchCase);
+			if (at >= 0)
+				found = from + at;
+		}
+	}
+	else
+	{
+		const qsizetype end = qMin(m_curByte + pattern.size() - 1, m_data.size());
+		found = lm::hex::findBytes(m_data, 0, end, pattern, -1, m_findMatchCase);
+	}
+	if (found >= 0)
+	{
+		m_curByte = found;
+		m_selected = true;
+		m_selStart = found;
+		m_selEnd = found + pattern.size() - 1;
+		showSelection();
+		changed();
+	}
+	else if (showDialogMessages)
+	{
+		lm::showWarning(this, HexFindDialog::tr("Could not find data."));
+	}
+	else
+	{
+		lm::showInformation(this, tr("Could not find any more occurrences."));
+	}
+}
+
+/** Frhed's Find dialog: the selection (when there is one) is what to
+    find, else the last text looked for. */
+void HexView::showFind()
+{
+	if (m_data.isEmpty())
+		return;
+	if (m_selected)
+		m_findText = selectionAsSpecialSyntax();
+	HexFindDialog dialog(m_findText, m_findDirection, m_findMatchCase, m_findUnicode, this);
+	if (!HexFindDialog::run(&dialog))
+		return;
+	const QString text = dialog.text();
+	m_findText = text;
+	if (text.isEmpty())
+	{
+		lm::showError(this, HexFindDialog::tr("Findstring is zero bytes long."));
+		return;
+	}
+	m_findMatchCase = dialog.matchCase();
+	m_findUnicode = dialog.unicode();
+	m_findDirection = dialog.direction();
+	QByteArray pattern;
+	if (m_findUnicode)
+	{
+		// the text as UTF-16, little-endian
+		for (const QChar ch : text)
+		{
+			pattern += static_cast<char>(ch.unicode() & 0xff);
+			pattern += static_cast<char>(ch.unicode() >> 8);
+		}
+	}
+	else
+	{
+		pattern = lm::hex::specialSyntaxToBytes(text, m_settings.bigEndian,
+			m_settings.oemCharacterSet);
+	}
+	if (pattern.isEmpty())
+	{
+		lm::showError(this, HexFindDialog::tr("Findstring is zero bytes long."));
+		return;
+	}
+	findFromCaret(pattern, m_findDirection, true);
+}
+
+/** Upstream's CMD_findnext and CMD_findprev (F3, Shift+F3): the selection
+    is what to find when there is one; without a text, the dialog. */
+void HexView::findNext()
+{
+	if (m_data.isEmpty())
+		return;
+	if (m_selected)
+		m_findText = selectionAsSpecialSyntax();
+	if (m_findText.isEmpty())
+	{
+		lm::showError(this, tr("String to find not specified."));
+		return;
+	}
+	const QByteArray pattern = lm::hex::specialSyntaxToBytes(m_findText, m_settings.bigEndian, m_settings.oemCharacterSet);
+	if (pattern.isEmpty())
+	{
+		m_findDirection = 1;
+		showFind();
+		return;
+	}
+	findFromCaret(pattern, 1, false);
+}
+
+void HexView::findPrevious()
+{
+	if (m_data.isEmpty())
+		return;
+	if (m_selected)
+		m_findText = selectionAsSpecialSyntax();
+	if (m_findText.isEmpty())
+	{
+		lm::showError(this, tr("String to find not specified."));
+		return;
+	}
+	const QByteArray pattern = lm::hex::specialSyntaxToBytes(m_findText, m_settings.bigEndian, m_settings.oemCharacterSet);
+	if (pattern.isEmpty())
+	{
+		m_findDirection = -1;
+		showFind();
+		return;
+	}
+	findFromCaret(pattern, -1, false);
+}
+
+void HexView::showReplace()
+{
+	if (m_data.isEmpty() || !canEdit())
+		return;
+	HexReplaceDialog dialog(this, this);
+	HexReplaceDialog::run(&dialog);
+}
+
+/** Frhed's "Go to Offset": the caret goes, the selection stays as it is. */
+void HexView::showGoTo()
+{
+	if (m_data.isEmpty())
+		return;
+	HexGoToDialog dialog(m_curByte, m_data.size(), this);
+	if (!HexGoToDialog::run(&dialog))
+		return;
+	m_curByte = dialog.offset();
+	snapCaret();
+	changed();
+}
+
+/** Frhed's context menu (IDR_CONTEXTMENU): the clipboard commands, then
+    the finding ones, each enabled as its command is. */
+void HexView::contextMenuEvent(QContextMenuEvent *event)
+{
+	// over the offsets a right click lengthens them instead, when their
+	// length does not follow the size
+	if (event->reason() == QContextMenuEvent::Mouse
+		&& hitTest(event->pos()).where == Hit::Offsets)
+	{
+		if (!m_settings.automaticOffsetLength)
+		{
+			HexSettings settings = m_settings;
+			settings.offsetLength = qMin(16, settings.offsetLength + 1);
+			settings.save();
+		}
+		return;
+	}
+	QMenu menu(this);
+	const auto add = [&menu](const QString &text, const QKeySequence &keys, bool enabled,
+		auto slot) {
+		QAction *action = menu.addAction(text, slot);
+		action->setShortcut(keys);
+		action->setShortcutVisibleInContextMenu(true);
+		action->setEnabled(enabled);
+	};
+	const bool haveData = !m_data.isEmpty();
+	add(tr("Cu&t..."), QKeySequence::Cut, canCopy() && canEdit(), [this]() { editCut(); });
+	add(tr("&Copy..."), QKeySequence::Copy, canCopy(), [this]() { editCopy(); });
+	add(tr("&Paste..."), QKeySequence::Paste,
+		canEdit() && !QGuiApplication::clipboard()->text().isEmpty(), [this]() { editPaste(); });
+	add(tr("&Delete"), QKeySequence(Qt::Key_Delete), canCopy() && canEdit(),
+		[this]() { editDelete(); });
+	menu.addSeparator();
+	add(tr("&Find..."), QKeySequence::Find, haveData, [this]() { showFind(); });
+#ifdef Q_OS_MACOS
+	const QKeySequence replaceKeys(Qt::CTRL | Qt::ALT | Qt::Key_F);
+	const QKeySequence goToKeys(Qt::META | Qt::Key_G);
+#else
+	const QKeySequence replaceKeys(Qt::CTRL | Qt::Key_H);
+	const QKeySequence goToKeys(Qt::CTRL | Qt::Key_G);
+#endif
+	add(tr("Replace..."), replaceKeys, haveData && canEdit(), [this]() { showReplace(); });
+	const bool canRepeat = haveData && (!m_findText.isEmpty() || m_selected);
+	add(tr("Find next"), QKeySequence(Qt::Key_F3), canRepeat, [this]() { findNext(); });
+	add(tr("Find previous"), QKeySequence(Qt::SHIFT | Qt::Key_F3), canRepeat,
+		[this]() { findPrevious(); });
+	add(tr("&Go To..."), goToKeys, haveData, [this]() { showGoTo(); });
+	if (contextMenuPresenter())
+		contextMenuPresenter()(&menu);
+	else
+		menu.exec(event->globalPos());
+}
+
+void HexView::setContextMenuPresenterForTest(std::function<void(QMenu *)> presenter)
+{
+	contextMenuPresenter() = std::move(presenter);
+}
+
 // --- keyboard ---------------------------------------------------------------
 
 bool HexView::focusNextPrevChild(bool)
@@ -829,6 +1267,33 @@ void HexView::keyPressEvent(QKeyEvent *event)
 		case Qt::Key_PageDown: v->setValue(v->value() + screenLines()); return;
 		default: break;
 		}
+	}
+	// the main window's Edit commands and Frhed's own accelerators, which
+	// open the editor's dialogs (Del included)
+	if (event->matches(QKeySequence::Copy))
+	{
+		editCopy();
+		return;
+	}
+	if (event->matches(QKeySequence::Cut))
+	{
+		editCut();
+		return;
+	}
+	if (event->matches(QKeySequence::Paste))
+	{
+		editPaste();
+		return;
+	}
+	if (event->matches(QKeySequence::SelectAll))
+	{
+		selectAll();
+		return;
+	}
+	if (key == Qt::Key_Delete && mods == Qt::NoModifier)
+	{
+		editDelete();
+		return;
 	}
 	switch (key)
 	{
@@ -1119,9 +1584,19 @@ void HexView::mousePressEvent(QMouseEvent *event)
 		return;
 	}
 	setFocus(Qt::MouseFocusReason);
+	Hit hit = hitTest(event->position().toPoint());
+	// upstream's: a click on the offsets shortens them, when their length
+	// does not follow the size
+	if (hit.where == Hit::Offsets && !m_settings.automaticOffsetLength
+		&& m_settings.offsetLength > 1)
+	{
+		HexSettings settings = m_settings;
+		--settings.offsetLength;
+		settings.save();
+		return;
+	}
 	m_pressed = true;
 	m_pressPoint = m_mousePoint = event->position().toPoint();
-	Hit hit = hitTest(m_pressPoint);
 	m_pressPos = m_lastPos = hit.pos;
 	if (event->modifiers() & Qt::ShiftModifier)
 	{
@@ -1325,20 +1800,27 @@ QString HexView::statusValuesText() const
 	const qsizetype available = m_data.size() - m_curByte;
 	if (available < 1)
 		return tr("END");
+	// the byte, the word and the longword at the caret, in the byte order
+	// and the signedness the settings ask for
 	const auto at = [this](qsizetype i) {
 		return static_cast<quint32>(static_cast<unsigned char>(m_data.at(m_curByte + i)));
 	};
-	// Frhed's defaults: unsigned, little-endian
-	QString text = tr("Unsigned") + QStringLiteral(": ") + tr("B") + QLatin1Char(':')
-		+ QString::number(at(0));
+	const bool big = m_settings.bigEndian;
+	const bool sign = !m_settings.unsignedValues;
+	const quint32 byte = at(0);
+	QString text = (sign ? tr("Signed") : tr("Unsigned")) + QStringLiteral(": ") + tr("B")
+		+ QLatin1Char(':') + (sign ? QString::number(static_cast<qint8>(byte)) : QString::number(byte));
 	if (available >= 2)
 	{
-		const quint32 word = at(1) << 8 | at(0);
-		text += QLatin1Char(',') + tr("W") + QLatin1Char(':') + QString::number(word);
+		const quint32 word = big ? (at(0) << 8 | at(1)) : (at(1) << 8 | at(0));
+		text += QLatin1Char(',') + tr("W") + QLatin1Char(':')
+			+ (sign ? QString::number(static_cast<qint16>(word)) : QString::number(word));
 		if (available >= 4)
 		{
-			const quint32 longword = word | (at(3) << 8 | at(2)) << 16;
-			text += QLatin1Char(',') + tr("L") + QLatin1Char(':') + QString::number(longword);
+			const quint32 longword = big ? (word << 16 | at(2) << 8 | at(3))
+				: (word | (at(3) << 8 | at(2)) << 16);
+			text += QLatin1Char(',') + tr("L") + QLatin1Char(':')
+				+ (sign ? QString::number(static_cast<qint32>(longword)) : QString::number(longword));
 		}
 	}
 	return text;
@@ -1347,7 +1829,8 @@ QString HexView::statusValuesText() const
 QString HexView::statusModeText() const
 {
 	const QString mode = m_readOnly ? tr("READ") : (m_insertMode ? tr("INS") : tr("OVR"));
-	return tr("ANSI") + QStringLiteral(" / ") + mode + QStringLiteral(" / ") + tr("L");
+	return (m_settings.oemCharacterSet ? tr("OEM") : tr("ANSI")) + QStringLiteral(" / ") + mode
+		+ QStringLiteral(" / ") + (m_settings.bigEndian ? tr("B") : tr("L"));
 }
 
 QString HexView::statusSizeText() const

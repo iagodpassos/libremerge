@@ -21,6 +21,7 @@ qt_add_executable(LibreMerge
   ImagePane.cpp
   HexView.cpp
   HexCompareView.cpp
+  HexDialogs.cpp
   OptionsDialog.cpp
   FiltersDialog.cpp
   FileFilterCombo.cpp

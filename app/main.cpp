@@ -63,6 +63,7 @@
 #include "ImageCompareView.h"
 #include "HexCompareView.h"
 #include "HexView.h"
+#include "HexDialogs.h"
 #include "FileOps.h"
 #include "FolderCompareDriver.h"
 #include "FolderCompareView.h"
@@ -335,6 +336,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestHexOpt(QStringLiteral("selftest-hex"),
 		QStringLiteral("Compare binary files in the hex view and verify it (for testing)"));
 	parser.addOption(selftestHexOpt);
+	QCommandLineOption selftestHexEditOpt(QStringLiteral("selftest-hex-edit"),
+		QStringLiteral("Edit a binary comparison through the hex editor's dialogs and verify it (for testing)"));
+	parser.addOption(selftestHexEditOpt);
 	QCommandLineOption selftestLastLineOpt(QStringLiteral("selftest-last-line"),
 		QStringLiteral("Compare files whose last lines differ and verify what is a difference (for testing)"));
 	parser.addOption(selftestLastLineOpt);
@@ -1350,11 +1354,11 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
-			OptionsDialog::ComparePage, OptionsDialog::FolderPage,
+			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::BinaryPage,
 			OptionsDialog::MessageBoxesPage, OptionsDialog::BackupPage };
-		bool ok = tree.size() == 6;
+		bool ok = tree.size() == 7;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1362,16 +1366,16 @@ int main(int argc, char *argv[])
 		// the Compare category shows Compare > General
 		const int expectedPage[] = { OptionsDialog::GeneralPage,
 			OptionsDialog::ComparePage, OptionsDialog::ComparePage,
-			OptionsDialog::FolderPage, OptionsDialog::MessageBoxesPage,
+			OptionsDialog::FolderPage, OptionsDialog::BinaryPage, OptionsDialog::MessageBoxesPage,
 			OptionsDialog::BackupPage };
-		for (int i = 0; ok && i < 6; ++i)
+		for (int i = 0; ok && i < 7; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
 			printf("item %d: page %d, title \"%s\"\n", i,
 				dialog.currentPageForTest(), qPrintable(dialog.windowTitle()));
 			ok = dialog.currentPageForTest() == expectedPage[i]
-				&& nested == (i >= 1 && i <= 3);
+				&& nested == (i >= 1 && i <= 4);
 		}
 
 		const auto boxes = [&dialog](OptionsDialog::Page page) {
@@ -1396,14 +1400,14 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(5); // Backup Files
+		dialog.selectCategoryForTest(6); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 
 		// every row of the Message Boxes list shows its check box (the
 		// macOS 27 style left all but the first one out)
 		{
-			dialog.selectCategoryForTest(4); // Message Boxes
+			dialog.selectCategoryForTest(5); // Message Boxes
 			dialog.grab(); // lays the pages out
 			auto *list = dialog.pageForTest(OptionsDialog::MessageBoxesPage)
 				->findChild<QTreeWidget *>();
@@ -9205,6 +9209,401 @@ int main(int argc, char *argv[])
 		return ok ? 0 : 1;
 	}
 
+	if (parser.isSet(selftestHexEditOpt))
+	{
+		// the hex editor's dialogs, as WinMerge's binary comparison opens
+		// them: Frhed's special syntax for bytes as text, Copy, Cut,
+		// Delete, Paste with dialogue, Find with F3, Replace and Go To,
+		// and the context menu that lists them
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto hexOf = [](const QByteArray &bytes) { return QString::fromLatin1(bytes.toHex(' ')); };
+		QStringList messages;
+		lm::setMessageSinkForTest([&messages](const QString &text) { messages << text; });
+
+		// --- the special syntax ---
+		const QByteArray raw("\x00<\\A\n\xff", 6);
+		const QString coded = lm::hex::bytesToSpecialSyntax(raw);
+		printf("  coded: %s\n", qPrintable(coded));
+		check(coded == QStringLiteral("<bh:00>\\<\\\\A\n<bh:ff>") && lm::hex::specialSyntaxToBytes(coded) == raw,
+			"bytes as text: printable as they are, \\< and \\\\, <bh:..> for the rest, and back");
+		check(lm::hex::specialSyntaxToBytes(QStringLiteral("<bd:65><wh:1234><ld:1>x"))
+				== QByteArray("A\x34\x12\x01\x00\x00\x00x", 8)
+				&& lm::hex::specialSyntaxToBytes(QStringLiteral("<bh:zz>")) == QByteArray("<bh:zz>"),
+			"<bd:..>, <wh:..>, <ld:..> little-endian; a malformed code is text");
+		qsizetype offset = 0;
+		check(lm::hex::parseOffset(QStringLiteral("x10"), &offset) && offset == 16
+				&& lm::hex::parseOffset(QStringLiteral("0X1f"), &offset) && offset == 31
+				&& lm::hex::parseOffset(QStringLiteral("42"), &offset) && offset == 42
+				&& !lm::hex::parseOffset(QStringLiteral("zz"), &offset),
+			"offsets: decimal, or hex after x or 0x");
+		check(lm::hex::findBytes(QByteArray("xxABCxxabc"), 0, 10, QByteArray("abc"), 1, false) == 2
+				&& lm::hex::findBytes(QByteArray("xxABCxxabc"), 0, 10, QByteArray("abc"), 1, true) == 7
+				&& lm::hex::findBytes(QByteArray("xxABCxxabc"), 0, 10, QByteArray("ABC"), -1, false) == 7,
+			"finding bytes: from either end, A to Z equal to a to z without matching case");
+
+		// a comparison to edit: 32 bytes 0x10..0x2f on both sides, the
+		// right side differing at 5
+		QByteArray bytes;
+		for (int i = 0; i < 32; ++i)
+			bytes.append(static_cast<char>(0x10 + i));
+		QByteArray other = bytes;
+		other[5] = 'Q';
+		const QString left = dir.filePath(QStringLiteral("left.dat"));
+		const QString right = dir.filePath(QStringLiteral("right.dat"));
+		for (const auto &[path, content] : { std::pair{ left, bytes }, std::pair{ right, other } })
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				return 2;
+			f.write(content);
+		}
+		HexCompareView view;
+		QString error;
+		if (!view.compare(QStringList{ left, right }, &error))
+			return 2;
+		view.resize(1000, 600);
+		view.show();
+		HexView *const pane = view.paneForTest(0);
+		pane->setFocus();
+		QApplication::processEvents();
+
+		// --- Copy, Cut and Delete ---
+		QString title, start, end, count;
+		bool countEnabled = true;
+		HexRangeDialog::setPresenterForTest([&](HexRangeDialog *dialog) {
+			title = dialog->windowTitle();
+			start = dialog->startField()->text();
+			end = dialog->endField()->text();
+			count = dialog->countField()->text();
+			countEnabled = dialog->countField()->isEnabled();
+			dialog->accept();
+			return dialog->result() == QDialog::Accepted;
+		});
+		pane->setSelection(2, 4);
+		{
+			QKeyEvent key(QEvent::KeyPress, Qt::Key_C, Qt::ControlModifier);
+			QKeyEvent cmd(QEvent::KeyPress, Qt::Key_C, QKeySequence(QKeySequence::Copy)[0].keyboardModifiers());
+			QApplication::sendEvent(pane, &cmd);
+		}
+		check(title == HexRangeDialog::tr("Copy") && start == QStringLiteral("0x2")
+				&& end == QStringLiteral("0x4") && count == QStringLiteral("3") && !countEnabled
+				&& QGuiApplication::clipboard()->text() == QStringLiteral("<bh:12><bh:13><bh:14>")
+				&& pane->length() == 32,
+			"Copy (its key): the selection's offsets and count, the bytes to the clipboard as text");
+		HexRangeDialog::setPresenterForTest([](HexRangeDialog *dialog) {
+			dialog->countButton()->setChecked(true);
+			dialog->countField()->setText(QStringLiteral("2"));
+			dialog->accept();
+			return dialog->result() == QDialog::Accepted;
+		});
+		pane->placeCaret(6);
+		pane->editCut();
+		check(pane->length() == 30 && pane->data().at(6) == 0x18 && pane->caretByte() == 6
+				&& QGuiApplication::clipboard()->text() == QStringLiteral("<bh:16><bh:17>")
+				&& pane->isModified(),
+			"Cut: two bytes from the caret by count, to the clipboard and out of the data");
+		HexRangeDialog::setPresenterForTest([](HexRangeDialog *dialog) {
+			dialog->countButton()->setChecked(true);
+			dialog->countField()->setText(QStringLiteral("x2"));
+			dialog->accept();
+			return dialog->result() == QDialog::Accepted;
+		});
+		{
+			QKeyEvent del(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+			QApplication::sendEvent(pane, &del);
+		}
+		check(pane->length() == 28 && pane->data().at(6) == 0x1a,
+			"Delete (its key): its count takes an offset's hex notation too, as Frhed's");
+		messages.clear();
+		bool accepted = true;
+		HexRangeDialog::setPresenterForTest([&accepted](HexRangeDialog *dialog) {
+			dialog->countButton()->setChecked(true);
+			dialog->countField()->setText(QStringLiteral("999"));
+			dialog->accept();
+			accepted = dialog->result() == QDialog::Accepted;
+			return accepted;
+		});
+		pane->editCopy();
+		check(!accepted && messages == QStringList{ HexRangeDialog::tr("Can't copy more bytes than are present.") },
+			"more bytes than there are: the dialog says so and stays");
+		HexRangeDialog::setPresenterForTest(nullptr);
+		while (view.canUndo())
+			view.undo();
+		check(pane->data() == bytes && !pane->isModified(), "Undo takes the cut and the delete back");
+
+		// --- Paste with dialogue ---
+		QGuiApplication::clipboard()->setText(QStringLiteral("<bh:aa><bh:bb>"));
+		HexPasteDialog::setPresenterForTest([](HexPasteDialog *dialog) {
+			dialog->timesField()->setText(QStringLiteral("2"));
+			dialog->skipField()->setText(QStringLiteral("1"));
+			dialog->accept();
+			return dialog->result() == QDialog::Accepted;
+		});
+		pane->placeCaret(4);
+		pane->editPaste();
+		printf("  after overwriting: %s\n", qPrintable(hexOf(pane->data().mid(2, 8))));
+		check(pane->length() == 32 && pane->data().mid(4, 5) == QByteArray("\xaa\xbb\x16\xaa\xbb", 5),
+			"overwriting: the clipboard's bytes twice, one byte skipped between");
+		view.undo();
+		HexPasteDialog::setPresenterForTest([](HexPasteDialog *dialog) {
+			dialog->timesField()->setText(QStringLiteral("1"));
+			dialog->skipField()->setText(QStringLiteral("0"));
+			dialog->insertButton()->setChecked(true);
+			dialog->accept();
+			return dialog->result() == QDialog::Accepted;
+		});
+		pane->placeCaret(4);
+		pane->editPaste();
+		check(pane->length() == 34 && pane->data().mid(3, 4) == QByteArray("\x13\xaa\xbb\x14", 4),
+			"inserting: the bytes come in at the caret");
+		view.undo();
+		HexPasteDialog::setPresenterForTest([](HexPasteDialog *dialog) {
+			dialog->asTextBox()->setChecked(true);
+			dialog->accept();
+			return dialog->result() == QDialog::Accepted;
+		});
+		pane->setSelection(1, 3);
+		pane->editPaste();
+		check(pane->length() == 43 && pane->data().mid(1, 14) == QByteArray("<bh:aa><bh:bb>"),
+			"over a selection, coded values as text: the text itself replaces the selection");
+		view.undo();
+		HexPasteDialog::setPresenterForTest([](HexPasteDialog *dialog) {
+			dialog->asTextBox()->setChecked(false);
+			dialog->insertButton()->setChecked(false);
+			dialog->accept();
+			return dialog->result() == QDialog::Accepted;
+		});
+		messages.clear();
+		pane->placeCaret(31);
+		pane->editPaste();
+		check(pane->data() == bytes
+				&& messages == QStringList{ HexPasteDialog::tr("Not enough space for overwriting.") },
+			"overwriting past the end: not enough space");
+		HexPasteDialog::setPresenterForTest(nullptr);
+
+		// --- Find, F3, Shift+F3 ---
+		HexFindDialog::setPresenterForTest([](HexFindDialog *dialog) {
+			dialog->textField()->setPlainText(QStringLiteral("<bh:1a><bh:1b>"));
+			return true;
+		});
+		pane->placeCaret(0);
+		view.showFind();
+		check(pane->hasSelection() && pane->selectionLower() == 0x0a && pane->selectionUpper() == 0x0b,
+			"Find: the bytes in the special syntax, selected");
+		pane->placeCaret(20);
+		messages.clear();
+		view.findRepeat(false);
+		check(!pane->hasSelection() && messages == QStringList{ HexView::tr("Could not find any more occurrences.") },
+			"F3: no more after the caret");
+		view.findRepeat(true);
+		check(pane->hasSelection() && pane->selectionLower() == 0x0a, "Shift+F3: the previous occurrence");
+		pane->setSelection(0x0b, 0x0b);
+		view.findRepeat(false);
+		check(pane->findTextForTest() == QStringLiteral("<bh:1b>") && pane->hasSelection()
+				&& pane->selectionLower() == 0x0b,
+			"F3 over a selection looks for the selection (here the only one, left selected)");
+		HexFindDialog::setPresenterForTest([](HexFindDialog *dialog) {
+			dialog->textField()->setPlainText(QStringLiteral("<bh:1f>"));
+			dialog->upButton()->setChecked(true);
+			return true;
+		});
+		pane->placeCaret(31);
+		view.showFind();
+		check(pane->selectionLower() == 0x0f, "Find up: before the caret");
+		messages.clear();
+		HexFindDialog::setPresenterForTest([](HexFindDialog *dialog) {
+			dialog->textField()->setPlainText(QStringLiteral("nothing like it"));
+			return true;
+		});
+		view.showFind();
+		check(messages == QStringList{ HexFindDialog::tr("Could not find data.") }, "Find: not found");
+		HexFindDialog::setPresenterForTest(nullptr);
+
+		// --- Replace ---
+		HexReplaceDialog::setPresenterForTest([&](HexReplaceDialog *dialog) {
+			dialog->findField()->setPlainText(QStringLiteral("<bh:12>"));
+			dialog->replaceField()->setPlainText(QStringLiteral("<bh:ee><bh:ee>"));
+			dialog->findNext();
+			dialog->replace();
+		});
+		pane->placeCaret(0);
+		view.showReplace();
+		check(pane->length() == 33 && pane->data().mid(1, 3) == QByteArray("\x11\xee\xee"),
+			"Replace: Find next selects, Replace puts the bytes in its place");
+		messages.clear();
+		HexReplaceDialog::setPresenterForTest([](HexReplaceDialog *dialog) {
+			dialog->findField()->setPlainText(QStringLiteral("<bh:ee>"));
+			dialog->replaceField()->setPlainText(QStringLiteral("<bh:dd>"));
+			dialog->findNext();
+			dialog->replaceFollowing();
+		});
+		pane->placeCaret(0);
+		view.showReplace();
+		check(pane->data().mid(1, 3) == QByteArray("\x11\xdd\xdd")
+				&& messages == QStringList{ HexReplaceDialog::tr("%1 occurrences replaced.").arg(2) },
+			"Replace all following occurrences, with the count");
+		messages.clear();
+		HexReplaceDialog::setPresenterForTest([](HexReplaceDialog *dialog) {
+			dialog->findField()->setPlainText(QStringLiteral("<bh:dd>"));
+			dialog->replaceField()->setPlainText(QStringLiteral("<bd:221>"));
+			dialog->replaceFollowing();
+		});
+		view.showReplace();
+		check(messages == QStringList{ HexReplaceDialog::tr("To-replace and replace-with data are same.") },
+			"the same bytes on both sides: nothing to do");
+		HexReplaceDialog::setPresenterForTest(nullptr);
+		while (view.canUndo())
+			view.undo();
+
+		// --- Go To ---
+		QString goToText;
+		HexGoToDialog::setPresenterForTest([&goToText](HexGoToDialog *dialog) {
+			dialog->offsetField()->setText(goToText);
+			dialog->accept();
+			return dialog->result() == QDialog::Accepted;
+		});
+		pane->placeCaret(3);
+		goToText = QStringLiteral("x10");
+		view.showGoTo();
+		check(pane->caretByte() == 16, "Go To: x10 is offset 16");
+		goToText = QStringLiteral("+3");
+		view.showGoTo();
+		check(pane->caretByte() == 19, "+3 jumps forward from the caret");
+		goToText = QStringLiteral("-100");
+		view.showGoTo();
+		check(pane->caretByte() == 0, "past the start: the first byte");
+		messages.clear();
+		goToText = QStringLiteral("zz");
+		view.showGoTo();
+		check(pane->caretByte() == 0 && messages == QStringList{ HexGoToDialog::tr("Offset not recognized.") },
+			"an offset that is none: the dialog says so");
+		HexGoToDialog::setPresenterForTest(nullptr);
+
+		// --- the context menu ---
+		QStringList items;
+		QList<bool> enabled;
+		HexView::setContextMenuPresenterForTest([&](QMenu *menu) {
+			for (QAction *action : menu->actions())
+			{
+				if (action->isSeparator())
+					continue;
+				items << action->text();
+				enabled << action->isEnabled();
+			}
+		});
+		view.setReadOnlySides({ true, false });
+		{
+			QContextMenuEvent event(QContextMenuEvent::Mouse, QPoint(40, 10));
+			QApplication::sendEvent(pane->viewport(), &event);
+		}
+		HexView::setContextMenuPresenterForTest(nullptr);
+		printf("  context menu: %s\n", qPrintable(items.join(QStringLiteral(", "))));
+		check(items.size() == 9 && items.at(0) == HexView::tr("Cu&t...") && items.at(8) == HexView::tr("&Go To...")
+				&& enabled == QList<bool>{ false, true, false, false, true, false, true, true, true },
+			"the context menu: Frhed's nine commands, the editing ones off in a read-only pane");
+		view.setReadOnlySides({ false, false });
+
+		// --- the editor's settings, from Options > Compare > Binary ---
+		{
+			OptionsDialog options;
+			QWidget *binaryPage = options.pageForTest(OptionsDialog::BinaryPage);
+			const auto press = [binaryPage](const QString &text) {
+				for (QPushButton *button : binaryPage->findChildren<QPushButton *>())
+					if (button->text() == text)
+						button->click();
+			};
+			HexViewSettingsDialog::setPresenterForTest([](HexViewSettingsDialog *dialog) {
+				dialog->automaticBytesBox()->setChecked(false);
+				dialog->bytesPerLineField()->setText(QStringLiteral("8"));
+				dialog->automaticOffsetBox()->setChecked(false);
+				dialog->offsetLengthField()->setText(QStringLiteral("6"));
+				dialog->signedButton()->setChecked(true);
+				dialog->accept();
+				return true;
+			});
+			press(OptionsDialog::tr("View &Settings..."));
+			pane->placeCaret(0);
+			QApplication::processEvents();
+			printf("  first line: \"%s\"\n", qPrintable(pane->lineTextForTest(0)));
+			check(pane->bytesPerLine() == 8 && pane->offsetLength() == 6
+					&& pane->lineTextForTest(0).startsWith(QStringLiteral("000000  10 11 12"))
+					&& view.statusTextForTest(0).contains(HexView::tr("Signed")),
+				"View Settings: eight bytes a line, six offset digits, signed values; every pane at once");
+			HexBinaryModeDialog::setPresenterForTest([](HexBinaryModeDialog *dialog) {
+				dialog->bigEndianButton()->setChecked(true);
+				dialog->accept();
+				return true;
+			});
+			press(OptionsDialog::tr("&Binary Mode..."));
+			const QString bigStatus = view.statusTextForTest(0);
+			printf("  big-endian status: %s\n", qPrintable(bigStatus));
+			check(bigStatus.contains(QStringLiteral("W:4113")) && bigStatus.endsWith(HexView::tr("B")
+					+ QStringLiteral(" | ") + HexView::tr("Size") + QStringLiteral(": 32"))
+					&& lm::hex::specialSyntaxToBytes(QStringLiteral("<wh:1234>"), true) == QByteArray("\x12\x34"),
+				"Binary Mode: big-endian values at the caret and words in the special syntax");
+			HexCharacterSetDialog::setPresenterForTest([](HexCharacterSetDialog *dialog) {
+				dialog->oemButton()->setChecked(true);
+				dialog->fontSizeField()->setText(QStringLiteral("15"));
+				dialog->accept();
+				return true;
+			});
+			press(OptionsDialog::tr("&Character Set..."));
+			check(pane->lineTextForTest(0).contains(QChar(0x25BA)) && view.statusTextForTest(0).contains(HexView::tr("OEM"))
+					&& qAbs(pane->font().pointSizeF() - 15) < 0.01,
+				"Character Set: OEM shows code page 437 (byte 10 as an arrow), the font in 15 points");
+			pane->placeCaret(0);
+			{
+				QKeyEvent tab(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
+				QApplication::sendEvent(pane, &tab);
+				QKeyEvent e(QEvent::KeyPress, 0, Qt::NoModifier, QString(QChar(0xe9)));
+				QApplication::sendEvent(pane, &e);
+				QKeyEvent back(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier);
+				QApplication::sendEvent(pane, &back);
+			}
+			check(static_cast<unsigned char>(pane->data().at(0)) == 0x82,
+				"typing in the text column takes the OEM byte (\u00e9 is 0x82)");
+			view.undo();
+			{
+				const QPointF at(2, 2);
+				QMouseEvent click(QEvent::MouseButtonPress, at, pane->viewport()->mapToGlobal(at),
+					Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+				QApplication::sendEvent(pane->viewport(), &click);
+				QMouseEvent release(QEvent::MouseButtonRelease, at, pane->viewport()->mapToGlobal(at),
+					Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+				QApplication::sendEvent(pane->viewport(), &release);
+			}
+			check(pane->offsetLength() == 5, "a click on the offsets shortens them, their length being fixed");
+			HexViewSettingsDialog::setPresenterForTest(nullptr);
+			HexBinaryModeDialog::setPresenterForTest(nullptr);
+			HexCharacterSetDialog::setPresenterForTest(nullptr);
+			HexSettings().save();
+			check(pane->bytesPerLine() != 8 && !view.statusTextForTest(0).contains(HexView::tr("OEM")),
+				"the defaults back: as many bytes as fit, ANSI");
+
+			// the patterns: a pattern of the drop-down toggles in the field
+			auto *patterns = binaryPage->findChild<QComboBox *>();
+			emit patterns->activated(0);
+			options.saveForTest();
+			const QString kept = QSettings().value(QStringLiteral("BinaryCompare/FilePatterns")).toString();
+			emit patterns->activated(0);
+			check(kept == QStringLiteral("*.frx") && patterns->currentText() == QStringLiteral("*.frx;*.bin"),
+				"Binary file patterns: *.bin of the drop-down goes and comes back");
+			QSettings().remove(QStringLiteral("BinaryCompare/FilePatterns"));
+		}
+
+		lm::setMessageSinkForTest([](const QString &) {});
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
 	if (parser.isSet(selftestHexOpt))
 	{
 		// WinMerge's binary comparison: two or three files as hex dumps,
@@ -9367,6 +9766,37 @@ int main(int argc, char *argv[])
 				"Shift with the arrows selects");
 			press(l, Qt::Key_Escape);
 			check(!l->hasSelection() && l->caretByte() == 0, "Escape leaves the caret at the selection's start");
+
+			// --- the mouse ---
+			const auto click = [&settle](HexView *pane, const QPoint &at, Qt::KeyboardModifiers mods = {}) {
+				const QPointF point(at);
+				QMouseEvent press(QEvent::MouseButtonPress, point, pane->viewport()->mapToGlobal(point),
+					Qt::LeftButton, Qt::LeftButton, mods);
+				QApplication::sendEvent(pane->viewport(), &press);
+				QMouseEvent release(QEvent::MouseButtonRelease, point, pane->viewport()->mapToGlobal(point),
+					Qt::LeftButton, Qt::NoButton, mods);
+				QApplication::sendEvent(pane->viewport(), &release);
+				settle();
+			};
+			click(l, l->pointForTest(2, 1, false));
+			check(!l->hasSelection() && l->caretByte() == 2 && l->caretNibble() == 1
+					&& l->area() == HexView::Area::Bytes,
+				"a click puts the caret on the nibble clicked");
+			click(l, l->pointForTest(5, 0, true));
+			check(l->caretByte() == 5 && l->area() == HexView::Area::Chars,
+				"a click in the text column, on the character");
+			click(l, l->pointForTest(9, 0, false), Qt::ShiftModifier);
+			check(l->hasSelection() && l->selectionLower() == 5 && l->selectionUpper() == 9,
+				"Shift with a click selects from the caret");
+			click(l, l->pointForTest(11, 0, false));
+			check(!l->hasSelection() && l->caretByte() == 11, "a click leaves no selection");
+			// within a difference with nothing selected, Next selects it
+			// from the caret's own byte (upstream's iGetEndOfSelection)
+			l->placeCaret(11);
+			view.gotoNextDiff();
+			check(l->selectionLower() == 11 && l->selectionUpper() == 12,
+				"Next Difference from a caret inside one: the rest of it");
+			l->placeCaret(0);
 
 			// --- typing ---
 			type(l, QStringLiteral("ab"));

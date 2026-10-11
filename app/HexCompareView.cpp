@@ -418,6 +418,34 @@ void HexCompareView::selectAll()
 	activeView()->selectAll();
 }
 
+void HexCompareView::showFind()
+{
+	activeView()->showFind();
+}
+
+void HexCompareView::showReplace()
+{
+	activeView()->showReplace();
+}
+
+void HexCompareView::showGoTo()
+{
+	activeView()->showGoTo();
+}
+
+void HexCompareView::findRepeat(bool backward)
+{
+	if (backward)
+		activeView()->findPrevious();
+	else
+		activeView()->findNext();
+}
+
+bool HexCompareView::activePaneEditable() const
+{
+	return !activeView()->isReadOnly();
+}
+
 void HexCompareView::focusNextPane()
 {
 	m_panes[(m_activePane + 1) % m_paneCount]->setFocus();

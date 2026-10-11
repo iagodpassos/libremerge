@@ -1,14 +1,51 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
 #include <QAbstractScrollArea>
 #include <QByteArray>
 #include <QColor>
 #include <QList>
 #include <QObject>
 
+class QMenu;
 class QTimer;
 class HexView;
+
+/**
+ * Frhed's settings that WinMerge's Options > Compare > Binary opens (the
+ * editor's View Settings, Binary Mode and Character Set dialogs), shared
+ * by every binary comparison.
+ */
+struct HexSettings
+{
+	bool automaticBytesPerLine = true;
+	int bytesPerLine = 16;
+	bool automaticOffsetLength = true;
+	int offsetLength = 6;
+	bool unsignedValues = true;
+	bool bigEndian = false;
+	bool oemCharacterSet = false;
+	/** The font's size in points; 0 for the system's fixed font size. */
+	qreal fontSize = 0;
+
+	static HexSettings load();
+	/** Keep them, and have every binary comparison take them. */
+	void save() const;
+	/** The size the font has before any zoom. */
+	qreal basePointSize() const;
+};
+
+/** Tells the binary comparisons that the settings changed. */
+class HexSettingsWatch : public QObject
+{
+	Q_OBJECT
+public:
+	static HexSettingsWatch *instance();
+
+signals:
+	void changed();
+};
 
 /**
  * The edits of every pane of a binary comparison in one history, as the
@@ -129,6 +166,29 @@ public:
 	/** After an undo or a redo here: the caret at the offset, nothing
 	    selected, and the focus. */
 	void showUndone(qsizetype offset);
+	/** Select bytes found, the caret at their start, and show them; the
+	    siblings take the caret (upstream's find). */
+	void selectFound(qsizetype start, qsizetype length);
+	/** The caret on a byte, nothing selected. */
+	void placeCaret(qsizetype offset);
+
+	// the editor's commands, with Frhed's dialogs
+	void editCopy();
+	void editCut();
+	void editPaste();
+	void editDelete();
+	void showFind();
+	void findNext();
+	void findPrevious();
+	void showReplace();
+	void showGoTo();
+	QString findTextForTest() const { return m_findText; }
+	/** What is handed the context menu in place of opening it (tests). */
+	static void setContextMenuPresenterForTest(std::function<void(QMenu *menu)> presenter);
+
+	/** Take the settings anew (the Options changed them). */
+	void applySettings(const HexSettings &settings);
+	const HexSettings &settings() const { return m_settings; }
 
 	int bytesPerLine() const { return m_bytesPerLine; }
 	int offsetLength() const { return m_offsetLength; }
@@ -149,6 +209,9 @@ public:
 
 	/** The text of one shown line, as painted (for tests). */
 	QString lineTextForTest(int line) const;
+	/** The middle of a byte's nibble in the hex column, or of its
+	    character, in the viewport (for tests). */
+	QPoint pointForTest(qsizetype byte, int nibble, bool chars) const;
 
 signals:
 	/** The caret, the selection or the data changed: the status bar and
@@ -168,6 +231,7 @@ protected:
 	void mouseMoveEvent(QMouseEvent *event) override;
 	void mouseReleaseEvent(QMouseEvent *event) override;
 	void wheelEvent(QWheelEvent *event) override;
+	void contextMenuEvent(QContextMenuEvent *event) override;
 	void focusInEvent(QFocusEvent *event) override;
 	void focusOutEvent(QFocusEvent *event) override;
 	void scrollContentsBy(int dx, int dy) override;
@@ -202,8 +266,16 @@ private:
 	void autoScroll();
 	void changed();
 	QColor separatorColor() const;
+	bool canCopy() const;
+	bool canEdit() const;
+	/** The selection, or the caret's byte, in the special syntax: what a
+	    Find, Find next or Replace looks for. */
+	QString selectionAsSpecialSyntax() const;
+	void findFromCaret(const QByteArray &pattern, int direction, bool showDialogMessages);
+	void editRange(int mode);
 
 	QByteArray m_data;
+	HexSettings m_settings;
 	HexView *m_siblings[2] = { this, this };
 	HexUndoHistory *m_history = nullptr;
 	int m_state = 0;      // the undo record the data stands at
@@ -236,4 +308,10 @@ private:
 
 	QTimer *m_blink;
 	bool m_caretShown = true;
+
+	// upstream's find context, a pane's own
+	QString m_findText;
+	int m_findDirection = 1;
+	bool m_findMatchCase = false;
+	bool m_findUnicode = false;
 };

@@ -72,6 +72,7 @@ public:
 		GeneralPage,
 		ComparePage, ///< Compare > General
 		FolderPage,  ///< Compare > Folder
+		BinaryPage,  ///< Compare > Binary
 		MessageBoxesPage,
 		BackupPage,
 	};
@@ -104,6 +105,7 @@ private:
 	QWidget *buildGeneralPage();
 	QWidget *buildComparePage();
 	QWidget *buildFolderPage();
+	QWidget *buildBinaryPage();
 	QWidget *buildMessageBoxesPage();
 	void loadMessageBoxes();
 	void resetMessageBoxes();
@@ -128,6 +130,9 @@ private:
 	QCheckBox *m_chkCloseSelector;
 	QComboBox *m_cmbAutoComplete;
 	QComboBox *m_cmbAutoReload;
+	// Compare > Binary
+	QComboBox *m_cmbBinaryPatterns = nullptr;
+	QString m_binaryPatterns;
 	QComboBox *m_cmbTheme;
 	QComboBox *m_cmbLanguage;
 	// Compare > General

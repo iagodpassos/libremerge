@@ -2,7 +2,10 @@
 #include "pch.h"
 
 #include "OptionsDialog.h"
+
+#include "BinaryFiles.h"
 #include "EngineOptions.h"
+#include "HexDialogs.h"
 #include "ItemCheckStyle.h"
 #include "MessageBoxes.h"
 #include "Theme.h"
@@ -14,6 +17,7 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QSettings>
@@ -146,6 +150,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	QTreeWidgetItem *compare = addCategory(nullptr, tr("Compare"), -1);
 	addCategory(compare, tr("General"), ComparePage);
 	addCategory(compare, tr("Folder"), FolderPage);
+	addCategory(compare, tr("Binary"), BinaryPage);
 	addCategory(nullptr, tr("Message Boxes"), MessageBoxesPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	m_categories->expandAll();
@@ -156,6 +161,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildGeneralPage());
 	m_pages->addWidget(buildComparePage());
 	m_pages->addWidget(buildFolderPage());
+	m_pages->addWidget(buildBinaryPage());
 	m_pages->addWidget(buildMessageBoxesPage());
 	m_pages->addWidget(buildBackupPage());
 	pageArea->addWidget(m_pages, 1);
@@ -358,6 +364,59 @@ QWidget *OptionsDialog::buildFolderPage()
 	return page;
 }
 
+/** WinMerge's Compare > Binary page (PropCompareBinary): the binary file
+    patterns, whose drop-down ticks WinMerge's defaults on and off, and the
+    hex editor's settings, whose dialogs keep what they set at once. */
+QWidget *OptionsDialog::buildBinaryPage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+	m_cmbBinaryPatterns = new QComboBox(page);
+	m_cmbBinaryPatterns->setEditable(true);
+	m_cmbBinaryPatterns->setInsertPolicy(QComboBox::NoInsert);
+	m_cmbBinaryPatterns->addItems(lm::defaultBinaryFilePatterns().split(QLatin1Char(';')));
+	connect(m_cmbBinaryPatterns->lineEdit(), &QLineEdit::textEdited, this,
+		[this](const QString &text) { m_binaryPatterns = text; });
+	// a pattern of the list toggles in the field (WildcardDropList)
+	connect(m_cmbBinaryPatterns, &QComboBox::activated, this, [this](int index) {
+		const QString pattern = m_cmbBinaryPatterns->itemText(index);
+		QStringList patterns = m_binaryPatterns.split(QLatin1Char(';'), Qt::SkipEmptyParts);
+		for (QString &p : patterns)
+			p = p.trimmed();
+		if (patterns.contains(pattern))
+			patterns.removeAll(pattern);
+		else
+			patterns.append(pattern);
+		m_binaryPatterns = patterns.join(QLatin1Char(';'));
+		m_cmbBinaryPatterns->setEditText(m_binaryPatterns);
+	});
+	addLabeled(box, tr("Binary file &patterns:"), m_cmbBinaryPatterns);
+
+	auto *group = new QGroupBox(tr("Hex editor settings"), page);
+	auto *groupLayout = new QVBoxLayout(group);
+	auto *viewSettings = new QPushButton(tr("View &Settings..."), group);
+	auto *binaryMode = new QPushButton(tr("&Binary Mode..."), group);
+	auto *characterSet = new QPushButton(tr("&Character Set..."), group);
+	connect(viewSettings, &QPushButton::clicked, this, [this]() {
+		HexViewSettingsDialog dialog(this);
+		HexViewSettingsDialog::run(&dialog);
+	});
+	connect(binaryMode, &QPushButton::clicked, this, [this]() {
+		HexBinaryModeDialog dialog(this);
+		HexBinaryModeDialog::run(&dialog);
+	});
+	connect(characterSet, &QPushButton::clicked, this, [this]() {
+		HexCharacterSetDialog dialog(this);
+		HexCharacterSetDialog::run(&dialog);
+	});
+	groupLayout->addWidget(viewSettings);
+	groupLayout->addWidget(binaryMode);
+	groupLayout->addWidget(characterSet);
+	box->addWidget(group);
+	box->addStretch(1);
+	return page;
+}
+
 /** WinMerge's Message Boxes page (PropMessageBoxes): the messages a
     "Don't display this message again" can hide, a tick for each hidden
     one with its remembered answer, and Reset to show them all again. */
@@ -521,6 +580,8 @@ void OptionsDialog::load()
 			mgr->GetBool(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES));
 	}
 	m_cmbCompareMethod->setCurrentIndex(lm::currentCompareMethod());
+	m_binaryPatterns = lm::binaryFilePatterns();
+	m_cmbBinaryPatterns->setEditText(m_binaryPatterns);
 	loadMessageBoxes();
 }
 
@@ -573,6 +634,8 @@ void OptionsDialog::save()
 		mgr->FlushOptions();
 	}
 	lm::saveCompareMethod(m_cmbCompareMethod->currentIndex());
+	settings.setValue(QStringLiteral("BinaryCompare/FilePatterns"),
+		m_cmbBinaryPatterns->currentText().trimmed());
 	for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)
 	{
 		const QTreeWidgetItem *item = m_messageList->topLevelItem(i);
@@ -624,6 +687,10 @@ void OptionsDialog::restoreDefaults(int page)
 		break;
 	case FolderPage:
 		m_cmbCompareMethod->setCurrentIndex(0); // Full Contents
+		break;
+	case BinaryPage:
+		m_binaryPatterns = lm::defaultBinaryFilePatterns();
+		m_cmbBinaryPatterns->setEditText(m_binaryPatterns);
 		break;
 	case MessageBoxesPage:
 		for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)

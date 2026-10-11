@@ -57,6 +57,13 @@ public:
 	bool canUndo() const;
 	bool canRedo() const;
 	void selectAll();
+	/** The Edit menu's Find, Replace, Go To and F3 (with Shift, back), in
+	    the active pane, with the editor's dialogs. */
+	void showFind();
+	void showReplace();
+	void showGoTo();
+	void findRepeat(bool backward);
+	bool activePaneEditable() const;
 	void focusNextPane();
 	void zoomIn();
 	void zoomOut();

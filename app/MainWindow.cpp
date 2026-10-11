@@ -318,9 +318,11 @@ MainWindow::MainWindow(QWidget *parent)
 	// dialogs of the active pane. On the Mac, Command+H hides the
 	// application: Replace takes Option+Command+F there, the Mac's own
 	QAction *findAction = addMenuAction(editMenu, tr("F&ind..."), QKeySequence::Find,
-		[fileView]() {
+		[fileView, hexView]() {
 			if (auto *view = fileView())
 				view->showFind();
+			else if (auto *hex = hexView())
+				hex->showFind();
 		});
 	findAction->setObjectName(QStringLiteral("editFind"));
 #ifdef Q_OS_MACOS
@@ -329,16 +331,20 @@ MainWindow::MainWindow(QWidget *parent)
 	const QKeySequence replaceShortcut(Qt::CTRL | Qt::Key_H);
 #endif
 	QAction *replaceAction = addMenuAction(editMenu, tr("Repla&ce..."), replaceShortcut,
-		[fileView]() {
+		[fileView, hexView]() {
 			if (auto *view = fileView(); view != nullptr && view->activePaneEditable())
 				view->showReplace();
+			else if (auto *hex = hexView(); hex != nullptr && hex->activePaneEditable())
+				hex->showReplace();
 		});
 	replaceAction->setObjectName(QStringLiteral("editReplace"));
 	// greyed out over a read-only pane (OnUpdateEditReplace) while the menu
 	// shows; its shortcut does nothing there either
-	connect(editMenu, &QMenu::aboutToShow, this, [fileView, replaceAction]() {
+	connect(editMenu, &QMenu::aboutToShow, this, [fileView, hexView, replaceAction]() {
 		const FileCompareView *view = fileView();
-		replaceAction->setEnabled(view == nullptr || view->activePaneEditable());
+		const HexCompareView *hex = hexView();
+		replaceAction->setEnabled(view != nullptr ? view->activePaneEditable()
+			: hex == nullptr || hex->activePaneEditable());
 	});
 	connect(editMenu, &QMenu::aboutToHide, this,
 		[replaceAction]() { replaceAction->setEnabled(true); });
@@ -352,14 +358,17 @@ MainWindow::MainWindow(QWidget *parent)
 	// F3 is upstream's: no menu item, the last search again; Shift goes the
 	// other way, Ctrl takes the selection or the word at the cursor
 	// (ID_EDIT_REPEAT). The Mac also has its Command+G
-	const auto addRepeat = [this, fileView](const char *name, bool control, bool shift,
+	const auto addRepeat = [this, fileView, hexView](const char *name, bool control, bool shift,
 		QList<QKeySequence> keys) {
 		auto *action = new QAction(this);
 		action->setObjectName(QLatin1String(name));
 		action->setShortcuts(keys);
-		connect(action, &QAction::triggered, this, [fileView, control, shift]() {
+		connect(action, &QAction::triggered, this, [fileView, hexView, control, shift]() {
 			if (auto *view = fileView())
 				view->findRepeat(control, shift);
+			// the binary comparison has F3 and Shift+F3 only (OnEditRepeat)
+			else if (auto *hex = hexView(); hex != nullptr && !control)
+				hex->findRepeat(shift);
 		});
 		addAction(action);
 	};
@@ -378,9 +387,11 @@ MainWindow::MainWindow(QWidget *parent)
 	// WinMerge's Edit > Go to... (Ctrl+G); on the Mac with Control, as
 	// Command+G finds the next match there
 	QAction *gotoAction = addMenuAction(editMenu, tr("&Go to..."),
-		FileCompareView::goToShortcut(), [fileView]() {
+		FileCompareView::goToShortcut(), [fileView, hexView]() {
 			if (auto *view = fileView())
 				view->showGoTo();
+			else if (auto *hex = hexView())
+				hex->showGoTo();
 		});
 	gotoAction->setObjectName(QStringLiteral("editGoto"));
 	editMenu->addSeparator();
