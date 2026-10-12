@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <QSet>
 #include <QStringList>
@@ -10,6 +11,7 @@
 #include "FileOps.h"
 
 class DisplayFilterBar;
+class FilepathEdit;
 class LineFilterHelper;
 class QAction;
 class QLabel;
@@ -51,6 +53,16 @@ public:
 	/** WinMerge's file description (strDesc): the tab title shows it
 	    instead of the file name, as "Original File" in a self-compare. */
 	void setSideDescription(int side, const QString &description);
+	/** WinMerge's ChangeFile, which the path bar calls: save what was
+	    changed (after asking), then open the files again with another
+	    one on one side. */
+	bool changeFile(int side, const QString &path, const QString &description);
+	/** How the changes are saved before (PromptAndSaveIfNeeded); false
+	    cancels. */
+	void setSavePrompt(std::function<bool()> prompt) { m_savePrompt = std::move(prompt); }
+	/** Ctrl+L: edit the active side's path in its bar. */
+	void editActivePanePath();
+	FilepathEdit *headerForTest(int side) const { return m_headers[side]; }
 	bool saveModified(QString *error);
 
 	void gotoFirstDiff();
@@ -176,9 +188,11 @@ private:
 	void gotoDiff(int blockIndex);
 	void selectDiffAtModelRow(int modelRow);
 	int nextActive(int from, int direction) const;
-	/** The grid the commands act on: the one with the focus, the left one
-	    otherwise. */
+	/** The grid the commands act on: the one with the focus, the one
+	    whose grid or bar had it last otherwise. */
 	int activeSide() const;
+	void setActiveSide(int side);
+	void updateHeader(int side);
 	int nextActiveFromRow(int viewRow, int direction) const;
 	int diffAtRow(int viewRow) const;
 	int searchRow(int offset) const;
@@ -195,6 +209,11 @@ private:
 	QChar m_delimiter = QChar(',');
 	bool m_firstRowIsHeader = true;
 	QString m_descriptions[2];
+	// WinMerge's path bar over each side, and what it was last given
+	FilepathEdit *m_headers[2] = {};
+	QString m_headerTexts[2];
+	int m_activeSide = 0;
+	std::function<bool()> m_savePrompt;
 	Side m_sides[2];
 	std::vector<Block> m_blocks;
 	// view row -> real row per side (-1 = ghost)

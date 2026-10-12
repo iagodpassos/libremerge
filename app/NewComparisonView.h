@@ -37,6 +37,8 @@ public:
 	static QStringList savedHistory();
 	/** Forget it, part of WinMerge's "Clear all recent items". */
 	static void clearSavedHistory();
+	/** Put paths at the top of the history, as WinMerge's addToMru. */
+	static void rememberPaths(const QStringList &paths);
 	/** Refill the path fields' dropdowns from the saved history. */
 	void reloadHistory();
 
@@ -74,7 +76,6 @@ private:
 	void setHint(const QString &text, bool error);
 	/** WinMerge's "Automatically verify paths" check of the fields. */
 	void verifyPaths();
-	void rememberPaths(const QStringList &paths);
 	/** WinMerge's filter group follows the paths' kind. */
 	void showFilterGroup(bool visible, bool enabled);
 	void applyFileFilter();

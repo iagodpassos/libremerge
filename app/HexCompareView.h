@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
 #include <QStringList>
 #include <QWidget>
 
@@ -9,6 +10,7 @@
 class QAction;
 class QLabel;
 class QSplitter;
+class FilepathEdit;
 class HexUndoHistory;
 class HexView;
 class HexStatusPosition;
@@ -19,8 +21,8 @@ class HexStatusPosition;
  * hex editor LibreMerge writes after WinMerge's (HexView). The bytes are
  * compared at the same offsets; Next and Previous Difference select the
  * next run of differing bytes in every pane, and the copy commands copy
- * what is selected. One undo history spans the panes. Each pane has the
- * editor's own status bar.
+ * what is selected. One undo history spans the panes. Each pane has
+ * WinMerge's path bar over it and the editor's own status bar.
  */
 class HexCompareView : public QWidget
 {
@@ -80,7 +82,17 @@ public:
 	    saved here; empty when none. */
 	QString changedPathOnDisk() const;
 
+	/** Upstream's ChangeFile, which the path bar calls: save what was
+	    changed (after asking), then load another file in one pane. */
+	bool changeFile(int pane, const QString &path, const QString &description);
+	/** How the changes are saved before (PromptAndSaveIfNeeded); false
+	    cancels. */
+	void setSavePrompt(std::function<bool()> prompt) { m_savePrompt = std::move(prompt); }
+	/** Ctrl+L: edit the active pane's path in its bar. */
+	void editActivePanePath();
+
 	HexView *paneForTest(int side) const { return m_panes[side]; }
+	FilepathEdit *headerForTest(int side) const { return m_headers[side]; }
 	int activePane() const { return m_activePane; }
 	QString statusTextForTest(int side) const;
 
@@ -112,7 +124,8 @@ private:
 	lm::FileStamp m_stamps[3];
 	QSplitter *m_splitter;
 	QWidget *m_columns[3];
-	QLabel *m_headers[3];
+	FilepathEdit *m_headers[3];
+	QString m_headerTexts[3];
 	HexView *m_panes[3];
 	QWidget *m_statusBars[3];
 	HexStatusPosition *m_statusPosition[3];
@@ -122,4 +135,5 @@ private:
 	QAction *m_actUndo = nullptr;
 	QAction *m_actRedo = nullptr;
 	QAction *m_actSave = nullptr;
+	std::function<bool()> m_savePrompt;
 };

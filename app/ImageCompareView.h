@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <QStringList>
 #include <QWidget>
@@ -17,6 +18,7 @@ class QSpinBox;
 class QSplitter;
 class QTimer;
 class CImgMergeBuffer;
+class FilepathEdit;
 class ImagePane;
 class DiffMapWidget;
 
@@ -52,6 +54,17 @@ public:
 	    title show it instead of the file name, as "Original File" in a
 	    self-compare. */
 	void setSideDescription(int side, const QString &description);
+	/** WinMerge's ChangeFile, which the path bar calls: save what was
+	    changed (after asking), then open the images again with another
+	    one in one pane. */
+	bool changeFile(int pane, const QString &path, const QString &description);
+	/** How the changes are saved before (PromptAndSaveIfNeeded); false
+	    cancels. */
+	void setSavePrompt(std::function<bool()> prompt) { m_savePrompt = std::move(prompt); }
+	/** Ctrl+L: edit the active pane's path in its bar. */
+	void editActivePanePath();
+	FilepathEdit *headerForTest(int pane) const { return m_headers[pane]; }
+	int activePaneForTest() const { return m_activePane; }
 	bool saveModified(QString *error);
 	void setReadOnlySides(const QList<bool> &readOnly);
 
@@ -178,8 +191,11 @@ private:
 
 	ImagePane *m_panes[3] = {};
 	QWidget *m_columns[3] = {};
-	QLabel *m_headers[3] = {};
+	// WinMerge's path bar over each pane
+	FilepathEdit *m_headers[3] = {};
+	QString m_headerTexts[3];
 	QString m_descriptions[3];
+	std::function<bool()> m_savePrompt;
 	QLabel *m_paneStatus[3] = {};
 	QSplitter *m_splitter = nullptr;
 	QLabel *m_status = nullptr;

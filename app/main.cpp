@@ -64,6 +64,7 @@
 #include "HexCompareView.h"
 #include "HexView.h"
 #include "HexDialogs.h"
+#include "FilepathEdit.h"
 #include "FileOps.h"
 #include "FolderCompareDriver.h"
 #include "FolderCompareView.h"
@@ -339,6 +340,12 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestHexEditOpt(QStringLiteral("selftest-hex-edit"),
 		QStringLiteral("Edit a binary comparison through the hex editor's dialogs and verify it (for testing)"));
 	parser.addOption(selftestHexEditOpt);
+	QCommandLineOption selftestHexHeaderOpt(QStringLiteral("selftest-hex-header"),
+		QStringLiteral("Use the path bar over the panes of a binary comparison and verify it (for testing)"));
+	parser.addOption(selftestHexHeaderOpt);
+	QCommandLineOption selftestPathBarsOpt(QStringLiteral("selftest-path-bars"),
+		QStringLiteral("Use the path bar over the panes of text, table and image comparisons and verify it (for testing)"));
+	parser.addOption(selftestPathBarsOpt);
 	QCommandLineOption selftestLastLineOpt(QStringLiteral("selftest-last-line"),
 		QStringLiteral("Compare files whose last lines differ and verify what is a difference (for testing)"));
 	parser.addOption(selftestLastLineOpt);
@@ -9601,6 +9608,504 @@ int main(int argc, char *argv[])
 			QSettings().remove(QStringLiteral("BinaryCompare/FilePatterns"));
 		}
 
+		lm::setMessageSinkForTest([](const QString &) {});
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestPathBarsOpt))
+	{
+		// WinMerge's path bar over the panes of the text, table and image
+		// comparisons: the whole path, the active pane, the caption edited
+		// for the bar and the tab, the path edited (Ctrl+L) into
+		// ChangeFile, which asks to save first and opens the files again
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto press = [](QWidget *widget, int key) {
+			QKeyEvent event(QEvent::KeyPress, key, Qt::NoModifier);
+			QApplication::sendEvent(widget, &event);
+		};
+		const auto focusIn = [](QWidget *widget) {
+			QFocusEvent focus(QEvent::FocusIn, Qt::MouseFocusReason);
+			QApplication::sendEvent(widget, &focus);
+		};
+		// type into a bar's editing and press Enter
+		const auto enter = [&press](FilepathEdit *bar, const QString &text) {
+			bar->setText(text);
+			press(bar, Qt::Key_Return);
+			QApplication::processEvents();
+		};
+		const auto editPathAction = [](QWidget *view) -> QAction * {
+			for (QAction *action : view->actions())
+				if (action->shortcuts().contains(QKeySequence(Qt::CTRL | Qt::Key_L))
+					&& action->shortcuts().contains(QKeySequence(Qt::ALT | Qt::Key_D)))
+					return action;
+			return nullptr;
+		};
+		QStringList messages;
+		lm::setMessageSinkForTest([&messages](const QString &text) { messages << text; });
+		NewComparisonView::clearSavedHistory();
+		int prompts = 0;
+		bool promptAnswer = true;
+		const auto prompt = [&]() { ++prompts; return promptAnswer; };
+
+		// --- the text comparison ---
+		{
+			const QString left = dir.filePath(QStringLiteral("left.txt"));
+			const QString right = dir.filePath(QStringLiteral("right.txt"));
+			const QString third = dir.filePath(QStringLiteral("third.txt"));
+			const QString binary = dir.filePath(QStringLiteral("binary.txt"));
+			write(left, "one\ntwo\nthree\n");
+			write(right, "one\nTWO\nthree\n");
+			write(third, "one\ntwo\nthree\n");
+			write(binary, QByteArray("bin\0ary", 7));
+			FileCompareView view;
+			QString error;
+			if (!view.compare(QStringList{ left, right }, &error))
+				return 2;
+			view.setSavePrompt(prompt);
+			int rescans = 0;
+			QObject::connect(&view, &FileCompareView::rescanned, [&rescans]() { ++rescans; });
+			view.resize(900, 500);
+			view.show();
+			QApplication::processEvents();
+			FilepathEdit *bar0 = view.headerForTest(0);
+			FilepathEdit *bar1 = view.headerForTest(1);
+			check(bar0->originalText() == left && bar0->path() == left && bar0->isActive()
+					&& bar1->originalText() == right && !bar1->isActive(),
+				"text: each bar shows its pane's whole path, the active pane's highlighted");
+			focusIn(bar1);
+			check(view.activePaneForTest() == 1 && bar1->isActive() && !bar0->isActive(),
+				"text: a click in a bar makes its pane the active one");
+			bool f2 = false;
+			for (QAction *action : view.actions())
+				f2 = f2 || action->shortcuts().contains(QKeySequence(Qt::Key_F2));
+			QAction *editPath = editPathAction(&view);
+			check(!f2 && editPath != nullptr,
+				"text: F2 belongs to the bar (upstream's accelerator there), Ctrl+L and Alt+D to the view");
+			if (editPath == nullptr)
+				return 1;
+			press(bar1, Qt::Key_F2);
+			enter(bar1, QStringLiteral("Theirs"));
+			check(bar1->originalText() == QStringLiteral("Theirs")
+					&& view.tabTitle().endsWith(QStringLiteral("Theirs")),
+				"text: a caption edited in the bar names the pane and the tab");
+			view.typeAtForTest(0, 0, QStringLiteral("x"));
+			QApplication::processEvents();
+			check(bar0->originalText() == QStringLiteral("* ") + left,
+				"text: a modified pane's bar starts with \"* \"");
+			focusIn(bar0);
+			promptAnswer = false;
+			editPath->trigger();
+			check(bar0->isEditing() && bar0->text() == left, "text: Ctrl+L edits the active pane's path");
+			enter(bar0, third);
+			check(prompts == 1 && view.paths().at(0) == left && view.isModified(),
+				"text: another file asks to save first, and cancelling keeps the pane");
+			promptAnswer = true;
+			messages.clear();
+			editPath->trigger();
+			enter(bar0, binary);
+			check(prompts == 2 && view.paths().at(0) == left && messages.size() == 1,
+				"text: a binary file is refused with the reason");
+			rescans = 0;
+			editPath->trigger();
+			enter(bar0, third);
+			check(prompts == 3 && view.paths().at(0) == third && bar0->originalText() == third
+					&& !view.isModified() && bar1->originalText() == QStringLiteral("Theirs")
+					&& rescans == 1 && view.diffCount() == 1
+					&& NewComparisonView::savedHistory().value(0) == third,
+				"text: the files open again, the new one in its pane, the other caption kept, into the recent paths");
+		}
+
+		// --- the table comparison ---
+		{
+			const QString left = dir.filePath(QStringLiteral("left.csv"));
+			const QString right = dir.filePath(QStringLiteral("right.csv"));
+			const QString third = dir.filePath(QStringLiteral("third.csv"));
+			write(left, "id,name\n1,apple\n2,banana\n");
+			write(right, "id,name\n1,apple\n2,cherry\n");
+			write(third, "id,name\n1,apple\n2,banana\n");
+			TableCompareView view;
+			QString error;
+			if (!view.compare(left, right, &error))
+				return 2;
+			view.setSavePrompt(prompt);
+			view.resize(900, 500);
+			view.show();
+			QApplication::processEvents();
+			FilepathEdit *bar0 = view.headerForTest(0);
+			FilepathEdit *bar1 = view.headerForTest(1);
+			check(bar0->originalText() == left && bar1->originalText() == right
+					&& bar0->isActive() && !bar1->isActive(),
+				"table: a path bar over each side");
+			view.setSideDescription(0, QStringLiteral("Mine"));
+			focusIn(bar1);
+			QAction *editPath = editPathAction(&view);
+			check(bar0->originalText() == QStringLiteral("Mine") && bar1->isActive() && editPath != nullptr,
+				"table: the description in the bar, the focused bar's side the active one");
+			if (editPath == nullptr)
+				return 1;
+			prompts = 0;
+			editPath->trigger();
+			check(bar1->isEditing() && bar1->text() == right, "table: Ctrl+L edits the active side's path");
+			enter(bar1, third);
+			check(prompts == 1 && view.paths() == QStringList{ left, third } && view.diffCount() == 0
+					&& bar1->originalText() == third && bar0->originalText() == QStringLiteral("Mine"),
+				"table: the files open again with the new one on its side");
+		}
+
+		// --- the image comparison ---
+		{
+			QImage red(16, 16, QImage::Format_RGB32);
+			red.fill(Qt::red);
+			QImage blue(16, 16, QImage::Format_RGB32);
+			blue.fill(Qt::blue);
+			const QString left = dir.filePath(QStringLiteral("left.png"));
+			const QString right = dir.filePath(QStringLiteral("right.png"));
+			const QString third = dir.filePath(QStringLiteral("third.png"));
+			red.save(left);
+			blue.save(right);
+			red.save(third);
+			ImageCompareView view;
+			QString error;
+			if (!view.compare(QStringList{ left, right }, &error))
+				return 2;
+			view.setSavePrompt(prompt);
+			view.resize(900, 500);
+			view.show();
+			QApplication::processEvents();
+			FilepathEdit *bar0 = view.headerForTest(0);
+			FilepathEdit *bar1 = view.headerForTest(1);
+			check(bar0->originalText() == left && bar1->originalText() == right && bar0->isActive(),
+				"image: a path bar over each pane");
+			focusIn(bar1);
+			QAction *editPath = editPathAction(&view);
+			check(view.activePaneForTest() == 1 && bar1->isActive() && editPath != nullptr,
+				"image: the focused bar's pane the active one");
+			if (editPath == nullptr)
+				return 1;
+			prompts = 0;
+			editPath->trigger();
+			enter(bar1, third);
+			check(prompts == 1 && view.paths().at(1) == third && view.diffCount() == 0
+					&& bar1->originalText() == third && view.activePaneForTest() == 1,
+				"image: the images open again with the new one, the active pane kept");
+
+			// Open Clipboard takes an image here, and nothing without one
+			QString pick = FilepathEdit::tr("Open C&lipboard");
+			FilepathEdit::setMenuPresenterForTest([&pick](QMenu *menu) {
+				for (QAction *action : menu->actions())
+					if (action->text() == pick)
+						action->trigger();
+			});
+			QGuiApplication::clipboard()->setText(QStringLiteral("no image"));
+			bar0->showMenu(QPoint());
+			const bool keptWithoutImage = view.paths().at(0) == left;
+			QGuiApplication::clipboard()->setImage(blue);
+			bar0->showMenu(QPoint());
+			const QString clipPath = view.paths().at(0);
+			printf("  clipboard: %s as %s\n", qPrintable(bar0->originalText()), qPrintable(clipPath));
+			check(keptWithoutImage && clipPath.endsWith(QStringLiteral(".png"))
+					&& QFileInfo(clipPath).fileName().startsWith(QStringLiteral("CLP"))
+					&& QImage(clipPath).pixelColor(0, 0) == QColor(Qt::blue)
+					&& bar0->originalText().startsWith(FilepathEdit::tr("Clipboard at %1").section(QStringLiteral("%1"), 0, 0))
+					&& view.diffCount() > 0,
+				"image: Open Clipboard opens the clipboard's image as a PNG file, and nothing without one");
+			FilepathEdit::setMenuPresenterForTest(nullptr);
+		}
+
+		NewComparisonView::clearSavedHistory();
+		lm::setMessageSinkForTest([](const QString &) {});
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestHexHeaderOpt))
+	{
+		// WinMerge's path bar over each pane of a binary comparison
+		// (CFilepathEdit with CEditorFilePathBar): the path cut to fit, its
+		// menu, the caption and the path edited in the bar, and the files
+		// it opens in the pane (Open, the clipboard, a recent one)
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto press = [](QWidget *widget, int key, Qt::KeyboardModifiers mods = Qt::NoModifier,
+			const QString &text = QString()) {
+			QKeyEvent event(QEvent::KeyPress, key, mods, text);
+			QApplication::sendEvent(widget, &event);
+		};
+		QStringList messages;
+		lm::setMessageSinkForTest([&messages](const QString &text) { messages << text; });
+		NewComparisonView::clearSavedHistory();
+
+		// --- the path cut to fit, and the tooltip's lines ---
+		const QFontMetrics metrics(QApplication::font());
+		const QString deep = QStringLiteral("/aaaa/bbbb/cccc/file.bin");
+		const QString cut = FilepathEdit::compactPath(deep, metrics,
+			metrics.horizontalAdvance(QStringLiteral("/...c/file.bin")));
+		printf("  cut: %s\n", qPrintable(cut));
+		check(cut == QStringLiteral("/...c/file.bin")
+				&& FilepathEdit::compactPath(deep, metrics, 10000) == deep,
+			"the path cut in the middle: the first and last parts, the rest from the right");
+		const QString lines = FilepathEdit::wrapPath(QStringLiteral("/aaaa/bbbb/cccc"), metrics,
+			metrics.horizontalAdvance(QStringLiteral("/aaaa/bbbb/c")));
+		check(lines == QStringLiteral("/aaaa/bbbb/\ncccc"),
+			"the tooltip's lines broken after the last separator that fits");
+
+		const QString left = dir.filePath(QStringLiteral("left.bin"));
+		const QString right = dir.filePath(QStringLiteral("right.bin"));
+		const QString third = dir.filePath(QStringLiteral("third.bin"));
+		const QString fourth = dir.filePath(QStringLiteral("fourth.bin"));
+		write(left, QByteArray("left bytes"));
+		write(right, QByteArray("right bytes"));
+		write(third, QByteArray("third bytes"));
+		write(fourth, QByteArray("fourth bytes"));
+		HexCompareView view;
+		QString error;
+		if (!view.compare(QStringList{ left, right }, &error))
+			return 2;
+		int prompts = 0;
+		bool promptAnswer = true;
+		view.setSavePrompt([&]() { ++prompts; return promptAnswer; });
+		view.resize(1000, 600);
+		view.show();
+		QApplication::processEvents();
+		FilepathEdit *const bar = view.headerForTest(0);
+		check(bar->originalText() == left && bar->path() == left && bar->isActive()
+				&& !view.headerForTest(1)->isActive()
+				&& view.headerForTest(1)->originalText() == right,
+			"each bar shows its pane's whole path, the active pane's bar highlighted");
+
+		// --- the menu, from the lines at the right end ---
+		QStringList items;
+		QList<bool> enabled;
+		QStringList recentItems;
+		QString pick;
+		FilepathEdit::setMenuPresenterForTest([&](QMenu *menu) {
+			items.clear();
+			enabled.clear();
+			recentItems.clear();
+			QMenu *recentMenu = nullptr;
+			for (QAction *action : menu->actions())
+			{
+				items << (action->isSeparator() ? QStringLiteral("-") : action->text());
+				enabled << action->isEnabled();
+				if (action->menu() != nullptr)
+					recentMenu = action->menu();
+			}
+			if (recentMenu != nullptr)
+				for (QAction *action : recentMenu->actions())
+					recentItems << action->text();
+			const auto pickFrom = [&pick](QMenu *from) {
+				for (QAction *action : from->actions())
+				{
+					if (!pick.isEmpty() && action->text() == pick)
+					{
+						action->trigger();
+						return true;
+					}
+				}
+				return false;
+			};
+			if (!pickFrom(menu) && recentMenu != nullptr)
+				pickFrom(recentMenu);
+		});
+		bar->setRecentItemsProvider([]() { return QStringList(); });
+		{
+			const QPoint lines = bar->menuRectForTest().center();
+			QMouseEvent click(QEvent::MouseButtonPress, QPointF(lines), QPointF(bar->mapToGlobal(lines)),
+				Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+			QApplication::sendEvent(bar, &click);
+		}
+		printf("  menu: %s\n", qPrintable(items.join(QStringLiteral(" | "))));
+		check(items == QStringList{ FilepathEdit::tr("Copy"), FilepathEdit::tr("&Copy Full Path"),
+				FilepathEdit::tr("Copy &Filename"), FilepathEdit::tr("&Edit Caption"), QStringLiteral("-"),
+				FilepathEdit::tr("Edit &Path"), FilepathEdit::tr("Open C&lipboard"),
+				FilepathEdit::tr("&Open\xE2\x80\xA6") }
+				&& !enabled.at(0) && enabled.at(1) && enabled.at(2) && enabled.at(5),
+			"the lines open the menu: Copy (greyed without a selection), the copies, the caption, the path, the clipboard, Open");
+		pick = FilepathEdit::tr("&Copy Full Path");
+		bar->showMenu(QPoint());
+		const QString fullPath = QGuiApplication::clipboard()->text();
+		pick = FilepathEdit::tr("Copy &Filename");
+		bar->showMenu(QPoint());
+		check(fullPath == left && QGuiApplication::clipboard()->text() == QStringLiteral("left.bin"),
+			"Copy Full Path and Copy Filename");
+		bar->setSelection(1, 5);
+		pick = FilepathEdit::tr("Copy");
+		bar->showMenu(QPoint());
+		check(enabled.at(0) && QGuiApplication::clipboard()->text() == bar->text().mid(1, 5),
+			"Copy: the text selected in the bar");
+		bar->deselect();
+		press(bar, Qt::Key_C, QKeySequence(QKeySequence::Copy)[0].keyboardModifiers());
+		check(QGuiApplication::clipboard()->text() == bar->text(),
+			"its Copy key without a selection copies the whole text shown");
+		pick.clear();
+		{
+			QContextMenuEvent menuEvent(QContextMenuEvent::Mouse, QPoint(20, 5), bar->mapToGlobal(QPoint(20, 5)));
+			items.clear();
+			QApplication::sendEvent(bar, &menuEvent);
+		}
+		check(items.size() == 8, "a right click opens the same menu");
+
+		// a modified pane's "* " is not part of the path copied
+		view.paneForTest(0)->replaceBytes(0, 1, QByteArray("L"));
+		QApplication::processEvents();
+		pick = FilepathEdit::tr("&Copy Full Path");
+		bar->showMenu(QPoint());
+		check(bar->originalText() == QStringLiteral("* ") + left
+				&& QGuiApplication::clipboard()->text() == left,
+			"a modified pane's bar starts with \"* \", which Copy Full Path leaves out");
+
+		// --- the caption, edited in the bar ---
+		bar->editCaption();
+		check(bar->isEditing() && !bar->isReadOnly() && bar->text() == left,
+			"Edit Caption: the bar turns editable with the caption, without the \"* \"");
+		bar->setText(QStringLiteral("zzz"));
+		press(bar, Qt::Key_Escape);
+		QApplication::processEvents();
+		check(!bar->isEditing() && bar->isReadOnly() && bar->originalText() == QStringLiteral("* ") + left,
+			"Esc leaves the caption as it was");
+		press(bar, Qt::Key_F2);
+		check(bar->isEditing(), "F2 in the bar edits the caption");
+		bar->setText(QStringLiteral("Version A"));
+		press(bar, Qt::Key_Return);
+		QApplication::processEvents();
+		check(!bar->isEditing() && bar->originalText() == QStringLiteral("* Version A")
+				&& view.tabTitle().startsWith(QStringLiteral("Version A")),
+			"Enter takes the new caption, for the bar and the tab");
+
+		// --- the path, edited in the bar (Ctrl+L or Alt+D) ---
+		QAction *editPathAction = nullptr;
+		for (QAction *action : view.actions())
+			if (action->shortcuts().contains(QKeySequence(Qt::CTRL | Qt::Key_L)))
+				editPathAction = action;
+		check(editPathAction != nullptr
+				&& editPathAction->shortcuts().contains(QKeySequence(Qt::ALT | Qt::Key_D)),
+			"Ctrl+L and Alt+D edit the active pane's path");
+		if (editPathAction == nullptr)
+			return 1;
+		editPathAction->trigger();
+		check(bar->isEditing() && bar->text() == left && bar->completer() != nullptr,
+			"Edit Path: the bar turns editable with the path, completing from the file system");
+		const QString missing = dir.filePath(QStringLiteral("missing.bin"));
+		bar->setText(missing);
+		press(bar, Qt::Key_Return);
+		QApplication::processEvents();
+		printf("  missing: %s\n", qPrintable(bar->text()));
+		check(!bar->isEditing() && bar->completer() == nullptr && view.paths().at(0) == left
+				&& bar->text() != missing && !bar->text().isEmpty() && prompts == 0,
+			"a path that is not there: the reason in the bar, the pane as it was");
+		editPathAction->trigger();
+		bar->setText(dir.path());
+		press(bar, Qt::Key_Return);
+		QApplication::processEvents();
+		check(bar->text() == FilepathEdit::tr("File not found: %1").arg(dir.path()) && view.paths().at(0) == left,
+			"a folder: \"File not found\" in the bar");
+		promptAnswer = false;
+		editPathAction->trigger();
+		bar->setText(third);
+		press(bar, Qt::Key_Return);
+		QApplication::processEvents();
+		check(prompts == 1 && view.paths().at(0) == left && view.paneForTest(0)->isModified(),
+			"a file: the changes are saved first, and cancelling that keeps the pane");
+		promptAnswer = true;
+		editPathAction->trigger();
+		bar->setText(third);
+		press(bar, Qt::Key_Return);
+		QApplication::processEvents();
+		check(prompts == 2 && view.paths().at(0) == third
+				&& view.paneForTest(0)->data() == QByteArray("third bytes")
+				&& !view.paneForTest(0)->isModified() && bar->originalText() == third
+				&& NewComparisonView::savedHistory().value(0) == third,
+			"then the file loads in the pane, without the caption, into the recent paths");
+
+		// --- Open... ---
+		QString startFolder;
+		FilepathEdit::setOpenDialogForTest([&](const QString &folder) {
+			startFolder = folder;
+			return fourth;
+		});
+		pick = FilepathEdit::tr("&Open\xE2\x80\xA6");
+		bar->showMenu(QPoint());
+		check(startFolder == dir.path() && view.paths().at(0) == fourth
+				&& view.paneForTest(0)->data() == QByteArray("fourth bytes")
+				&& NewComparisonView::savedHistory().value(0) == fourth,
+			"Open: from the caption's folder, the file chosen in the pane");
+		FilepathEdit::setOpenDialogForTest(nullptr);
+
+		// --- Open Clipboard ---
+		QGuiApplication::clipboard()->setText(QStringLiteral("clipboard bytes"));
+		pick = FilepathEdit::tr("Open C&lipboard");
+		bar->showMenu(QPoint());
+		const QString clipPath = view.paths().at(0);
+		printf("  clipboard: %s as %s\n", qPrintable(bar->originalText()), qPrintable(clipPath));
+		check(view.paneForTest(0)->data() == QByteArray("clipboard bytes")
+				&& QFileInfo(clipPath).fileName().startsWith(QStringLiteral("CLP"))
+				&& QFileInfo::exists(clipPath)
+				&& bar->originalText().startsWith(FilepathEdit::tr("Clipboard at %1").section(QStringLiteral("%1"), 0, 0))
+				&& bar->path() == clipPath && view.tabTitle().startsWith(FilepathEdit::tr("Clipboard at %1").section(QStringLiteral("%1"), 0, 0))
+				&& NewComparisonView::savedHistory().value(0) == fourth,
+			"Open Clipboard: its text in a temporary file, captioned with the time, not a recent path");
+
+		// --- Recent Files or Folders ---
+		bar->setRecentItemsProvider([&]() { return QStringList{ missing, right }; });
+		pick.clear();
+		bar->showMenu(QPoint());
+		check(items.size() == 10 && items.at(8) == QStringLiteral("-")
+				&& items.at(9) == FilepathEdit::tr("Recent F&iles or Folders")
+				&& recentItems == QStringList{ QStringLiteral("&1 missing.bin"), QStringLiteral("&2 right.bin") },
+			"the recent files, by name, after a separator");
+		pick = QStringLiteral("&1 missing.bin");
+		bar->showMenu(QPoint());
+		view.paneForTest(0)->placeCaret(2);
+		QApplication::processEvents();
+		check(bar->originalText() == FilepathEdit::tr("File not found: %1").arg(missing)
+				&& view.paths().at(0) == clipPath,
+			"one not found: said in the bar, which keeps it while the pane is as it was");
+		pick = QStringLiteral("&2 right.bin");
+		bar->showMenu(QPoint());
+		check(view.paths().at(0) == right && bar->originalText() == right
+				&& view.paneForTest(0)->data() == QByteArray("right bytes") && view.diffCount() == 0,
+			"one there: loaded in the pane, compared again");
+
+		// --- the active pane follows the bar's focus ---
+		{
+			QFocusEvent focus(QEvent::FocusIn, Qt::MouseFocusReason);
+			QApplication::sendEvent(view.headerForTest(1), &focus);
+		}
+		check(view.activePane() == 1 && view.headerForTest(1)->isActive() && !bar->isActive(),
+			"a click in a bar makes its pane the active one");
+
+		FilepathEdit::setMenuPresenterForTest(nullptr);
+		NewComparisonView::clearSavedHistory();
 		lm::setMessageSinkForTest([](const QString &) {});
 		printf("ok: %d\n", ok);
 		return ok ? 0 : 1;

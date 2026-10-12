@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <QHash>
 #include <QKeySequence>
@@ -18,10 +19,10 @@ class QLabel;
 class QLineEdit;
 class QMenu;
 class QPlainTextEdit;
-class QToolButton;
 class QVBoxLayout;
 class DiffTextEdit;
 class DisplayFilterBar;
+class FilepathEdit;
 class LineFilterHelper;
 class LocationPane;
 class PaneSearch;
@@ -216,6 +217,16 @@ public:
 	    title show it instead of the file name, as "Original File" in a
 	    self-compare. */
 	void setSideDescription(int side, const QString &description);
+	/** WinMerge's ChangeFile, which the path bar and a dropped file call:
+	    save what was changed (after asking), then open the files again
+	    with another one in one pane. */
+	bool changeFile(int side, const QString &path, const QString &description);
+	/** How the changes are saved before (PromptAndSaveIfNeeded); false
+	    cancels. */
+	void setSavePrompt(std::function<bool()> prompt) { m_savePrompt = std::move(prompt); }
+	/** Ctrl+L: edit the active pane's path in its bar. */
+	void editActivePanePath();
+	FilepathEdit *headerForTest(int side) const { return m_headers[side]; }
 
 	// --- WinMerge's display filter of the file window: the filter bar
 	// (CLineFilterBar) and the filter itself
@@ -353,9 +364,6 @@ private:
 		const QList<bool> &flagsBefore, const QList<bool> &flagsAfter);
 	void resetUndoHistory();
 	void refreshAfterUndoRedo(const int countsBefore[3]);
-	void showHeaderMenu(int side);
-	void editCaption(int side);
-	void changeSideFile(int side, const QString &path);
 	SaveResult saveSide(int side, QString *error);
 	void setSideModified(int side, bool modified);
 	void paneScrolled(int pane);
@@ -380,9 +388,11 @@ private:
 	int m_paneCount = 2;
 	bool m_readOnly[3] = {};
 	DiffTextEdit *m_panes[3];
-	QLabel *m_headers[3];
-	QWidget *m_headerRows[3] = {};
-	QToolButton *m_headerButtons[3] = {};
+	// WinMerge's path bar over each pane, and what it was last given
+	// (CMergeDoc::m_sCurrentHeaderTitle)
+	FilepathEdit *m_headers[3] = {};
+	QString m_headerTexts[3];
+	std::function<bool()> m_savePrompt;
 	QLabel *m_posLabels[3];
 	QLabel *m_encLabels[3];
 	std::unique_ptr<SyntaxHighlighter> m_highlighters[3];

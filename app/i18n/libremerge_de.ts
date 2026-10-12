@@ -273,16 +273,6 @@
         <translation>Vergleichseinstellungen</translation>
     </message>
     <message>
-        <source>Pane options</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Ausschnittoptionen</translation>
-    </message>
-    <message>
-        <source>Edit Caption</source>
-        <translatorcomment>After WinMerge&apos;s &quot;&amp;Edit Caption\tF2&quot;.</translatorcomment>
-        <translation>Titelzeile bearbeiten</translation>
-    </message>
-    <message>
         <source>expected 2 or 3 files</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>2 oder 3 Dateien erwartet</translation>
@@ -368,59 +358,9 @@
         <translation>Zeile: %1  Spalte: %2/%3  Zeichen: %2/%3</translation>
     </message>
     <message>
-        <source>Copy Full Path</source>
-        <translatorcomment>After WinMerge&apos;s &quot;&amp;Copy Full Path&quot;.</translatorcomment>
-        <translation>Vollständigen Pfad kopieren</translation>
-    </message>
-    <message>
-        <source>Copy Filename</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;Filename&quot;.</translatorcomment>
-        <translation>Dateinamen kopieren</translation>
-    </message>
-    <message>
-        <source>Edit Caption…</source>
-        <translatorcomment>After WinMerge&apos;s &quot;&amp;Edit Caption\tF2&quot;.</translatorcomment>
-        <translation>Titelzeile bearbeiten…</translation>
-    </message>
-    <message>
-        <source>Open File…</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Datei öffnen…</translation>
-    </message>
-    <message>
-        <source>Open File</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Datei öffnen</translation>
-    </message>
-    <message>
-        <source>Reveal in Finder</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Im Finder zeigen</translation>
-    </message>
-    <message>
-        <source>Show in File Manager</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Im Dateimanager anzeigen</translation>
-    </message>
-    <message>
-        <source>Recent Files</source>
-        <translatorcomment>LibreMerge&apos;s own text, worded in a native speaker&apos;s review.</translatorcomment>
-        <translation>Kürzlich verwendete Dateien</translation>
-    </message>
-    <message>
-        <source>Caption for this pane (leave empty to show the file path):</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Titelzeile für diesen Ausschnitt (leer lassen, um den Dateipfad anzuzeigen):</translation>
-    </message>
-    <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
-    </message>
-    <message>
-        <source>Discard unsaved changes in this pane?</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Ungespeicherte Änderungen in diesem Ausschnitt verwerfen?</translation>
     </message>
     <message>
         <source>The merge target is read-only.</source>
@@ -1077,6 +1017,63 @@ Bitte löschen Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so 
         <source>at position</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>an Position</translation>
+    </message>
+</context>
+<context>
+    <name>FilepathEdit</name>
+    <message>
+        <source>Copy</source>
+        <translation>Kopieren</translation>
+    </message>
+    <message>
+        <source>&amp;Copy Full Path</source>
+        <translation>Vollständigen Pfad kopieren</translation>
+    </message>
+    <message>
+        <source>Copy &amp;Filename</source>
+        <translation>Dateinamen kopieren</translation>
+    </message>
+    <message>
+        <source>&amp;Edit Caption</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Titelzeile bearbeiten\tF2&quot;.</translatorcomment>
+        <translation>Titelzeile bearbeiten</translation>
+    </message>
+    <message>
+        <source>Edit &amp;Path</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Pfad bearbeiten\tStrg+L&quot;.</translatorcomment>
+        <translation>&amp;Pfad bearbeiten</translation>
+    </message>
+    <message>
+        <source>Open C&amp;lipboard</source>
+        <translation>Z&amp;wischenablage öffnen</translation>
+    </message>
+    <message>
+        <source>&amp;Open…</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Öffnen...&quot;.</translatorcomment>
+        <translation>&amp;Öffnen…</translation>
+    </message>
+    <message>
+        <source>Recent F&amp;iles or Folders</source>
+        <translatorcomment>Changed in a native speaker&apos;s review; WinMerge&apos;s is &quot;Kürzlich&amp;e Dateien oder Ordner&quot;.</translatorcomment>
+        <translation>&amp;Kürzlich verwendet</translation>
+    </message>
+    <message>
+        <source>File not found: %1</source>
+        <translation>Datei nicht gefunden: %1</translation>
+    </message>
+    <message>
+        <source>Clipboard at %1</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Zwischenablage am %s&quot;.</translatorcomment>
+        <translation>Zwischenablage am %1</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Öffnen</translation>
+    </message>
+    <message>
+        <source>All Files (*)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Alle Dateien (*.*)|*.*||&quot;.</translatorcomment>
+        <translation>Alle Dateien (*)</translation>
     </message>
 </context>
 <context>
@@ -2592,6 +2589,17 @@ Patches sind nicht betroffen.</translation>
     <message>
         <source>Untitled Right</source>
         <translation>Unbenannt rechts</translation>
+    </message>
+    <message>
+        <source>Cannot open file(s)
+%1
+
+%2</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Kann Datei nicht öffnen\n%1\n\n%2&quot;.</translatorcomment>
+        <translation>Kann Dateien nicht öffnen
+%1
+
+%2</translation>
     </message>
     <message>
         <source>Pt: (%1, %2)  RGBA: (%3, %4, %5, %6)  </source>

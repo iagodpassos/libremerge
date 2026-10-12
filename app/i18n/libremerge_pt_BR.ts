@@ -252,14 +252,6 @@
         <translation>Opções de Comparação</translation>
     </message>
     <message>
-        <source>Pane options</source>
-        <translation>Opções do painel</translation>
-    </message>
-    <message>
-        <source>Edit Caption</source>
-        <translation>Editar Legenda</translation>
-    </message>
-    <message>
         <source>expected 2 or 3 files</source>
         <translation>eram esperados 2 ou 3 arquivos</translation>
     </message>
@@ -331,48 +323,8 @@
         <translation>  • alterações não salvas</translation>
     </message>
     <message>
-        <source>Copy Full Path</source>
-        <translation>Copiar o Caminho Completo</translation>
-    </message>
-    <message>
-        <source>Copy Filename</source>
-        <translation>Copiar o Nome do Arquivo</translation>
-    </message>
-    <message>
-        <source>Edit Caption…</source>
-        <translation>Editar Legenda…</translation>
-    </message>
-    <message>
-        <source>Open File…</source>
-        <translation>Abrir Arquivo…</translation>
-    </message>
-    <message>
-        <source>Open File</source>
-        <translation>Abrir Arquivo</translation>
-    </message>
-    <message>
-        <source>Reveal in Finder</source>
-        <translation>Revelar no Finder</translation>
-    </message>
-    <message>
-        <source>Show in File Manager</source>
-        <translation>Mostrar no Gerenciador de Arquivos</translation>
-    </message>
-    <message>
-        <source>Recent Files</source>
-        <translation>Arquivos Recentes</translation>
-    </message>
-    <message>
-        <source>Caption for this pane (leave empty to show the file path):</source>
-        <translation>Legenda deste painel (vazio mostra o caminho do arquivo):</translation>
-    </message>
-    <message>
         <source>LibreMerge</source>
         <translation>LibreMerge</translation>
-    </message>
-    <message>
-        <source>Discard unsaved changes in this pane?</source>
-        <translation>Descartar as alterações não salvas deste painel?</translation>
     </message>
     <message>
         <source>The merge target is read-only.</source>
@@ -1019,6 +971,57 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     <message>
         <source>at position</source>
         <translation>na posição</translation>
+    </message>
+</context>
+<context>
+    <name>FilepathEdit</name>
+    <message>
+        <source>Copy</source>
+        <translation>Copiar</translation>
+    </message>
+    <message>
+        <source>&amp;Copy Full Path</source>
+        <translation>&amp;Copiar o Caminho Completo</translation>
+    </message>
+    <message>
+        <source>Copy &amp;Filename</source>
+        <translation>Copiar &amp;o Nome do Arquivo</translation>
+    </message>
+    <message>
+        <source>&amp;Edit Caption</source>
+        <translation>&amp;Editar Legenda</translation>
+    </message>
+    <message>
+        <source>Edit &amp;Path</source>
+        <translation>E&amp;ditar Caminho</translation>
+    </message>
+    <message>
+        <source>Open C&amp;lipboard</source>
+        <translation>Abrir Á&amp;rea de Transferência</translation>
+    </message>
+    <message>
+        <source>&amp;Open…</source>
+        <translation>&amp;Abrir…</translation>
+    </message>
+    <message>
+        <source>Recent F&amp;iles or Folders</source>
+        <translation>Arqu&amp;ivos ou Pastas Recentes</translation>
+    </message>
+    <message>
+        <source>File not found: %1</source>
+        <translation>Arquivo não encontrado: %1</translation>
+    </message>
+    <message>
+        <source>Clipboard at %1</source>
+        <translation>Área de transferência em %1</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Abrir</translation>
+    </message>
+    <message>
+        <source>All Files (*)</source>
+        <translation>Todos os Arquivos (*)</translation>
     </message>
 </context>
 <context>
@@ -2348,6 +2351,16 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>Untitled Right</source>
         <translation>Direita Sem Título</translation>
+    </message>
+    <message>
+        <source>Cannot open file(s)
+%1
+
+%2</source>
+        <translation>Não foi possível abrir os arquivos
+%1
+
+%2</translation>
     </message>
     <message>
         <source>Pt: (%1, %2)  RGBA: (%3, %4, %5, %6)  </source>

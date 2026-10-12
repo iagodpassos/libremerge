@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "HexCompareView.h"
 
+#include <QAction>
 #include <QFile>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -13,9 +14,11 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+#include "FilepathEdit.h"
 #include "HexView.h"
 #include "Icons.h"
 #include "MessageBoxes.h"
+#include "NewComparisonView.h"
 #include "Theme.h"
 
 /** The first part of the editor's status bar: the caret's offset and
@@ -150,10 +153,27 @@ HexCompareView::HexCompareView(QWidget *parent)
 		auto *columnLayout = new QVBoxLayout(column);
 		columnLayout->setContentsMargins(0, 0, 0, 0);
 		columnLayout->setSpacing(0);
-		m_headers[i] = new QLabel(column);
-		m_headers[i]->setContentsMargins(6, 3, 6, 3);
-		m_headers[i]->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+		// upstream's path bar (CEditorFilePathBar) over each pane
+		m_headers[i] = new FilepathEdit(column);
 		columnLayout->addWidget(m_headers[i]);
+		connect(m_headers[i], &FilepathEdit::focusedIn, this, [this, i]() { setActivePane(i); });
+		connect(m_headers[i], &FilepathEdit::captionChanged, this, [this, i](const QString &text) {
+			// SetDescription and UpdateHeaderPath
+			m_headerTexts[i].clear();
+			setSideDescription(i, text);
+			m_panes[i]->setFocus();
+			emit pathsChanged();
+		});
+		connect(m_headers[i], &FilepathEdit::fileSelected, this,
+			[this, i](const QString &path, const QString &description) {
+				if (!changeFile(i, path, description))
+					return;
+				m_panes[i]->setFocus();
+				// the clipboard's file is not a recent one
+				if (description.isEmpty())
+					NewComparisonView::rememberPaths({ path });
+			});
+		connect(m_headers[i], &FilepathEdit::editEnded, this, [this, i]() { m_panes[i]->setFocus(); });
 		m_panes[i] = new HexView(column);
 		m_panes[i]->setUndoHistory(m_history);
 		columnLayout->addWidget(m_panes[i], 1);
@@ -192,6 +212,9 @@ HexCompareView::HexCompareView(QWidget *parent)
 		connect(m_panes[i], &HexView::scrolled, this, [this, i]() { syncScroll(i); });
 	}
 	layout->addWidget(m_splitter, 1);
+
+	FilepathEdit::addEditPathShortcut(this, [this]() { editActivePanePath(); });
+
 	connect(m_history, &HexUndoHistory::changed, this, &HexCompareView::updateActions);
 	connect(lm::Theme::instance(), &lm::Theme::changed, this, &HexCompareView::applyTheme);
 	applyTheme();
@@ -477,6 +500,37 @@ void HexCompareView::refreshByUser()
 	emit rescanned();
 }
 
+bool HexCompareView::changeFile(int pane, const QString &path, const QString &description)
+{
+	if (pane < 0 || pane >= m_paneCount)
+		return false;
+	if (m_savePrompt && !m_savePrompt())
+		return false;
+	const bool readOnly = m_panes[pane]->isReadOnly();
+	QString error;
+	if (!loadPane(pane, path, &error))
+	{
+		// upstream's Try: the system's reason
+		QFile probe(path);
+		const bool opened = probe.open(QIODevice::ReadOnly);
+		lm::showError(this, opened || probe.errorString().isEmpty() ? error : probe.errorString());
+		return false;
+	}
+	m_panes[pane]->setReadOnly(readOnly);
+	m_descriptions[pane] = description;
+	updateLastCompareResult();
+	updateHeader(pane);
+	updateStatus(pane);
+	updateActions();
+	emit pathsChanged();
+	return true;
+}
+
+void HexCompareView::editActivePanePath()
+{
+	m_headers[m_activePane]->editPath();
+}
+
 bool HexCompareView::reload(QString *error)
 {
 	for (int i = 0; i < m_paneCount; ++i)
@@ -580,8 +634,8 @@ bool HexCompareView::saveModified(QString *error)
     the pane holds unsaved changes. */
 void HexCompareView::updateHeader(int pane)
 {
-	QString text = m_descriptions[pane].isEmpty()
-		? QFileInfo(m_paths[pane]).fileName() : m_descriptions[pane];
+	// upstream's UpdateHeaderPath: the description, or the path
+	QString text = m_descriptions[pane].isEmpty() ? m_paths[pane] : m_descriptions[pane];
 	if (text.isEmpty())
 	{
 		if (pane == 0)
@@ -593,17 +647,15 @@ void HexCompareView::updateHeader(int pane)
 	}
 	if (m_panes[pane]->isModified())
 		text.prepend(QStringLiteral("* "));
-	m_headers[pane]->setText(text);
-	m_headers[pane]->setToolTip(m_paths[pane]);
-	const bool dark = lm::Theme::instance()->dark();
-	const bool active = pane == m_activePane;
-	// the active pane's header highlighted, like WinMerge's file bar
-	const QString bg = dark ? (active ? QStringLiteral("#3d5a86") : QStringLiteral("#2c2c2c"))
-		: (active ? QStringLiteral("#c8d8ee") : QStringLiteral("#ececec"));
-	const QString fg = dark ? QStringLiteral("#d4d4d4") : QStringLiteral("#303030");
-	m_headers[pane]->setStyleSheet(QStringLiteral(
-		"QLabel { background: %1; color: %2; font-weight: %3; }")
-		.arg(bg, fg, active ? QStringLiteral("bold") : QStringLiteral("normal")));
+	// only when it changes: what the bar shows otherwise (a recent file
+	// not found) stays until then
+	if (text != m_headerTexts[pane])
+	{
+		m_headerTexts[pane] = text;
+		m_headers[pane]->setOriginalText(text);
+	}
+	m_headers[pane]->setPath(m_paths[pane]);
+	m_headers[pane]->setActive(pane == m_activePane);
 }
 
 void HexCompareView::updateStatus(int pane)

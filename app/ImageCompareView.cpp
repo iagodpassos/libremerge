@@ -30,9 +30,11 @@
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
+#include "FilepathEdit.h"
 #include "Icons.h"
 #include "ImagePane.h"
 #include "MessageBoxes.h"
+#include "NewComparisonView.h"
 #include "Theme.h"
 
 #include "ImgMergeBuffer.hpp"
@@ -202,15 +204,36 @@ ImageCompareView::ImageCompareView(QWidget *parent)
 		auto *columnLayout = new QVBoxLayout(column);
 		columnLayout->setContentsMargins(0, 0, 0, 0);
 		columnLayout->setSpacing(0);
-		m_headers[i] = new QLabel(column);
-		m_headers[i]->setContentsMargins(6, 3, 6, 3);
-		// header and status text must never drive the column width: the
-		// cursor readout grows on hover, and a label-driven minimum width
-		// makes the splitter relayout under the mouse in a feedback loop
-		// (WinMerge's status bars clip; these do too)
-		m_headers[i]->setSizePolicy(QSizePolicy::Ignored,
-			QSizePolicy::Preferred);
+		// upstream's path bar (CEditorFilePathBar) over each pane; like
+		// the status text it never drives the column width (the bar's
+		// size policy ignores its text)
+		m_headers[i] = new FilepathEdit(column);
+		// Open Clipboard takes the clipboard's image here
+		m_headers[i]->setClipboardImages(true);
 		columnLayout->addWidget(m_headers[i]);
+		connect(m_headers[i], &FilepathEdit::focusedIn, this, [this, i]() {
+			if (m_activePane == i)
+				return;
+			m_activePane = i;
+			for (int p = 0; p < m_paneCount; ++p)
+				updatePaneHeader(p);
+		});
+		connect(m_headers[i], &FilepathEdit::captionChanged, this, [this, i](const QString &text) {
+			// the image frame's caption callback
+			setSideDescription(i, text);
+			setActivePane(i);
+			emit pathsChanged();
+		});
+		connect(m_headers[i], &FilepathEdit::fileSelected, this,
+			[this, i](const QString &path, const QString &description) {
+				if (!changeFile(i, path, description))
+					return;
+				setActivePane(i);
+				// the clipboard's file is not a recent one
+				if (description.isEmpty())
+					NewComparisonView::rememberPaths({ path });
+			});
+		connect(m_headers[i], &FilepathEdit::editEnded, this, [this, i]() { m_panes[i]->setFocus(); });
 		m_panes[i] = new ImagePane(column);
 		columnLayout->addWidget(m_panes[i], 1);
 		m_paneStatus[i] = new QLabel(column);
@@ -289,6 +312,7 @@ ImageCompareView::ImageCompareView(QWidget *parent)
 	addShortcut(QKeySequence::Paste, [this]() { editPaste(); });
 	addShortcut(QKeySequence::Delete, [this]() { editDelete(); });
 	addShortcut(QKeySequence::SelectAll, [this]() { selectAll(); });
+	FilepathEdit::addEditPathShortcut(this, [this]() { editActivePanePath(); });
 
 	loadSettings();
 	applyDiffColors();
@@ -1535,8 +1559,8 @@ void ImageCompareView::updatePaneHeader(int pane)
 {
 	if (m_headers[pane] == nullptr)
 		return;
-	QString text = m_descriptions[pane].isEmpty()
-		? QFileInfo(m_paths[pane]).fileName() : m_descriptions[pane];
+	// upstream's UpdateHeaderPath: the description, or the path
+	QString text = m_descriptions[pane].isEmpty() ? m_paths[pane] : m_descriptions[pane];
 	if (text.isEmpty())
 	{
 		if (pane == 0)
@@ -1548,18 +1572,51 @@ void ImageCompareView::updatePaneHeader(int pane)
 	}
 	if (m_buffer->IsModified(pane))
 		text.prepend(QStringLiteral("* "));
-	m_headers[pane]->setText(text);
-	m_headers[pane]->setToolTip(m_paths[pane]);
-	const bool dark = lm::Theme::instance()->dark();
-	const bool active = pane == m_activePane;
-	// active pane highlighted in the header, like WinMerge's file bar
-	QString bg = dark ? (active ? QStringLiteral("#3d5a86")
-			: QStringLiteral("#2c2c2c"))
-		: (active ? QStringLiteral("#c8d8ee") : QStringLiteral("#ececec"));
-	QString fg = dark ? QStringLiteral("#d4d4d4") : QStringLiteral("#303030");
-	m_headers[pane]->setStyleSheet(QStringLiteral(
-		"QLabel { background: %1; color: %2; font-weight: %3; }")
-		.arg(bg, fg, active ? QStringLiteral("bold") : QStringLiteral("normal")));
+	m_headers[pane]->setPath(m_paths[pane]);
+	m_headers[pane]->setActive(pane == m_activePane);
+	// only when it changes: what the bar shows otherwise (a recent file
+	// not found) stays until then
+	if (text != m_headerTexts[pane])
+	{
+		m_headerTexts[pane] = text;
+		m_headers[pane]->setOriginalText(text);
+	}
+}
+
+/** Upstream's ChangeFile: the images are opened again (OpenImages), the
+    new one in its pane with its description, then MoveOnLoad, which
+    keeps the active pane. */
+bool ImageCompareView::changeFile(int pane, const QString &path, const QString &description)
+{
+	if (pane < 0 || pane >= m_paneCount || path.isEmpty())
+		return false;
+	// PromptAndSaveIfNeeded
+	if (m_savePrompt && !m_savePrompt())
+		return false;
+	const QString oldPath = m_paths[pane];
+	const QString oldDescription = m_descriptions[pane];
+	const int active = m_activePane;
+	m_paths[pane] = path;
+	m_descriptions[pane] = description;
+	QString error;
+	if (!reload(&error))
+	{
+		// nothing was touched: reload refuses what it cannot read
+		const QString files = paths().join(QLatin1Char('|'));
+		m_paths[pane] = oldPath;
+		m_descriptions[pane] = oldDescription;
+		updatePaneHeader(pane);
+		lm::showError(this, tr("Cannot open file(s)\n%1\n\n%2").arg(files, error));
+		return false;
+	}
+	setActivePane(active);
+	emit pathsChanged();
+	return true;
+}
+
+void ImageCompareView::editActivePanePath()
+{
+	m_headers[m_activePane]->editPath();
 }
 
 void ImageCompareView::updatePaneStatus(int pane)

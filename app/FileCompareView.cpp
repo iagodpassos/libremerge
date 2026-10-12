@@ -4,6 +4,8 @@
 #include "FileCompareView.h"
 
 #include "BinaryFiles.h"
+#include "FilepathEdit.h"
+#include "NewComparisonView.h"
 
 #include <QAction>
 #include <climits>
@@ -11,7 +13,6 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
-#include <QDesktopServices>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -19,12 +20,10 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QHBoxLayout>
-#include <QInputDialog>
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
 #include "Dialogs.h"
-#include <QProcess>
 #include <QScrollBar>
 #include <QWheelEvent>
 #include <QSettings>
@@ -35,8 +34,6 @@
 #include <QTextLayout>
 #include <QTimer>
 #include <QToolBar>
-#include <QToolButton>
-#include <QUrl>
 #include <QVBoxLayout>
 
 #include "DiffTextEdit.h"
@@ -76,40 +73,6 @@ namespace
 constexpr int kBreakType = 1;
 // skip intra-line marks for pathologically large blocks
 constexpr int kMaxWordDiffBlockBytes = 256 * 1024;
-
-/** QLabel that elides its text in the middle to fit the available width. */
-class ElidedLabel : public QLabel
-{
-public:
-	explicit ElidedLabel(QWidget *parent = nullptr) : QLabel(parent)
-	{
-		setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-	}
-
-	void setFullText(const QString &text)
-	{
-		m_fullText = text;
-		setToolTip(text);
-		updateElision();
-	}
-
-protected:
-	void resizeEvent(QResizeEvent *event) override
-	{
-		QLabel::resizeEvent(event);
-		updateElision();
-	}
-
-private:
-	void updateElision()
-	{
-		const int margin = contentsMargins().left() + contentsMargins().right() + 4;
-		setText(fontMetrics().elidedText(m_fullText, Qt::ElideMiddle,
-			qMax(20, width() - margin)));
-	}
-
-	QString m_fullText;
-};
 
 /** Map an inclusive UTF-8 byte range from the engine onto UTF-16 offsets
     of the QString it was encoded from. */
@@ -407,28 +370,29 @@ FileCompareView::FileCompareView(QWidget *parent)
 		column->setContentsMargins(0, 0, 0, 0);
 		column->setSpacing(0);
 
-		auto *headerRow = new QWidget(this);
-		headerRow->setAttribute(Qt::WA_StyledBackground, true);
-		auto *headerLayout = new QHBoxLayout(headerRow);
-		headerLayout->setContentsMargins(0, 0, 0, 0);
-		headerLayout->setSpacing(0);
-		auto *header = new ElidedLabel(headerRow);
-		header->setContentsMargins(6, 2, 6, 2);
-		m_headers[i] = header;
-		headerLayout->addWidget(header, 1);
-		// WinMerge's per-pane menu button
-		auto *menuButton = new QToolButton(headerRow);
-		menuButton->setText(QString::fromUtf8("\xE2\x89\xA1"));
-		menuButton->setAutoRaise(true);
-		menuButton->setFixedWidth(24);
-		menuButton->setToolTip(tr("Pane options"));
-		menuButton->setFocusPolicy(Qt::NoFocus);
-		connect(menuButton, &QToolButton::clicked,
-			this, [this, i]() { showHeaderMenu(i); });
-		m_headerButtons[i] = menuButton;
-		headerLayout->addWidget(menuButton);
-		m_headerRows[i] = headerRow;
-		column->addWidget(headerRow);
+		// upstream's path bar (CEditorFilePathBar) over each pane
+		m_headers[i] = new FilepathEdit(this);
+		column->addWidget(m_headers[i]);
+		connect(m_headers[i], &FilepathEdit::focusedIn, this, [this, i]() {
+			m_activePane = i;
+			updateHeaderStyles();
+		});
+		connect(m_headers[i], &FilepathEdit::captionChanged, this, [this, i](const QString &text) {
+			// SetDescription and UpdateHeaderPath
+			setSideDescription(i, text);
+			m_panes[i]->setFocus();
+			emit pathsChanged();
+		});
+		connect(m_headers[i], &FilepathEdit::fileSelected, this,
+			[this, i](const QString &path, const QString &description) {
+				if (!changeFile(i, path, description))
+					return;
+				m_panes[i]->setFocus();
+				// the clipboard's file is not a recent one
+				if (description.isEmpty())
+					NewComparisonView::rememberPaths({ path });
+			});
+		connect(m_headers[i], &FilepathEdit::editEnded, this, [this, i]() { m_panes[i]->setFocus(); });
 
 		m_panes[i] = new DiffTextEdit(this);
 		m_panes[i]->setLineWrapMode(QPlainTextEdit::NoWrap);
@@ -472,8 +436,9 @@ FileCompareView::FileCompareView(QWidget *parent)
 		// and a click outside it leaves none current, like OnLButtonUp
 		m_panes[i]->setMouseReleaseHook(
 			[this, i]() { deselectDiffIfCursorNotInCurrentDiff(i); });
+		// a file dropped on a pane opens there (CMergeEditView::OnDropFiles)
 		m_panes[i]->setFileDropHook(
-			[this, i](const QString &path) { changeSideFile(i, path); });
+			[this, i](const QString &path) { changeFile(i, path, QString()); });
 		m_panes[i]->setContextMenuHook(
 			[this, i](QMenu *menu) { buildPaneMenu(i, menu); });
 		m_panes[i]->setTabStopDistance(
@@ -571,13 +536,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 		});
 	updateHeaderStyles();
 
-	auto *captionAction = new QAction(tr("Edit Caption"), this);
-	captionAction->setShortcut(QKeySequence(Qt::Key_F2));
-	captionAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
-	addAction(captionAction);
-	connect(captionAction, &QAction::triggered, this, [this]() {
-		editCaption(m_activePane);
-	});
+	FilepathEdit::addEditPathShortcut(this, [this]() { editActivePanePath(); });
 
 	m_status = new QLabel(this);
 	m_status->setContentsMargins(6, 3, 6, 3);
@@ -641,7 +600,7 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 	for (int i = 0; i < 3; ++i)
 	{
 		const bool visible = i < m_paneCount;
-		m_headerRows[i]->setVisible(visible);
+		m_headers[i]->setVisible(visible);
 		m_panes[i]->setVisible(visible);
 		m_posLabels[i]->setVisible(visible);
 		m_encLabels[i]->setVisible(visible);
@@ -677,7 +636,7 @@ void FileCompareView::startBlank()
 	for (int i = 0; i < 3; ++i)
 	{
 		const bool visible = i < m_paneCount;
-		m_headerRows[i]->setVisible(visible);
+		m_headers[i]->setVisible(visible);
 		m_panes[i]->setVisible(visible);
 		m_posLabels[i]->setVisible(visible);
 		m_encLabels[i]->setVisible(visible);
@@ -1727,10 +1686,16 @@ void FileCompareView::setSideCaption(int side, const QString &caption)
 
 void FileCompareView::updateHeader(int side)
 {
+	// upstream's UpdateHeaderPath: the description (or the display root's
+	// path), or the path; given to the bar only when it changes
 	const Side &s = m_sides[side];
-	const QString display = s.caption.isEmpty() ? s.path : s.caption;
-	static_cast<ElidedLabel *>(m_headers[side])->setFullText(
-		(s.modified ? QStringLiteral("* ") : QString()) + display);
+	const QString text = (s.modified ? QStringLiteral("* ") : QString())
+		+ (s.caption.isEmpty() ? s.path : s.caption);
+	m_headers[side]->setPath(s.path);
+	if (text == m_headerTexts[side])
+		return;
+	m_headerTexts[side] = text;
+	m_headers[side]->setOriginalText(text);
 }
 
 /** Apply the light (WinMerge classic) or dark palette to every themed
@@ -1786,24 +1751,8 @@ void FileCompareView::applyTheme()
 
 void FileCompareView::updateHeaderStyles()
 {
-	const int active = m_activePane;
-	const bool dark = lm::Theme::instance()->dark();
-	const QString activeStyle = dark
-		? QStringLiteral("QWidget { background: #2d4a6b; border: 1px solid #46689a; }"
-			" QLabel { background: transparent; border: none; color: #e8e8e8; font-weight: 600; }"
-			" QToolButton { background: transparent; border: none; color: #e8e8e8; }")
-		: QStringLiteral("QWidget { background: #d6e4f5; border: 1px solid #a0b0c8; }"
-			" QLabel { background: transparent; border: none; color: #101010; font-weight: 600; }"
-			" QToolButton { background: transparent; border: none; color: #101010; }");
-	const QString inactiveStyle = dark
-		? QStringLiteral("QWidget { background: #303030; border: 1px solid #454545; }"
-			" QLabel { background: transparent; border: none; color: #b0b0b0; }"
-			" QToolButton { background: transparent; border: none; color: #b0b0b0; }")
-		: QStringLiteral("QWidget { background: #ececec; border: 1px solid #c0c0c0; }"
-			" QLabel { background: transparent; border: none; color: #404040; }"
-			" QToolButton { background: transparent; border: none; color: #404040; }");
 	for (int i = 0; i < 3; ++i)
-		m_headerRows[i]->setStyleSheet(i == active ? activeStyle : inactiveStyle);
+		m_headers[i]->setActive(i == m_activePane);
 }
 
 int FileCompareView::firstVisibleViewLine() const
@@ -1847,122 +1796,62 @@ QStringList FileCompareView::paths() const
 	return result;
 }
 
-void FileCompareView::showHeaderMenu(int side)
+/** Upstream's ChangeFile: the files are opened again (OpenDocs), the
+    new one in its pane with its description, the others as they are on
+    disk with theirs, then MoveOnLoad. */
+bool FileCompareView::changeFile(int side, const QString &path, const QString &description)
 {
-	const QString path = m_sides[side].path;
-	QMenu menu(this);
-	QAction *copyPath = menu.addAction(tr("Copy Full Path"), this, [path]() {
-		QApplication::clipboard()->setText(path);
-	});
-	copyPath->setEnabled(!path.isEmpty());
-	QAction *copyName = menu.addAction(tr("Copy Filename"), this, [path]() {
-		QApplication::clipboard()->setText(QFileInfo(path).fileName());
-	});
-	copyName->setEnabled(!path.isEmpty());
-	menu.addSeparator();
-	QAction *caption = menu.addAction(tr("Edit Caption\xE2\x80\xA6"), this,
-		[this, side]() { editCaption(side); });
-	caption->setShortcut(QKeySequence(Qt::Key_F2));
-	menu.addSeparator();
-	menu.addAction(tr("Open File\xE2\x80\xA6"), this, [this, side, path]() {
-		const QString chosen = QFileDialog::getOpenFileName(this,
-			tr("Open File"), QFileInfo(path).absolutePath());
-		if (!chosen.isEmpty())
-			changeSideFile(side, chosen);
-	});
-#ifdef Q_OS_MACOS
-	QAction *reveal = menu.addAction(tr("Reveal in Finder"), this, [path]() {
-		QProcess::startDetached(QStringLiteral("/usr/bin/open"),
-			{ QStringLiteral("-R"), path });
-	});
-#else
-	QAction *reveal = menu.addAction(tr("Show in File Manager"), this, [path]() {
-		QDesktopServices::openUrl(
-			QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
-	});
-#endif
-	reveal->setEnabled(!path.isEmpty());
-	QMenu *recent = menu.addMenu(tr("Recent Files"));
-	const QStringList history =
-		QSettings().value(QStringLiteral("NewComparison/History")).toStringList();
-	for (const QString &entry : history)
-	{
-		if (entry == path || !QFileInfo(entry).isFile())
-			continue;
-		recent->addAction(
-			menu.fontMetrics().elidedText(entry, Qt::ElideMiddle, 420),
-			this, [this, side, entry]() { changeSideFile(side, entry); });
-	}
-	recent->setEnabled(!recent->isEmpty());
-
-	menu.exec(m_headerButtons[side]->mapToGlobal(
-		QPoint(0, m_headerButtons[side]->height())));
-}
-
-void FileCompareView::editCaption(int side)
-{
-	bool ok = false;
-	const QString text = QInputDialog::getText(this, tr("Edit Caption"),
-		tr("Caption for this pane (leave empty to show the file path):"),
-		QLineEdit::Normal, m_sides[side].caption, &ok);
-	if (!ok)
-		return;
-	m_sides[side].caption = text.trimmed();
-	updateHeader(side);
-}
-
-/** Load a different file into one pane and recompare, like WinMerge's
-    per-pane Open. */
-void FileCompareView::changeSideFile(int side, const QString &path)
-{
-	if (path.isEmpty() || path == m_sides[side].path)
-		return;
-	if (m_sides[side].modified
-		&& lm::question(this, tr("LibreMerge"),
-			tr("Discard unsaved changes in this pane?")) != QMessageBox::Yes)
-		return;
-
+	if (side < 0 || side >= m_paneCount || path.isEmpty())
+		return false;
+	// PromptAndSaveIfNeeded
+	if (m_savePrompt && !m_savePrompt())
+		return false;
 	QString error;
-	if (!loadSide(side, path, &error))
+	if (!canLoad(path, &error))
 	{
-		lm::warning(this, tr("LibreMerge"), error);
-		return;
+		lm::showError(this, error);
+		return false;
 	}
-	m_sides[side].caption.clear();
-	m_panes[side]->setReadOnly(m_readOnly[side]);
+	Side &s = m_sides[side];
+	const Side before = s;
+	s.path = path;
+	s.caption = description;
+	s.described = !description.isEmpty();
+	if (!reload(&error))
+	{
+		s.path = before.path;
+		s.caption = before.caption;
+		s.described = before.described;
+		updateHeader(side);
+		lm::showError(this, error);
+		return false;
+	}
 	m_highlighters[side] = std::make_unique<SyntaxHighlighter>(
 		m_panes[side]->document(), path);
-	setSideModified(side, false);
-	// the reload dropped this pane's undo stack (the other panes keep
-	// theirs; the recompare below realigns them undoably)
-	m_undoOrder.removeIf([side](const UndoRef &r) { return r.side == side; });
-	m_redoOrder.removeIf([side](const UndoRef &r) { return r.side == side; });
+	updateHeader(side);
 
-	QSettings settings;
-	const QString historyKey = QStringLiteral("NewComparison/History");
-	QStringList history = settings.value(historyKey).toStringList();
-	history.removeAll(path);
-	history.prepend(path);
-	while (history.size() > 12)
-		history.removeLast();
-	settings.setValue(historyKey, history);
-
-	recompare();
-
-	// changing a pane's file re-applies "scroll to first difference",
-	// like WinMerge (CMergeDoc::ChangeFile ends in MoveOnLoad) - this
-	// covers dropping files onto the panes of a File > New comparison.
-	// Deferred one cycle so the reloaded documents are laid out.
-	if (OptionsDialog::scrollToFirstDiff())
-	{
-		QTimer::singleShot(0, this, [this]() {
+	// MoveOnLoad: the first difference when the option asks, the first
+	// line otherwise (after the reload's own move, one cycle later)
+	QTimer::singleShot(0, this, [this]() {
+		if (OptionsDialog::scrollToFirstDiff() && m_diffCount > 0)
+		{
 			gotoFirstDiff();
 			if (OptionsDialog::scrollToFirstInlineDiff())
 				scrollToFirstInlineDiff();
-		});
-	}
+			return;
+		}
+		gotoLine(0, false, m_activePane, true);
+	});
 
+	// OpenDocs tells when the files are identical
+	emit rescanned();
 	emit pathsChanged();
+	return true;
+}
+
+void FileCompareView::editActivePanePath()
+{
+	m_headers[m_activePane]->editPath();
 }
 
 /** The next difference to stop at: not an ignored one, not one merged

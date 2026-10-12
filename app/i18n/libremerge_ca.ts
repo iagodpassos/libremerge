@@ -290,16 +290,6 @@
         <translation>Opcions de comparació</translation>
     </message>
     <message>
-        <source>Pane options</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Opcions de la subfinestra</translation>
-    </message>
-    <message>
-        <source>Edit Caption</source>
-        <translatorcomment>After WinMerge&apos;s &quot;&amp;Edit Caption\tF2&quot;.</translatorcomment>
-        <translation>Edita la llegenda</translation>
-    </message>
-    <message>
         <source>expected 2 or 3 files</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>s&apos;esperaven 2 o 3 fitxers</translation>
@@ -385,59 +375,9 @@
         <translation>Lín: %1  Col: %2/%3  Car: %2/%3</translation>
     </message>
     <message>
-        <source>Copy Full Path</source>
-        <translatorcomment>After WinMerge&apos;s &quot;&amp;Copy Full Path&quot;.</translatorcomment>
-        <translation>Copia el camí sencer del fitxer</translation>
-    </message>
-    <message>
-        <source>Copy Filename</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;Filename&quot;.</translatorcomment>
-        <translation>Copia el nom del fitxer</translation>
-    </message>
-    <message>
-        <source>Edit Caption…</source>
-        <translatorcomment>After WinMerge&apos;s &quot;&amp;Edit Caption\tF2&quot;.</translatorcomment>
-        <translation>Edita la llegenda…</translation>
-    </message>
-    <message>
-        <source>Open File…</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Obre un fitxer…</translation>
-    </message>
-    <message>
-        <source>Open File</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Obre un fitxer</translation>
-    </message>
-    <message>
-        <source>Reveal in Finder</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Mostra al Finder</translation>
-    </message>
-    <message>
-        <source>Show in File Manager</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Mostra al gestor de fitxers</translation>
-    </message>
-    <message>
-        <source>Recent Files</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Fitxers recents</translation>
-    </message>
-    <message>
-        <source>Caption for this pane (leave empty to show the file path):</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Títol d&apos;aquesta subfinestra (deixeu-lo buit per a mostrar el camí del fitxer):</translation>
-    </message>
-    <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
-    </message>
-    <message>
-        <source>Discard unsaved changes in this pane?</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Voleu descartar els canvis sense desar d&apos;aquesta subfinestra?</translation>
     </message>
     <message>
         <source>The merge target is read-only.</source>
@@ -1240,6 +1180,62 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <source>at position</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>a la posició</translation>
+    </message>
+</context>
+<context>
+    <name>FilepathEdit</name>
+    <message>
+        <source>Copy</source>
+        <translation>Copia</translation>
+    </message>
+    <message>
+        <source>&amp;Copy Full Path</source>
+        <translation>&amp;Copia el camí sencer del fitxer</translation>
+    </message>
+    <message>
+        <source>Copy &amp;Filename</source>
+        <translation>Copia el nom del &amp;fitxer</translation>
+    </message>
+    <message>
+        <source>&amp;Edit Caption</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Edita la llegenda\tF2&quot;.</translatorcomment>
+        <translation>&amp;Edita la llegenda</translation>
+    </message>
+    <message>
+        <source>Edit &amp;Path</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Edita el &amp;camí</translation>
+    </message>
+    <message>
+        <source>Open C&amp;lipboard</source>
+        <translation>Obre el porta-reta&amp;lls</translation>
+    </message>
+    <message>
+        <source>&amp;Open…</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Obre...&quot;.</translatorcomment>
+        <translation>&amp;Obre…</translation>
+    </message>
+    <message>
+        <source>Recent F&amp;iles or Folders</source>
+        <translation>Fitxers i &amp;carpetes recents</translation>
+    </message>
+    <message>
+        <source>File not found: %1</source>
+        <translation>No s&apos;ha trobat el fitxer: %1</translation>
+    </message>
+    <message>
+        <source>Clipboard at %1</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Porta-retalls a %s&quot;.</translatorcomment>
+        <translation>Porta-retalls a %1</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Obre</translation>
+    </message>
+    <message>
+        <source>All Files (*)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Tots els fitxers (*.*)|*.*||&quot;.</translatorcomment>
+        <translation>Tots els fitxers (*)</translation>
     </message>
 </context>
 <context>
@@ -2779,6 +2775,17 @@ Potser el fitxer és només de lectura?</translation>
     <message>
         <source>Untitled Right</source>
         <translation>Fitxer dret sense títol</translation>
+    </message>
+    <message>
+        <source>Cannot open file(s)
+%1
+
+%2</source>
+        <translatorcomment>After WinMerge&apos;s &quot;No es pot obrir el fitxer\n%1\n\n%2&quot;.</translatorcomment>
+        <translation>No es poden obrir els fitxers
+%1
+
+%2</translation>
     </message>
     <message>
         <source>Pt: (%1, %2)  RGBA: (%3, %4, %5, %6)  </source>

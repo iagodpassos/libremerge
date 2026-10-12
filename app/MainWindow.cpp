@@ -918,6 +918,7 @@ void MainWindow::openTableComparison(const QString &leftPath,
 			tr("Could not compare files:\n%1").arg(error));
 		return;
 	}
+	view->setSavePrompt([this, view]() { return promptAndSaveIfNeeded(view, false); });
 	auto refreshTab = [this](TableCompareView *v) {
 		const int tabIndex = m_tabs->indexOf(v);
 		if (tabIndex < 0)
@@ -969,6 +970,7 @@ void MainWindow::openImageComparison(const QStringList &paths,
 		return;
 	}
 	view->setReadOnlySides(readOnly);
+	view->setSavePrompt([this, view]() { return promptAndSaveIfNeeded(view, false); });
 	auto refreshTab = [this](ImageCompareView *v) {
 		const int tabIndex = m_tabs->indexOf(v);
 		if (tabIndex < 0)
@@ -1009,6 +1011,7 @@ void MainWindow::openHexComparison(const QStringList &paths, const QList<bool> &
 		return;
 	}
 	view->setReadOnlySides(readOnly);
+	view->setSavePrompt([this, view]() { return promptAndSaveIfNeeded(view, false); });
 	auto refreshTab = [this](HexCompareView *v) {
 		const int tabIndex = m_tabs->indexOf(v);
 		if (tabIndex < 0)
@@ -1044,6 +1047,8 @@ void MainWindow::openBlankComparison()
 
 void MainWindow::attachFileView(FileCompareView *view)
 {
+	// the path bar's ChangeFile saves what was changed first
+	view->setSavePrompt([this, view]() { return promptAndSaveIfNeeded(view, false); });
 	auto refreshTab = [this](FileCompareView *v) {
 		const int tabIndex = m_tabs->indexOf(v);
 		if (tabIndex < 0)

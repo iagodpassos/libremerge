@@ -5,6 +5,7 @@
 
 #include <QAbstractTableModel>
 #include <QAction>
+#include <QApplication>
 #include <QFile>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -22,11 +23,14 @@
 #include <QVBoxLayout>
 
 #include "DisplayFilterBar.h"
+#include "FilepathEdit.h"
 #include "FileFilters.h"
 #include "FileOps.h"
 #include "Icons.h"
 #include "LineFilterMenu.h"
 #include "MessageBoxes.h"
+#include "NewComparisonView.h"
+#include "OptionsDialog.h"
 #include "Theme.h"
 
 // engine
@@ -512,6 +516,31 @@ TableCompareView::TableCompareView(QWidget *parent)
 	tables->setSpacing(1);
 	for (int i = 0; i < 2; ++i)
 	{
+		// upstream's path bar (CEditorFilePathBar) over each side: the
+		// table is its text window in another dress
+		auto *column = new QVBoxLayout;
+		column->setContentsMargins(0, 0, 0, 0);
+		column->setSpacing(0);
+		m_headers[i] = new FilepathEdit(this);
+		column->addWidget(m_headers[i]);
+		connect(m_headers[i], &FilepathEdit::focusedIn, this, [this, i]() { setActiveSide(i); });
+		connect(m_headers[i], &FilepathEdit::captionChanged, this, [this, i](const QString &text) {
+			// SetDescription and UpdateHeaderPath
+			setSideDescription(i, text);
+			m_tables[i]->setFocus();
+			emit pathsChanged();
+		});
+		connect(m_headers[i], &FilepathEdit::fileSelected, this,
+			[this, i](const QString &path, const QString &description) {
+				if (!changeFile(i, path, description))
+					return;
+				m_tables[i]->setFocus();
+				// the clipboard's file is not a recent one
+				if (description.isEmpty())
+					NewComparisonView::rememberPaths({ path });
+			});
+		connect(m_headers[i], &FilepathEdit::editEnded, this, [this, i]() { m_tables[i]->setFocus(); });
+
 		m_models[i] = new TableSideModel(this, i);
 		m_tables[i] = new RuledTableView(this);
 		m_tables[i]->setVerticalHeader(new RuledRowHeader(m_tables[i]));
@@ -521,7 +550,8 @@ TableCompareView::TableCompareView(QWidget *parent)
 		m_tables[i]->horizontalHeader()->setDefaultSectionSize(110);
 		m_tables[i]->verticalHeader()->setDefaultSectionSize(22);
 		m_tables[i]->setAlternatingRowColors(false);
-		tables->addWidget(m_tables[i], 1);
+		column->addWidget(m_tables[i], 1);
+		tables->addLayout(column, 1);
 		connect(m_tables[i]->verticalScrollBar(), &QScrollBar::valueChanged,
 			this, [this, i](int value) {
 				if (m_syncing)
@@ -559,6 +589,13 @@ TableCompareView::TableCompareView(QWidget *parent)
 			});
 	}
 	layout->addLayout(tables, 1);
+	// the bar of the grid that has the focus highlighted
+	connect(qApp, &QApplication::focusChanged, this, [this](QWidget *, QWidget *now) {
+		for (int i = 0; i < 2; ++i)
+			if (now == m_tables[i])
+				setActiveSide(i);
+	});
+	FilepathEdit::addEditPathShortcut(this, [this]() { editActivePanePath(); });
 
 	m_status = new QLabel(this);
 	m_status->setContentsMargins(6, 3, 6, 3);
@@ -1064,6 +1101,8 @@ void TableCompareView::updateStatus()
 	if (modified)
 		text += tr("  \xE2\x80\xA2 unsaved changes");
 	m_status->setText(text);
+	for (int side = 0; side < 2; ++side)
+		updateHeader(side);
 }
 
 int TableCompareView::nextActive(int from, int direction) const
@@ -1101,7 +1140,91 @@ void TableCompareView::gotoDiff(int blockIndex)
 
 int TableCompareView::activeSide() const
 {
-	return m_tables[1]->hasFocus() ? 1 : 0;
+	if (m_tables[1]->hasFocus())
+		return 1;
+	if (m_tables[0]->hasFocus())
+		return 0;
+	return m_activeSide;
+}
+
+void TableCompareView::setActiveSide(int side)
+{
+	m_activeSide = side;
+	for (int i = 0; i < 2; ++i)
+		m_headers[i]->setActive(i == side);
+}
+
+void TableCompareView::updateHeader(int side)
+{
+	// upstream's UpdateHeaderPath: the description or the path, given to
+	// the bar only when it changes
+	const QString text = (m_sides[side].modified ? QStringLiteral("* ") : QString())
+		+ (m_descriptions[side].isEmpty() ? m_sides[side].path : m_descriptions[side]);
+	m_headers[side]->setPath(m_sides[side].path);
+	m_headers[side]->setActive(side == m_activeSide);
+	if (text == m_headerTexts[side])
+		return;
+	m_headerTexts[side] = text;
+	m_headers[side]->setOriginalText(text);
+}
+
+/** Upstream's ChangeFile (the table being its text window): both files
+    are opened again, the new one on its side with its description, then
+    MoveOnLoad. */
+bool TableCompareView::changeFile(int side, const QString &path, const QString &description)
+{
+	if (side < 0 || side > 1 || path.isEmpty())
+		return false;
+	// PromptAndSaveIfNeeded
+	if (m_savePrompt && !m_savePrompt())
+		return false;
+	QString paths[2] = { m_sides[0].path, m_sides[1].path };
+	paths[side] = path;
+	// refuse before touching anything, as reload does
+	for (const QString &file : paths)
+	{
+		QFile probe(file);
+		if (!probe.open(QIODevice::ReadOnly))
+		{
+			lm::showError(this, tr("cannot open %1").arg(file));
+			return false;
+		}
+	}
+	const bool wasModified = isModified();
+	QString error;
+	if (!compare(paths[0], paths[1], &error))
+	{
+		lm::showError(this, error);
+		return false;
+	}
+	m_descriptions[side] = description;
+	updateHeader(side);
+	m_actSave->setEnabled(isModified());
+	if (wasModified != isModified())
+		emit modifiedChanged(isModified());
+
+	// MoveOnLoad: the first difference when the option asks, the first
+	// row otherwise
+	if (OptionsDialog::scrollToFirstDiff() && m_diffCount > 0)
+	{
+		gotoFirstDiff();
+	}
+	else if (m_models[m_activeSide]->rowCount() > 0)
+	{
+		const QModelIndex first = m_models[m_activeSide]->index(0, 0);
+		m_tables[m_activeSide]->setCurrentIndex(first);
+		m_tables[m_activeSide]->scrollTo(first);
+	}
+
+	// OpenDocs tells when the files are identical
+	emit rescanned();
+	emit pathsChanged();
+	return true;
+}
+
+void TableCompareView::editActivePanePath()
+{
+	m_headers[m_activeSide]->editPath();
 }
 
 /** Upstream's Next/PrevSignificantDiffFromLine, past the differences
@@ -1321,6 +1444,7 @@ void TableCompareView::swapSides()
 	// snapshots refer to sides by index, which a swap would scramble
 	clearHistory();
 	std::swap(m_sides[0], m_sides[1]);
+	std::swap(m_descriptions[0], m_descriptions[1]);
 	QString error;
 	runDiff(&error);
 	rebuildModel();
@@ -1516,8 +1640,10 @@ QString TableCompareView::tabTitle() const
 
 void TableCompareView::setSideDescription(int side, const QString &description)
 {
-	if (side >= 0 && side < 2)
-		m_descriptions[side] = description;
+	if (side < 0 || side >= 2)
+		return;
+	m_descriptions[side] = description;
+	updateHeader(side);
 }
 
 bool TableCompareView::saveModified(QString *error)
