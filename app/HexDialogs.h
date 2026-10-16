@@ -233,9 +233,15 @@ private:
 
 /** Frhed's View Settings, as WinMerge's Options > Compare > Binary opens
     them: the bytes per line (or as many as fit), the offset's length (or
-    the size's), and the caret's values signed or not. Frhed's own rows,
-    the text editor to call and its language, do nothing in WinMerge and
-    are left out. */
+    the size's), and the caret's values signed or not. Frhed's own rows do
+    nothing in WinMerge and are left out: read-only on opening files acts
+    only on the files heksedit opens itself, while WinMerge reads them
+    (CHexMergeView::LoadFile) and its own option makes a pane read-only;
+    the text editor to call serves Frhed's "Open in text editor" (F5),
+    which never runs there (WinMerge's Refresh takes F5 first, and the
+    command wants a file heksedit saved); and the language picks Frhed's
+    own .po files, which WinMerge does not ship (its load_lang call is
+    commented out). */
 class HexViewSettingsDialog : public QDialog
 {
 	Q_OBJECT
