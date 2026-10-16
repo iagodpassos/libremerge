@@ -77,7 +77,8 @@ and Qt's own for the button that restores defaults; the hint of the
 path fields on the selection screen became shorter in every language;
 and File > Recent Files or Folders reads "Kürzlich verwendet" (in the
 menu of the path bar over the panes too), where WinMerge's "Kürzliche
-Dateien oder Ordner" reads oddly.
+Dateien oder Ordner" reads oddly, the Shift+Delete hint of the path
+fields likewise "kürzlich verwendeten Pfad".
 
 ## Deliberately excluded (and why)
 

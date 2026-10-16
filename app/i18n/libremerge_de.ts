@@ -3756,8 +3756,8 @@ Die binäre Übereinstimmung wird geprüft...</translation>
     </message>
     <message>
         <source>Shift+Delete on the open list removes the highlighted recent path</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Umschalt+Entf entfernt in der geöffneten Liste den hervorgehobenen kürzlichen Pfad</translation>
+        <translatorcomment>LibreMerge&apos;s own text, worded in a native speaker&apos;s review.</translatorcomment>
+        <translation>Umschalt+Entf entfernt in der geöffneten Liste den hervorgehobenen kürzlich verwendeten Pfad</translation>
     </message>
     <message>
         <source>Type a path or drop a file or folder here</source>
