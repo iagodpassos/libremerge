@@ -64,6 +64,20 @@ QPalette darkPalette()
 	return palette;
 }
 #endif
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+/** The scheme asked of Qt: none for System, which follows the desktop. */
+Qt::ColorScheme requestedScheme(ThemeMode mode)
+{
+	switch (mode)
+	{
+	case ThemeMode::Light: return Qt::ColorScheme::Light;
+	case ThemeMode::Dark: return Qt::ColorScheme::Dark;
+	case ThemeMode::System: break;
+	}
+	return Qt::ColorScheme::Unknown;
+}
+#endif
 } // namespace
 
 Theme *Theme::instance()
@@ -105,7 +119,7 @@ void Theme::setMode(ThemeMode mode)
 
 void Theme::systemChanged()
 {
-	// our own request to the platform (macOS) echoes back while applying
+	// our own request to the platform echoes back while applying
 	if (m_mode != ThemeMode::System || m_applying)
 		return;
 	applyToApplication();
@@ -144,21 +158,27 @@ void Theme::applyToApplication()
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
 	// the application's appearance (menus, dialogs, title bars and the
 	// native controls) follows a fixed choice instead of the system's
-	QStyleHints *hints = qApp->styleHints();
-	switch (m_mode)
-	{
-	case ThemeMode::Light: hints->setColorScheme(Qt::ColorScheme::Light); break;
-	case ThemeMode::Dark: hints->setColorScheme(Qt::ColorScheme::Dark); break;
-	case ThemeMode::System: hints->unsetColorScheme(); break;
-	}
+	qApp->styleHints()->setColorScheme(requestedScheme(m_mode));
 #endif
 #else
 	// back to the platform's palette first; replace it only when it does
 	// not match, so a GNOME or KDE theme that agrees stays as it is
 	static const QPalette platformToolTips = QToolTip::palette();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+	QStyleHints *hints = qApp->styleHints();
+	hints->unsetColorScheme();
+#endif
 	QApplication::setPalette(QPalette());
 	const bool wanted = dark();
-	if (wanted == paletteIsDark(qApp->palette()))
+	const bool matches = wanted == paletteIsDark(qApp->palette());
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+	// Qt's KDE and GNOME themes hand the desktop's scheme to Fusion, whose
+	// standard palette follows it: on a dark KDE desktop, Light came out
+	// dark (issue #13). Asked for, the scheme also stays when the
+	// desktop's changes later
+	hints->setColorScheme(requestedScheme(m_mode));
+#endif
+	if (matches)
 	{
 		QToolTip::setPalette(platformToolTips);
 	}
