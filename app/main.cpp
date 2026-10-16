@@ -334,6 +334,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestDiffFromCursorOpt(QStringLiteral("selftest-diff-from-cursor"),
 		QStringLiteral("Go to the next and previous difference from where the cursor is and verify it (for testing)"));
 	parser.addOption(selftestDiffFromCursorOpt);
+	QCommandLineOption selftestDiffScrollOpt(QStringLiteral("selftest-diff-scroll"),
+		QStringLiteral("Step through differences and verify the panes scroll as WinMerge's do (for testing)"));
+	parser.addOption(selftestDiffScrollOpt);
 	QCommandLineOption selftestHexOpt(QStringLiteral("selftest-hex"),
 		QStringLiteral("Compare binary files in the hex view and verify it (for testing)"));
 	parser.addOption(selftestHexOpt);
@@ -10873,6 +10876,160 @@ int main(int argc, char *argv[])
 		return ok ? 0 : 1;
 	}
 
+	if (parser.isSet(selftestDiffScrollOpt))
+	{
+		// WinMerge's ShowDiff scrolls to a difference only when it does
+		// not show whole with 3 lines to spare under it, and then puts its
+		// first line 5 lines below the top: stepping down, the next
+		// differences tend to be on screen already. LibreMerge centered
+		// every difference it went to (issue #10). The text and the table
+		// views alike.
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		// 400 lines, lines 100, 104, 108 and 200 different on the right:
+		// differences 0 to 3, the first three close together; the tables
+		// have the same data rows under a header row
+		const QList<int> changed = { 100, 104, 108, 200 };
+		QByteArray leftText, rightText;
+		QByteArray leftCsv = "id,value\n", rightCsv = "id,value\n";
+		for (int i = 1; i <= 400; ++i)
+		{
+			const QByteArray number = QByteArray::number(i);
+			leftText += "line " + number + " of the text\n";
+			rightText += changed.contains(i) ? "line " + number + " CHANGED\n"
+				: "line " + number + " of the text\n";
+			leftCsv += number + ",same\n";
+			rightCsv += number + (changed.contains(i) ? ",changed\n" : ",same\n");
+		}
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		const QString leftTable = dir.filePath(QStringLiteral("left.csv"));
+		const QString rightTable = dir.filePath(QStringLiteral("right.csv"));
+		write(left, leftText);
+		write(right, rightText);
+		write(leftTable, leftCsv);
+		write(rightTable, rightCsv);
+
+		// --- the text view: the scroll bar counts lines from 0 ---
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(QStringList{ left, right }, &error))
+			{
+				printf("compare failed: %s\n", qPrintable(error));
+				return 2;
+			}
+			view.resize(1000, 640);
+			view.show();
+			settle();
+			DiffTextEdit *const pane = view.paneForTest(0);
+			DiffTextEdit *const other = view.paneForTest(1);
+			const auto top = [&]() { return pane->verticalScrollBar()->value(); };
+			printf("  %d lines on screen\n", pane->visibleLineCount());
+			check(pane->visibleLineCount() >= 20, "room for the close differences together");
+
+			view.gotoFirstDiff();
+			printf("  the first difference (line 100): top %d\n", top());
+			check(view.currentDiffForTest() == 0 && top() == 99 - 5
+					&& other->verticalScrollBar()->value() == top(),
+				"a difference out of sight goes 5 lines below the top, in every pane");
+			view.gotoNextDiff();
+			check(view.currentDiffForTest() == 1 && top() == 94,
+				"Next to a difference on screen does not scroll");
+			view.gotoNextDiff();
+			check(view.currentDiffForTest() == 2 && top() == 94, "nor does the next one on screen");
+			view.gotoNextDiff();
+			printf("  the fourth difference (line 200): top %d\n", top());
+			check(view.currentDiffForTest() == 3 && top() == 199 - 5,
+				"Next to a difference out of sight scrolls it 5 lines below the top");
+			view.gotoPrevDiff();
+			check(view.currentDiffForTest() == 2 && top() == 107 - 5,
+				"so does Previous to one above the screen");
+			view.gotoPrevDiff();
+			check(view.currentDiffForTest() == 1 && top() == 102,
+				"and Previous to one on screen does not scroll");
+			// near the bottom edge: the third difference (view line 107)
+			// with 3 lines on screen under it, then with 2
+			const int spareThree = 107 + 3 - pane->visibleLineCount() + 1;
+			pane->verticalScrollBar()->setValue(spareThree);
+			settle();
+			view.gotoNextDiff();
+			check(view.currentDiffForTest() == 2 && top() == spareThree,
+				"a difference with 3 lines under it on screen does not scroll");
+			view.gotoPrevDiff();
+			pane->verticalScrollBar()->setValue(spareThree - 1);
+			settle();
+			view.gotoNextDiff();
+			check(view.currentDiffForTest() == 2 && top() == 102,
+				"with 2 lines under it, it counts as out of sight");
+		}
+
+		// --- the table view: data row n is model row n - 1 ---
+		{
+			TableCompareView view;
+			QString error;
+			if (!view.compare(leftTable, rightTable, &error))
+			{
+				printf("compare failed: %s\n", qPrintable(error));
+				return 2;
+			}
+			view.resize(1000, 640);
+			view.show();
+			settle();
+			QList<QTableView *> grids = view.findChildren<QTableView *>();
+			std::sort(grids.begin(), grids.end(), [&view](QTableView *a, QTableView *b) {
+				return a->mapTo(&view, QPoint()).x() < b->mapTo(&view, QPoint()).x();
+			});
+			if (grids.size() < 2)
+				return 2;
+			QTableView *const grid = grids.first();
+			const auto top = [&]() { return grid->rowAt(0); };
+			printf("  %d rows on screen\n",
+				grid->viewport()->height() / grid->verticalHeader()->defaultSectionSize());
+
+			view.gotoFirstDiff();
+			printf("  table: the first difference (row 100): top %d\n", top());
+			check(view.currentDiffForTest() == 0 && top() == 99 - 5
+					&& grids.last()->rowAt(0) == top(),
+				"table: a difference out of sight goes 5 rows below the top, in both grids");
+			view.gotoNextDiff();
+			view.gotoNextDiff();
+			check(view.currentDiffForTest() == 2 && top() == 94,
+				"table: Next to differences on screen does not scroll");
+			view.gotoNextDiff();
+			check(view.currentDiffForTest() == 3 && top() == 199 - 5,
+				"table: Next to a difference out of sight scrolls it 5 rows below the top");
+			view.gotoPrevDiff();
+			check(view.currentDiffForTest() == 2 && top() == 107 - 5,
+				"table: so does Previous to one above the screen");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
 	if (parser.isSet(selftestScrollSyncOpt))
 	{
 		// however a pane scrolls, the other panes follow it and the
@@ -11411,6 +11568,10 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "compare failed: %s\n", qPrintable(error));
 			return 2;
 		}
+		// panes of their real size: hidden, a pane is a line or two tall
+		// and the difference gone to sits under its bottom edge
+		view.show();
+		QCoreApplication::processEvents();
 		view.gotoLastDiff();
 		QCoreApplication::processEvents();
 		const int scrollBefore = view.firstVisibleViewLine();

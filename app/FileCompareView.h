@@ -349,7 +349,8 @@ private:
 	void applyZoom(qreal pointSize);
 	void updateHeader(int side);
 	void updateHeaderStyles();
-	void gotoDiff(int blockIndex, bool center = true);
+	void gotoDiff(int blockIndex, bool scroll = true);
+	int diffScrollLine(int blockIndex) const;
 	void selectDiffAtViewLine(int viewLine);
 	int nextActive(int from, int direction) const;
 	int nextActiveFromLine(int viewLine, int direction) const;

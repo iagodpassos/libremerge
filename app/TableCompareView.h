@@ -188,6 +188,7 @@ private:
 	void computeCellDiffs();
 	void updateStatus();
 	void gotoDiff(int blockIndex);
+	void scrollDiffIntoView(int blockIndex);
 	void selectDiffAtModelRow(int modelRow);
 	int nextActive(int from, int direction) const;
 	/** The grid the commands act on: the one with the focus, the one

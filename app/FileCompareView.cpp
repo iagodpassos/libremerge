@@ -1881,11 +1881,15 @@ int FileCompareView::nextActive(int from, int direction) const
 	return -1;
 }
 
-void FileCompareView::gotoDiff(int blockIndex, bool center)
+void FileCompareView::gotoDiff(int blockIndex, bool scroll)
 {
 	if (blockIndex < 0 || blockIndex >= static_cast<int>(m_blocks.size()))
 		return;
 	m_current = blockIndex;
+	// judged from where the panes are, applied after the cursor moves and
+	// over its own scroll: a pane not sized yet (a comparison just opened)
+	// would keep the scroll that brought the cursor into a line or two
+	const int topLine = scroll ? diffScrollLine(blockIndex) : -1;
 	for (int side = 0; side < m_paneCount; ++side)
 	{
 		const QTextBlock cursorBlock = m_panes[side]->document()
@@ -1893,15 +1897,37 @@ void FileCompareView::gotoDiff(int blockIndex, bool center)
 		QTextCursor cursor(cursorBlock);
 		m_syncing = true;
 		m_panes[side]->setTextCursor(cursor);
-		// centerCursor dereferences the block's QTextLine; a freshly
-		// replaced document may not be laid out yet (crashed on macOS)
-		if (center && cursorBlock.layout() != nullptr
-			&& cursorBlock.layout()->lineCount() > 0)
-			m_panes[side]->centerCursor();
+		if (topLine >= 0)
+			m_panes[side]->verticalScrollBar()->setValue(topLine);
 		m_syncing = false;
 	}
 	applyHighlights();
 	updateStatus();
+}
+
+/** CMergeEditView::ShowDiff's scroll: none (-1) while the difference
+    shows whole with CONTEXT_LINES_BELOW to spare under it
+    (IsDiffVisible); otherwise the top line that puts its first line
+    CONTEXT_LINES_ABOVE lines below the top, the most a step down can
+    scroll, which tends to bring the next differences on screen too
+    (issue #10). */
+int FileCompareView::diffScrollLine(int blockIndex) const
+{
+	constexpr int contextLinesAbove = 5;
+	constexpr int contextLinesBelow = 3;
+	const Block &block = m_blocks[blockIndex];
+	const DiffTextEdit *edit = m_panes[qBound(0, m_activePane, m_paneCount - 1)];
+	const int top = edit->verticalScrollBar()->value();
+	const int screenLines = edit->visibleLineCount();
+	const int start = shownLineOfView(block.viewBegin);
+	const int end = shownLineOfView(qMax(block.viewBegin, block.viewEnd));
+	// upstream's height, the last line's sublines plus one: a line more
+	// than the difference has
+	const int height = end - start + 1 + 1;
+	if (start >= top && end < top + screenLines - contextLinesBelow
+		&& height < screenLines)
+		return -1;
+	return start > contextLinesAbove ? start - contextLinesAbove : start;
 }
 
 /** Upstream's Next/PrevSignificantDiffFromLine, past the differences

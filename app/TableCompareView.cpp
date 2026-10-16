@@ -1131,9 +1131,8 @@ void TableCompareView::gotoDiff(int blockIndex)
 		return;
 	m_current = blockIndex;
 	const int modelRow = modelRowOf(m_blocks[blockIndex].viewBegin);
-	for (int i = 0; i < 2 && modelRow >= 0; ++i)
-		m_tables[i]->scrollTo(m_models[i]->index(modelRow, 0),
-			QAbstractItemView::PositionAtCenter);
+	if (modelRow >= 0)
+		scrollDiffIntoView(blockIndex);
 	m_models[0]->refresh(m_models[0]->columnCount());
 	m_models[1]->refresh(m_models[1]->columnCount());
 	// upstream's SelectDiff puts the cursor at the start of the difference,
@@ -1145,6 +1144,40 @@ void TableCompareView::gotoDiff(int blockIndex)
 			m_models[i]->index(modelRow, 0), QItemSelectionModel::NoUpdate);
 	}
 	updateStatus();
+}
+
+/** CMergeEditView::ShowDiff's scroll, as in the file comparison (the table
+    is WinMerge's text view in table mode): none while the difference
+    shows whole with CONTEXT_LINES_BELOW rows to spare under it, otherwise
+    its first row goes CONTEXT_LINES_ABOVE rows below the top (issue #10);
+    then EnsureVisible brings its first column in. */
+void TableCompareView::scrollDiffIntoView(int blockIndex)
+{
+	constexpr int contextLinesAbove = 5;
+	constexpr int contextLinesBelow = 3;
+	const Block &block = m_blocks[blockIndex];
+	const QTableView *table = m_tables[activeSide()];
+	const int rowHeight = qMax(1, table->verticalHeader()->defaultSectionSize());
+	const int top = qMax(0, table->rowAt(0));
+	const int screenLines = table->viewport()->height() / rowHeight;
+	const int start = modelRowOf(block.viewBegin);
+	const int end = modelRowOf(qMax(block.viewBegin, block.viewEnd));
+	// upstream's height, the last line's sublines plus one: a row more
+	// than the difference has
+	const int height = end - start + 1 + 1;
+	if (start < top || end >= top + screenLines - contextLinesBelow
+		|| height >= screenLines)
+	{
+		int row = start;
+		if (row > contextLinesAbove)
+			row -= contextLinesAbove;
+		for (int i = 0; i < 2; ++i)
+			m_tables[i]->scrollTo(m_models[i]->index(row, 0),
+				QAbstractItemView::PositionAtTop);
+	}
+	for (int i = 0; i < 2; ++i)
+		m_tables[i]->scrollTo(m_models[i]->index(start, 0),
+			QAbstractItemView::EnsureVisible);
 }
 
 int TableCompareView::activeSide() const

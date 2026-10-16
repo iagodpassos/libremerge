@@ -632,8 +632,12 @@ int DiffTextEdit::firstVisibleLine() const
 
 int DiffTextEdit::visibleLineCount() const
 {
-	const int lineHeight = qMax(1, qRound(blockBoundingRect(firstVisibleBlock()).height()));
-	return viewport()->height() / lineHeight;
+	int lineHeight = qRound(blockBoundingRect(firstVisibleBlock()).height());
+	// a document not laid out yet (a comparison just opened) has no
+	// line height to measure: the font's
+	if (lineHeight <= 0)
+		lineHeight = fontMetrics().lineSpacing();
+	return viewport()->height() / qMax(1, lineHeight);
 }
 
 bool DiffTextEdit::linesOnScreen(int first, int last) const
