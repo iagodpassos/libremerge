@@ -660,6 +660,15 @@ bool TableCompareView::compare(const QString &leftPath,
 
 bool TableCompareView::loadSide(int side, const QString &path, QString *error)
 {
+	// an empty path is an untitled, empty side, as upstream opens the side
+	// an item of a folder comparison is not on
+	if (path.isEmpty())
+	{
+		Side &s = m_sides[side];
+		s = Side();
+		s.unicoding = ucr::UTF8;
+		return true;
+	}
 	// taken before the content: a change made while reading shows later
 	const lm::FileStamp stamp = lm::fileStamp(path);
 	UniMemFile file;
@@ -1158,8 +1167,10 @@ void TableCompareView::updateHeader(int side)
 {
 	// upstream's UpdateHeaderPath: the description or the path, given to
 	// the bar only when it changes
-	const QString text = (m_sides[side].modified ? QStringLiteral("* ") : QString())
-		+ (m_descriptions[side].isEmpty() ? m_sides[side].path : m_descriptions[side]);
+	QString caption = m_descriptions[side].isEmpty() ? m_sides[side].path : m_descriptions[side];
+	if (caption.isEmpty())
+		caption = untitledName(side);
+	const QString text = (m_sides[side].modified ? QStringLiteral("* ") : QString()) + caption;
 	m_headers[side]->setPath(m_sides[side].path);
 	m_headers[side]->setActive(side == m_activeSide);
 	if (text == m_headerTexts[side])
@@ -1184,7 +1195,7 @@ bool TableCompareView::changeFile(int side, const QString &path, const QString &
 	for (const QString &file : paths)
 	{
 		QFile probe(file);
-		if (!probe.open(QIODevice::ReadOnly))
+		if (!file.isEmpty() && !probe.open(QIODevice::ReadOnly))
 		{
 			lm::showError(this, tr("cannot open %1").arg(file));
 			return false;
@@ -1220,6 +1231,11 @@ bool TableCompareView::changeFile(int side, const QString &path, const QString &
 	emit rescanned();
 	emit pathsChanged();
 	return true;
+}
+
+QString TableCompareView::untitledName(int side) const
+{
+	return side == 0 ? tr("Untitled Left") : tr("Untitled Right");
 }
 
 void TableCompareView::editActivePanePath()
@@ -1574,7 +1590,8 @@ bool TableCompareView::reload(QString *error)
 	// be put back (WinMerge closes the comparison at this point instead)
 	for (const Side &s : m_sides)
 	{
-		if (!QFile(s.path).open(QIODevice::ReadOnly))
+		// an untitled side starts over empty
+		if (!s.path.isEmpty() && !QFile(s.path).open(QIODevice::ReadOnly))
 		{
 			if (error != nullptr)
 				*error = tr("cannot open %1").arg(s.path);
@@ -1632,8 +1649,10 @@ QStringList TableCompareView::paths() const
 QString TableCompareView::tabTitle() const
 {
 	const auto name = [this](int side) {
-		return m_descriptions[side].isEmpty()
-			? QFileInfo(m_sides[side].path).fileName() : m_descriptions[side];
+		if (!m_descriptions[side].isEmpty())
+			return m_descriptions[side];
+		return m_sides[side].path.isEmpty() ? untitledName(side)
+			: QFileInfo(m_sides[side].path).fileName();
 	};
 	return name(0) + QString::fromUtf8(" \xE2\x86\x94 ") + name(1);
 }
@@ -1654,6 +1673,20 @@ bool TableCompareView::saveModified(QString *error)
 		Side &s = m_sides[side];
 		if (!s.modified)
 			continue;
+
+		// an untitled side asks for a name on its first save
+		if (s.path.isEmpty())
+		{
+			const QString chosen = lm::askSaveAsPath(this, tr("Save As"));
+			if (chosen.isEmpty())
+			{
+				if (error != nullptr)
+					*error = tr("save canceled");
+				return false;
+			}
+			s.path = chosen;
+			emit pathsChanged();
+		}
 
 		// WinMerge's DoSave: writing over a file another application
 		// changed since it was loaded here asks first; No leaves the file

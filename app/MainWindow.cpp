@@ -848,12 +848,16 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 
 	// image pairs/triples open as an image comparison (WinMerge's image
 	// file patterns decide, checked before the table patterns like
-	// upstream; 3-way image compare is supported)
-	if (!forceText && (paths.size() == 2 || paths.size() == 3))
+	// upstream; 3-way image compare is supported). A side with no file
+	// (an item of a folder comparison on one side only) does not count,
+	// as upstream's ShowAutoMergeDoc skips its empty path
+	const auto isEmpty = [](const QString &path) { return path.isEmpty(); };
+	if (!forceText && (paths.size() == 2 || paths.size() == 3)
+		&& !std::all_of(paths.cbegin(), paths.cend(), isEmpty))
 	{
 		bool allImages = true;
 		for (const QString &path : paths)
-			allImages = allImages && lm::isImageFile(path);
+			allImages = allImages && (path.isEmpty() || lm::isImageFile(path));
 		if (allImages)
 		{
 			openImageComparison(paths, readOnly);
@@ -876,8 +880,11 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 	{
 		const QStringList tableExts = { QStringLiteral("csv"),
 			QStringLiteral("tsv") };
-		if (tableExts.contains(QFileInfo(paths.at(0)).suffix().toLower())
-			&& tableExts.contains(QFileInfo(paths.at(1)).suffix().toLower()))
+		const auto isTable = [&tableExts](const QString &path) {
+			return path.isEmpty() || tableExts.contains(QFileInfo(path).suffix().toLower());
+		};
+		if (!std::all_of(paths.cbegin(), paths.cend(), isEmpty)
+			&& isTable(paths.at(0)) && isTable(paths.at(1)))
 		{
 			openTableComparison(paths.at(0), paths.at(1));
 			return;

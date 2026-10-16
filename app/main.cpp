@@ -346,6 +346,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestPathBarsOpt(QStringLiteral("selftest-path-bars"),
 		QStringLiteral("Use the path bar over the panes of text, table and image comparisons and verify it (for testing)"));
 	parser.addOption(selftestPathBarsOpt);
+	QCommandLineOption selftestUniqueItemsOpt(QStringLiteral("selftest-unique-items"),
+		QStringLiteral("Open items of a folder comparison that are on one side only and verify it (for testing)"));
+	parser.addOption(selftestUniqueItemsOpt);
 	QCommandLineOption selftestLastLineOpt(QStringLiteral("selftest-last-line"),
 		QStringLiteral("Compare files whose last lines differ and verify what is a difference (for testing)"));
 	parser.addOption(selftestLastLineOpt);
@@ -9607,6 +9610,163 @@ int main(int argc, char *argv[])
 				"Binary file patterns: *.bin of the drop-down goes and comes back");
 			QSettings().remove(QStringLiteral("BinaryCompare/FilePatterns"));
 		}
+
+		lm::setMessageSinkForTest([](const QString &) {});
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestUniqueItemsOpt))
+	{
+		// upstream's CDirView::Open: an item of a folder comparison on one
+		// side only opens with the sides it misses as empty untitled panes,
+		// in the comparison its file calls for; saving such a pane asks
+		// for a name
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+		};
+		const auto waitFor = [](FolderCompareView *view) {
+			for (int i = 0; i < 400 && view->isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+		};
+		QStringList messages;
+		lm::setMessageSinkForTest([&messages](const QString &text) { messages << text; });
+
+		const QString left = dir.filePath(QStringLiteral("left"));
+		const QString right = dir.filePath(QStringLiteral("right"));
+		write(left + QStringLiteral("/same.txt"), "same\n");
+		write(right + QStringLiteral("/same.txt"), "same\n");
+		write(left + QStringLiteral("/only-left.txt"), "one\ntwo\n");
+		write(right + QStringLiteral("/only-right.txt"), "three\n");
+		write(left + QStringLiteral("/only-left.csv"), "id,name\n1,apple\n");
+		QImage red(16, 16, QImage::Format_RGB32);
+		red.fill(Qt::red);
+		red.save(left + QStringLiteral("/only-left.png"));
+		write(left + QStringLiteral("/only-left.bin"), QByteArray("\x00\x01\x02", 3));
+
+		MainWindow window;
+		window.handleIncomingPaths({ left, right });
+		auto *folder = window.findChild<FolderCompareView *>();
+		if (folder == nullptr)
+			return 1;
+		waitFor(folder);
+		const auto opened = [&window](auto *type, const QStringList &paths) {
+			using View = std::remove_pointer_t<decltype(type)>;
+			for (View *view : window.findChildren<View *>())
+				if (view->paths() == paths)
+					return view;
+			return static_cast<View *>(nullptr);
+		};
+
+		// --- text ---
+		folder->activateRowForTest(QStringLiteral("only-left.txt"));
+		QCoreApplication::processEvents();
+		const QString onlyLeft = left + QStringLiteral("/only-left.txt");
+		FileCompareView *text = opened(static_cast<FileCompareView *>(nullptr), { onlyLeft, QString() });
+		check(text != nullptr && text->headerForTest(1)->originalText() == FileCompareView::tr("Untitled Right")
+				&& text->tabTitle().endsWith(FileCompareView::tr("Untitled Right"))
+				&& text->diffCount() == 1,
+			"text: a file on the left only opens against an empty untitled right pane");
+		folder->activateRowForTest(QStringLiteral("only-right.txt"));
+		QCoreApplication::processEvents();
+		FileCompareView *textRight = opened(static_cast<FileCompareView *>(nullptr),
+			{ QString(), right + QStringLiteral("/only-right.txt") });
+		check(textRight != nullptr
+				&& textRight->headerForTest(0)->originalText() == FileCompareView::tr("Untitled Left"),
+			"text: one on the right only, against an untitled left pane");
+		if (text != nullptr)
+		{
+			const QString saved = dir.filePath(QStringLiteral("saved.txt"));
+			QString asked;
+			lm::setSaveAsPathForTest([&asked, saved](const QString &) {
+				asked = saved;
+				return saved;
+			});
+			text->typeAtForTest(1, 0, QStringLiteral("new\n"));
+			QCoreApplication::processEvents();
+			QString error;
+			const bool done = text->saveModified(&error);
+			lm::setSaveAsPathForTest(nullptr);
+			check(done && asked == saved && read(saved).startsWith("new")
+					&& text->paths().at(1) == saved && text->headerForTest(1)->originalText() == saved,
+				"text: saving the untitled pane asks for a name, then shows its path");
+		}
+
+		// --- table, image, binary: the file decides ---
+		folder->activateRowForTest(QStringLiteral("only-left.csv"));
+		QCoreApplication::processEvents();
+		TableCompareView *table = opened(static_cast<TableCompareView *>(nullptr),
+			{ left + QStringLiteral("/only-left.csv"), QString() });
+		check(table != nullptr && table->headerForTest(1)->originalText() == TableCompareView::tr("Untitled Right")
+				&& table->tabTitle().endsWith(TableCompareView::tr("Untitled Right")) && table->diffCount() > 0,
+			"table: a CSV on one side only opens as a table, the other side untitled");
+		folder->activateRowForTest(QStringLiteral("only-left.png"));
+		QCoreApplication::processEvents();
+		ImageCompareView *image = opened(static_cast<ImageCompareView *>(nullptr),
+			{ left + QStringLiteral("/only-left.png"), QString() });
+		check(image != nullptr && image->headerForTest(1)->originalText() == ImageCompareView::tr("Untitled Right")
+				&& image->tabTitle().endsWith(ImageCompareView::tr("Untitled Right")),
+			"image: an image on one side only opens as an image comparison, the other pane untitled");
+		folder->activateRowForTest(QStringLiteral("only-left.bin"));
+		QCoreApplication::processEvents();
+		HexCompareView *hex = opened(static_cast<HexCompareView *>(nullptr),
+			{ left + QStringLiteral("/only-left.bin"), QString() });
+		check(hex != nullptr && hex->tabTitle().endsWith(HexCompareView::tr("Untitled Right"))
+				&& hex->diffCount() != 0,
+			"binary: a binary file on one side only opens as a binary comparison, the other pane untitled");
+
+		// --- 3-way: every side opens, the missing ones untitled ---
+		const QString a = dir.filePath(QStringLiteral("a"));
+		const QString b = dir.filePath(QStringLiteral("b"));
+		const QString c = dir.filePath(QStringLiteral("c"));
+		write(a + QStringLiteral("/only-a.txt"), "a\n");
+		write(a + QStringLiteral("/a-and-c.txt"), "a\n");
+		write(c + QStringLiteral("/a-and-c.txt"), "c\n");
+		QDir().mkpath(b);
+		MainWindow window3;
+		window3.handleIncomingPaths({ a, b, c });
+		auto *folder3 = window3.findChild<FolderCompareView *>();
+		if (folder3 == nullptr)
+			return 1;
+		waitFor(folder3);
+		const auto opened3 = [&window3](const QStringList &paths) {
+			for (FileCompareView *view : window3.findChildren<FileCompareView *>())
+				if (view->paths() == paths)
+					return view;
+			return static_cast<FileCompareView *>(nullptr);
+		};
+		folder3->activateRowForTest(QStringLiteral("only-a.txt"));
+		QCoreApplication::processEvents();
+		FileCompareView *three = opened3({ a + QStringLiteral("/only-a.txt"), QString(), QString() });
+		check(three != nullptr && three->headerForTest(1)->originalText() == FileCompareView::tr("Untitled Middle")
+				&& three->headerForTest(2)->originalText() == FileCompareView::tr("Untitled Right"),
+			"3-way: an item on one side opens all three panes, the others untitled");
+		folder3->activateRowForTest(QStringLiteral("a-and-c.txt"));
+		QCoreApplication::processEvents();
+		check(opened3({ a + QStringLiteral("/a-and-c.txt"), QString(), c + QStringLiteral("/a-and-c.txt") }) != nullptr,
+			"3-way: one on two sides opens three panes too, the missing middle untitled");
 
 		lm::setMessageSinkForTest([](const QString &) {});
 		printf("ok: %d\n", ok);

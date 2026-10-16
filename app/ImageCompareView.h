@@ -157,6 +157,7 @@ private:
 	void afterDiffNavigation();
 	void afterBufferChange();
 	void updatePaneHeader(int pane);
+	QString untitledName(int pane) const;
 	void updatePaneStatus(int pane);
 	void updateDiffStatus();
 	void updateActions();

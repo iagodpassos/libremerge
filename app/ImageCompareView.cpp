@@ -644,8 +644,14 @@ QString ImageCompareView::tabTitle() const
 {
 	QStringList names;
 	for (int i = 0; i < m_paneCount; ++i)
-		names.append(m_descriptions[i].isEmpty()
-			? QFileInfo(m_paths[i]).fileName() : m_descriptions[i]);
+	{
+		if (!m_descriptions[i].isEmpty())
+			names.append(m_descriptions[i]);
+		else if (m_paths[i].isEmpty())
+			names.append(untitledName(i));
+		else
+			names.append(QFileInfo(m_paths[i]).fileName());
+	}
 	return names.join(QString::fromUtf8(" \xE2\x86\x94 "));
 }
 
@@ -669,11 +675,12 @@ bool ImageCompareView::savePane(int pane, QString *error)
 		return true;
 
 	QString target = m_paths[pane];
-	if (!m_buffer->IsSaveSupported(pane))
+	if (target.isEmpty() || !m_buffer->IsSaveSupported(pane))
 	{
-		// Qt cannot re-encode this format (GIF, multi-page): offer PNG
-		target = QFileDialog::getSaveFileName(this, tr("Save As"),
-			target + QStringLiteral(".png"),
+		// an untitled pane asks for a name; for a format Qt cannot
+		// re-encode (GIF, multi-page) PNG is offered
+		target = lm::askSaveAsPath(this, tr("Save As"),
+			target.isEmpty() ? QString() : target + QStringLiteral(".png"),
 			tr("PNG image (*.png);;All files (*)"));
 		if (target.isEmpty())
 		{
@@ -847,7 +854,8 @@ bool ImageCompareView::reload(QString *error)
 	// (WinMerge reopens regardless and shows what it could read)
 	for (int i = 0; i < m_paneCount; ++i)
 	{
-		if (!QImageReader(m_paths[i]).canRead())
+		// an untitled pane opens empty again
+		if (!m_paths[i].isEmpty() && !QImageReader(m_paths[i]).canRead())
 		{
 			if (error != nullptr)
 				*error = tr("Could not open the files as images.");
@@ -1562,14 +1570,7 @@ void ImageCompareView::updatePaneHeader(int pane)
 	// upstream's UpdateHeaderPath: the description, or the path
 	QString text = m_descriptions[pane].isEmpty() ? m_paths[pane] : m_descriptions[pane];
 	if (text.isEmpty())
-	{
-		if (pane == 0)
-			text = tr("Untitled Left");
-		else if (pane == 1 && m_paneCount == 3)
-			text = tr("Untitled Middle");
-		else
-			text = tr("Untitled Right");
-	}
+		text = untitledName(pane);
 	if (m_buffer->IsModified(pane))
 		text.prepend(QStringLiteral("* "));
 	m_headers[pane]->setPath(m_paths[pane]);
@@ -1612,6 +1613,16 @@ bool ImageCompareView::changeFile(int pane, const QString &path, const QString &
 	setActivePane(active);
 	emit pathsChanged();
 	return true;
+}
+
+/** A pane without a file: upstream's "Untitled" description. */
+QString ImageCompareView::untitledName(int pane) const
+{
+	if (pane == 0)
+		return tr("Untitled Left");
+	if (pane == 1 && m_paneCount == 3)
+		return tr("Untitled Middle");
+	return tr("Untitled Right");
 }
 
 void ImageCompareView::editActivePanePath()

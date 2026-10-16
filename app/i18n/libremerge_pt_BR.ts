@@ -264,6 +264,10 @@
         <translation>Direita Sem Título</translation>
     </message>
     <message>
+        <source>Untitled Middle</source>
+        <translation>Meio Sem Título</translation>
+    </message>
+    <message>
         <source>Untitled</source>
         <translation>Sem Título</translation>
     </message>
@@ -1696,6 +1700,14 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>expected 2 or 3 files</source>
         <translation>eram esperados 2 ou 3 arquivos</translation>
+    </message>
+    <message>
+        <source>Save As</source>
+        <translation>Salvar Como</translation>
+    </message>
+    <message>
+        <source>save canceled</source>
+        <translation>salvamento cancelado</translation>
     </message>
     <message>
         <source>could not create the backup file %1</source>
@@ -4106,6 +4118,10 @@ de2	para2
         <translation>  • alterações não salvas</translation>
     </message>
     <message>
+        <source>Untitled Left</source>
+        <translation>Esquerda Sem Título</translation>
+    </message>
+    <message>
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
@@ -4114,12 +4130,24 @@ Please clear the display filter or adjust the filter settings to show all lines 
 Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas antes de mesclar.</translation>
     </message>
     <message>
+        <source>Save As</source>
+        <translation>Salvar Como</translation>
+    </message>
+    <message>
+        <source>save canceled</source>
+        <translation>salvamento cancelado</translation>
+    </message>
+    <message>
         <source>could not create the backup file %1</source>
         <translation>não foi possível criar o arquivo de backup %1</translation>
     </message>
     <message>
         <source>cannot write %1</source>
         <translation>não foi possível gravar %1</translation>
+    </message>
+    <message>
+        <source>Untitled Right</source>
+        <translation>Direita Sem Título</translation>
     </message>
 </context>
 <context>

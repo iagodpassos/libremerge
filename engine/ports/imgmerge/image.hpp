@@ -111,6 +111,9 @@ public:
 
 	bool load(const std::wstring& filename)
 	{
+		// an untitled pane has no file: nothing to read (and no warning)
+		if (filename.empty())
+			return false;
 		QImageReader reader(QString::fromStdWString(filename));
 		reader.setAutoTransform(false);
 		QImage img = reader.read();
@@ -300,6 +303,8 @@ public:
 	bool load(const std::wstring& filename)
 	{
 		close();
+		if (filename.empty())
+			return false;
 		QImageReader reader(QString::fromStdWString(filename));
 		if (!reader.canRead())
 			return false;

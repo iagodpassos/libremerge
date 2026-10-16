@@ -4,6 +4,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QFileDialog>
 #include <QFileInfo>
 
 namespace lm
@@ -73,6 +74,24 @@ FileChange fileChangedOnDisk(const QString &path, const FileStamp &stamp)
 	if (info.lastModified() != stamp.modified || info.size() != stamp.size)
 		return FileChange::Changed;
 	return FileChange::NoChange;
+}
+
+namespace
+{
+std::function<QString(const QString &)> s_saveAsAnswer;
+}
+
+QString askSaveAsPath(QWidget *parent, const QString &title, const QString &start,
+	const QString &filter)
+{
+	if (s_saveAsAnswer)
+		return s_saveAsAnswer(start);
+	return QFileDialog::getSaveFileName(parent, title, start, filter);
+}
+
+void setSaveAsPathForTest(std::function<QString(const QString &)> answer)
+{
+	s_saveAsAnswer = std::move(answer);
 }
 
 } // namespace lm

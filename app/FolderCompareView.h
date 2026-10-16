@@ -135,10 +135,13 @@ public slots:
 	void recompare();
 
 signals:
+	/** 2-way activation: either path empty when the item is on one side
+	    only (opened as an untitled pane). */
 	void openFileComparisonRequested(const QString &leftPath, const QString &rightPath);
 	/** The file filter pane was clicked: open Tools > Filters. */
 	void filtersRequested();
-	/** 3-way activation: the item exists on all three sides. */
+	/** 3-way activation: the three paths, empty for a side the item is
+	    not on (opened as an untitled pane). */
 	void openFileComparison3Requested(const QStringList &paths);
 
 protected:

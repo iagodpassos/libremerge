@@ -288,6 +288,10 @@
         <translation>Derecho sin título</translation>
     </message>
     <message>
+        <source>Untitled Middle</source>
+        <translation>Central sin título</translation>
+    </message>
+    <message>
         <source>Untitled</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Sin título</translation>
@@ -1822,6 +1826,15 @@ El archivo puede ser de solo lectura.</translation>
         <source>expected 2 or 3 files</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>se esperaban 2 o 3 archivos</translation>
+    </message>
+    <message>
+        <source>Save As</source>
+        <translation>Guardar como</translation>
+    </message>
+    <message>
+        <source>save canceled</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>guardado cancelado</translation>
     </message>
     <message>
         <source>could not create the backup file %1</source>
@@ -4517,6 +4530,10 @@ desde2	hasta2
         <translation>  • cambios sin guardar</translation>
     </message>
     <message>
+        <source>Untitled Left</source>
+        <translation>Izquierdo sin título</translation>
+    </message>
+    <message>
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
@@ -4524,6 +4541,15 @@ Please clear the display filter or adjust the filter settings to show all lines 
         <translation>Por ahora no se pueden combinar ni copiar diferencias que contienen líneas ocultas.
 
 Borre el filtro de visualización o ajuste la configuración del filtro para mostrar todas las líneas antes de combinar.</translation>
+    </message>
+    <message>
+        <source>Save As</source>
+        <translation>Guardar como</translation>
+    </message>
+    <message>
+        <source>save canceled</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>guardado cancelado</translation>
     </message>
     <message>
         <source>could not create the backup file %1</source>
@@ -4534,6 +4560,10 @@ Borre el filtro de visualización o ajuste la configuración del filtro para mos
         <source>cannot write %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>no se puede escribir %1</translation>
+    </message>
+    <message>
+        <source>Untitled Right</source>
+        <translation>Derecho sin título</translation>
     </message>
 </context>
 <context>

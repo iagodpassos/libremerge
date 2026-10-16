@@ -36,6 +36,8 @@ public:
 	explicit TableCompareView(QWidget *parent = nullptr);
 	~TableCompareView() override;
 
+	/** Load both files and compare them; an empty path is an untitled,
+	    empty side. */
 	bool compare(const QString &leftPath, const QString &rightPath,
 		QString *error);
 
@@ -193,6 +195,8 @@ private:
 	int activeSide() const;
 	void setActiveSide(int side);
 	void updateHeader(int side);
+	/** A side without a file: upstream's "Untitled" description. */
+	QString untitledName(int side) const;
 	int nextActiveFromRow(int viewRow, int direction) const;
 	int diffAtRow(int viewRow) const;
 	int searchRow(int offset) const;

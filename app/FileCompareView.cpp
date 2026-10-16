@@ -611,6 +611,14 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 
 	for (int i = 0; i < m_paneCount; ++i)
 	{
+		// an empty path is an untitled pane, as upstream opens the side an
+		// item of a folder comparison is not on
+		if (paths.at(i).isEmpty())
+		{
+			startUntitled(i);
+			m_panes[i]->setReadOnly(m_readOnly[i]);
+			continue;
+		}
 		if (!loadSide(i, paths.at(i), error))
 			return false;
 		m_panes[i]->setReadOnly(m_readOnly[i]);
@@ -646,21 +654,8 @@ void FileCompareView::startBlank()
 	// like upstream's DoFileNew: empty untitled buffers, default encoding
 	for (int side = 0; side < m_paneCount; ++side)
 	{
-		Side &s = m_sides[side];
-		s = Side();
-		s.caption = side == 0 ? tr("Untitled Left") : tr("Untitled Right");
-		s.unicoding = ucr::UTF8;
-		s.codepage = 65001;
-		m_syncing = true;
-		m_panes[side]->setPlainText(QString());
-		m_panes[side]->document()->setModified(false);
-		m_syncing = false;
+		startUntitled(side);
 		m_panes[side]->setReadOnly(false);
-		m_highlighters[side].reset();
-		updateHeader(side);
-		m_encLabels[side]->setText(QStringLiteral("%1  %2")
-			.arg(encodingName(s.unicoding, s.codepage, s.bom), eolName(s.eol)));
-		updatePaneStatus(side);
 	}
 
 	QString error;
@@ -670,6 +665,27 @@ void FileCompareView::startBlank()
 	updateStatus();
 	updateHeaderStyles();
 	resetUndoHistory();
+}
+
+/** An empty untitled pane in the default encoding (upstream's
+    BUFFERTYPE::UNNAMED with its "Untitled" description). */
+void FileCompareView::startUntitled(int side)
+{
+	Side &s = m_sides[side];
+	s = Side();
+	s.caption = side == 0 ? tr("Untitled Left")
+		: (side == 1 && m_paneCount == 3) ? tr("Untitled Middle") : tr("Untitled Right");
+	s.unicoding = ucr::UTF8;
+	s.codepage = 65001;
+	m_syncing = true;
+	m_panes[side]->setPlainText(QString());
+	m_panes[side]->document()->setModified(false);
+	m_syncing = false;
+	m_highlighters[side].reset();
+	updateHeader(side);
+	m_encLabels[side]->setText(QStringLiteral("%1  %2")
+		.arg(encodingName(s.unicoding, s.codepage, s.bom), eolName(s.eol)));
+	updatePaneStatus(side);
 }
 
 QList<int> FileCompareView::diffLinesForTest() const
@@ -2725,8 +2741,7 @@ FileCompareView::SaveResult FileCompareView::saveSide(int side, QString *error)
 	// untitled panes (File > New) ask for a name on first save
 	if (s.path.isEmpty())
 	{
-		const QString chosen = QFileDialog::getSaveFileName(this,
-			tr("Save As"));
+		const QString chosen = lm::askSaveAsPath(this, tr("Save As"));
 		if (chosen.isEmpty())
 		{
 			if (error != nullptr)
@@ -2735,6 +2750,7 @@ FileCompareView::SaveResult FileCompareView::saveSide(int side, QString *error)
 		}
 		s.path = chosen;
 		s.caption.clear();
+		s.described = false;
 		m_highlighters[side] = std::make_unique<SyntaxHighlighter>(
 			m_panes[side]->document(), chosen);
 		updateHeader(side);

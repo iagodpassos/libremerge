@@ -109,6 +109,7 @@ private:
 	bool savePane(int pane, QString *error);
 	void updateLastCompareResult();
 	void updateHeader(int pane);
+	QString untitledName(int pane) const;
 	void updateStatus(int pane);
 	void updateActions();
 	void applyTheme();

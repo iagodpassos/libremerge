@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
 #include <QDateTime>
 #include <QString>
+
+class QWidget;
 
 namespace lm
 {
@@ -44,5 +47,12 @@ enum class FileChange
 /** WinMerge's IsFileChangedOnDisk: what happened to a file since its
     stamp was taken. */
 FileChange fileChangedOnDisk(const QString &path, const FileStamp &stamp);
+
+/** The Save As dialog: where an untitled pane (or one Qt cannot write
+    back) goes; empty when cancelled. */
+QString askSaveAsPath(QWidget *parent, const QString &title,
+	const QString &start = QString(), const QString &filter = QString());
+/** For tests: answer the Save As dialog with this instead. */
+void setSaveAsPathForTest(std::function<QString(const QString &start)> answer);
 
 } // namespace lm

@@ -303,6 +303,10 @@
         <translation>Fitxer dret sense títol</translation>
     </message>
     <message>
+        <source>Untitled Middle</source>
+        <translation>Fitxer del mig sense títol</translation>
+    </message>
+    <message>
         <source>Untitled</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Sense títol</translation>
@@ -2006,6 +2010,15 @@ Potser el fitxer és només de lectura?</translation>
         <source>expected 2 or 3 files</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>s&apos;esperaven 2 o 3 fitxers</translation>
+    </message>
+    <message>
+        <source>Save As</source>
+        <translation>Anomena i desa</translation>
+    </message>
+    <message>
+        <source>save canceled</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>desament cancel·lat</translation>
     </message>
     <message>
         <source>could not create the backup file %1</source>
@@ -4808,6 +4821,10 @@ de2	a2
         <translation>  • canvis sense desar</translation>
     </message>
     <message>
+        <source>Untitled Left</source>
+        <translation>Fitxer esquerre sense títol</translation>
+    </message>
+    <message>
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
@@ -4815,6 +4832,15 @@ Please clear the display filter or adjust the filter settings to show all lines 
         <translation>Ara per ara no es poden combinar ni copiar diferències que contenen línies amagades.
 
 Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar totes les línies abans de combinar.</translation>
+    </message>
+    <message>
+        <source>Save As</source>
+        <translation>Anomena i desa</translation>
+    </message>
+    <message>
+        <source>save canceled</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>desament cancel·lat</translation>
     </message>
     <message>
         <source>could not create the backup file %1</source>
@@ -4825,6 +4851,10 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <source>cannot write %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>no es pot escriure %1</translation>
+    </message>
+    <message>
+        <source>Untitled Right</source>
+        <translation>Fitxer dret sense títol</translation>
     </message>
 </context>
 <context>

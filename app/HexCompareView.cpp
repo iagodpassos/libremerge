@@ -296,7 +296,7 @@ QString HexCompareView::tabTitle() const
 	const auto name = [this](int side) {
 		if (!m_descriptions[side].isEmpty())
 			return m_descriptions[side];
-		return QFileInfo(m_paths[side]).fileName();
+		return m_paths[side].isEmpty() ? untitledName(side) : QFileInfo(m_paths[side]).fileName();
 	};
 	QStringList names;
 	for (int i = 0; i < m_paneCount; ++i)
@@ -526,6 +526,16 @@ bool HexCompareView::changeFile(int pane, const QString &path, const QString &de
 	return true;
 }
 
+/** A pane without a file: upstream's "Untitled" description. */
+QString HexCompareView::untitledName(int pane) const
+{
+	if (pane == 0)
+		return tr("Untitled Left");
+	if (pane == 1 && m_paneCount == 3)
+		return tr("Untitled Middle");
+	return tr("Untitled Right");
+}
+
 void HexCompareView::editActivePanePath()
 {
 	m_headers[m_activePane]->editPath();
@@ -574,9 +584,22 @@ QString HexCompareView::changedPathOnDisk() const
 bool HexCompareView::savePane(int pane, QString *error)
 {
 	HexView *view = m_panes[pane];
-	if (!view->isModified() || m_paths[pane].isEmpty())
+	if (!view->isModified())
 		return true;
-	const QString &path = m_paths[pane];
+	// an untitled pane asks for a name on its first save
+	if (m_paths[pane].isEmpty())
+	{
+		const QString chosen = lm::askSaveAsPath(this, tr("Save As"));
+		if (chosen.isEmpty())
+		{
+			if (error != nullptr)
+				*error = tr("save canceled");
+			return false;
+		}
+		m_paths[pane] = chosen;
+		emit pathsChanged();
+	}
+	const QString path = m_paths[pane];
 	if (lm::fileChangedOnDisk(path, m_stamps[pane]) == lm::FileChange::Changed
 		&& !lm::askOverwriteChangedFile(this, path))
 		return true;
@@ -637,14 +660,7 @@ void HexCompareView::updateHeader(int pane)
 	// upstream's UpdateHeaderPath: the description, or the path
 	QString text = m_descriptions[pane].isEmpty() ? m_paths[pane] : m_descriptions[pane];
 	if (text.isEmpty())
-	{
-		if (pane == 0)
-			text = tr("Untitled Left");
-		else if (pane == 1 && m_paneCount == 3)
-			text = tr("Untitled Middle");
-		else
-			text = tr("Untitled Right");
-	}
+		text = untitledName(pane);
 	if (m_panes[pane]->isModified())
 		text.prepend(QStringLiteral("* "));
 	// only when it changes: what the bar shows otherwise (a recent file

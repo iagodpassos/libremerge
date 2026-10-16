@@ -46,6 +46,8 @@ inline bool matchesBinaryFilePatterns(const QString &path)
     uses. */
 inline bool looksBinary(const QString &path)
 {
+	if (path.isEmpty())
+		return false;
 	QFile probe(path);
 	if (!probe.open(QIODevice::ReadOnly))
 		return false;

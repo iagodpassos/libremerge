@@ -52,7 +52,6 @@ enum ItemRole
 	RoleLeftPath = Qt::UserRole,
 	RoleRightPath,
 	RoleIsFile,
-	RoleBothSides, ///< the item exists on every compared side
 	RoleFolder,
 	RoleName,
 	RoleMiddlePath, ///< 3-way only
@@ -233,13 +232,11 @@ void FolderCompareView::fillRow(QTreeWidgetItem *row,
 {
 	row->setText(ColName, item.name);
 	row->setText(ColFolder, item.folder);
-	bool allSides = true;
 	for (int i = 0; i < m_sides; ++i)
 	{
 		row->setText(colSize(i), sizeText(item.size[i]));
 		row->setText(colDate(i), dateText(item.mtime[i]));
 		row->setTextAlignment(colSize(i), Qt::AlignRight | Qt::AlignVCenter);
-		allSides = allSides && !item.path[i].isEmpty();
 	}
 	row->setData(0, RoleFileType, static_cast<int>(item.fileType));
 	setRowCategory(row, item.category, item.threeWay, item.isDir);
@@ -252,7 +249,6 @@ void FolderCompareView::fillRow(QTreeWidgetItem *row,
 	else
 		row->setData(0, RoleRightPath, item.path[1]);
 	row->setData(0, RoleIsFile, !item.isDir);
-	row->setData(0, RoleBothSides, allSides);
 	row->setData(0, RoleFolder, item.folder);
 	row->setData(0, RoleName, item.name);
 }
@@ -1200,7 +1196,6 @@ QTreeWidgetItem *FolderCompareView::folderNode(const QString &folder,
 		? new QTreeWidgetItem(parent) : new QTreeWidgetItem(m_tree);
 	row->setText(ColName, name);
 	row->setText(ColFolder, parentFolder);
-	bool allSides = true;
 	for (int i = 0; i < m_sides; ++i)
 	{
 		const QString path = m_roots[i] + QLatin1Char('/') + folder;
@@ -1208,10 +1203,8 @@ QTreeWidgetItem *FolderCompareView::folderNode(const QString &folder,
 		const int role = i == 0 ? int(RoleLeftPath)
 			: (m_sides == 3 && i == 1) ? int(RoleMiddlePath) : int(RoleRightPath);
 		row->setData(0, role, exists ? path : QString());
-		allSides = allSides && exists;
 	}
 	row->setData(0, RoleIsFile, false);
-	row->setData(0, RoleBothSides, allSides);
 	row->setData(0, RoleFolder, parentFolder);
 	row->setData(0, RoleName, name);
 	nodes.insert(folder, row);
@@ -1285,7 +1278,6 @@ void FolderCompareView::updateRowFromDisk(QTreeWidgetItem *row)
 		isDir = isDir || (exists[i] && infos[i].isDir());
 	}
 
-	bool allSides = true;
 	for (int i = 0; i < m_sides; ++i)
 	{
 		const int role = i == 0 ? int(RoleLeftPath)
@@ -1295,9 +1287,7 @@ void FolderCompareView::updateRowFromDisk(QTreeWidgetItem *row)
 			? sizeText(infos[i].size()) : QString());
 		row->setText(colDate(i), exists[i]
 			? dateText(infos[i].lastModified()) : QString());
-		allSides = allSides && exists[i];
 	}
-	row->setData(0, RoleBothSides, allSides);
 
 	// the result's item too, which the list is rebuilt from (a theme or a
 	// tree mode change), and the engine's, which the display filter goes by
@@ -1468,25 +1458,13 @@ void FolderCompareView::itemActivated(QTreeWidgetItem *item, int column)
 	Q_UNUSED(column);
 	if (item == nullptr || !item->data(0, RoleIsFile).toBool())
 		return;
+	// upstream's CDirView::Open: every side opens, one the item misses as
+	// an empty untitled pane (its path left empty)
+	QStringList paths;
+	for (int i = 0; i < m_sides; ++i)
+		paths.append(sidePath(item, i));
 	if (m_sides == 3)
-	{
-		// present on all three sides opens the 3-way comparison; on
-		// exactly two, the 2-way of the pair that exists
-		QStringList present;
-		for (int i = 0; i < 3; ++i)
-		{
-			const QString path = sidePath(item, i);
-			if (!path.isEmpty())
-				present.append(path);
-		}
-		if (present.size() == 3)
-			emit openFileComparison3Requested(present);
-		else if (present.size() == 2)
-			emit openFileComparisonRequested(present.at(0), present.at(1));
-		return;
-	}
-	if (!item->data(0, RoleBothSides).toBool())
-		return;
-	emit openFileComparisonRequested(item->data(0, RoleLeftPath).toString(),
-		item->data(0, RoleRightPath).toString());
+		emit openFileComparison3Requested(paths);
+	else
+		emit openFileComparisonRequested(paths.at(0), paths.at(1));
 }

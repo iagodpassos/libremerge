@@ -44,7 +44,8 @@ public:
 	explicit FileCompareView(QWidget *parent = nullptr);
 	~FileCompareView() override;
 
-	/** Load 2 or 3 files and run the initial comparison. */
+	/** Load 2 or 3 files and run the initial comparison; an empty path is
+	    an untitled, empty pane. */
 	bool compare(const QStringList &paths, QString *error);
 
 	/** Open an empty, editable 2-way comparison (WinMerge's File > New):
@@ -334,6 +335,7 @@ private:
 
 	static bool canLoad(const QString &path, QString *error);
 	bool loadSide(int side, const QString &path, QString *error);
+	void startUntitled(int side);
 	bool runDiff(QString *error);
 	void rebuildAlignment();
 	void refreshSideMaps(int side);

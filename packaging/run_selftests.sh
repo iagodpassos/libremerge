@@ -58,6 +58,7 @@ run_one selftest-hex
 run_one selftest-hex-edit
 run_one selftest-hex-header
 run_one selftest-path-bars
+run_one selftest-unique-items
 run_one selftest-location-pane
 run_one selftest-find-replace
 run_one selftest-markers

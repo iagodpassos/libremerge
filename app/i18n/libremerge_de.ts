@@ -286,6 +286,10 @@
         <translation>Unbenannt rechts</translation>
     </message>
     <message>
+        <source>Untitled Middle</source>
+        <translation>Unbenannt Mitte</translation>
+    </message>
+    <message>
         <source>Untitled</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Unbenannt</translation>
@@ -1820,6 +1824,15 @@ Patches sind nicht betroffen.</translation>
         <source>expected 2 or 3 files</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>2 oder 3 Dateien erwartet</translation>
+    </message>
+    <message>
+        <source>Save As</source>
+        <translation>Speichern unter</translation>
+    </message>
+    <message>
+        <source>save canceled</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Speichern abgebrochen</translation>
     </message>
     <message>
         <source>could not create the backup file %1</source>
@@ -4513,6 +4526,10 @@ von2	zu2
         <translation>  • ungespeicherte Änderungen</translation>
     </message>
     <message>
+        <source>Untitled Left</source>
+        <translation>Unbenannt links</translation>
+    </message>
+    <message>
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
@@ -4520,6 +4537,15 @@ Please clear the display filter or adjust the filter settings to show all lines 
         <translation>Das Zusammenführen/Kopieren von Unterschieden, die ausgeblendete Zeilen enthalten, wird derzeit nicht unterstützt.
 
 Bitte löschen Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so an, dass vor dem Zusammenführen alle Zeilen angezeigt werden.</translation>
+    </message>
+    <message>
+        <source>Save As</source>
+        <translation>Speichern unter</translation>
+    </message>
+    <message>
+        <source>save canceled</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Speichern abgebrochen</translation>
     </message>
     <message>
         <source>could not create the backup file %1</source>
@@ -4530,6 +4556,10 @@ Bitte löschen Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so 
         <source>cannot write %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>%1 kann nicht geschrieben werden</translation>
+    </message>
+    <message>
+        <source>Untitled Right</source>
+        <translation>Unbenannt rechts</translation>
     </message>
 </context>
 <context>
