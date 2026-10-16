@@ -12,7 +12,8 @@ Every one of these contributions shaped a release.
 * [@evpix](https://github.com/evpix): image comparison ([#2](https://github.com/iagodpassos/libremerge/issues/2))
 * [@voidray](https://github.com/voidray): insertion marker for text present on one side only ([#6](https://github.com/iagodpassos/libremerge/issues/6))
 * [@ta7mid](https://github.com/ta7mid): Homebrew on Linux, installing the AppImage through the cask ([homebrew-tap#1](https://github.com/iagodpassos/homebrew-tap/pull/1))
-* [@KrokusPokus](https://github.com/KrokusPokus): folder compare methods and View menu filters, and the Full Contents fix they led to ([#7](https://github.com/iagodpassos/libremerge/issues/7)), the location pane and the panes following every scroll ([#9](https://github.com/iagodpassos/libremerge/issues/9))
+* [@KrokusPokus](https://github.com/KrokusPokus): folder compare methods and View menu filters, and the Full Contents fix they led to ([#7](https://github.com/iagodpassos/libremerge/issues/7)), the location pane and the panes following every scroll ([#9](https://github.com/iagodpassos/libremerge/issues/9)), next and previous difference from the cursor ([#10](https://github.com/iagodpassos/libremerge/issues/10))
+* [@hendev1](https://github.com/hendev1): opening the files a folder comparison has on one side only ([#12](https://github.com/iagodpassos/libremerge/issues/12))
 
 ## Translations
 
