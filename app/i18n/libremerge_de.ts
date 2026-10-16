@@ -1742,8 +1742,8 @@ Patches sind nicht betroffen.</translation>
     </message>
     <message>
         <source>Font size in points:</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Schriftgröße in Punkt:</translation>
+        <translatorcomment>LibreMerge&apos;s own text, worded in a native speaker&apos;s review.</translatorcomment>
+        <translation>Schriftgröße in Punkten:</translation>
     </message>
     <message>
         <source>OK</source>
@@ -2362,8 +2362,8 @@ Patches sind nicht betroffen.</translation>
     </message>
     <message>
         <source>Display values at caret position as:</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Werte an der Cursorposition anzeigen als:</translation>
+        <translatorcomment>LibreMerge&apos;s own text, worded in a native speaker&apos;s review.</translatorcomment>
+        <translation>Anzeige der Werte an der Cursorposition:</translation>
     </message>
     <message>
         <source>unsigned</source>

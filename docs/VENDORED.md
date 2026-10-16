@@ -78,7 +78,9 @@ path fields on the selection screen became shorter in every language;
 and File > Recent Files or Folders reads "Kürzlich verwendet" (in the
 menu of the path bar over the panes too), where WinMerge's "Kürzliche
 Dateien oder Ordner" reads oddly, the Shift+Delete hint of the path
-fields likewise "kürzlich verwendeten Pfad".
+fields likewise "kürzlich verwendeten Pfad". In the binary comparison's
+own dialogs, the values at the caret read "Anzeige der Werte an der
+Cursorposition:" and the font size "Schriftgröße in Punkten:".
 
 ## Deliberately excluded (and why)
 
