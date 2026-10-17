@@ -22,8 +22,8 @@ struct TableSettings;
 /**
  * The application options dialog, laid out like WinMerge's (Preferences
  * dialog): a page tree on the left, where a category's pages sit indented
- * under it (General; Compare > General, Folder, Table, Binary; Message
- * Boxes; Backup Files), and the
+ * under it (General; Compare > General, Folder, Table, Binary, Image;
+ * Message Boxes; Backup Files), and the
  * selected page on the right with its own Defaults button. Every option
  * sits on the page and at the position WinMerge gives it.
  */
@@ -80,6 +80,7 @@ public:
 		FolderPage,  ///< Compare > Folder
 		TablePage,   ///< Compare > Table
 		BinaryPage,  ///< Compare > Binary
+		ImagePage,   ///< Compare > Image
 		MessageBoxesPage,
 		BackupPage,
 	};
@@ -115,6 +116,7 @@ private:
 	QWidget *buildTablePage();
 	void showTableSettings(const lm::TableSettings &table);
 	QWidget *buildBinaryPage();
+	QWidget *buildImagePage();
 	QWidget *buildMessageBoxesPage();
 	void loadMessageBoxes();
 	void resetMessageBoxes();
@@ -149,6 +151,9 @@ private:
 	QLineEdit *m_editQuote = nullptr;
 	// Compare > Binary
 	QComboBox *m_cmbBinaryPatterns = nullptr;
+	// Compare > Image
+	QComboBox *m_cmbImagePatterns = nullptr;
+	QCheckBox *m_chkImageInFolderCompare = nullptr;
 	QComboBox *m_cmbTheme;
 	QComboBox *m_cmbLanguage;
 	// Compare > General

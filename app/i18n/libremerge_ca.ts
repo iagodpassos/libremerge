@@ -4272,6 +4272,10 @@ S&apos;està comprovant la identitat binària...</translation>
         <translation>Binari</translation>
     </message>
     <message>
+        <source>Image</source>
+        <translation>Imatge</translation>
+    </message>
+    <message>
         <source>Message Boxes</source>
         <translation>Quadres de missatges</translation>
     </message>
@@ -4460,6 +4464,14 @@ S&apos;està comprovant la identitat binària...</translation>
         <source>Hex editor settings</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Opcions de l&apos;editor hexadecimal</translation>
+    </message>
+    <message>
+        <source>Image file &amp;patterns:</source>
+        <translation>Patrons de fitxer d&apos;imatge:</translation>
+    </message>
+    <message>
+        <source>&amp;Enable image compare in folder compare</source>
+        <translation>Habilita la comparació d&apos;imatge en la comparació de directoris</translation>
     </message>
     <message>
         <source>Some messages can be hidden by the user. Press Reset to make all messages visible again.</source>

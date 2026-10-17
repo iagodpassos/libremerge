@@ -192,8 +192,7 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	// matching pairs compare by pixels through the registered hook, with
 	// the same color-distance threshold as the image window
 	FileFilterHelper imgFilter;
-	if (QSettings().value(QStringLiteral("ImageCompare/EnableInFolderCompare"),
-			false).toBool())
+	if (lm::imageCompareInFolderCompare())
 	{
 		ctxt.m_bEnableImageCompare = true;
 		ctxt.m_dColorDistanceThreshold = QSettings().value(

@@ -3554,6 +3554,10 @@ Checando identidade binária...</translation>
         <translation>Binário</translation>
     </message>
     <message>
+        <source>Image</source>
+        <translation>Imagem</translation>
+    </message>
+    <message>
         <source>Message Boxes</source>
         <translation>Caixas de Mensagens</translation>
     </message>
@@ -3688,6 +3692,14 @@ Checando identidade binária...</translation>
     <message>
         <source>Hex editor settings</source>
         <translation>Configurações do editor hexadecimal</translation>
+    </message>
+    <message>
+        <source>Image file &amp;patterns:</source>
+        <translation>&amp;Padrões de arquivo de imagem:</translation>
+    </message>
+    <message>
+        <source>&amp;Enable image compare in folder compare</source>
+        <translation>&amp;Habilitar comparação de imagens na comparação de pastas</translation>
     </message>
     <message>
         <source>Some messages can be hidden by the user. Press Reset to make all messages visible again.</source>

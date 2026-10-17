@@ -35,6 +35,11 @@ QString userFiltersDir();
     the presets read again (for tests). */
 void setFiltersDirsForTest(const QString &shared, const QString &user);
 
+/** FileFilterHelper::includeFile over a list of file patterns, masks or an
+    expression, the way WinMerge matches a file against its binary, image
+    and table patterns: an empty list takes no file. */
+bool filePatternsTake(const QString &patterns, const QString &path);
+
 /** The mask or expression in use. */
 QString fileFilterMask();
 /** Take another one and save it; an empty one is "*.*" (what

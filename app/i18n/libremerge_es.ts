@@ -3991,6 +3991,10 @@ Comprobando la identidad binaria...</translation>
         <translation>Binario</translation>
     </message>
     <message>
+        <source>Image</source>
+        <translation>Imagen</translation>
+    </message>
+    <message>
         <source>Message Boxes</source>
         <translation>Cuadros de mensajes</translation>
     </message>
@@ -4175,6 +4179,14 @@ Comprobando la identidad binaria...</translation>
         <source>Hex editor settings</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Configuración del editor hexadecimal</translation>
+    </message>
+    <message>
+        <source>Image file &amp;patterns:</source>
+        <translation>Formatos de archivo de ima&amp;gen:</translation>
+    </message>
+    <message>
+        <source>&amp;Enable image compare in folder compare</source>
+        <translation>Activar la comparación de imág&amp;enes en la comparación de carpetas</translation>
     </message>
     <message>
         <source>Some messages can be hidden by the user. Press Reset to make all messages visible again.</source>

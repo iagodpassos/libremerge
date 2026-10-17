@@ -56,6 +56,7 @@ run_one selftest-scroll-sync
 run_one selftest-diff-from-cursor
 run_one selftest-diff-scroll
 run_one selftest-table-options
+run_one selftest-image-options
 run_one selftest-hex
 run_one selftest-hex-edit
 run_one selftest-hex-header

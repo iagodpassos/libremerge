@@ -62,6 +62,8 @@
 #include "TableCompareView.h"
 #include "TableFiles.h"
 #include "ImageCompareView.h"
+#include "ImageFormats.h"
+#include "BinaryFiles.h"
 #include "HexCompareView.h"
 #include "HexView.h"
 #include "HexDialogs.h"
@@ -341,6 +343,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestTableOptionsOpt(QStringLiteral("selftest-table-options"),
 		QStringLiteral("Verify the Compare > Table options and the files they open as tables (for testing)"));
 	parser.addOption(selftestTableOptionsOpt);
+	QCommandLineOption selftestImageOptionsOpt(QStringLiteral("selftest-image-options"),
+		QStringLiteral("Verify the Compare > Image options and the files they open as images (for testing)"));
+	parser.addOption(selftestImageOptionsOpt);
 	QCommandLineOption selftestHexOpt(QStringLiteral("selftest-hex"),
 		QStringLiteral("Compare binary files in the hex view and verify it (for testing)"));
 	parser.addOption(selftestHexOpt);
@@ -1371,11 +1376,12 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 1, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
-			OptionsDialog::BinaryPage, OptionsDialog::MessageBoxesPage, OptionsDialog::BackupPage };
-		bool ok = tree.size() == 8;
+			OptionsDialog::BinaryPage, OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
+			OptionsDialog::BackupPage };
+		bool ok = tree.size() == 9;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1384,15 +1390,15 @@ int main(int argc, char *argv[])
 		const int expectedPage[] = { OptionsDialog::GeneralPage,
 			OptionsDialog::ComparePage, OptionsDialog::ComparePage,
 			OptionsDialog::FolderPage, OptionsDialog::TablePage, OptionsDialog::BinaryPage,
-			OptionsDialog::MessageBoxesPage, OptionsDialog::BackupPage };
-		for (int i = 0; ok && i < 8; ++i)
+			OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage, OptionsDialog::BackupPage };
+		for (int i = 0; ok && i < 9; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
 			printf("item %d: page %d, title \"%s\"\n", i,
 				dialog.currentPageForTest(), qPrintable(dialog.windowTitle()));
 			ok = dialog.currentPageForTest() == expectedPage[i]
-				&& nested == (i >= 1 && i <= 5);
+				&& nested == (i >= 1 && i <= 6);
 		}
 
 		const auto boxes = [&dialog](OptionsDialog::Page page) {
@@ -1417,14 +1423,14 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(7); // Backup Files
+		dialog.selectCategoryForTest(8); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 
 		// every row of the Message Boxes list shows its check box (the
 		// macOS 27 style left all but the first one out)
 		{
-			dialog.selectCategoryForTest(6); // Message Boxes
+			dialog.selectCategoryForTest(7); // Message Boxes
 			dialog.grab(); // lays the pages out
 			auto *list = dialog.pageForTest(OptionsDialog::MessageBoxesPage)
 				->findChild<QTreeWidget *>();
@@ -10874,6 +10880,102 @@ int main(int argc, char *argv[])
 			clickRow(250);
 			view.copyCurrentDiff(0);
 			check(view.diffCount() == 5, "table: Copy to Right with the cursor in no difference copies nothing");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestImageOptionsOpt))
+	{
+		// WinMerge's Options > Compare > Image (PropCompareImage) and what
+		// its patterns drive (ShowAutoMergeDoc): the first file, in the
+		// panes' order, that the image patterns take opens the image
+		// comparison, or that the binary patterns take, the binary one.
+		// LibreMerge wanted every side to be an image, and read only the
+		// "*.ext" patterns of both lists.
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		// PNG images, under the names the patterns go by
+		QImage image(8, 8, QImage::Format_RGB32);
+		image.fill(Qt::red);
+		QImage changed = image;
+		changed.setPixelColor(1, 1, Qt::blue);
+		const QString png = dir.filePath(QStringLiteral("a.png"));
+		const QString pngAsBak = dir.filePath(QStringLiteral("b.bak"));
+		const QString pngAsBin = dir.filePath(QStringLiteral("c.bin"));
+		if (!image.save(png, "PNG") || !changed.save(pngAsBak, "PNG")
+			|| !changed.save(pngAsBin, "PNG"))
+			return 2;
+		const auto opens = [&settle](const QStringList &paths) {
+			MainWindow window;
+			window.openFileComparison(paths);
+			settle();
+			return window.findChild<ImageCompareView *>() != nullptr ? QStringLiteral("image")
+				: window.findChild<HexCompareView *>() != nullptr ? QStringLiteral("binary")
+				: QStringLiteral("other");
+		};
+
+		check(lm::isImageFile(png) && lm::isImageFile(dir.filePath(QStringLiteral("UPPER.PNG")))
+				&& !lm::isImageFile(pngAsBak) && !lm::isImageFile(QString()),
+			"WinMerge's defaults: a .png file is an image, in any case; .bak is not");
+		check(opens({ png, pngAsBak }) == QStringLiteral("image")
+				&& opens({ pngAsBak, png }) == QStringLiteral("image"),
+			"one image file opens the image comparison, on either side");
+		check(opens({ pngAsBin, png }) == QStringLiteral("binary")
+				&& opens({ png, pngAsBin }) == QStringLiteral("image"),
+			"the first file decides: a binary one before an image one opens the binary comparison");
+
+		// masks, not extensions only
+		QSettings().setValue(QStringLiteral("ImageCompare/FilePatterns"), QStringLiteral("b.*"));
+		QSettings().setValue(QStringLiteral("BinaryCompare/FilePatterns"), QStringLiteral("c.*"));
+		printf("  b.bak an image: %d, c.bin binary: %d\n", lm::isImageFile(pngAsBak),
+			lm::matchesBinaryFilePatterns(pngAsBin));
+		check(lm::isImageFile(pngAsBak) && !lm::isImageFile(png)
+				&& lm::matchesBinaryFilePatterns(pngAsBin)
+				&& !lm::matchesBinaryFilePatterns(pngAsBak),
+			"the patterns are masks, the binary ones as well");
+
+		// the page
+		{
+			OptionsDialog dialog;
+			QWidget *page = dialog.pageForTest(OptionsDialog::ImagePage);
+			const QList<QComboBox *> lists = page->findChildren<QComboBox *>();
+			const QList<QCheckBox *> boxes = page->findChildren<QCheckBox *>();
+			if (lists.size() != 1 || boxes.size() != 1)
+			{
+				printf("page: %d lists, %d check boxes\n", static_cast<int>(lists.size()),
+					static_cast<int>(boxes.size()));
+				return 2;
+			}
+			check(lists.at(0)->currentText() == QStringLiteral("b.*") && !boxes.at(0)->isChecked(),
+				"the page shows the options saved");
+			dialog.selectCategoryForTest(6); // Compare > Image
+			dialog.restoreDefaultsForTest();
+			check(lists.at(0)->currentText() == lm::defaultImageFilePatterns()
+					&& !boxes.at(0)->isChecked(),
+				"Defaults: WinMerge's");
+			boxes.at(0)->setChecked(true);
+			lists.at(0)->setEditText(QStringLiteral("*.png;*.PNG;*.gif"));
+			dialog.saveForTest();
+			check(lm::imageCompareInFolderCompare()
+					&& lm::imageFilePatterns() == QStringLiteral("*.PNG;*.gif"),
+				"OK saves the page, a pattern another one takes in left out");
 		}
 
 		printf("ok: %d\n", ok);

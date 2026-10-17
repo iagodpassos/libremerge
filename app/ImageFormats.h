@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <QFileInfo>
 #include <QSettings>
 #include <QString>
-#include <QStringList>
+
+#include "FileFilters.h"
 
 namespace lm
 {
@@ -26,23 +26,21 @@ inline QString imageFilePatterns()
 		defaultImageFilePatterns()).toString();
 }
 
-/** Whether a path matches the image patterns (drives opening a pair as an
-    image comparison, like WinMerge's ShowAutoMergeDoc). */
+/** WinMerge's "Enable image compare in folder compare" (Options > Compare
+    > Image, off by default): a folder comparison compares the files the
+    image patterns take by their pixels. */
+inline bool imageCompareInFolderCompare()
+{
+	return QSettings().value(QStringLiteral("ImageCompare/EnableInFolderCompare"),
+		false).toBool();
+}
+
+/** Whether the image patterns (masks or an expression) take a path:
+    WinMerge's ShowAutoMergeDoc opens such a file in its image
+    comparison. */
 inline bool isImageFile(const QString &path)
 {
-	const QString suffix = QFileInfo(path).suffix().toLower();
-	if (suffix.isEmpty())
-		return false;
-	const QStringList patterns = imageFilePatterns().split(QLatin1Char(';'),
-		Qt::SkipEmptyParts);
-	for (const QString &pattern : patterns)
-	{
-		const QString trimmed = pattern.trimmed();
-		if (trimmed.startsWith(QStringLiteral("*."))
-			&& trimmed.mid(2).toLower() == suffix)
-			return true;
-	}
-	return false;
+	return filePatternsTake(imageFilePatterns(), path);
 }
 
 } // namespace lm

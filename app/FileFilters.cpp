@@ -325,6 +325,17 @@ QList<bool> linesHiddenByFilter(LineFilterHelper *filter, const ILineDataProvide
 	return hidden;
 }
 
+bool filePatternsTake(const QString &patterns, const QString &path)
+{
+	if (patterns.isEmpty())
+		return false;
+	FileFilterHelper filter;
+	filter.SetMaskOrExpression(patterns.toStdString());
+	// the masks match paths written with backslashes, as upstream's are
+	return filter.includeFile(QString(path).replace(QLatin1Char('/'),
+		QLatin1Char('\\')).toStdString());
+}
+
 QStringList fileFilterErrors(FileFilterHelper *helper, const QString &mask)
 {
 	helper->SetMaskOrExpression(mask.toStdString());

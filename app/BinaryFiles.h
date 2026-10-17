@@ -7,6 +7,8 @@
 #include <QString>
 #include <QStringList>
 
+#include "FileFilters.h"
+
 namespace lm
 {
 
@@ -22,23 +24,12 @@ inline QString binaryFilePatterns()
 		defaultBinaryFilePatterns()).toString();
 }
 
-/** Whether a path matches the binary patterns: WinMerge's ShowAutoMergeDoc
-    opens such a file in its binary comparison. */
+/** Whether the binary patterns (masks or an expression) take a path:
+    WinMerge's ShowAutoMergeDoc opens such a file in its binary
+    comparison. */
 inline bool matchesBinaryFilePatterns(const QString &path)
 {
-	const QString suffix = QFileInfo(path).suffix().toLower();
-	if (suffix.isEmpty())
-		return false;
-	const QStringList patterns = binaryFilePatterns().split(QLatin1Char(';'),
-		Qt::SkipEmptyParts);
-	for (const QString &pattern : patterns)
-	{
-		const QString trimmed = pattern.trimmed();
-		if (trimmed.startsWith(QStringLiteral("*."))
-			&& trimmed.mid(2).toLower() == suffix)
-			return true;
-	}
-	return false;
+	return filePatternsTake(binaryFilePatterns(), path);
 }
 
 /** Whether a file looks binary: a NUL among its first 8 KB that no

@@ -4,6 +4,7 @@
 #include "OptionsDialog.h"
 
 #include "BinaryFiles.h"
+#include "ImageFormats.h"
 #include "EngineOptions.h"
 #include "HexDialogs.h"
 #include "ItemCheckStyle.h"
@@ -66,6 +67,8 @@ void setPatterns(QComboBox *combo, const QString &patterns)
 {
 	combo->setProperty(kPatternsProperty, patterns);
 	combo->setEditText(patterns);
+	// a long list shows from its first pattern, as upstream's field does
+	combo->lineEdit()->setCursorPosition(0);
 }
 
 /** WinMerge's WildcardDropList: a pattern list whose drop-down holds the
@@ -198,6 +201,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	addCategory(compare, tr("Folder"), FolderPage);
 	addCategory(compare, tr("Table"), TablePage);
 	addCategory(compare, tr("Binary"), BinaryPage);
+	addCategory(compare, tr("Image"), ImagePage);
 	addCategory(nullptr, tr("Message Boxes"), MessageBoxesPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	m_categories->expandAll();
@@ -210,6 +214,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildFolderPage());
 	m_pages->addWidget(buildTablePage());
 	m_pages->addWidget(buildBinaryPage());
+	m_pages->addWidget(buildImagePage());
 	m_pages->addWidget(buildMessageBoxesPage());
 	m_pages->addWidget(buildBackupPage());
 	pageArea->addWidget(m_pages, 1);
@@ -492,6 +497,28 @@ QWidget *OptionsDialog::buildBinaryPage()
 	return page;
 }
 
+/** WinMerge's Compare > Image page (PropCompareImage): the image file
+    patterns, whose drop-down ticks WinMerge's defaults on and off, and
+    image compare in folder compare. Its other rows are left out: "Prefer
+    WIC Decoder" picks a Windows decoder (Qt's decode the images here),
+    and "OCR result" shapes the text of upstream's command comparing the
+    text Windows' OCR reads in the images, a command LibreMerge does not
+    have. The drop-down also leaves out the PDF, SVG and Windows metafile
+    patterns upstream adds there, kinds the image comparison cannot open. */
+QWidget *OptionsDialog::buildImagePage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+	m_cmbImagePatterns = new QComboBox(page);
+	setUpPatternList(m_cmbImagePatterns, lm::defaultImageFilePatterns());
+	addLabeled(box, tr("Image file &patterns:"), m_cmbImagePatterns);
+	m_chkImageInFolderCompare = new QCheckBox(
+		tr("&Enable image compare in folder compare"), page);
+	box->addWidget(m_chkImageInFolderCompare);
+	box->addStretch(1);
+	return page;
+}
+
 /** WinMerge's Message Boxes page (PropMessageBoxes): the messages a
     "Don't display this message again" can hide, a tick for each hidden
     one with its remembered answer, and Reset to show them all again. */
@@ -657,6 +684,8 @@ void OptionsDialog::load()
 	m_cmbCompareMethod->setCurrentIndex(lm::currentCompareMethod());
 	showTableSettings(lm::TableSettings::load());
 	setPatterns(m_cmbBinaryPatterns, lm::binaryFilePatterns());
+	setPatterns(m_cmbImagePatterns, lm::imageFilePatterns());
+	m_chkImageInFolderCompare->setChecked(lm::imageCompareInFolderCompare());
 	loadMessageBoxes();
 }
 
@@ -721,7 +750,11 @@ void OptionsDialog::save()
 	table.quote = m_editQuote->text();
 	table.save();
 	settings.setValue(QStringLiteral("BinaryCompare/FilePatterns"),
-		m_cmbBinaryPatterns->currentText().trimmed());
+		lm::removeDuplicatePatterns(m_cmbBinaryPatterns->currentText().trimmed()));
+	settings.setValue(QStringLiteral("ImageCompare/FilePatterns"),
+		lm::removeDuplicatePatterns(m_cmbImagePatterns->currentText().trimmed()));
+	settings.setValue(QStringLiteral("ImageCompare/EnableInFolderCompare"),
+		m_chkImageInFolderCompare->isChecked());
 	for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)
 	{
 		const QTreeWidgetItem *item = m_messageList->topLevelItem(i);
@@ -790,6 +823,10 @@ void OptionsDialog::restoreDefaults(int page)
 		break;
 	case BinaryPage:
 		setPatterns(m_cmbBinaryPatterns, lm::defaultBinaryFilePatterns());
+		break;
+	case ImagePage:
+		setPatterns(m_cmbImagePatterns, lm::defaultImageFilePatterns());
+		m_chkImageInFolderCompare->setChecked(false);
 		break;
 	case MessageBoxesPage:
 		for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)

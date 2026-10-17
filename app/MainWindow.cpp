@@ -847,32 +847,26 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 		return;
 	}
 
-	// image pairs/triples open as an image comparison (WinMerge's image
-	// file patterns decide, checked before the table patterns like
-	// upstream; 3-way image compare is supported). A side with no file
-	// (an item of a folder comparison on one side only) does not count,
-	// as upstream's ShowAutoMergeDoc skips its empty path
-	const auto isEmpty = [](const QString &path) { return path.isEmpty(); };
-	if (!forceText && (paths.size() == 2 || paths.size() == 3)
-		&& !std::all_of(paths.cbegin(), paths.cend(), isEmpty))
+	// WinMerge's ShowAutoMergeDoc: the files in the order of their panes,
+	// the first one the image patterns take opening the image comparison
+	// (2-way or 3-way), or the first one the binary patterns take the
+	// binary one; a side with no file (an item of a folder comparison on
+	// one side only) takes none. The table patterns come after
+	if (!forceText && (paths.size() == 2 || paths.size() == 3))
 	{
-		bool allImages = true;
 		for (const QString &path : paths)
-			allImages = allImages && (path.isEmpty() || lm::isImageFile(path));
-		if (allImages)
 		{
-			openImageComparison(paths, readOnly);
-			return;
+			if (lm::isImageFile(path))
+			{
+				openImageComparison(paths, readOnly);
+				return;
+			}
+			if (lm::matchesBinaryFilePatterns(path))
+			{
+				openHexComparison(paths, readOnly);
+				return;
+			}
 		}
-	}
-
-	// WinMerge's binary file patterns open the binary comparison, checked
-	// after the image patterns like upstream (any side matching)
-	if (!forceText && (paths.size() == 2 || paths.size() == 3)
-		&& std::any_of(paths.cbegin(), paths.cend(), lm::matchesBinaryFilePatterns))
-	{
-		openHexComparison(paths, readOnly);
-		return;
 	}
 
 	// a file that the Table options' patterns take makes the pair a table

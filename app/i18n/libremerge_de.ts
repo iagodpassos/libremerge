@@ -3987,6 +3987,10 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <translation>Binär</translation>
     </message>
     <message>
+        <source>Image</source>
+        <translation>Bild</translation>
+    </message>
+    <message>
         <source>Message Boxes</source>
         <translation>Meldungen</translation>
     </message>
@@ -4173,6 +4177,14 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <source>Hex editor settings</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Hex-Editor-Einstellungen</translation>
+    </message>
+    <message>
+        <source>Image file &amp;patterns:</source>
+        <translation>&amp;Bilddateimuster:</translation>
+    </message>
+    <message>
+        <source>&amp;Enable image compare in folder compare</source>
+        <translation>&amp;Bildvergleich im Ordnervergleich aktivieren</translation>
     </message>
     <message>
         <source>Some messages can be hidden by the user. Press Reset to make all messages visible again.</source>

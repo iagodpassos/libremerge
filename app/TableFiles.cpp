@@ -6,8 +6,9 @@
 #include <QSettings>
 #include <QStringList>
 
+#include "FileFilters.h"
+
 // engine
-#include "FileFilterHelper.h"
 #include "UnicodeString.h"
 
 namespace lm
@@ -23,17 +24,6 @@ const QString kDsvFilePatterns = QStringLiteral("TableCompare/DSVFilePatterns");
 const QString kDsvDelimiter = QStringLiteral("TableCompare/DSVDelimiterCharacter");
 const QString kAllowNewlines = QStringLiteral("TableCompare/TableAllowNewlinesInQuotes");
 const QString kQuote = QStringLiteral("TableCompare/TableQuoteCharacter");
-
-/** FileFilterHelper::includeFile over one group's patterns, none taking
-    a path when the group has none. */
-bool patternsTake(const QString &patterns, const QString &path)
-{
-	if (patterns.isEmpty())
-		return false;
-	FileFilterHelper filter;
-	filter.SetMaskOrExpression(patterns.toStdString());
-	return filter.includeFile(path.toStdString());
-}
 } // namespace
 
 TableSettings TableSettings::load()
@@ -70,17 +60,17 @@ TableProps tablePropertiesByFileName(const QString &path)
 	TableProps props;
 	props.quote = characterOfField(settings.quote);
 	props.allowNewlinesInQuotes = settings.allowNewlinesInQuotes;
-	if (patternsTake(settings.csvFilePatterns, path))
+	if (filePatternsTake(settings.csvFilePatterns, path))
 	{
 		props.isTable = true;
 		props.delimiter = characterOfField(settings.csvDelimiter);
 	}
-	else if (patternsTake(settings.tsvFilePatterns, path))
+	else if (filePatternsTake(settings.tsvFilePatterns, path))
 	{
 		props.isTable = true;
 		props.delimiter = QLatin1Char('\t');
 	}
-	else if (patternsTake(settings.dsvFilePatterns, path))
+	else if (filePatternsTake(settings.dsvFilePatterns, path))
 	{
 		props.isTable = true;
 		props.delimiter = characterOfField(settings.dsvDelimiter);
