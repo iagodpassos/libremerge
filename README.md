@@ -36,7 +36,7 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 
 ## Install (macOS)
 
-**Requirements**: macOS 14.4 (Sonoma) or later, Intel or Apple Silicon (universal binary).
+**Requirements**: macOS 14.4 (Sonoma) or later, Intel or Apple Silicon (universal binary). macOS 12 and 13 stay with [LibreMerge 0.9.9](https://github.com/iagodpassos/libremerge/releases/tag/v0.9.9), the last release that runs on them.
 
 **Homebrew**:
 
