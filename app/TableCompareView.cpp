@@ -164,6 +164,18 @@ protected:
     (CCrystalTextBuffer::GetColumnCount and GetCellText): the delimiters
     outside quotes part the cells, and a cell keeps the quotes it is
     written with. */
+/** A cell's text as the grid shows it: a line break kept from the file,
+    whatever its kind, starts a line of the cell. */
+QString displayText(const QString &cell)
+{
+	if (!cell.contains(QLatin1Char('\r')))
+		return cell;
+	QString text = cell;
+	text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+	text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+	return text;
+}
+
 int rawCellCount(const QString &line, const lm::TableProps &props)
 {
 	int count = 1;
@@ -337,7 +349,7 @@ public:
 			const auto &cells = m_view->m_sides[m_side].cells;
 			if (real < static_cast<int>(cells.size())
 				&& index.column() < cells[real].size())
-				return cells[real].at(index.column());
+				return displayText(cells[real].at(index.column()));
 			return {};
 		}
 		if (role == Qt::BackgroundRole)
@@ -612,19 +624,21 @@ void TableCompareView::applyTheme()
 	lm::applyToolbarTheme(this);
 	m_models[0]->refresh(m_models[0]->columnCount());
 	m_models[1]->refresh(m_models[1]->columnCount());
+	fitRowHeights();
 }
 
 bool TableCompareView::compare(const QString &leftPath,
 	const QString &rightPath, QString *error)
 {
-	if (!loadSide(0, leftPath, error) || !loadSide(1, rightPath, error))
-		return false;
-	clearHistory();
-
 	// each side by the Table options' group its file is in (WinMerge's
 	// SetTableProperties), as the files are opened or opened again
 	const QList<lm::TableProps> props =
 		lm::tablePropertiesOfSides({ leftPath, rightPath });
+	if (!loadSide(0, leftPath, props.at(0), error)
+		|| !loadSide(1, rightPath, props.at(1), error))
+		return false;
+	clearHistory();
+
 	for (int side = 0; side < 2; ++side)
 	{
 		m_sides[side].props = props.at(side);
@@ -641,7 +655,8 @@ bool TableCompareView::compare(const QString &leftPath,
 	return true;
 }
 
-bool TableCompareView::loadSide(int side, const QString &path, QString *error)
+bool TableCompareView::loadSide(int side, const QString &path,
+	const lm::TableProps &props, QString *error)
 {
 	// an empty path is an untitled, empty side, as upstream opens the side
 	// an item of a folder comparison is not on
@@ -676,10 +691,27 @@ bool TableCompareView::loadSide(int side, const QString &path, QString *error)
 	String line, eol;
 	bool lossy = false;
 	bool lastHadEol = true;
+	// CCrystalTextBuffer::JoinLinesForTableEditingMode: while a quote is
+	// open at the end of a line, the next line goes on the same row, the
+	// line break kept in it
+	const bool joinLines = props.allowNewlinesInQuotes && !props.quote.isNull();
+	bool inQuote = false;
+	QString pendingEol;
 	while (file.ReadString(line, eol, &lossy))
 	{
-		s.rawLines.append(
-			QString::fromUtf8(line.data(), static_cast<int>(line.size())));
+		const QString text =
+			QString::fromUtf8(line.data(), static_cast<int>(line.size()));
+		if (inQuote)
+			s.rawLines.last().append(pendingEol + text);
+		else
+			s.rawLines.append(text);
+		if (joinLines)
+		{
+			for (const QChar c : text)
+				if (c == props.quote)
+					inQuote = !inQuote;
+			pendingEol = QString::fromStdString(eol);
+		}
 		if (eol == "\r\n") ++crlf;
 		else if (eol == "\n") ++lf;
 		else if (eol == "\r") ++cr;
@@ -712,9 +744,19 @@ bool TableCompareView::runDiff(QString *error)
 			return false;
 		}
 		// every row goes with its line ending, the last one too (see the
-		// text compare's runDiff)
-		QByteArray bytes = m_sides[i].rawLines.join(QChar('\n')).toUtf8();
-		if (!m_sides[i].rawLines.isEmpty())
+		// text compare's runDiff); the line breaks inside a row go escaped,
+		// so that a row stays one line (DiffTextBuffer's SaveToFile for a
+		// table's temporary file)
+		QStringList rows = m_sides[i].rawLines;
+		if (m_sides[i].props.allowNewlinesInQuotes)
+			for (QString &row : rows)
+			{
+				row.replace(QChar(0x1b), QStringLiteral("\x1b\x1b"));
+				row.replace(QLatin1Char('\r'), QStringLiteral("\x1br"));
+				row.replace(QLatin1Char('\n'), QStringLiteral("\x1bn"));
+			}
+		QByteArray bytes = rows.join(QChar('\n')).toUtf8();
+		if (!rows.isEmpty())
 			bytes.append('\n');
 		temp[i].write(bytes);
 		temp[i].flush();
@@ -827,6 +869,39 @@ void TableCompareView::rebuildModel()
 			columns = qMax(columns, static_cast<int>(row.size()));
 	for (int side = 0; side < 2; ++side)
 		m_models[side]->refresh(columns);
+	fitRowHeights();
+}
+
+/** Upstream's table draws the line breaks a quoted cell keeps as lines of
+    its row: such a row is as tall as its cell of the most lines, on both
+    sides, so that the rows stay side by side. */
+void TableCompareView::fitRowHeights()
+{
+	for (QTableView *table : m_tables)
+	{
+		const int base = table->verticalHeader()->defaultSectionSize();
+		const int lineSpacing = table->fontMetrics().lineSpacing();
+		for (int modelRow = 0; modelRow < m_modelRows.size(); ++modelRow)
+		{
+			const int viewRow = m_modelRows.at(modelRow);
+			int lines = 1;
+			for (int side = 0; side < 2; ++side)
+			{
+				const int real = m_viewToReal[side].value(viewRow, -1);
+				if (real < 0 || real >= static_cast<int>(m_sides[side].cells.size()))
+					continue;
+				const QString &row = m_sides[side].rawLines.value(real);
+				if (!row.contains(QLatin1Char('\n')) && !row.contains(QLatin1Char('\r')))
+					continue;
+				for (const QString &cell : m_sides[side].cells[real])
+					lines = qMax(lines,
+						static_cast<int>(displayText(cell).count(QLatin1Char('\n'))) + 1);
+			}
+			if (lines > 1)
+				table->verticalHeader()->resizeSection(modelRow,
+					base + (lines - 1) * lineSpacing);
+		}
+	}
 }
 
 /** CMergeDoc::HideLines, its display filter part: a row the filter's
@@ -1121,10 +1196,12 @@ void TableCompareView::gotoDiff(int blockIndex)
 		return;
 	m_current = blockIndex;
 	const int modelRow = modelRowOf(m_blocks[blockIndex].viewBegin);
-	if (modelRow >= 0)
-		scrollDiffIntoView(blockIndex);
 	m_models[0]->refresh(m_models[0]->columnCount());
 	m_models[1]->refresh(m_models[1]->columnCount());
+	// the rows as tall as their cells again before the scroll is judged
+	fitRowHeights();
+	if (modelRow >= 0)
+		scrollDiffIntoView(blockIndex);
 	// upstream's SelectDiff puts the cursor at the start of the difference,
 	// nothing selected
 	for (int i = 0; i < 2 && modelRow >= 0; ++i)
@@ -1147,20 +1224,25 @@ void TableCompareView::scrollDiffIntoView(int blockIndex)
 	constexpr int contextLinesBelow = 3;
 	const Block &block = m_blocks[blockIndex];
 	const QTableView *table = m_tables[activeSide()];
-	const int rowHeight = qMax(1, table->verticalHeader()->defaultSectionSize());
-	const int top = qMax(0, table->rowAt(0));
-	const int screenLines = table->viewport()->height() / rowHeight;
+	// upstream counts lines on screen, a row whose cells have several
+	// lines taking as many (its sublines): in pixels here, by the rows'
+	// heights
+	const int line = qMax(1, table->verticalHeader()->defaultSectionSize());
+	const int screen = table->viewport()->height() / line * line;
 	const int start = modelRowOf(block.viewBegin);
 	const int end = modelRowOf(qMax(block.viewBegin, block.viewEnd));
-	// upstream's height, the last line's sublines plus one: a row more
+	const int startY = table->rowViewportPosition(start);
+	const int endY = table->rowViewportPosition(end) + table->rowHeight(end);
+	// upstream's height, the last line's sublines plus one: a line more
 	// than the difference has
-	const int height = end - start + 1 + 1;
-	if (start < top || end >= top + screenLines - contextLinesBelow
-		|| height >= screenLines)
+	const int height = endY - startY + line;
+	if (startY < 0 || endY > screen - contextLinesBelow * line || height >= screen)
 	{
+		// CONTEXT_LINES_ABOVE lines over its first one, when it has more
 		int row = start;
-		if (row > contextLinesAbove)
-			row -= contextLinesAbove;
+		if (startY - table->rowViewportPosition(0) > contextLinesAbove * line)
+			for (int above = 0; row > 0 && above < contextLinesAbove * line;)
+				above += table->rowHeight(--row);
 		for (int i = 0; i < 2; ++i)
 			m_tables[i]->scrollTo(m_models[i]->index(row, 0),
 				QAbstractItemView::PositionAtTop);

@@ -176,7 +176,10 @@ private:
 
 	class LineProvider;
 
-	bool loadSide(int side, const QString &path, QString *error);
+	bool loadSide(int side, const QString &path, const lm::TableProps &props,
+		QString *error);
+	/** The rows a cell of several lines makes taller, as tall on both sides. */
+	void fitRowHeights();
 	bool runDiff(QString *error);
 	void rebuildModel();
 	void hideLines();

@@ -11054,6 +11054,73 @@ int main(int argc, char *argv[])
 				"OK saves the page, a pattern another one takes in left out");
 		}
 
+		// "Allow newlines in quotes" (JoinLinesForTableEditingMode): a
+		// quoted cell's line breaks stay in its row, which compares,
+		// copies and saves as one
+		lm::TableSettings().save();
+		const QString multiLeft = dir.filePath(QStringLiteral("multi-left.csv"));
+		const QString multiRight = dir.filePath(QStringLiteral("multi-right.csv"));
+		const QByteArray leftBytes = "id,text\n1,\"first\nsecond\"\n2,same\n";
+		write(multiLeft, leftBytes);
+		write(multiRight, "id,text\n1,\"first\nSECOND\"\n2,same\n");
+		{
+			MainWindow window;
+			window.openFileComparison({ multiLeft, multiRight });
+			settle();
+			auto *table = window.findChild<TableCompareView *>();
+			if (table == nullptr)
+				return 2;
+			QTableView *grid = table->tableForTest(0);
+			const QAbstractItemModel *model = grid->model();
+			printf("  %d rows, %d difference(s), heights %d and %d\n", model->rowCount(),
+				table->diffCount(), grid->rowHeight(0), grid->rowHeight(1));
+			check(model->rowCount() == 2 && table->diffCount() == 1
+					&& model->index(0, 1).data().toString() == QStringLiteral("first\nsecond"),
+				"a quoted cell over two lines is one cell of one row");
+			check(grid->rowHeight(0) > grid->rowHeight(1)
+					&& table->tableForTest(1)->rowHeight(0) == grid->rowHeight(0),
+				"its row is as tall as its lines, on both sides");
+			table->gotoFirstDiff();
+			table->copyCurrentDiff(0);
+			QString error;
+			check(table->saveModified(&error), "the copy saves");
+			QFile saved(multiRight);
+			check(saved.open(QIODevice::ReadOnly) && saved.readAll() == leftBytes,
+				"Copy to Right takes the whole row, its line break kept");
+		}
+		const QByteArray crlfLeft = "id,text\r\n1,\"first\r\nsecond\"\r\n2,same\r\n";
+		write(multiLeft, crlfLeft);
+		write(multiRight, "id,text\r\n1,\"other\"\r\n2,same\r\n");
+		{
+			MainWindow window;
+			window.openFileComparison({ multiLeft, multiRight });
+			settle();
+			auto *table = window.findChild<TableCompareView *>();
+			if (table == nullptr)
+				return 2;
+			check(table->tableForTest(0)->model()->index(0, 1).data().toString()
+					== QStringLiteral("first\nsecond"),
+				"a CRLF line break in a cell shows as a line");
+			table->gotoFirstDiff();
+			table->copyCurrentDiff(0);
+			QString error;
+			table->saveModified(&error);
+			QFile saved(multiRight);
+			check(saved.open(QIODevice::ReadOnly) && saved.readAll() == crlfLeft,
+				"and saves as it was read");
+		}
+		lm::TableSettings noNewlines;
+		noNewlines.allowNewlinesInQuotes = false;
+		noNewlines.save();
+		{
+			MainWindow window;
+			window.openFileComparison({ multiLeft, multiRight });
+			settle();
+			auto *table = window.findChild<TableCompareView *>();
+			check(table != nullptr && table->tableForTest(0)->model()->rowCount() == 3,
+				"with the option off, every line of the file is a row");
+		}
+
 		printf("ok: %d\n", ok);
 		return ok ? 0 : 1;
 	}
