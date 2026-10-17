@@ -3,6 +3,8 @@
 
 #include "TableCompareView.h"
 
+#include <set>
+
 #include <QAbstractTableModel>
 #include <QAction>
 #include <QApplication>
@@ -15,9 +17,12 @@
 #include <QMenu>
 #include <QPainter>
 #include <QPaintEvent>
+#include <QPlainTextEdit>
 #include <QScrollBar>
 #include <QSettings>
+#include <QStyledItemDelegate>
 #include <QTableView>
+#include <QTimer>
 #include <QTemporaryFile>
 #include <QToolBar>
 #include <QVBoxLayout>
@@ -95,6 +100,100 @@ quint64 cellKey(int row, int column)
 
 /** A row's header tells whether hidden rows follow the row. */
 constexpr int kBoundaryRole = Qt::UserRole + 1;
+
+int rawCellCount(const QString &line, const lm::TableProps &props);
+
+/** Where a cell's text sits in its line, quotes and all, the delimiters
+    outside quotes parting the cells as rawCell reads them: from its first
+    character to past its last; -1 for a cell the line does not have. */
+std::pair<int, int> rawCellSpan(const QString &line, const lm::TableProps &props, int column)
+{
+	int current = 0;
+	int start = 0;
+	bool quoted = false;
+	for (int i = 0; i < line.size(); ++i)
+	{
+		const QChar c = line.at(i);
+		if (!props.quote.isNull() && c == props.quote)
+			quoted = !quoted;
+		else if (!quoted && !props.delimiter.isNull() && c == props.delimiter)
+		{
+			if (current == column)
+				return { start, i };
+			++current;
+			start = i + 1;
+		}
+	}
+	return current == column ? std::pair<int, int>{ start, static_cast<int>(line.size()) }
+		: std::pair<int, int>{ -1, -1 };
+}
+
+/** A line with one of its cells written anew: the cells a short line
+    lacks up to it are added, empty. */
+QString withCell(const QString &line, const lm::TableProps &props, int column, const QString &raw)
+{
+	const auto [start, end] = rawCellSpan(line, props, column);
+	if (start >= 0)
+		return QString(line).replace(start, end - start, raw);
+	if (props.delimiter.isNull())
+		return line;
+	const int cells = rawCellCount(line, props);
+	return line + QString(column - cells + 1, props.delimiter) + raw;
+}
+
+/** A cell's value as the file writes it: within the quote character when
+    it holds the delimiter, the quote character (doubled inside) or a line
+    break, or when the cell it replaces was quoted. */
+QString rawValue(const QString &value, const lm::TableProps &props, bool quoted)
+{
+	const QChar quote = props.quote;
+	if (quote.isNull())
+		return value;
+	if (!quoted && !value.contains(quote) && !value.contains(QLatin1Char('\n'))
+		&& !value.contains(QLatin1Char('\r'))
+		&& (props.delimiter.isNull() || !value.contains(props.delimiter)))
+		return value;
+	QString inner = value;
+	inner.replace(quote, QString(2, quote));
+	return quote + inner + quote;
+}
+
+/** The editor of a cell: a line, or lines for a cell that has line
+    breaks (a quoted cell may, with "Allow newlines in quotes"). */
+class CellDelegate : public QStyledItemDelegate
+{
+public:
+	using QStyledItemDelegate::QStyledItemDelegate;
+
+	QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
+		const QModelIndex &index) const override
+	{
+		if (index.data(Qt::EditRole).toString().contains(QLatin1Char('\n')))
+			return new QPlainTextEdit(parent);
+		return QStyledItemDelegate::createEditor(parent, option, index);
+	}
+
+	void setEditorData(QWidget *editor, const QModelIndex &index) const override
+	{
+		if (auto *text = qobject_cast<QPlainTextEdit *>(editor))
+		{
+			text->setPlainText(index.data(Qt::EditRole).toString());
+			return;
+		}
+		QStyledItemDelegate::setEditorData(editor, index);
+	}
+
+	void setModelData(QWidget *editor, QAbstractItemModel *model,
+		const QModelIndex &index) const override
+	{
+		if (auto *text = qobject_cast<QPlainTextEdit *>(editor))
+		{
+			model->setData(index, text->toPlainText(), Qt::EditRole);
+			return;
+		}
+		QStyledItemDelegate::setModelData(editor, model, index);
+	}
+};
 
 /** The grid of a side, with a rule under each row that hidden rows
     follow: upstream's editor draws its boundary line there, in the colour
@@ -354,15 +453,15 @@ public:
 			return {};
 		const int real = m_view->m_viewToReal[m_side].at(viewRow);
 
-		if (role == Qt::DisplayRole)
+		if (role == Qt::DisplayRole || role == Qt::EditRole)
 		{
 			if (real < 0)
-				return {};
+				return role == Qt::EditRole ? QVariant(QString()) : QVariant();
 			const auto &cells = m_view->m_sides[m_side].cells;
 			if (real < static_cast<int>(cells.size())
 				&& index.column() < cells[real].size())
 				return displayText(cells[real].at(index.column()));
-			return {};
+			return role == Qt::EditRole ? QVariant(QString()) : QVariant();
 		}
 		if (role == Qt::BackgroundRole)
 		{
@@ -386,6 +485,31 @@ public:
 			return {};
 		}
 		return {};
+	}
+
+	/** Every cell takes an edit, a filler's too: upstream's table is its
+	    text editor, where typing on a filler line makes it a line of the
+	    file. */
+	Qt::ItemFlags flags(const QModelIndex &index) const override
+	{
+		return QAbstractTableModel::flags(index) | Qt::ItemIsEditable;
+	}
+
+	bool setData(const QModelIndex &index, const QVariant &value, int role) override
+	{
+		if (role != Qt::EditRole || !index.isValid())
+			return false;
+		// once the editor has let go: the edit compares the tables again,
+		// and so resets this model
+		TableCompareView *view = m_view;
+		const int side = m_side;
+		const int row = index.row();
+		const int column = index.column();
+		const QString text = value.toString();
+		QTimer::singleShot(0, view, [view, side, row, column, text]() {
+			view->editCell(side, row, column, text);
+		});
+		return true;
 	}
 
 	QVariant headerData(int section, Qt::Orientation orientation,
@@ -554,8 +678,13 @@ TableCompareView::TableCompareView(QWidget *parent)
 		m_tables[i] = new RuledTableView(this);
 		m_tables[i]->setVerticalHeader(new RuledRowHeader(m_tables[i]));
 		m_tables[i]->setModel(m_models[i]);
-		m_tables[i]->setEditTriggers(QAbstractItemView::NoEditTriggers);
-		m_tables[i]->setSelectionBehavior(QAbstractItemView::SelectRows);
+		// a cell edits on F2 or as typing starts (a double click selects
+		// the difference, as upstream's does); cells select one by one, for
+		// the copies of the selected cells
+		m_tables[i]->setItemDelegate(new CellDelegate(m_tables[i]));
+		m_tables[i]->setEditTriggers(QAbstractItemView::EditKeyPressed
+			| QAbstractItemView::AnyKeyPressed);
+		m_tables[i]->setSelectionBehavior(QAbstractItemView::SelectItems);
 		m_tables[i]->horizontalHeader()->setDefaultSectionSize(110);
 		m_tables[i]->verticalHeader()->setDefaultSectionSize(22);
 		m_tables[i]->setAlternatingRowColors(false);
@@ -1579,6 +1708,13 @@ void TableCompareView::applyEntry(const UndoEntry &entry)
 	runDiff(&error);
 	rebuildModel();
 	m_current = -1;
+	// an edit goes back to its cell, as upstream's undo of typing does
+	if (entry.column >= 0)
+	{
+		updateStatus();
+		showCell(entry.side, entry.realRow, entry.column);
+		return;
+	}
 	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
 		if (!m_blocks[b].trivial && m_blocks[b].viewEnd >= entry.viewBegin)
 		{
@@ -1602,7 +1738,10 @@ void TableCompareView::undo()
 	if (m_undoStack.isEmpty())
 		return;
 	const UndoEntry entry = m_undoStack.takeLast();
-	m_redoStack.append(captureEntry(entry.side, entry.viewBegin));
+	UndoEntry current = captureEntry(entry.side, entry.viewBegin);
+	current.realRow = entry.realRow;
+	current.column = entry.column;
+	m_redoStack.append(current);
 	applyEntry(entry);
 	updateUndoActions();
 }
@@ -1612,7 +1751,10 @@ void TableCompareView::redo()
 	if (m_redoStack.isEmpty())
 		return;
 	const UndoEntry entry = m_redoStack.takeLast();
-	m_undoStack.append(captureEntry(entry.side, entry.viewBegin));
+	UndoEntry current = captureEntry(entry.side, entry.viewBegin);
+	current.realRow = entry.realRow;
+	current.column = entry.column;
+	m_undoStack.append(current);
 	applyEntry(entry);
 	updateUndoActions();
 }
@@ -1652,6 +1794,177 @@ void TableCompareView::focusNextPane()
 	m_tables[(activeSide() + 1) % m_paneCount]->setFocus();
 }
 
+void TableCompareView::editCell(int side, int modelRow, int column, const QString &text)
+{
+	if (side < 0 || side >= m_paneCount || column < 0)
+		return;
+	const int viewRow = m_modelRows.value(modelRow, -1);
+	if (viewRow < 0)
+		return;
+	Side &s = m_sides[side];
+	int real = m_viewToReal[side].value(viewRow, -1);
+	// a line break typed in a cell goes as the file writes its own
+	QString value = text;
+	value.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+	value.replace(QLatin1Char('\n'), s.eol);
+	if (real >= 0 && real < s.rawLines.size())
+	{
+		if (displayText(s.cells[real].value(column)) == displayText(value))
+			return;
+		const QString &line = s.rawLines.at(real);
+		const auto [start, end] = rawCellSpan(line, s.props, column);
+		const bool quoted = start >= 0 && start < end && !s.props.quote.isNull()
+			&& line.at(start) == s.props.quote;
+		UndoEntry entry = captureEntry(side, viewRow);
+		entry.realRow = real;
+		entry.column = column;
+		pushUndo(entry);
+		s.rawLines[real] = withCell(line, s.props, column, rawValue(value, s.props, quoted));
+		s.cells[real] = splitRow(s.rawLines.at(real), s.props);
+	}
+	else
+	{
+		// typing on a filler row makes it a row of the side's file, before
+		// the side's rows that come after it
+		if (value.isEmpty())
+			return;
+		int insertAt = 0;
+		for (int v = 0; v < viewRow; ++v)
+			if (m_viewToReal[side].value(v, -1) >= 0)
+				++insertAt;
+		UndoEntry entry = captureEntry(side, viewRow);
+		entry.realRow = insertAt;
+		entry.column = column;
+		pushUndo(entry);
+		const QString line = withCell(QString(), s.props, column, rawValue(value, s.props, false));
+		s.rawLines.insert(insertAt, line);
+		s.cells.insert(s.cells.begin() + insertAt, splitRow(line, s.props));
+		real = insertAt;
+	}
+	setSideModified(side, true);
+	// FlushAndRescan: the tables are compared again with the edit
+	QString error;
+	runDiff(&error);
+	rebuildModel();
+	m_current = -1;
+	updateStatus();
+	showCell(side, real, column);
+}
+
+void TableCompareView::showCell(int side, int realRow, int column)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	// the first shown row that is the side's row or comes after it
+	int modelRow = -1;
+	for (int row = 0; row < m_modelRows.size() && modelRow < 0; ++row)
+		if (m_viewToReal[side].value(m_modelRows.at(row), -1) >= realRow)
+			modelRow = row;
+	if (modelRow < 0)
+		modelRow = static_cast<int>(m_modelRows.size()) - 1;
+	if (modelRow < 0)
+		return;
+	const QModelIndex index = m_models[side]->index(modelRow, qMax(0, column));
+	m_tables[side]->setCurrentIndex(index);
+	m_tables[side]->scrollTo(index);
+}
+
+bool TableCompareView::copySelectedCells(int sourceSide, int targetSide)
+{
+	// upstream's copy of the selected word differences, which a column
+	// selection makes the selected cells' in its table; one selected cell
+	// is the cursor, as a click puts it there, and the difference goes whole
+	const QItemSelectionModel *selection = m_tables[activeSide()]->selectionModel();
+	const QModelIndexList selected = selection->selectedIndexes();
+	if (selected.size() < 2)
+		return false;
+	const Side &from = m_sides[sourceSide];
+	Side &to = m_sides[targetSide];
+
+	// whole rows (their headers clicked): the differences they are in go
+	// whole, as upstream copies the differences a selection of lines takes
+	// in (CopyMultipleList), each from the bottom up so the rows above keep
+	// their places
+	bool wholeRows = true;
+	for (const QModelIndex &index : selected)
+		wholeRows = wholeRows && selection->isRowSelected(index.row(), QModelIndex());
+	if (wholeRows)
+	{
+		std::set<int> blocks;
+		for (const QModelIndex &index : selected)
+		{
+			const int block = diffAtRow(m_modelRows.value(index.row(), -1));
+			if (block >= 0)
+				blocks.insert(block);
+		}
+		if (blocks.empty())
+			return true;
+		pushUndo(captureEntry(targetSide, m_blocks[*blocks.begin()].viewBegin));
+		for (auto it = blocks.rbegin(); it != blocks.rend(); ++it)
+		{
+			const Block &block = m_blocks[*it];
+			QStringList rows;
+			for (int row = block.begin[sourceSide];
+				row <= block.end[sourceSide] && row < from.rawLines.size(); ++row)
+				rows.append(from.rawLines.at(qMax(0, row)));
+			const int first = block.begin[targetSide];
+			const int count = qMax(0, block.end[targetSide] - block.begin[targetSide] + 1);
+			for (int k = 0; k < count; ++k)
+				to.rawLines.removeAt(first);
+			for (int k = 0; k < rows.size(); ++k)
+				to.rawLines.insert(first + k, rows.at(k));
+		}
+		to.cells.clear();
+		for (const QString &line : to.rawLines)
+			to.cells.push_back(splitRow(line, to.props));
+		setSideModified(targetSide, true);
+		QString error;
+		runDiff(&error);
+		rebuildModel();
+		m_current = -1;
+		updateStatus();
+		return true;
+	}
+
+	bool copied = false;
+	for (const QModelIndex &index : selected)
+	{
+		const int viewRow = m_modelRows.value(index.row(), -1);
+		if (viewRow < 0 || diffAtRow(viewRow) < 0)
+			continue; // a cell of no difference to copy
+		const int fromReal = m_viewToReal[sourceSide].value(viewRow, -1);
+		const int toReal = m_viewToReal[targetSide].value(viewRow, -1);
+		if (fromReal < 0 || toReal < 0)
+			continue; // a row one side lacks goes with the whole difference
+		const int column = index.column();
+		const QString value = from.cells[fromReal].value(column);
+		if (value == to.cells[toReal].value(column))
+			continue;
+		if (!copied)
+		{
+			pushUndo(captureEntry(targetSide, viewRow));
+			copied = true;
+		}
+		const QString &fromLine = from.rawLines.at(fromReal);
+		const auto [start, end] = rawCellSpan(fromLine, from.props, column);
+		const bool quoted = start >= 0 && start < end && !from.props.quote.isNull()
+			&& fromLine.at(start) == from.props.quote;
+		to.rawLines[toReal] = withCell(to.rawLines.at(toReal), to.props, column,
+			rawValue(value, to.props, quoted));
+		to.cells[toReal] = splitRow(to.rawLines.at(toReal), to.props);
+	}
+	if (copied)
+	{
+		setSideModified(targetSide, true);
+		QString error;
+		runDiff(&error);
+		rebuildModel();
+		m_current = -1;
+		updateStatus();
+	}
+	return true;
+}
+
 void TableCompareView::copyToRight()
 {
 	const int target = qMin(activeSide() + 1, m_paneCount - 1);
@@ -1669,6 +1982,8 @@ void TableCompareView::copyCurrentDiff(int sourceSide, int targetSide)
 	const int target = targetSide >= 0 ? targetSide : 1 - sourceSide;
 	if (sourceSide < 0 || sourceSide >= m_paneCount || target < 0
 		|| target >= m_paneCount || target == sourceSide)
+		return;
+	if (copySelectedCells(sourceSide, target))
 		return;
 	// upstream's OnX2Y: with no current difference, the one the cursor is
 	// in, and none when it is in none

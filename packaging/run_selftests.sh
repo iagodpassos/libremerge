@@ -58,6 +58,7 @@ run_one selftest-diff-scroll
 run_one selftest-table-options
 run_one selftest-image-options
 run_one selftest-table-3way
+run_one selftest-table-edit
 run_one selftest-hex
 run_one selftest-hex-edit
 run_one selftest-hex-header

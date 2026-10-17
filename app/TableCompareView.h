@@ -84,6 +84,11 @@ public:
 	    MenuIDtoXY), so the middle one of three pushes into either side. */
 	void copyToRight();
 	void copyToLeft();
+	/** Upstream's typing in its table: a cell of a grid's row takes a new
+	    value, only that cell of the line written anew (a row a side does
+	    not have becomes one of its file), into the undo history, and the
+	    tables are compared again. */
+	void editCell(int side, int modelRow, int column, const QString &text);
 	/** The Copy All commands: "Copy all differences to other file?"
 	    first, as upstream's table view (its text view) asks. */
 	void copyAllToRight();
@@ -184,6 +189,8 @@ private:
 		bool modified;
 		int saveSerial;   // invalid once the side is saved again
 		int viewBegin;    // where the change was, to reselect
+		int realRow = -1; // an edited cell's row and column, to go back to
+		int column = -1;
 	};
 
 	class LineProvider;
@@ -221,6 +228,12 @@ private:
 	bool diffOnScreen(int blockIndex) const;
 	void deselectDiffIfCursorNotInCurrentDiff(int modelRow);
 	UndoEntry captureEntry(int side, int viewBegin) const;
+	/** The copy of the selected cells' differences, when two or more
+	    cells are selected; false when the copy is the whole difference's. */
+	bool copySelectedCells(int sourceSide, int targetSide);
+	/** A side's row and column current in its grid, as the comparison
+	    shows it now. */
+	void showCell(int side, int realRow, int column);
 	void applyEntry(const UndoEntry &entry);
 	void pushUndo(const UndoEntry &entry);
 	void clearHistory();

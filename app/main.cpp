@@ -349,6 +349,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestTable3WayOpt(QStringLiteral("selftest-table-3way"),
 		QStringLiteral("Compare three tables and copy, undo, swap and save in them (for testing)"));
 	parser.addOption(selftestTable3WayOpt);
+	QCommandLineOption selftestTableEditOpt(QStringLiteral("selftest-table-edit"),
+		QStringLiteral("Edit the cells of a table comparison and copy selected cells, with undo (for testing)"));
+	parser.addOption(selftestTableEditOpt);
 	QCommandLineOption selftestHexOpt(QStringLiteral("selftest-hex"),
 		QStringLiteral("Compare binary files in the hex view and verify it (for testing)"));
 	parser.addOption(selftestHexOpt);
@@ -10883,6 +10886,179 @@ int main(int argc, char *argv[])
 			clickRow(250);
 			view.copyCurrentDiff(0);
 			check(view.diffCount() == 5, "table: Copy to Right with the cursor in no difference copies nothing");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestTableEditOpt))
+	{
+		// upstream's table is its text editor: a cell takes what is typed
+		// in it, a filler row becomes a row of the file, the edits go into
+		// the undo history with the copies, and a selection of cells
+		// copies only its cells' differences (its column selection). The
+		// grid rewrites the one cell, quoting it when its value needs it.
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const QString left = dir.filePath(QStringLiteral("left.csv"));
+		const QString right = dir.filePath(QStringLiteral("right.csv"));
+		write(left, "id,name,note\n1,apple,\"red, round\"\n2,banana,yellow\n");
+		write(right, "id,name,note\n1,apple,\"red, round\"\n2,banana,green\n3,cherry,dark\n");
+		{
+			TableCompareView view;
+			QString error;
+			if (!view.compare(left, right, &error))
+				return 2;
+			view.resize(1000, 500);
+			view.show();
+			settle();
+			// (view row 1 is the apple's, the header's being row 0)
+			check(!view.diffRowsForTest().contains(1), "the apple rows agree before the edit");
+			// a cell of a row the two share: its line keeps the quotes it had
+			view.editCell(1, 0, 2, QStringLiteral("red; round"));
+			printf("  the edited line: %s\n", qPrintable(view.shownRowsForTest(1).value(0)));
+			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,apple,\"red; round\"")
+					&& view.diffRowsForTest().contains(1) && view.isModified(),
+				"an edited cell rewrites that cell of its line, and the tables compare again");
+			view.undo();
+			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,apple,\"red, round\"")
+					&& !view.diffRowsForTest().contains(1)
+					&& view.tableForTest(1)->currentIndex() == view.tableForTest(1)->model()->index(0, 2),
+				"Undo takes the edit back, at the edited cell");
+			view.redo();
+			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,apple,\"red; round\""),
+				"and Redo makes it again");
+			// a value with the delimiter and the quote is quoted, its quotes doubled
+			view.editCell(0, 1, 2, QStringLiteral("say \"hi\", ok"));
+			check(view.shownRowsForTest(0).value(1) == QStringLiteral("2,banana,\"say \"\"hi\"\", ok\"")
+					&& view.tableForTest(0)->model()->index(1, 2).data().toString()
+						== QStringLiteral("say \"hi\", ok"),
+				"a value that needs it is quoted, as the grid shows it unquoted");
+			// a cell past the end of the line: the cells before it come empty
+			view.editCell(0, 1, 4, QStringLiteral("x"));
+			check(view.shownRowsForTest(0).value(1).endsWith(QStringLiteral(",,x")),
+				"a cell past the last one adds the empty ones before it");
+			// the left one has no cherry row: typing there makes it a row
+			view.editCell(0, 2, 1, QStringLiteral("cherry"));
+			check(view.shownRowsForTest(0).value(2) == QStringLiteral(",cherry"),
+				"a cell of a filler row makes the row a line of the file");
+			// through the grid, as typing in a cell does
+			QAbstractItemModel *rightModel = view.tableForTest(1)->model();
+			rightModel->setData(rightModel->index(1, 1), QStringLiteral("Banana"), Qt::EditRole);
+			settle();
+			check(view.shownRowsForTest(1).value(1) == QStringLiteral("2,Banana,green"),
+				"the grid's editor commits its cell");
+			check(view.saveModified(&error)
+					&& read(right) == "id,name,note\n1,apple,\"red; round\"\n2,Banana,green\n3,cherry,dark\n",
+				"Save writes the edited lines");
+		}
+
+		// a line break in a quoted cell, with "Allow newlines in quotes"
+		write(left, "id,text\n1,one\n");
+		write(right, "id,text\n1,one\n");
+		{
+			TableCompareView view;
+			QString error;
+			if (!view.compare(left, right, &error))
+				return 2;
+			view.editCell(1, 0, 1, QStringLiteral("first\nsecond"));
+			check(view.tableForTest(1)->model()->rowCount() == 1
+					&& view.tableForTest(1)->model()->index(0, 1).data().toString()
+						== QStringLiteral("first\nsecond")
+					&& view.saveModified(&error)
+					&& read(right) == "id,text\n1,\"first\nsecond\"\n",
+				"a line break typed in a cell keeps the row one, its cell quoted");
+		}
+
+		// the copies of the selected cells
+		write(left, "id,a,b,c\n1,x,y,z\n");
+		write(right, "id,a,b,c\n1,X,Y,z\n");
+		{
+			TableCompareView view;
+			QString error;
+			if (!view.compare(left, right, &error))
+				return 2;
+			QItemSelectionModel *selection = view.tableForTest(0)->selectionModel();
+			const QAbstractItemModel *model = view.tableForTest(0)->model();
+			selection->select(model->index(0, 1), QItemSelectionModel::Select);
+			selection->select(model->index(0, 3), QItemSelectionModel::Select);
+			view.copyCurrentDiff(0, 1);
+			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,x,Y,z")
+					&& view.diffCount() == 1,
+				"Copy to Right with two cells selected copies only the one of them that differs");
+			view.undo();
+			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,X,Y,z"),
+				"Undo takes the copy of the cells back");
+			view.tableForTest(0)->selectionModel()->clearSelection();
+			view.tableForTest(0)->selectionModel()->select(view.tableForTest(0)->model()->index(0, 2),
+				QItemSelectionModel::Select);
+			view.copyCurrentDiff(0, 1);
+			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,x,y,z")
+					&& view.diffCount() == 0,
+				"one selected cell is the cursor: the whole difference goes");
+		}
+
+		// whole rows selected: the differences they are in go whole, rows a
+		// side lacks among them
+		write(left, "id,v\n1,a\n2,b\n3,c\n");
+		write(right, "id,v\n1,a\n2,B\n");
+		{
+			TableCompareView view;
+			QString error;
+			if (!view.compare(left, right, &error))
+				return 2;
+			QItemSelectionModel *selection = view.tableForTest(0)->selectionModel();
+			const QAbstractItemModel *model = view.tableForTest(0)->model();
+			selection->select(QItemSelection(model->index(1, 0), model->index(2, 1)),
+				QItemSelectionModel::Select | QItemSelectionModel::Rows);
+			view.copyCurrentDiff(0, 1);
+			check(view.diffCount() == 0
+					&& view.shownRowsForTest(1) == QStringList({ QStringLiteral("1,a"),
+						QStringLiteral("2,b"), QStringLiteral("3,c") }),
+				"whole rows selected copy the differences they are in, the right's missing row too");
+		}
+
+		// a middle side edits as the others do
+		const QString middle = dir.filePath(QStringLiteral("middle.csv"));
+		write(left, "id,v\n1,a\n");
+		write(middle, "id,v\n1,a\n");
+		write(right, "id,v\n1,b\n");
+		{
+			TableCompareView view;
+			QString error;
+			if (!view.compare(QStringList{ left, middle, right }, &error))
+				return 2;
+			view.editCell(1, 0, 1, QStringLiteral("b"));
+			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,b"),
+				"the middle one of three tables takes edits too");
 		}
 
 		printf("ok: %d\n", ok);
