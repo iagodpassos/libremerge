@@ -8,16 +8,22 @@
 
 class QCheckBox;
 class QComboBox;
+class QLineEdit;
 class QRadioButton;
 class QStackedWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
 
+namespace lm
+{
+struct TableSettings;
+}
+
 /**
  * The application options dialog, laid out like WinMerge's (Preferences
  * dialog): a page tree on the left, where a category's pages sit indented
- * under it (General; Compare > General, Folder; Message Boxes; Backup
- * Files), and the
+ * under it (General; Compare > General, Folder, Table, Binary; Message
+ * Boxes; Backup Files), and the
  * selected page on the right with its own Defaults button. Every option
  * sits on the page and at the position WinMerge gives it.
  */
@@ -72,6 +78,7 @@ public:
 		GeneralPage,
 		ComparePage, ///< Compare > General
 		FolderPage,  ///< Compare > Folder
+		TablePage,   ///< Compare > Table
 		BinaryPage,  ///< Compare > Binary
 		MessageBoxesPage,
 		BackupPage,
@@ -105,6 +112,8 @@ private:
 	QWidget *buildGeneralPage();
 	QWidget *buildComparePage();
 	QWidget *buildFolderPage();
+	QWidget *buildTablePage();
+	void showTableSettings(const lm::TableSettings &table);
 	QWidget *buildBinaryPage();
 	QWidget *buildMessageBoxesPage();
 	void loadMessageBoxes();
@@ -130,9 +139,16 @@ private:
 	QCheckBox *m_chkCloseSelector;
 	QComboBox *m_cmbAutoComplete;
 	QComboBox *m_cmbAutoReload;
+	// Compare > Table
+	QComboBox *m_cmbCsvPatterns = nullptr;
+	QLineEdit *m_editCsvDelimiter = nullptr;
+	QComboBox *m_cmbTsvPatterns = nullptr;
+	QComboBox *m_cmbDsvPatterns = nullptr;
+	QLineEdit *m_editDsvDelimiter = nullptr;
+	QCheckBox *m_chkAllowNewlines = nullptr;
+	QLineEdit *m_editQuote = nullptr;
 	// Compare > Binary
 	QComboBox *m_cmbBinaryPatterns = nullptr;
-	QString m_binaryPatterns;
 	QComboBox *m_cmbTheme;
 	QComboBox *m_cmbLanguage;
 	// Compare > General

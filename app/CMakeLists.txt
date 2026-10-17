@@ -17,6 +17,7 @@ qt_add_executable(LibreMerge
   NewComparisonView.cpp
   FileCompareView.cpp
   TableCompareView.cpp
+  TableFiles.cpp
   ImageCompareView.cpp
   ImagePane.cpp
   HexView.cpp

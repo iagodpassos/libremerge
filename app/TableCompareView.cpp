@@ -31,6 +31,7 @@
 #include "MessageBoxes.h"
 #include "NewComparisonView.h"
 #include "OptionsDialog.h"
+#include "TableFiles.h"
 #include "Theme.h"
 
 // engine
@@ -46,9 +47,11 @@
 namespace
 {
 
-/** Split one CSV/TSV line honoring quotes ("" escapes a quote). */
-QStringList splitRow(const QString &line, QChar delimiter)
+/** Split one line into its cells by the side's delimiter, honoring its
+    quote character (a doubled one escapes it). */
+QStringList splitRow(const QString &line, const lm::TableProps &props)
 {
+	const QChar quote = props.quote;
 	QStringList cells;
 	QString cell;
 	bool quoted = false;
@@ -57,11 +60,11 @@ QStringList splitRow(const QString &line, QChar delimiter)
 		const QChar c = line.at(i);
 		if (quoted)
 		{
-			if (c == QChar('"'))
+			if (c == quote)
 			{
-				if (i + 1 < line.size() && line.at(i + 1) == QChar('"'))
+				if (i + 1 < line.size() && line.at(i + 1) == quote)
 				{
-					cell.append(QChar('"'));
+					cell.append(quote);
 					++i;
 				}
 				else
@@ -70,9 +73,9 @@ QStringList splitRow(const QString &line, QChar delimiter)
 			else
 				cell.append(c);
 		}
-		else if (c == QChar('"') && cell.isEmpty())
+		else if (!quote.isNull() && c == quote && cell.isEmpty())
 			quoted = true;
-		else if (c == delimiter)
+		else if (!props.delimiter.isNull() && c == props.delimiter)
 		{
 			cells.append(cell);
 			cell.clear();
@@ -82,27 +85,6 @@ QStringList splitRow(const QString &line, QChar delimiter)
 	}
 	cells.append(cell);
 	return cells;
-}
-
-/** Pick the delimiter that splits the sampled lines most consistently. */
-QChar sniffDelimiter(const QStringList &sample)
-{
-	const QList<QChar> candidates = {
-		QChar(','), QChar(';'), QChar('\t'), QChar('|') };
-	QChar best = QChar(',');
-	int bestScore = -1;
-	for (const QChar candidate : candidates)
-	{
-		int score = 0;
-		for (const QString &line : sample)
-			score += static_cast<int>(line.count(candidate));
-		if (score > bestScore)
-		{
-			bestScore = score;
-			best = candidate;
-		}
-	}
-	return best;
 }
 
 quint64 cellKey(int row, int column)
@@ -182,33 +164,34 @@ protected:
     (CCrystalTextBuffer::GetColumnCount and GetCellText): the delimiters
     outside quotes part the cells, and a cell keeps the quotes it is
     written with. */
-int rawCellCount(const QString &line, QChar delimiter)
+int rawCellCount(const QString &line, const lm::TableProps &props)
 {
 	int count = 1;
 	bool quoted = false;
 	for (const QChar c : line)
 	{
-		if (c == QChar('"'))
+		if (!props.quote.isNull() && c == props.quote)
 			quoted = !quoted;
-		else if (!quoted && c == delimiter)
+		else if (!quoted && !props.delimiter.isNull() && c == props.delimiter)
 			++count;
 	}
 	return count;
 }
 
-QString rawCell(const QString &line, QChar delimiter, int column)
+QString rawCell(const QString &line, const lm::TableProps &props, int column)
 {
 	QString cell;
 	int current = 0;
 	bool quoted = false;
+	const bool delimiter = !props.delimiter.isNull();
 	for (int i = 0; i < line.size() && current <= column; ++i)
 	{
 		const QChar c = line.at(i);
-		if (current == column && (quoted || c != delimiter))
+		if (current == column && (quoted || !delimiter || c != props.delimiter))
 			cell.append(c);
-		if (c == QChar('"'))
+		if (!props.quote.isNull() && c == props.quote)
 			quoted = !quoted;
-		else if (!quoted && c == delimiter)
+		else if (!quoted && delimiter && c == props.delimiter)
 			++current;
 	}
 	return cell;
@@ -269,11 +252,12 @@ public:
 	int GetColumnCount(int pane, int lineIndex) const override
 	{
 		return valid(pane, lineIndex)
-			? rawCellCount(line(pane, lineIndex), m_view->m_delimiter) : 1;
+			? rawCellCount(line(pane, lineIndex), m_view->m_sides[pane].props) : 1;
 	}
 	std::string GetColumn(int pane, int lineIndex, int columnIndex) const override
 	{
-		return rawCell(line(pane, lineIndex), m_view->m_delimiter, columnIndex).toStdString();
+		return rawCell(line(pane, lineIndex), m_view->m_sides[pane].props,
+			columnIndex).toStdString();
 	}
 	int GetRealLineNumber(int pane, int lineIndex) const override
 	{
@@ -637,17 +621,16 @@ bool TableCompareView::compare(const QString &leftPath,
 		return false;
 	clearHistory();
 
-	// sniff the delimiter over both files' first rows
-	QStringList sample;
-	for (int side = 0; side < 2; ++side)
-		for (int row = 0; row < qMin(20, m_sides[side].rawLines.size()); ++row)
-			sample.append(m_sides[side].rawLines.at(row));
-	m_delimiter = sniffDelimiter(sample);
+	// each side by the Table options' group its file is in (WinMerge's
+	// SetTableProperties), as the files are opened or opened again
+	const QList<lm::TableProps> props =
+		lm::tablePropertiesOfSides({ leftPath, rightPath });
 	for (int side = 0; side < 2; ++side)
 	{
+		m_sides[side].props = props.at(side);
 		m_sides[side].cells.clear();
 		for (const QString &line : m_sides[side].rawLines)
-			m_sides[side].cells.push_back(splitRow(line, m_delimiter));
+			m_sides[side].cells.push_back(splitRow(line, m_sides[side].props));
 	}
 
 	if (!runDiff(error))
@@ -1104,8 +1087,15 @@ void TableCompareView::updateStatus()
 	}
 	else
 		text = tr("%n difference(s) found", nullptr, m_diffCount);
-	text += tr("  \xE2\x80\xA2  delimiter: %1")
-		.arg(m_delimiter == QChar('\t') ? tr("tab") : QString(m_delimiter));
+	// each side's delimiter when the Table options give them different ones
+	const auto delimiterName = [this](int side) {
+		const QChar delimiter = m_sides[side].props.delimiter;
+		return delimiter == QLatin1Char('\t') ? tr("tab") : QString(delimiter);
+	};
+	QString delimiters = delimiterName(0);
+	if (m_sides[1].props.delimiter != m_sides[0].props.delimiter)
+		delimiters += QStringLiteral(" | ") + delimiterName(1);
+	text += tr("  \xE2\x80\xA2  delimiter: %1").arg(delimiters);
 	bool modified = m_sides[0].modified || m_sides[1].modified;
 	if (modified)
 		text += tr("  \xE2\x80\xA2 unsaved changes");
@@ -1427,7 +1417,7 @@ void TableCompareView::applyEntry(const UndoEntry &entry)
 	side.rawLines = entry.lines;
 	side.cells.clear();
 	for (const QString &line : side.rawLines)
-		side.cells.push_back(splitRow(line, m_delimiter));
+		side.cells.push_back(splitRow(line, side.props));
 	// once the side has been saved again the snapshot no longer matches
 	// the file on disk, so the side stays marked as modified
 	setSideModified(entry.side,
@@ -1539,7 +1529,7 @@ void TableCompareView::copyCurrentDiff(int sourceSide)
 		lines.insert(first + k, newLines.at(k));
 	m_sides[target].cells.clear();
 	for (const QString &line : lines)
-		m_sides[target].cells.push_back(splitRow(line, m_delimiter));
+		m_sides[target].cells.push_back(splitRow(line, m_sides[target].props));
 	setSideModified(target, true);
 
 	const int wasViewBegin = block.viewBegin;

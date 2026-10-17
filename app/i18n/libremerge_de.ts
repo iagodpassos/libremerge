@@ -3979,6 +3979,10 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <translation>Ordner</translation>
     </message>
     <message>
+        <source>Table</source>
+        <translation>Tabelle</translation>
+    </message>
+    <message>
         <source>Binary</source>
         <translation>Binär</translation>
     </message>
@@ -4130,6 +4134,36 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <source>The status bar of a folder comparison shows the method in use; click it to switch and recompare.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Die Statusleiste eines Ordnervergleichs zeigt die verwendete Methode; klicken Sie darauf, um sie zu wechseln und neu zu vergleichen.</translation>
+    </message>
+    <message>
+        <source>CSV</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>CSV</translation>
+    </message>
+    <message>
+        <source>File patterns:</source>
+        <translation>&amp;Dateimuster:</translation>
+    </message>
+    <message>
+        <source>D&amp;elimiter character:</source>
+        <translation>T&amp;rennzeichen:</translation>
+    </message>
+    <message>
+        <source>TSV</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>TSV</translation>
+    </message>
+    <message>
+        <source>Custom Delimiter-Separated Values</source>
+        <translation>Benutzerdefinierte, durch Trennzeichen getrennte Werte</translation>
+    </message>
+    <message>
+        <source>&amp;Allow newlines in quotes</source>
+        <translation>&amp;Zeilenumbrüche in Zitaten zulassen</translation>
+    </message>
+    <message>
+        <source>&amp;Quote character:</source>
+        <translation>&amp;Anführungszeichen:</translation>
     </message>
     <message>
         <source>Binary file &amp;patterns:</source>

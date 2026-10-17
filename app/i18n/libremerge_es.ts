@@ -3983,6 +3983,10 @@ Comprobando la identidad binaria...</translation>
         <translation>Carpeta</translation>
     </message>
     <message>
+        <source>Table</source>
+        <translation>Tabla</translation>
+    </message>
+    <message>
         <source>Binary</source>
         <translation>Binario</translation>
     </message>
@@ -4132,6 +4136,36 @@ Comprobando la identidad binaria...</translation>
         <source>The status bar of a folder comparison shows the method in use; click it to switch and recompare.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>La barra de estado de una comparación de carpetas muestra el método en uso; haga clic en ella para cambiarlo y volver a comparar.</translation>
+    </message>
+    <message>
+        <source>CSV</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>CSV</translation>
+    </message>
+    <message>
+        <source>File patterns:</source>
+        <translation>Formatos de archivo:</translation>
+    </message>
+    <message>
+        <source>D&amp;elimiter character:</source>
+        <translation>Caráct&amp;er delimitador:</translation>
+    </message>
+    <message>
+        <source>TSV</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>TSV</translation>
+    </message>
+    <message>
+        <source>Custom Delimiter-Separated Values</source>
+        <translation>Valores separados por delimitadores personalizados</translation>
+    </message>
+    <message>
+        <source>&amp;Allow newlines in quotes</source>
+        <translation>Permitir nuev&amp;as líneas entre comillas</translation>
+    </message>
+    <message>
+        <source>&amp;Quote character:</source>
+        <translation>Ca&amp;rácter de comillas:</translation>
     </message>
     <message>
         <source>Binary file &amp;patterns:</source>

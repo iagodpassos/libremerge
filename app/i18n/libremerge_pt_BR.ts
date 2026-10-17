@@ -3546,6 +3546,10 @@ Checando identidade binária...</translation>
         <translation>Pasta</translation>
     </message>
     <message>
+        <source>Table</source>
+        <translation>Tabela</translation>
+    </message>
+    <message>
         <source>Binary</source>
         <translation>Binário</translation>
     </message>
@@ -3648,6 +3652,34 @@ Checando identidade binária...</translation>
     <message>
         <source>Whitespaces</source>
         <translation>Espaços em branco</translation>
+    </message>
+    <message>
+        <source>CSV</source>
+        <translation>CSV</translation>
+    </message>
+    <message>
+        <source>File patterns:</source>
+        <translation>Padrões de arquivo:</translation>
+    </message>
+    <message>
+        <source>D&amp;elimiter character:</source>
+        <translation>C&amp;aractere delimitador:</translation>
+    </message>
+    <message>
+        <source>TSV</source>
+        <translation>TSV</translation>
+    </message>
+    <message>
+        <source>Custom Delimiter-Separated Values</source>
+        <translation>Valores Personalizados Separados por Delimitadores</translation>
+    </message>
+    <message>
+        <source>&amp;Allow newlines in quotes</source>
+        <translation>&amp;Permitir linhas novas nas citações</translation>
+    </message>
+    <message>
+        <source>&amp;Quote character:</source>
+        <translation>&amp;Caractere de citação:</translation>
     </message>
     <message>
         <source>Binary file &amp;patterns:</source>

@@ -8,6 +8,7 @@
 #include "HexDialogs.h"
 #include "ItemCheckStyle.h"
 #include "MessageBoxes.h"
+#include "TableFiles.h"
 #include "Theme.h"
 
 #include <QCheckBox>
@@ -47,11 +48,56 @@ const QString kAutoReload = QStringLiteral("General/AutoReloadModifiedFiles");
 const QString kBackup = QStringLiteral("Backup/FileCompare");
 const QString kLanguage = QStringLiteral("Appearance/Language");
 
-/** A label over its control, the way WinMerge's pages stack them. */
+/** A label over its control, the way WinMerge's pages stack them; its
+    accelerator letter goes to the control. */
 void addLabeled(QVBoxLayout *box, const QString &label, QWidget *control)
 {
-	box->addWidget(new QLabel(label, control->parentWidget()));
+	auto *text = new QLabel(label, control->parentWidget());
+	text->setBuddy(control);
+	box->addWidget(text);
 	box->addWidget(control);
+}
+
+const char *const kPatternsProperty = "lmPatterns";
+
+/** The patterns of a pattern list, kept apart from the field: picking an
+    item of the drop-down would leave it in the field otherwise. */
+void setPatterns(QComboBox *combo, const QString &patterns)
+{
+	combo->setProperty(kPatternsProperty, patterns);
+	combo->setEditText(patterns);
+}
+
+/** WinMerge's WildcardDropList: a pattern list whose drop-down holds the
+    default patterns, each picked turning on or off in the field, which
+    also takes any pattern typed. */
+void setUpPatternList(QComboBox *combo, const QString &fixedPatterns)
+{
+	combo->setEditable(true);
+	combo->setInsertPolicy(QComboBox::NoInsert);
+	combo->addItems(fixedPatterns.split(QLatin1Char(';'), Qt::SkipEmptyParts));
+	QObject::connect(combo->lineEdit(), &QLineEdit::textEdited, combo,
+		[combo](const QString &text) { combo->setProperty(kPatternsProperty, text); });
+	QObject::connect(combo, &QComboBox::activated, combo, [combo](int index) {
+		const QString pattern = combo->itemText(index);
+		QStringList patterns = combo->property(kPatternsProperty).toString()
+			.split(QLatin1Char(';'), Qt::SkipEmptyParts);
+		for (QString &p : patterns)
+			p = p.trimmed();
+		if (patterns.contains(pattern))
+			patterns.removeAll(pattern);
+		else
+			patterns.append(pattern);
+		setPatterns(combo, patterns.join(QLatin1Char(';')));
+	});
+}
+
+/** A field for one character, as narrow as WinMerge's. */
+QLineEdit *characterField(QWidget *parent)
+{
+	auto *field = new QLineEdit(parent);
+	field->setFixedWidth(field->fontMetrics().horizontalAdvance(QLatin1Char('M')) * 4);
+	return field;
 }
 
 QLabel *noteLabel(const QString &text, QWidget *page)
@@ -150,6 +196,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	QTreeWidgetItem *compare = addCategory(nullptr, tr("Compare"), -1);
 	addCategory(compare, tr("General"), ComparePage);
 	addCategory(compare, tr("Folder"), FolderPage);
+	addCategory(compare, tr("Table"), TablePage);
 	addCategory(compare, tr("Binary"), BinaryPage);
 	addCategory(nullptr, tr("Message Boxes"), MessageBoxesPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
@@ -161,6 +208,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildGeneralPage());
 	m_pages->addWidget(buildComparePage());
 	m_pages->addWidget(buildFolderPage());
+	m_pages->addWidget(buildTablePage());
 	m_pages->addWidget(buildBinaryPage());
 	m_pages->addWidget(buildMessageBoxesPage());
 	m_pages->addWidget(buildBackupPage());
@@ -364,6 +412,50 @@ QWidget *OptionsDialog::buildFolderPage()
 	return page;
 }
 
+/** WinMerge's Compare > Table page (PropCompareTable): the patterns that
+    open a file as a table, by group (CSV, TSV, a delimiter of one's own),
+    each pattern list's drop-down ticking the group's defaults on and off,
+    and the quote settings of every table. */
+QWidget *OptionsDialog::buildTablePage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+	const lm::TableSettings defaults;
+
+	auto *csv = new QGroupBox(tr("CSV"), page);
+	auto *csvLayout = new QVBoxLayout(csv);
+	m_cmbCsvPatterns = new QComboBox(csv);
+	setUpPatternList(m_cmbCsvPatterns, defaults.csvFilePatterns);
+	addLabeled(csvLayout, tr("File patterns:"), m_cmbCsvPatterns);
+	m_editCsvDelimiter = characterField(csv);
+	addLabeled(csvLayout, tr("D&elimiter character:"), m_editCsvDelimiter);
+	box->addWidget(csv);
+
+	auto *tsv = new QGroupBox(tr("TSV"), page);
+	auto *tsvLayout = new QVBoxLayout(tsv);
+	m_cmbTsvPatterns = new QComboBox(tsv);
+	setUpPatternList(m_cmbTsvPatterns, defaults.tsvFilePatterns);
+	addLabeled(tsvLayout, tr("File patterns:"), m_cmbTsvPatterns);
+	box->addWidget(tsv);
+
+	auto *dsv = new QGroupBox(tr("Custom Delimiter-Separated Values"), page);
+	auto *dsvLayout = new QVBoxLayout(dsv);
+	m_cmbDsvPatterns = new QComboBox(dsv);
+	setUpPatternList(m_cmbDsvPatterns, defaults.dsvFilePatterns);
+	addLabeled(dsvLayout, tr("File patterns:"), m_cmbDsvPatterns);
+	m_editDsvDelimiter = characterField(dsv);
+	addLabeled(dsvLayout, tr("D&elimiter character:"), m_editDsvDelimiter);
+	box->addWidget(dsv);
+
+	m_chkAllowNewlines = new QCheckBox(tr("&Allow newlines in quotes"), page);
+	box->addWidget(m_chkAllowNewlines);
+	m_editQuote = characterField(page);
+	addLabeled(box, tr("&Quote character:"), m_editQuote);
+
+	box->addStretch(1);
+	return page;
+}
+
 /** WinMerge's Compare > Binary page (PropCompareBinary): the binary file
     patterns, whose drop-down ticks WinMerge's defaults on and off, and the
     hex editor's settings, whose dialogs keep what they set at once. */
@@ -372,24 +464,7 @@ QWidget *OptionsDialog::buildBinaryPage()
 	auto *page = new QWidget(this);
 	auto *box = new QVBoxLayout(page);
 	m_cmbBinaryPatterns = new QComboBox(page);
-	m_cmbBinaryPatterns->setEditable(true);
-	m_cmbBinaryPatterns->setInsertPolicy(QComboBox::NoInsert);
-	m_cmbBinaryPatterns->addItems(lm::defaultBinaryFilePatterns().split(QLatin1Char(';')));
-	connect(m_cmbBinaryPatterns->lineEdit(), &QLineEdit::textEdited, this,
-		[this](const QString &text) { m_binaryPatterns = text; });
-	// a pattern of the list toggles in the field (WildcardDropList)
-	connect(m_cmbBinaryPatterns, &QComboBox::activated, this, [this](int index) {
-		const QString pattern = m_cmbBinaryPatterns->itemText(index);
-		QStringList patterns = m_binaryPatterns.split(QLatin1Char(';'), Qt::SkipEmptyParts);
-		for (QString &p : patterns)
-			p = p.trimmed();
-		if (patterns.contains(pattern))
-			patterns.removeAll(pattern);
-		else
-			patterns.append(pattern);
-		m_binaryPatterns = patterns.join(QLatin1Char(';'));
-		m_cmbBinaryPatterns->setEditText(m_binaryPatterns);
-	});
+	setUpPatternList(m_cmbBinaryPatterns, lm::defaultBinaryFilePatterns());
 	addLabeled(box, tr("Binary file &patterns:"), m_cmbBinaryPatterns);
 
 	auto *group = new QGroupBox(tr("Hex editor settings"), page);
@@ -580,8 +655,8 @@ void OptionsDialog::load()
 			mgr->GetBool(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES));
 	}
 	m_cmbCompareMethod->setCurrentIndex(lm::currentCompareMethod());
-	m_binaryPatterns = lm::binaryFilePatterns();
-	m_cmbBinaryPatterns->setEditText(m_binaryPatterns);
+	showTableSettings(lm::TableSettings::load());
+	setPatterns(m_cmbBinaryPatterns, lm::binaryFilePatterns());
 	loadMessageBoxes();
 }
 
@@ -634,6 +709,17 @@ void OptionsDialog::save()
 		mgr->FlushOptions();
 	}
 	lm::saveCompareMethod(m_cmbCompareMethod->currentIndex());
+	// the pattern lists without the patterns another of theirs takes in,
+	// as WinMerge saves them
+	lm::TableSettings table;
+	table.csvFilePatterns = lm::removeDuplicatePatterns(m_cmbCsvPatterns->currentText());
+	table.csvDelimiter = m_editCsvDelimiter->text();
+	table.tsvFilePatterns = lm::removeDuplicatePatterns(m_cmbTsvPatterns->currentText());
+	table.dsvFilePatterns = lm::removeDuplicatePatterns(m_cmbDsvPatterns->currentText());
+	table.dsvDelimiter = m_editDsvDelimiter->text();
+	table.allowNewlinesInQuotes = m_chkAllowNewlines->isChecked();
+	table.quote = m_editQuote->text();
+	table.save();
 	settings.setValue(QStringLiteral("BinaryCompare/FilePatterns"),
 		m_cmbBinaryPatterns->currentText().trimmed());
 	for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)
@@ -649,6 +735,17 @@ void OptionsDialog::save()
 		}
 		lm::setRememberedAnswer(item->data(0, Qt::UserRole).toString(), answer);
 	}
+}
+
+void OptionsDialog::showTableSettings(const lm::TableSettings &table)
+{
+	setPatterns(m_cmbCsvPatterns, table.csvFilePatterns);
+	m_editCsvDelimiter->setText(table.csvDelimiter);
+	setPatterns(m_cmbTsvPatterns, table.tsvFilePatterns);
+	setPatterns(m_cmbDsvPatterns, table.dsvFilePatterns);
+	m_editDsvDelimiter->setText(table.dsvDelimiter);
+	m_chkAllowNewlines->setChecked(table.allowNewlinesInQuotes);
+	m_editQuote->setText(table.quote);
 }
 
 /** One page back to WinMerge's defaults, like its per-page button. */
@@ -688,9 +785,11 @@ void OptionsDialog::restoreDefaults(int page)
 	case FolderPage:
 		m_cmbCompareMethod->setCurrentIndex(0); // Full Contents
 		break;
+	case TablePage:
+		showTableSettings(lm::TableSettings());
+		break;
 	case BinaryPage:
-		m_binaryPatterns = lm::defaultBinaryFilePatterns();
-		m_cmbBinaryPatterns->setEditText(m_binaryPatterns);
+		setPatterns(m_cmbBinaryPatterns, lm::defaultBinaryFilePatterns());
 		break;
 	case MessageBoxesPage:
 		for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)

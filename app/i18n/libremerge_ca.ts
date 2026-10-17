@@ -4264,6 +4264,10 @@ S&apos;està comprovant la identitat binària...</translation>
         <translation>Directori</translation>
     </message>
     <message>
+        <source>Table</source>
+        <translation>Taula</translation>
+    </message>
+    <message>
         <source>Binary</source>
         <translation>Binari</translation>
     </message>
@@ -4416,6 +4420,36 @@ S&apos;està comprovant la identitat binària...</translation>
         <source>The status bar of a folder comparison shows the method in use; click it to switch and recompare.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>La barra d&apos;estat d&apos;una comparació de carpetes mostra el mètode en ús; feu-hi clic per a canviar-lo i tornar a comparar.</translation>
+    </message>
+    <message>
+        <source>CSV</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>CSV</translation>
+    </message>
+    <message>
+        <source>File patterns:</source>
+        <translation>Patrons de fitxer:</translation>
+    </message>
+    <message>
+        <source>D&amp;elimiter character:</source>
+        <translation>Caràcter d&amp;elimitador:</translation>
+    </message>
+    <message>
+        <source>TSV</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>TSV</translation>
+    </message>
+    <message>
+        <source>Custom Delimiter-Separated Values</source>
+        <translation>Delimitador de valors personalitzat</translation>
+    </message>
+    <message>
+        <source>&amp;Allow newlines in quotes</source>
+        <translation>Permet salts de línia entre cometes</translation>
+    </message>
+    <message>
+        <source>&amp;Quote character:</source>
+        <translation>Caràcter de cometes:</translation>
     </message>
     <message>
         <source>Binary file &amp;patterns:</source>

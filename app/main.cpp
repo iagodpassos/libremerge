@@ -60,6 +60,7 @@
 #include <QTranslator>
 #include "FileCompareView.h"
 #include "TableCompareView.h"
+#include "TableFiles.h"
 #include "ImageCompareView.h"
 #include "HexCompareView.h"
 #include "HexView.h"
@@ -337,6 +338,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestDiffScrollOpt(QStringLiteral("selftest-diff-scroll"),
 		QStringLiteral("Step through differences and verify the panes scroll as WinMerge's do (for testing)"));
 	parser.addOption(selftestDiffScrollOpt);
+	QCommandLineOption selftestTableOptionsOpt(QStringLiteral("selftest-table-options"),
+		QStringLiteral("Verify the Compare > Table options and the files they open as tables (for testing)"));
+	parser.addOption(selftestTableOptionsOpt);
 	QCommandLineOption selftestHexOpt(QStringLiteral("selftest-hex"),
 		QStringLiteral("Compare binary files in the hex view and verify it (for testing)"));
 	parser.addOption(selftestHexOpt);
@@ -1367,11 +1371,11 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
-			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::BinaryPage,
-			OptionsDialog::MessageBoxesPage, OptionsDialog::BackupPage };
-		bool ok = tree.size() == 7;
+			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
+			OptionsDialog::BinaryPage, OptionsDialog::MessageBoxesPage, OptionsDialog::BackupPage };
+		bool ok = tree.size() == 8;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1379,16 +1383,16 @@ int main(int argc, char *argv[])
 		// the Compare category shows Compare > General
 		const int expectedPage[] = { OptionsDialog::GeneralPage,
 			OptionsDialog::ComparePage, OptionsDialog::ComparePage,
-			OptionsDialog::FolderPage, OptionsDialog::BinaryPage, OptionsDialog::MessageBoxesPage,
-			OptionsDialog::BackupPage };
-		for (int i = 0; ok && i < 7; ++i)
+			OptionsDialog::FolderPage, OptionsDialog::TablePage, OptionsDialog::BinaryPage,
+			OptionsDialog::MessageBoxesPage, OptionsDialog::BackupPage };
+		for (int i = 0; ok && i < 8; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
 			printf("item %d: page %d, title \"%s\"\n", i,
 				dialog.currentPageForTest(), qPrintable(dialog.windowTitle()));
 			ok = dialog.currentPageForTest() == expectedPage[i]
-				&& nested == (i >= 1 && i <= 4);
+				&& nested == (i >= 1 && i <= 5);
 		}
 
 		const auto boxes = [&dialog](OptionsDialog::Page page) {
@@ -1413,14 +1417,14 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(6); // Backup Files
+		dialog.selectCategoryForTest(7); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 
 		// every row of the Message Boxes list shows its check box (the
 		// macOS 27 style left all but the first one out)
 		{
-			dialog.selectCategoryForTest(5); // Message Boxes
+			dialog.selectCategoryForTest(6); // Message Boxes
 			dialog.grab(); // lays the pages out
 			auto *list = dialog.pageForTest(OptionsDialog::MessageBoxesPage)
 				->findChild<QTreeWidget *>();
@@ -10870,6 +10874,184 @@ int main(int argc, char *argv[])
 			clickRow(250);
 			view.copyCurrentDiff(0);
 			check(view.diffCount() == 5, "table: Copy to Right with the cursor in no difference copies nothing");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestTableOptionsOpt))
+	{
+		// WinMerge's Options > Compare > Table (PropCompareTable) and what
+		// it drives (MakeTablePropertiesByFileName, SetTableProperties):
+		// the files that open as tables and the delimiter and quote they
+		// read by. LibreMerge opened only .csv and .tsv pairs, and guessed
+		// the delimiter from the content.
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+
+		// the fields (strutils::from_charstr) and the pattern lists as
+		// they are saved (WildcardRemoveDuplicatePatterns)
+		check(lm::characterOfField(QStringLiteral(",")) == QLatin1Char(',')
+				&& lm::characterOfField(QStringLiteral("\\t")) == QLatin1Char('\t')
+				&& lm::characterOfField(QStringLiteral("TAB")) == QLatin1Char('\t')
+				&& lm::characterOfField(QStringLiteral("0x3b")) == QLatin1Char(';')
+				&& lm::characterOfField(QString::fromUtf8("\xC2\xA7")) == QChar(0xA7)
+				&& lm::characterOfField(QString()).isNull(),
+			"a field names its character, as it is or by an escape");
+		check(lm::removeDuplicatePatterns(QStringLiteral("*.csv;*.CSV")) == QStringLiteral("*.CSV")
+				&& lm::removeDuplicatePatterns(QStringLiteral("*.csv;*.*")) == QStringLiteral("*.*")
+				&& lm::removeDuplicatePatterns(QStringLiteral("*.csv;*.txt"))
+					== QStringLiteral("*.csv;*.txt"),
+			"a pattern another one of the list takes in goes");
+
+		const QString csv = dir.filePath(QStringLiteral("a.csv"));
+		const QString tsv = dir.filePath(QStringLiteral("b.tsv"));
+		const QString txt = dir.filePath(QStringLiteral("c.txt"));
+		const QString otherTxt = dir.filePath(QStringLiteral("d.txt"));
+		const QString dat = dir.filePath(QStringLiteral("e.dat"));
+		lm::TableProps props = lm::tablePropertiesByFileName(csv);
+		check(props.isTable && props.delimiter == QLatin1Char(',')
+				&& props.quote == QLatin1Char('"') && props.allowNewlinesInQuotes,
+			"WinMerge's defaults: a .csv file is a table, by commas");
+		props = lm::tablePropertiesByFileName(tsv);
+		check(props.isTable && props.delimiter == QLatin1Char('\t'), "a .tsv file, by tabs");
+		check(!lm::tablePropertiesByFileName(txt).isTable
+				&& !lm::tablePropertiesByFileName(dat).isTable,
+			"other files are no tables, the custom group having no patterns");
+
+		lm::TableSettings settings;
+		settings.csvDelimiter = QStringLiteral(";");
+		settings.dsvFilePatterns = QStringLiteral("*.dat;*.psv");
+		settings.dsvDelimiter = QStringLiteral("|");
+		settings.quote = QStringLiteral("'");
+		settings.save();
+		props = lm::tablePropertiesByFileName(csv);
+		check(props.delimiter == QLatin1Char(';') && props.quote == QLatin1Char('\''),
+			"the CSV group's delimiter and the quote of the options");
+		props = lm::tablePropertiesByFileName(dat);
+		check(props.isTable && props.delimiter == QLatin1Char('|'),
+			"the custom group's patterns and delimiter");
+		QList<lm::TableProps> sides = lm::tablePropertiesOfSides({ csv, txt });
+		check(sides.at(1).isTable && sides.at(1).delimiter == QLatin1Char(';'),
+			"one table file is enough: the other side reads by its settings");
+		sides = lm::tablePropertiesOfSides({ csv, dat });
+		check(sides.at(0).delimiter == QLatin1Char(';') && sides.at(1).delimiter == QLatin1Char('|'),
+			"each table file reads by its own group");
+		sides = lm::tablePropertiesOfSides({ txt, otherTxt });
+		check(sides.at(0).isTable && sides.at(0).delimiter == QLatin1Char('|')
+				&& sides.at(1).delimiter == QLatin1Char('|'),
+			"a table asked for of files no pattern takes: the custom group's delimiter");
+
+		// what the comparisons open as
+		write(csv, "id;name\n1;'a;b'\n2;c\n");
+		write(txt, "id;name\n1;'a;b'\n2;d\n");
+		write(otherTxt, "id;name\n1;x\n");
+		{
+			MainWindow window;
+			window.openFileComparison({ csv, txt });
+			settle();
+			auto *table = window.findChild<TableCompareView *>();
+			check(table != nullptr, "a .csv file against a .txt file opens as a table");
+			if (table != nullptr)
+			{
+				// the file's first line is the header, its second the
+				// first row
+				const QAbstractItemModel *model = table->tableForTest(1)->model();
+				printf("  %d columns, the second cell \"%s\"\n", model->columnCount(),
+					qPrintable(model->index(0, 1).data().toString()));
+				check(model->columnCount() == 2
+						&& model->index(0, 1).data().toString() == QStringLiteral("a;b"),
+					"the cells part by the options' delimiter and quote");
+			}
+		}
+		{
+			MainWindow window;
+			window.openFileComparison({ txt, otherTxt });
+			settle();
+			check(window.findChild<TableCompareView *>() == nullptr
+					&& window.findChild<FileCompareView *>() != nullptr,
+				"files no pattern takes compare as text");
+		}
+		{
+			const QString csv2 = dir.filePath(QStringLiteral("f.csv"));
+			const QString csv3 = dir.filePath(QStringLiteral("g.csv"));
+			write(csv2, "id;name\n");
+			write(csv3, "id;name\n");
+			MainWindow window;
+			window.openFileComparison({ csv, csv2, csv3 });
+			settle();
+			check(window.findChild<TableCompareView *>() == nullptr
+					&& window.findChild<FileCompareView *>() != nullptr,
+				"three table files compare as text: the grids have two sides");
+		}
+
+		// the page
+		{
+			OptionsDialog dialog;
+			QWidget *page = dialog.pageForTest(OptionsDialog::TablePage);
+			const QList<QComboBox *> lists = page->findChildren<QComboBox *>();
+			QList<QLineEdit *> fields;
+			for (QLineEdit *field : page->findChildren<QLineEdit *>())
+				if (qobject_cast<QComboBox *>(field->parentWidget()) == nullptr)
+					fields.append(field);
+			const QList<QCheckBox *> boxes = page->findChildren<QCheckBox *>();
+			if (lists.size() != 3 || fields.size() != 3 || boxes.size() != 1)
+			{
+				printf("page: %d lists, %d fields, %d check boxes\n",
+					static_cast<int>(lists.size()), static_cast<int>(fields.size()),
+					static_cast<int>(boxes.size()));
+				return 2;
+			}
+			check(lists.at(2)->currentText() == QStringLiteral("*.dat;*.psv")
+					&& fields.at(0)->text() == QStringLiteral(";")
+					&& fields.at(2)->text() == QStringLiteral("'"),
+				"the page shows the options saved");
+			dialog.selectCategoryForTest(4); // Compare > Table
+			dialog.restoreDefaultsForTest();
+			check(lists.at(0)->currentText() == QStringLiteral("*.csv")
+					&& lists.at(1)->currentText() == QStringLiteral("*.tsv")
+					&& lists.at(2)->currentText().isEmpty()
+					&& fields.at(0)->text() == QStringLiteral(",")
+					&& fields.at(1)->text() == QStringLiteral(";")
+					&& fields.at(2)->text() == QStringLiteral("\"")
+					&& boxes.at(0)->isChecked(),
+				"Defaults: WinMerge's");
+			emit lists.at(0)->activated(0);
+			const bool ticksOff = lists.at(0)->currentText().isEmpty();
+			emit lists.at(0)->activated(0);
+			check(ticksOff && lists.at(0)->currentText() == QStringLiteral("*.csv"),
+				"a default pattern of the drop-down ticks off and on");
+			lists.at(1)->setEditText(QStringLiteral("*.tsv;*.TSV"));
+			boxes.at(0)->setChecked(false);
+			dialog.saveForTest();
+			const lm::TableSettings saved = lm::TableSettings::load();
+			check(saved.tsvFilePatterns == QStringLiteral("*.TSV")
+					&& saved.csvDelimiter == QStringLiteral(",")
+					&& !saved.allowNewlinesInQuotes,
+				"OK saves the page, a pattern another one takes in left out");
 		}
 
 		printf("ok: %d\n", ok);

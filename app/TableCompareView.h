@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "FileOps.h"
+#include "TableFiles.h"
 
 class DisplayFilterBar;
 class FilepathEdit;
@@ -156,6 +157,7 @@ private:
 		bool hadFinalEol = true;
 		bool modified = false;
 		lm::FileStamp stamp;                  // the file as loaded or last saved
+		lm::TableProps props;                 // delimiter and quote, by the Table options
 		QStringList rawLines;                 // file content, one per row
 		std::vector<QStringList> cells;       // parsed per row
 	};
@@ -211,7 +213,6 @@ private:
 	void applyTheme();
 	void setSideModified(int side, bool modified);
 
-	QChar m_delimiter = QChar(',');
 	bool m_firstRowIsHeader = true;
 	QString m_descriptions[2];
 	// WinMerge's path bar over each side, and what it was last given

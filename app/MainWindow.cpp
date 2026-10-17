@@ -38,6 +38,7 @@
 #include "FiltersDialog.h"
 #include "FileCompareView.h"
 #include "TableCompareView.h"
+#include "TableFiles.h"
 #include "ImageCompareView.h"
 #include "HexCompareView.h"
 #include "HexView.h"
@@ -874,21 +875,17 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 		return;
 	}
 
-	// CSV/TSV pairs open as side-by-side grids, like WinMerge's table
-	// compare; "Open as Text" in the table view forces the text path
-	if (!forceText && paths.size() == 2)
+	// a file that the Table options' patterns take makes the pair a table
+	// comparison, side-by-side grids (WinMerge's SetTableProperties: one
+	// table file is enough); "Open as Text" in the table view forces the
+	// text path. The grids have two sides: three files compare as text
+	if (!forceText && paths.size() == 2
+		&& std::any_of(paths.cbegin(), paths.cend(), [](const QString &path) {
+			return lm::tablePropertiesByFileName(path).isTable;
+		}))
 	{
-		const QStringList tableExts = { QStringLiteral("csv"),
-			QStringLiteral("tsv") };
-		const auto isTable = [&tableExts](const QString &path) {
-			return path.isEmpty() || tableExts.contains(QFileInfo(path).suffix().toLower());
-		};
-		if (!std::all_of(paths.cbegin(), paths.cend(), isEmpty)
-			&& isTable(paths.at(0)) && isTable(paths.at(1)))
-		{
-			openTableComparison(paths.at(0), paths.at(1));
-			return;
-		}
+		openTableComparison(paths.at(0), paths.at(1));
+		return;
 	}
 
 	// binary content opens the binary comparison too (LibreMerge's own:
