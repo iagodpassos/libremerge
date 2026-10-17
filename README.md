@@ -128,7 +128,7 @@ If LibreMerge saves you time, you can [buy me a coffee](https://buymeacoffee.com
 
 ## AI-assisted development
 
-This port was built with the assistance of **Claude Fable 5**, an AI model by [Anthropic](https://www.anthropic.com): the engine portability layer, the Qt interface and the release tooling came out of AI-assisted pair-programming sessions. Everything that ships is validated against WinMerge's own engine test suite (369 tests) and an application selftest suite, on macOS and Linux CI.
+This port was built with the assistance of **Claude Fable 5**, an AI model by [Anthropic](https://www.anthropic.com): the engine portability layer, the Qt interface and the release tooling came out of AI-assisted pair-programming sessions. Everything that ships is validated against WinMerge's own engine test suite (357 tests) and an application selftest suite, on macOS and Linux CI.
 
 ## Relationship to WinMerge, license
 
