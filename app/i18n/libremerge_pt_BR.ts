@@ -1450,6 +1450,30 @@ O arquivo pode ser somente leitura.</translation>
         <translation>, %1 ocultos pelos filtros do menu Ver</translation>
     </message>
     <message>
+        <source>Comp&amp;are</source>
+        <translation>Comp&amp;arar</translation>
+    </message>
+    <message>
+        <source>Compare Non-hor&amp;izontally</source>
+        <translation>Comparar Não Hor&amp;izontalmente</translation>
+    </message>
+    <message>
+        <source>First &amp;Left with Second Left</source>
+        <translation>Primeiro à &amp;Esquerda com o Segundo à Esquerda</translation>
+    </message>
+    <message>
+        <source>First &amp;Right with Second Right</source>
+        <translation>Primeiro à &amp;Direita com o Segundo à Direita</translation>
+    </message>
+    <message>
+        <source>&amp;First Left with Second Right</source>
+        <translation>&amp;Primeiro à Esquerda com o Segundo à Direita</translation>
+    </message>
+    <message>
+        <source>&amp;Second Left with First Right</source>
+        <translation>&amp;Segundo à Esquerda com o Primeiro à Direita</translation>
+    </message>
+    <message>
         <source>Copy %1 to %2</source>
         <translation>Copiar %1 para %2</translation>
     </message>

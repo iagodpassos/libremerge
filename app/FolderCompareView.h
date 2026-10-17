@@ -95,6 +95,21 @@ public:
 	int hiddenRowsForTest() const { return m_hiddenRows; }
 	/** Copy one row between sides without the confirmation (for
 	    tests). */
+	/** What a selection of items compares (DirActions' SELECTIONTYPE): by
+	    the sides the items are on, or the named side of each of two. */
+	enum SelectionType
+	{
+		SelectionNormal,
+		SelectionLeft1Left2,
+		SelectionRight1Right2,
+		SelectionLeft1Right2,
+		SelectionLeft2Right1,
+	};
+	/** Select the rows of these names, and only them (for tests). */
+	void selectRowsForTest(const QStringList &names);
+	/** The selection's context menu, as a right click builds it (for
+	    tests). */
+	void buildContextMenuForTest(QMenu *menu) { buildContextMenu(menu); }
 	void copyRowForTest(const QString &name, int sourceSide, int targetSide);
 	/** Delete one row's sides without the confirmation (for tests). */
 	void deleteRowForTest(const QString &name, const QList<int> &sides);
@@ -171,6 +186,21 @@ private:
 	void adjustCategoryCounters(lm::FolderCompareItem::Category from,
 		lm::FolderCompareItem::Category to);
 	void buildContextMenu(QMenu *menu);
+	/** The selected items, in the list's order (CDirView's selection). */
+	QList<QTreeWidgetItem *> selectedResultRows() const;
+	/** CDirView::AreItemsComparable: the selection compares as one. */
+	bool itemsComparable(SelectionType type) const;
+	/** CDirView::AreItemsComparableIndivisually: each selected item
+	    compares by itself. */
+	bool itemsComparableIndividually() const;
+	/** CDirView::OpenSelection: one item compares its sides, two or
+	    three compare with each other. */
+	void openSelection(SelectionType type);
+	/** CDirView::OnMergeCompare: the selection as one, or its items one
+	    by one. */
+	void compareSelection();
+	/** One item's sides compared (CDirView::Open of one item). */
+	void openRow(QTreeWidgetItem *row);
 	int colSize(int side) const { return 3 + side; }
 	int colDate(int side) const { return 3 + m_sides + side; }
 	int colCount() const { return 3 + 2 * m_sides; }

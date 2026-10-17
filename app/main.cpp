@@ -352,6 +352,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestTableEditOpt(QStringLiteral("selftest-table-edit"),
 		QStringLiteral("Edit the cells of a table comparison and copy selected cells, with undo (for testing)"));
 	parser.addOption(selftestTableEditOpt);
+	QCommandLineOption selftestFolderSelectionOpt(QStringLiteral("selftest-folder-selection"),
+		QStringLiteral("Compare two or three selected items of a folder comparison with each other (for testing)"));
+	parser.addOption(selftestFolderSelectionOpt);
 	QCommandLineOption selftestHexOpt(QStringLiteral("selftest-hex"),
 		QStringLiteral("Compare binary files in the hex view and verify it (for testing)"));
 	parser.addOption(selftestHexOpt);
@@ -10887,6 +10890,170 @@ int main(int argc, char *argv[])
 			view.copyCurrentDiff(0);
 			check(view.diffCount() == 5, "table: Copy to Right with the cursor in no difference copies nothing");
 		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestFolderSelectionOpt))
+	{
+		// WinMerge's CDirView::OpenSelection over two or three selected
+		// items (issue #14): files with different names compare with each
+		// other, by the sides they are on or by the sides picked (Compare
+		// Non-horizontally); its Compare otherwise opens each item, and
+		// Enter compares the selection
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).absolutePath());
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto waitFor = [](FolderCompareView *view) {
+			for (int i = 0; i < 400 && view->isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+		};
+		const QString left = dir.filePath(QStringLiteral("left"));
+		const QString right = dir.filePath(QStringLiteral("right"));
+		write(left + QStringLiteral("/b-left.txt"), "left only\n");
+		write(left + QStringLiteral("/c-left.txt"), "left only too\n");
+		write(right + QStringLiteral("/a-right.txt"), "right only\n");
+		write(left + QStringLiteral("/both1.txt"), "same\n");
+		write(right + QStringLiteral("/both1.txt"), "same\n");
+		write(left + QStringLiteral("/both2.txt"), "one\n");
+		write(right + QStringLiteral("/both2.txt"), "two\n");
+		write(left + QStringLiteral("/only-dir/inside.txt"), "x\n");
+
+		FolderCompareView view;
+		QStringList opened;
+		QObject::connect(&view, &FolderCompareView::openFileComparisonRequested,
+			[&opened](const QString &l, const QString &r) {
+				opened.append(QFileInfo(l).dir().dirName() + QLatin1Char('/') + QFileInfo(l).fileName()
+					+ QStringLiteral(" | ") + QFileInfo(r).dir().dirName() + QLatin1Char('/')
+					+ QFileInfo(r).fileName());
+			});
+		view.start(QStringList{ left, right });
+		waitFor(&view);
+		// the menu of the selection, its item of a name triggered
+		const auto trigger = [&view](const char *name) {
+			QMenu menu;
+			view.buildContextMenuForTest(&menu);
+			QAction *action = menu.findChild<QAction *>(QLatin1String(name));
+			if (action == nullptr || !action->isEnabled())
+				return false;
+			action->trigger();
+			return true;
+		};
+		const auto enabled = [&view](const char *name) {
+			QMenu menu;
+			view.buildContextMenuForTest(&menu);
+			QAction *action = menu.findChild<QAction *>(QLatin1String(name));
+			return action != nullptr && action->isEnabled();
+		};
+		const auto present = [&view](const char *name) {
+			QMenu menu;
+			view.buildContextMenuForTest(&menu);
+			return menu.findChild<QAction *>(QLatin1String(name)) != nullptr;
+		};
+
+		view.selectRowsForTest({ QStringLiteral("b-left.txt"), QStringLiteral("a-right.txt") });
+		opened.clear();
+		trigger("compareSelection");
+		printf("  %s\n", qPrintable(opened.join(QStringLiteral("; "))));
+		check(opened == QStringList{ QStringLiteral("left/b-left.txt | right/a-right.txt") },
+			"a file only on the left and one only on the right compare with each other");
+		view.selectRowsForTest({ QStringLiteral("both1.txt"), QStringLiteral("a-right.txt") });
+		opened.clear();
+		trigger("compareSelection");
+		check(opened == QStringList{ QStringLiteral("left/both1.txt | right/a-right.txt") },
+			"one on both sides and one on the right: the left from the first");
+		view.selectRowsForTest({ QStringLiteral("both1.txt"), QStringLiteral("b-left.txt") });
+		opened.clear();
+		trigger("compareSelection");
+		check(opened == QStringList{ QStringLiteral("left/b-left.txt | right/both1.txt") },
+			"one on both sides and one on the left: the left from the left one");
+
+		// two on both sides do not compare with each other: each opens by
+		// itself, and the non-horizontal pairs pick their sides
+		view.selectRowsForTest({ QStringLiteral("both1.txt"), QStringLiteral("both2.txt") });
+		opened.clear();
+		trigger("compareSelection");
+		check(opened == QStringList({ QStringLiteral("left/both1.txt | right/both1.txt"),
+				QStringLiteral("left/both2.txt | right/both2.txt") }),
+			"Compare opens each of two items that do not go together");
+		opened.clear();
+		trigger("compareLeft1Left2");
+		trigger("compareRight1Right2");
+		trigger("compareLeft1Right2");
+		trigger("compareLeft2Right1");
+		printf("  %s\n", qPrintable(opened.join(QStringLiteral("; "))));
+		check(opened == QStringList({ QStringLiteral("left/both1.txt | left/both2.txt"),
+				QStringLiteral("right/both1.txt | right/both2.txt"),
+				QStringLiteral("left/both1.txt | right/both2.txt"),
+				QStringLiteral("left/both2.txt | right/both1.txt") }),
+			"Compare Non-horizontally: the four pairs of sides");
+		view.selectRowsForTest({ QStringLiteral("b-left.txt"), QStringLiteral("c-left.txt") });
+		check(enabled("compareLeft1Left2") && !enabled("compareRight1Right2")
+				&& !enabled("compareLeft1Right2") && enabled("compareSelection"),
+			"two files on the left: First Left with Second Left only");
+
+		// Enter compares the selection, and nothing when it does not go together
+		view.selectRowsForTest({ QStringLiteral("b-left.txt"), QStringLiteral("a-right.txt") });
+		opened.clear();
+		view.activateRowForTest(QStringLiteral("b-left.txt"));
+		check(opened == QStringList{ QStringLiteral("left/b-left.txt | right/a-right.txt") },
+			"Enter compares the two selected items");
+		view.selectRowsForTest({ QStringLiteral("both1.txt"), QStringLiteral("both2.txt") });
+		opened.clear();
+		view.activateRowForTest(QStringLiteral("both1.txt"));
+		check(opened.isEmpty(), "and does nothing when they do not go together");
+
+		// a folder selected: no Compare in a recursive comparison
+		view.selectRowsForTest({ QStringLiteral("only-dir") });
+		check(!present("compareSelection"), "a selected folder leaves Compare out of the menu");
+
+		// three items, one on each side of a three-way comparison
+		const QString l3 = dir.filePath(QStringLiteral("l3"));
+		const QString m3 = dir.filePath(QStringLiteral("m3"));
+		const QString r3 = dir.filePath(QStringLiteral("r3"));
+		write(l3 + QStringLiteral("/l.txt"), "l\n");
+		write(m3 + QStringLiteral("/m.txt"), "m\n");
+		write(r3 + QStringLiteral("/r.txt"), "r\n");
+		FolderCompareView three;
+		QStringList opened3;
+		QObject::connect(&three, &FolderCompareView::openFileComparison3Requested,
+			[&opened3](const QStringList &paths) {
+				QStringList names;
+				for (const QString &path : paths)
+					names.append(QFileInfo(path).dir().dirName() + QLatin1Char('/')
+						+ QFileInfo(path).fileName());
+				opened3.append(names.join(QStringLiteral(" | ")));
+			});
+		three.start(QStringList{ l3, m3, r3 });
+		waitFor(&three);
+		three.selectRowsForTest({ QStringLiteral("r.txt"), QStringLiteral("l.txt"), QStringLiteral("m.txt") });
+		QMenu menu3;
+		three.buildContextMenuForTest(&menu3);
+		QAction *compare3 = menu3.findChild<QAction *>(QStringLiteral("compareSelection"));
+		if (compare3 != nullptr && compare3->isEnabled())
+			compare3->trigger();
+		printf("  %s\n", qPrintable(opened3.join(QStringLiteral("; "))));
+		check(opened3 == QStringList{ QStringLiteral("l3/l.txt | m3/m.txt | r3/r.txt") }
+				&& menu3.findChild<QAction *>(QStringLiteral("compareLeft1Left2")) == nullptr,
+			"three-way: one item of each side compares, each on its side; no non-horizontal pairs");
 
 		printf("ok: %d\n", ok);
 		return ok ? 0 : 1;

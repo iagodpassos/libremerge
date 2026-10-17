@@ -1573,6 +1573,30 @@ El archivo puede ser de solo lectura.</translation>
         <translation>Cancelado: resultados parciales. </translation>
     </message>
     <message>
+        <source>Comp&amp;are</source>
+        <translation>Com&amp;parar</translation>
+    </message>
+    <message>
+        <source>Compare Non-hor&amp;izontally</source>
+        <translation>No comparar hor&amp;izontalmente</translation>
+    </message>
+    <message>
+        <source>First &amp;Left with Second Left</source>
+        <translation>Primer e&amp;lemento izquierdo con segundo elemento izquierdo</translation>
+    </message>
+    <message>
+        <source>First &amp;Right with Second Right</source>
+        <translation>Prime&amp;r elemento derecho con segundo elemento derecho</translation>
+    </message>
+    <message>
+        <source>&amp;First Left with Second Right</source>
+        <translation>&amp;Primer elemento izquierdo con segundo elemento derecho</translation>
+    </message>
+    <message>
+        <source>&amp;Second Left with First Right</source>
+        <translation>&amp;Segundo elemento izquierdo con primer elemento derecho</translation>
+    </message>
+    <message>
         <source>Copy %1 to %2</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Copiar del %1 al %2</translation>

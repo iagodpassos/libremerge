@@ -1757,6 +1757,30 @@ Potser el fitxer és només de lectura?</translation>
         <translation>Cancel·lat: resultats parcials. </translation>
     </message>
     <message>
+        <source>Comp&amp;are</source>
+        <translation>Compa&amp;ra</translation>
+    </message>
+    <message>
+        <source>Compare Non-hor&amp;izontally</source>
+        <translation>Compara no-hor&amp;itzontalment</translation>
+    </message>
+    <message>
+        <source>First &amp;Left with Second Left</source>
+        <translation>El primer element de l&apos;&amp;esquerra amb el segon element de l&apos;esquerra</translation>
+    </message>
+    <message>
+        <source>First &amp;Right with Second Right</source>
+        <translation>El primer element de la &amp;dreta amb el segon element de la dreta</translation>
+    </message>
+    <message>
+        <source>&amp;First Left with Second Right</source>
+        <translation>El &amp;primer element de l&apos;esquerra amb el segon element de la dreta</translation>
+    </message>
+    <message>
+        <source>&amp;Second Left with First Right</source>
+        <translation>El &amp;segon element de l&apos;esquerra amb el primer element de la dreta</translation>
+    </message>
+    <message>
         <source>Copy %1 to %2</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Copia de %1 a %2</translation>

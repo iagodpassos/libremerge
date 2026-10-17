@@ -1572,6 +1572,30 @@ Patches sind nicht betroffen.</translation>
         <translation>Abgebrochen – Teilergebnisse. </translation>
     </message>
     <message>
+        <source>Comp&amp;are</source>
+        <translation>Ver&amp;gleichen</translation>
+    </message>
+    <message>
+        <source>Compare Non-hor&amp;izontally</source>
+        <translation>Nicht hor&amp;izontal vergleichen</translation>
+    </message>
+    <message>
+        <source>First &amp;Left with Second Left</source>
+        <translation>Erstes Objekt &amp;links mit zweitem Objekt links</translation>
+    </message>
+    <message>
+        <source>First &amp;Right with Second Right</source>
+        <translation>Erstes Objekt &amp;rechts mit zweitem Objekt rechts</translation>
+    </message>
+    <message>
+        <source>&amp;First Left with Second Right</source>
+        <translation>Erstes Objekt links mit zweitem Objekt rechts</translation>
+    </message>
+    <message>
+        <source>&amp;Second Left with First Right</source>
+        <translation>Zweites Objekt links mit erstem Objekt rechts</translation>
+    </message>
+    <message>
         <source>Copy %1 to %2</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Kopieren: %1 nach %2</translation>

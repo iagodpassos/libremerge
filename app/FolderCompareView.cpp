@@ -662,6 +662,41 @@ void FolderCompareView::adjustCategoryCounters(
     least one selected row. */
 void FolderCompareView::buildContextMenu(QMenu *menu)
 {
+	// upstream's IDR_POPUP_DIRVIEW begins with its comparisons: Compare,
+	// left out when a folder is selected in a recursive comparison, as
+	// this one always is
+	bool folderSelected = false;
+	for (QTreeWidgetItem *row : m_tree->selectedItems())
+		folderSelected = folderSelected || !row->data(0, RoleIsFile).toBool();
+	if (!folderSelected)
+	{
+		QAction *compare = menu->addAction(tr("Comp&are"));
+		compare->setObjectName(QStringLiteral("compareSelection"));
+		compare->setEnabled(itemsComparable(SelectionNormal) || itemsComparableIndividually());
+		connect(compare, &QAction::triggered, this, [this]() { compareSelection(); });
+	}
+	// and two items' sides of choice; three-way, upstream's "Right" of
+	// these items would be the middle folder, and they are left out
+	if (m_sides == 2)
+	{
+		QMenu *nonHorizontally = menu->addMenu(tr("Compare Non-hor&izontally"));
+		const struct { const char *text; const char *name; SelectionType type; } kinds[] = {
+			{ QT_TR_NOOP("First &Left with Second Left"), "compareLeft1Left2", SelectionLeft1Left2 },
+			{ QT_TR_NOOP("First &Right with Second Right"), "compareRight1Right2", SelectionRight1Right2 },
+			{ QT_TR_NOOP("&First Left with Second Right"), "compareLeft1Right2", SelectionLeft1Right2 },
+			{ QT_TR_NOOP("&Second Left with First Right"), "compareLeft2Right1", SelectionLeft2Right1 },
+		};
+		for (const auto &kind : kinds)
+		{
+			QAction *action = nonHorizontally->addAction(tr(kind.text));
+			action->setObjectName(QLatin1String(kind.name));
+			action->setEnabled(itemsComparable(kind.type));
+			const SelectionType type = kind.type;
+			connect(action, &QAction::triggered, this, [this, type]() { openSelection(type); });
+		}
+	}
+	menu->addSeparator();
+
 	if (m_sides == 2)
 	{
 		menu->addAction(m_actCopyRight);
@@ -1456,15 +1491,203 @@ void FolderCompareView::deleteRows(const QList<QTreeWidgetItem *> &rows,
 void FolderCompareView::itemActivated(QTreeWidgetItem *item, int column)
 {
 	Q_UNUSED(column);
-	if (item == nullptr || !item->data(0, RoleIsFile).toBool())
+	if (item == nullptr)
+		return;
+	// CDirView::OnChar: Enter opens the selection, two or three items
+	// compared with each other (nothing when they do not go together)
+	const QList<QTreeWidgetItem *> rows = selectedResultRows();
+	if (rows.size() >= 2 && rows.contains(item))
+	{
+		if (itemsComparable(SelectionNormal))
+			openSelection(SelectionNormal);
+		return;
+	}
+	openRow(item);
+}
+
+void FolderCompareView::openRow(QTreeWidgetItem *row)
+{
+	if (row == nullptr || !row->data(0, RoleIsFile).toBool())
 		return;
 	// upstream's CDirView::Open: every side opens, one the item misses as
 	// an empty untitled pane (its path left empty)
 	QStringList paths;
 	for (int i = 0; i < m_sides; ++i)
-		paths.append(sidePath(item, i));
+		paths.append(sidePath(row, i));
 	if (m_sides == 3)
 		emit openFileComparison3Requested(paths);
 	else
 		emit openFileComparisonRequested(paths.at(0), paths.at(1));
+}
+
+QList<QTreeWidgetItem *> FolderCompareView::selectedResultRows() const
+{
+	QList<QTreeWidgetItem *> rows;
+	for (QTreeWidgetItemIterator it(m_tree, QTreeWidgetItemIterator::Selected);
+		*it != nullptr; ++it)
+		if ((*it)->data(0, RoleCategory).isValid()) // not a node made for the tree
+			rows.append(*it);
+	return rows;
+}
+
+bool FolderCompareView::itemsComparable(SelectionType type) const
+{
+	const QList<QTreeWidgetItem *> rows = selectedResultRows();
+	if (rows.isEmpty() || rows.size() > 3)
+		return false;
+	// the comparison is recursive: its folders do not compare as items,
+	// as upstream's menu leaves Compare out when one is selected
+	for (QTreeWidgetItem *row : rows)
+		if (!row->data(0, RoleIsFile).toBool())
+			return false;
+	const auto exists = [this](QTreeWidgetItem *row, int side) {
+		return !sidePath(row, side).isEmpty();
+	};
+	// upstream's paths compare without case
+	bool sameFolder = true;
+	for (int side = 1; side < m_sides; ++side)
+		sameFolder = sameFolder
+			&& QString::compare(m_roots[0], m_roots[side], Qt::CaseInsensitive) == 0;
+	if (rows.size() == 1)
+		return type == SelectionNormal;
+	if (rows.size() == 2)
+	{
+		// AreItemsOpenable for two items, of a two-way comparison
+		if (m_sides != 2)
+			return false;
+		const bool left1 = exists(rows[0], 0), right1 = exists(rows[0], 1);
+		const bool left2 = exists(rows[1], 0), right2 = exists(rows[1], 1);
+		switch (type)
+		{
+		case SelectionNormal:
+		{
+			// on different sides, or one on a side and one on both
+			const bool firstOnly1 = left1 && !right1, secondOnly1 = !left1 && right1;
+			const bool firstOnly2 = left2 && !right2, secondOnly2 = !left2 && right2;
+			const bool both1 = left1 && right1, both2 = left2 && right2;
+			if ((firstOnly1 && (secondOnly2 || both2)) || (secondOnly1 && (firstOnly2 || both2))
+				|| (both1 && (firstOnly2 || secondOnly2)))
+				return true;
+			break;
+		}
+		case SelectionLeft1Left2:
+			if (left1 && left2)
+				return true;
+			break;
+		case SelectionRight1Right2:
+			if (right1 && right2)
+				return true;
+			break;
+		case SelectionLeft1Right2:
+			if (left1 && right2)
+				return true;
+			break;
+		case SelectionLeft2Right1:
+			if (right1 && left2)
+				return true;
+			break;
+		}
+		return sameFolder;
+	}
+	// three items, one on each side, of a three-way comparison
+	if (m_sides != 3 || type != SelectionNormal)
+		return false;
+	bool taken[3] = {};
+	for (QTreeWidgetItem *row : rows)
+	{
+		int only = -1;
+		for (int side = 0; side < 3; ++side)
+			if (exists(row, side))
+				only = only == -1 ? side : -2;
+		if (only < 0 || taken[only])
+			return sameFolder;
+		taken[only] = true;
+	}
+	return true;
+}
+
+bool FolderCompareView::itemsComparableIndividually() const
+{
+	const QList<QTreeWidgetItem *> rows = selectedResultRows();
+	if (rows.isEmpty())
+		return false;
+	for (QTreeWidgetItem *row : rows)
+		if (!row->data(0, RoleIsFile).toBool())
+			return false;
+	return true;
+}
+
+void FolderCompareView::openSelection(SelectionType type)
+{
+	if (!itemsComparable(type))
+		return;
+	const QList<QTreeWidgetItem *> rows = selectedResultRows();
+	if (rows.size() == 1)
+	{
+		openRow(rows.first());
+		return;
+	}
+	const auto exists = [this](QTreeWidgetItem *row, int side) {
+		return !sidePath(row, side).isEmpty();
+	};
+	if (rows.size() == 2)
+	{
+		// GetOpenTwoItems: the first item on the left, a side of each
+		QTreeWidgetItem *first = rows[0];
+		QTreeWidgetItem *second = rows[1];
+		int panes[2] = { 0, 1 };
+		switch (type)
+		{
+		case SelectionNormal:
+			if ((!exists(first, 0) && exists(first, 1))
+				|| (exists(first, 0) && exists(first, 1) && exists(second, 0)
+					&& !exists(second, 1)))
+				std::swap(first, second);
+			break;
+		case SelectionLeft1Left2:
+			panes[1] = 0;
+			break;
+		case SelectionRight1Right2:
+			panes[0] = 1;
+			break;
+		case SelectionLeft1Right2:
+			break;
+		case SelectionLeft2Right1:
+			std::swap(first, second);
+			break;
+		}
+		emit openFileComparisonRequested(intendedSidePath(first, panes[0]),
+			intendedSidePath(second, panes[1]));
+		return;
+	}
+	// GetOpenThreeItems: each item on the side it is on
+	QTreeWidgetItem *bySide[3] = {};
+	for (QTreeWidgetItem *row : rows)
+		for (int side = 0; side < 3; ++side)
+			if (exists(row, side) && bySide[side] == nullptr)
+			{
+				bySide[side] = row;
+				break;
+			}
+	QStringList paths;
+	for (int side = 0; side < 3; ++side)
+		paths.append(intendedSidePath(bySide[side] != nullptr ? bySide[side] : rows[side], side));
+	emit openFileComparison3Requested(paths);
+}
+
+void FolderCompareView::compareSelection()
+{
+	if (itemsComparable(SelectionNormal))
+		openSelection(SelectionNormal);
+	else if (itemsComparableIndividually())
+		for (QTreeWidgetItem *row : selectedResultRows())
+			openRow(row);
+}
+
+void FolderCompareView::selectRowsForTest(const QStringList &names)
+{
+	m_tree->clearSelection();
+	for (const QString &name : names)
+		if (QTreeWidgetItem *row = findRowByName(name))
+			row->setSelected(true);
 }
