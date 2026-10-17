@@ -4501,6 +4501,11 @@ von2	zu2
         <translation>Als Text öffnen</translation>
     </message>
     <message>
+        <source>a table comparison takes two or three files</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>ein Tabellenvergleich nimmt zwei oder drei Dateien</translation>
+    </message>
+    <message>
         <source>cannot open %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>%1 kann nicht geöffnet werden</translation>
@@ -4606,6 +4611,10 @@ Bitte löschen Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so 
     <message>
         <source>Untitled Right</source>
         <translation>Unbenannt rechts</translation>
+    </message>
+    <message>
+        <source>Untitled Middle</source>
+        <translation>Unbenannt Mitte</translation>
     </message>
 </context>
 <context>

@@ -23,8 +23,12 @@ public:
 	void openFileComparison(const QString &leftPath, const QString &rightPath);
 	void openFileComparison(const QStringList &paths,
 		const QList<bool> &readOnly = {}, bool forceText = false);
-	/** CSV/TSV side-by-side grid comparison. */
-	void openTableComparison(const QString &leftPath, const QString &rightPath);
+	/** CSV/TSV side-by-side grid comparison, 2- or 3-way. */
+	void openTableComparison(const QStringList &paths);
+	void openTableComparison(const QString &leftPath, const QString &rightPath)
+	{
+		openTableComparison(QStringList{ leftPath, rightPath });
+	}
 	/** Image comparison, 2- or 3-way (WinMerge's image compare). */
 	void openImageComparison(const QStringList &paths,
 		const QList<bool> &readOnly = {});

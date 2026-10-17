@@ -346,6 +346,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestImageOptionsOpt(QStringLiteral("selftest-image-options"),
 		QStringLiteral("Verify the Compare > Image options and the files they open as images (for testing)"));
 	parser.addOption(selftestImageOptionsOpt);
+	QCommandLineOption selftestTable3WayOpt(QStringLiteral("selftest-table-3way"),
+		QStringLiteral("Compare three tables and copy, undo, swap and save in them (for testing)"));
+	parser.addOption(selftestTable3WayOpt);
 	QCommandLineOption selftestHexOpt(QStringLiteral("selftest-hex"),
 		QStringLiteral("Compare binary files in the hex view and verify it (for testing)"));
 	parser.addOption(selftestHexOpt);
@@ -10886,6 +10889,113 @@ int main(int argc, char *argv[])
 		return ok ? 0 : 1;
 	}
 
+	if (parser.isSet(selftestTable3WayOpt))
+	{
+		// three tables in three grids, as WinMerge compares three texts in
+		// its table mode: the rows aligned over the three, the differences
+		// of the one side that differs, the cells that differ on each, and
+		// the copies between any two sides with undo, the swap and the save
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+		};
+		const QString left = dir.filePath(QStringLiteral("left.csv"));
+		const QString middle = dir.filePath(QStringLiteral("middle.csv"));
+		const QString right = dir.filePath(QStringLiteral("right.csv"));
+		// banana changed in the middle only, cherry in the right only, and
+		// a row the right one alone has at the end
+		const QByteArray base = "id,name,qty\n1,apple,10\n2,banana,20\n3,cherry,30\n4,date,40\n";
+		write(left, base);
+		write(middle, "id,name,qty\n1,apple,10\n2,banana,21\n3,cherry,30\n4,date,40\n");
+		write(right, "id,name,qty\n1,apple,10\n2,banana,20\n3,cherry,31\n4,date,40\n5,elder,50\n");
+
+		TableCompareView view;
+		QString error;
+		if (!view.compare(QStringList{ left, middle, right }, &error))
+		{
+			printf("compare failed: %s\n", qPrintable(error));
+			return 2;
+		}
+		int textDiffs = -1;
+		{
+			FileCompareView text;
+			if (text.compare(QStringList{ left, middle, right }, &error))
+				textDiffs = text.diffCount();
+		}
+		view.resize(1200, 600);
+		view.show();
+		QCoreApplication::processEvents();
+		printf("  %d grids, %d difference(s), \"%s\"\n", view.paneCount(), view.diffCount(),
+			qPrintable(view.tabTitle()));
+		// the engine's three-way diff takes the right's two changes as one
+		check(view.paneCount() == 3 && view.diffCount() == 2 && textDiffs == 2
+				&& view.tabTitle() == QString::fromUtf8(
+					"left.csv \xE2\x86\x94 middle.csv \xE2\x86\x94 right.csv"),
+			"three tables, the differences the text comparison finds, the three names");
+		const QAbstractItemModel *leftModel = view.tableForTest(0)->model();
+		check(leftModel->rowCount() == 5 && view.tableForTest(2)->model()->rowCount() == 5
+				&& leftModel->index(4, 0).data().isNull()
+				&& view.tableForTest(2)->model()->index(4, 1).data().toString()
+					== QStringLiteral("elder"),
+			"the rows line up: the left and the middle have a filler where the right has its own");
+		check(view.cellDiffersForTest(1, 1, 2) && view.cellDiffersForTest(0, 1, 2)
+				&& view.cellDiffersForTest(2, 1, 2) && !view.cellDiffersForTest(1, 1, 1)
+				&& view.cellDiffersForTest(2, 2, 2) && !view.cellDiffersForTest(0, 2, 1),
+			"the cells that differ are marked on every side, the others are not");
+
+		// the middle's banana to the left, then to the right
+		view.gotoFirstDiff();
+		view.copyCurrentDiff(1, 0);
+		check(view.diffCount() == 2 && view.isModified(),
+			"Copy from the middle to the left: the right one still differs");
+		view.gotoFirstDiff();
+		view.copyCurrentDiff(1, 2);
+		check(view.diffCount() == 1, "and to the right: the three agree on banana");
+		view.undo();
+		check(view.diffCount() == 2, "Undo takes the right one's copy back");
+		view.redo();
+		check(view.diffCount() == 1, "and Redo makes it again");
+		check(view.saveModified(&error) && read(left).contains("2,banana,21")
+				&& read(right).contains("2,banana,21") && read(middle).contains("2,banana,21"),
+			"Save writes the left and the right files");
+
+		// Swap Panes trades the first side and the last
+		view.swapSides();
+		check(view.paths() == QStringList({ right, middle, left }),
+			"Swap Panes trades the left and the right tables");
+
+		// an untitled middle, and back to two tables in the same window
+		if (!view.compare(QStringList{ left, QString(), right }, &error))
+			return 2;
+		check(view.headerForTest(1)->originalText() == TableCompareView::tr("Untitled Middle"),
+			"a side without a file in the middle is the untitled middle one");
+		if (!view.compare(QStringList{ left, right }, &error))
+			return 2;
+		check(view.paneCount() == 2 && !view.tableForTest(2)->isVisible()
+				&& view.tabTitle() == QString::fromUtf8("left.csv \xE2\x86\x94 right.csv"),
+			"two tables again: the third grid goes");
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
 	if (parser.isSet(selftestImageOptionsOpt))
 	{
 		// WinMerge's Options > Compare > Image (PropCompareImage) and what
@@ -11105,9 +11215,9 @@ int main(int argc, char *argv[])
 			MainWindow window;
 			window.openFileComparison({ csv, csv2, csv3 });
 			settle();
-			check(window.findChild<TableCompareView *>() == nullptr
-					&& window.findChild<FileCompareView *>() != nullptr,
-				"three table files compare as text: the grids have two sides");
+			auto *table = window.findChild<TableCompareView *>();
+			check(table != nullptr && table->paneCount() == 3,
+				"three table files open in three grids, as three texts do upstream");
 		}
 
 		// the page

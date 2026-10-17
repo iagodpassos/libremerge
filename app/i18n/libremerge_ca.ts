@@ -4792,6 +4792,11 @@ de2	a2
         <translation>Obre com a text</translation>
     </message>
     <message>
+        <source>a table comparison takes two or three files</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>una comparació de taules pren dos o tres fitxers</translation>
+    </message>
+    <message>
         <source>cannot open %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>no es pot obrir %1</translation>
@@ -4901,6 +4906,10 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
     <message>
         <source>Untitled Right</source>
         <translation>Fitxer dret sense títol</translation>
+    </message>
+    <message>
+        <source>Untitled Middle</source>
+        <translation>Fitxer del mig sense títol</translation>
     </message>
 </context>
 <context>

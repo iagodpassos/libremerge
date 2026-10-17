@@ -22,13 +22,14 @@ class QVBoxLayout;
 class TableSideModel;
 
 /**
- * Two-way CSV/TSV comparison as side-by-side grids (WinMerge's table
- * compare): the same line diff engine drives the alignment, rows in a
- * difference are colored, and the individual cells that differ are
+ * Two- or three-way CSV/TSV comparison as side-by-side grids (WinMerge's
+ * table compare): the same line diff engine drives the alignment, rows in
+ * a difference are colored, and the individual cells that differ are
  * emphasized. Blocks can be copied between sides and saved back with
  * the original encoding and line endings. WinMerge's table is its text
  * window in another dress, so the display filter bar is here as well,
- * with rows for lines and the cells of a row for a filter's columns.
+ * with rows for lines and the cells of a row for a filter's columns, and
+ * three files compare in three grids, as three texts do there.
  */
 class TableCompareView : public QWidget
 {
@@ -37,10 +38,12 @@ public:
 	explicit TableCompareView(QWidget *parent = nullptr);
 	~TableCompareView() override;
 
-	/** Load both files and compare them; an empty path is an untitled,
-	    empty side. */
+	/** Load the two or three files and compare them; an empty path is an
+	    untitled, empty side. */
+	bool compare(const QStringList &paths, QString *error);
 	bool compare(const QString &leftPath, const QString &rightPath,
-		QString *error);
+		QString *error) { return compare(QStringList{ leftPath, rightPath }, error); }
+	int paneCount() const { return m_paneCount; }
 
 	bool isModified() const;
 	int diffCount() const { return m_diffCount; }
@@ -73,8 +76,14 @@ public:
 	void gotoPrevDiff();
 	void gotoLastDiff();
 	void selectDiffAtCursor();
-	void copyCurrentDiff(int sourceSide);
-	void copyAllFrom(int sourceSide);
+	/** Copy the current difference from one side to another: the other
+	    side of a two-way comparison when none is named. */
+	void copyCurrentDiff(int sourceSide, int targetSide = -1);
+	void copyAllFrom(int sourceSide, int targetSide = -1);
+	/** WinMerge's ID_L2R and ID_R2L: relative to the active grid (its
+	    MenuIDtoXY), so the middle one of three pushes into either side. */
+	void copyToRight();
+	void copyToLeft();
 	/** The Copy All commands: "Copy all differences to other file?"
 	    first, as upstream's table view (its text view) asks. */
 	void copyAllToRight();
@@ -124,6 +133,8 @@ public:
 	/** The lines of the rows on show, the header's row left out, an empty
 	    one for a row the side does not have (for tests). */
 	QStringList shownRowsForTest(int side) const;
+	/** A cell of a grid's row is one of those that differ (for tests). */
+	bool cellDiffersForTest(int side, int modelRow, int column) const;
 
 signals:
 	/** A recompare asked for by the user is about to run: WinMerge's
@@ -135,14 +146,15 @@ signals:
 	void fileSaved(const QStringList &paths, int significantDiffs);
 	void modifiedChanged(bool modified);
 	void pathsChanged();
-	void openAsTextRequested(const QString &leftPath, const QString &rightPath);
+	void openAsTextRequested(const QStringList &paths);
 
 private:
 	struct Block
 	{
-		int begin[2];
-		int end[2];   // inclusive, real rows; end < begin = empty side
+		int begin[3];
+		int end[3];   // inclusive, real rows; end < begin = empty side
 		bool trivial;
+		int op = 0;   // the engine's OP_* (which side of three differs)
 		int viewBegin = 0;
 		int viewEnd = -1;
 	};
@@ -217,16 +229,20 @@ private:
 	void setSideModified(int side, bool modified);
 
 	bool m_firstRowIsHeader = true;
-	QString m_descriptions[2];
+	int m_paneCount = 2;
+	QString m_descriptions[3];
+	// a side's column: its path bar over its grid, hidden for a third side
+	// a two-way comparison has not
+	QWidget *m_columns[3] = {};
 	// WinMerge's path bar over each side, and what it was last given
-	FilepathEdit *m_headers[2] = {};
-	QString m_headerTexts[2];
+	FilepathEdit *m_headers[3] = {};
+	QString m_headerTexts[3];
 	int m_activeSide = 0;
 	std::function<bool()> m_savePrompt;
-	Side m_sides[2];
+	Side m_sides[3];
 	std::vector<Block> m_blocks;
 	// view row -> real row per side (-1 = ghost)
-	QList<int> m_viewToReal[2];
+	QList<int> m_viewToReal[3];
 	// the display filter: the view rows it hides (empty when none), and
 	// the rows the grids show, in order, as view rows
 	std::unique_ptr<LineFilterHelper> m_displayFilter;
@@ -235,9 +251,9 @@ private:
 	DisplayFilterBar *m_filterBar = nullptr;
 	QVBoxLayout *m_layout = nullptr;
 	// "row,column" pairs whose cells differ between the sides
-	QSet<quint64> m_cellDiffs[2];
-	QTableView *m_tables[2];
-	TableSideModel *m_models[2];
+	QSet<quint64> m_cellDiffs[3];
+	QTableView *m_tables[3];
+	TableSideModel *m_models[3];
 	QLabel *m_status;
 	QAction *m_actSave = nullptr;
 	QAction *m_actHeader = nullptr;
@@ -245,7 +261,7 @@ private:
 	QAction *m_actRedo = nullptr;
 	QList<UndoEntry> m_undoStack;
 	QList<UndoEntry> m_redoStack;
-	int m_saveSerial[2] = { 0, 0 };
+	int m_saveSerial[3] = { 0, 0, 0 };
 	int m_diffCount = 0;
 	int m_current = -1;
 	bool m_syncing = false;

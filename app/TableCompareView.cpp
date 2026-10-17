@@ -224,7 +224,8 @@ public:
 		: m_view(view)
 	{
 		const int rows = static_cast<int>(view->m_viewToReal[0].size());
-		for (int side = 0; side < 2; ++side)
+		m_sides = view->m_paneCount;
+		for (int side = 0; side < m_sides; ++side)
 		{
 			m_flags[side].assign(rows, 0);
 			m_realIndex[side].assign(rows, 0);
@@ -242,15 +243,25 @@ public:
 		}
 		// the difference flags, as PrimeTextBuffers sets them
 		for (const Block &block : view->m_blocks)
-			for (int side = 0; side < 2; ++side)
+			for (int side = 0; side < m_sides; ++side)
+			{
+				unsigned threeWay = 0;
+				if (block.op == OP_1STONLY)
+					threeWay = LF_DIFF_1STONLY;
+				else if (block.op == OP_2NDONLY)
+					threeWay = LF_DIFF_2NDONLY;
+				else if (block.op == OP_3RDONLY)
+					threeWay = LF_DIFF_3RDONLY;
 				for (int row = block.viewBegin; row <= block.viewEnd && row < rows; ++row)
 				{
 					unsigned &flags = m_flags[side][row];
+					flags |= threeWay;
 					if (block.trivial)
 						flags |= LF_TRIVIAL;
 					else if (!(flags & LF_GHOST))
 						flags |= LF_DIFF;
 				}
+			}
 	}
 
 	int GetLineCount() const override
@@ -296,7 +307,7 @@ public:
 private:
 	bool valid(int pane, int lineIndex) const
 	{
-		return pane >= 0 && pane < 2 && lineIndex >= 0
+		return pane >= 0 && pane < m_sides && lineIndex >= 0
 			&& lineIndex < static_cast<int>(m_flags[pane].size());
 	}
 	/** The row's line as the file has it, empty for a ghost row. */
@@ -310,9 +321,10 @@ private:
 	}
 
 	const TableCompareView *m_view;
-	std::vector<unsigned> m_flags[2];
-	std::vector<int> m_realIndex[2];
-	int m_realCount[2] = {};
+	int m_sides = 2;
+	std::vector<unsigned> m_flags[3];
+	std::vector<int> m_realIndex[3];
+	int m_realCount[3] = {};
 };
 
 /** Read-only model over one side's aligned rows. */
@@ -470,9 +482,9 @@ TableCompareView::TableCompareView(QWidget *parent)
 		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x98"), [this]() { gotoLastDiff(); });
 	toolbar->addSeparator();
 	addToolAction(lm::Icon::CopyRight, tr("Copy to Right"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyCurrentDiff(0); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyToRight(); });
 	addToolAction(lm::Icon::CopyLeft, tr("Copy to Left"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x90"), [this]() { copyCurrentDiff(1); });
+		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x90"), [this]() { copyToLeft(); });
 	addToolAction(lm::Icon::CopyAllRight, tr("Copy All to Right"), QString(),
 		[this]() { copyAllToRight(); });
 	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"), QString(),
@@ -503,18 +515,19 @@ TableCompareView::TableCompareView(QWidget *parent)
 		rebuildModel();
 	});
 	addToolAction(lm::Icon::Find, tr("Open as Text"), QString(), [this]() {
-		emit openAsTextRequested(m_sides[0].path, m_sides[1].path);
+		emit openAsTextRequested(paths());
 	});
 	layout->addWidget(toolbar);
 
 	auto *tables = new QHBoxLayout;
 	tables->setContentsMargins(0, 0, 0, 0);
 	tables->setSpacing(1);
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < 3; ++i)
 	{
 		// upstream's path bar (CEditorFilePathBar) over each side: the
 		// table is its text window in another dress
-		auto *column = new QVBoxLayout;
+		m_columns[i] = new QWidget(this);
+		auto *column = new QVBoxLayout(m_columns[i]);
 		column->setContentsMargins(0, 0, 0, 0);
 		column->setSpacing(0);
 		m_headers[i] = new FilepathEdit(this);
@@ -547,13 +560,16 @@ TableCompareView::TableCompareView(QWidget *parent)
 		m_tables[i]->verticalHeader()->setDefaultSectionSize(22);
 		m_tables[i]->setAlternatingRowColors(false);
 		column->addWidget(m_tables[i], 1);
-		tables->addLayout(column, 1);
+		tables->addWidget(m_columns[i], 1);
+		// the other grids follow one that scrolls
 		connect(m_tables[i]->verticalScrollBar(), &QScrollBar::valueChanged,
 			this, [this, i](int value) {
 				if (m_syncing)
 					return;
 				m_syncing = true;
-				m_tables[1 - i]->verticalScrollBar()->setValue(value);
+				for (int other = 0; other < m_paneCount; ++other)
+					if (other != i)
+						m_tables[other]->verticalScrollBar()->setValue(value);
 				m_syncing = false;
 			});
 		connect(m_tables[i]->horizontalScrollBar(), &QScrollBar::valueChanged,
@@ -561,7 +577,9 @@ TableCompareView::TableCompareView(QWidget *parent)
 				if (m_syncing)
 					return;
 				m_syncing = true;
-				m_tables[1 - i]->horizontalScrollBar()->setValue(value);
+				for (int other = 0; other < m_paneCount; ++other)
+					if (other != i)
+						m_tables[other]->horizontalScrollBar()->setValue(value);
 				m_syncing = false;
 			});
 		connect(m_tables[i], &QTableView::doubleClicked,
@@ -585,9 +603,10 @@ TableCompareView::TableCompareView(QWidget *parent)
 			});
 	}
 	layout->addLayout(tables, 1);
+	m_columns[2]->hide(); // until three files are compared
 	// the bar of the grid that has the focus highlighted
 	connect(qApp, &QApplication::focusChanged, this, [this](QWidget *, QWidget *now) {
-		for (int i = 0; i < 2; ++i)
+		for (int i = 0; i < m_paneCount; ++i)
 			if (now == m_tables[i])
 				setActiveSide(i);
 	});
@@ -616,30 +635,46 @@ void TableCompareView::applyTheme()
 		pal.setColor(QPalette::Base, Qt::white);
 		pal.setColor(QPalette::Text, Qt::black);
 	}
-	for (int i = 0; i < 2; ++i)
-		m_tables[i]->setPalette(pal);
+	for (QTableView *table : m_tables)
+		table->setPalette(pal);
 	m_status->setStyleSheet(dark
 		? QStringLiteral("QLabel { background: #2c2c2c; color: #b8b8b8; }")
 		: QStringLiteral("QLabel { background: #ececec; color: #303030; }"));
 	lm::applyToolbarTheme(this);
-	m_models[0]->refresh(m_models[0]->columnCount());
-	m_models[1]->refresh(m_models[1]->columnCount());
+	for (TableSideModel *model : m_models)
+		model->refresh(model->columnCount());
 	fitRowHeights();
 }
 
-bool TableCompareView::compare(const QString &leftPath,
-	const QString &rightPath, QString *error)
+bool TableCompareView::compare(const QStringList &paths, QString *error)
 {
+	if (paths.size() != 2 && paths.size() != 3)
+	{
+		if (error != nullptr)
+			*error = tr("a table comparison takes two or three files");
+		return false;
+	}
 	// each side by the Table options' group its file is in (WinMerge's
 	// SetTableProperties), as the files are opened or opened again
-	const QList<lm::TableProps> props =
-		lm::tablePropertiesOfSides({ leftPath, rightPath });
-	if (!loadSide(0, leftPath, props.at(0), error)
-		|| !loadSide(1, rightPath, props.at(1), error))
-		return false;
+	const QList<lm::TableProps> props = lm::tablePropertiesOfSides(paths);
+	for (int side = 0; side < paths.size(); ++side)
+		if (!loadSide(side, paths.at(side), props.at(side), error))
+			return false;
+	// a third side only for three files (the grid's column with it)
+	if (m_paneCount != paths.size())
+	{
+		m_paneCount = static_cast<int>(paths.size());
+		m_columns[2]->setVisible(m_paneCount == 3);
+		if (m_paneCount == 2)
+		{
+			m_sides[2] = Side();
+			m_descriptions[2].clear();
+		}
+		m_activeSide = qMin(m_activeSide, m_paneCount - 1);
+	}
 	clearHistory();
 
-	for (int side = 0; side < 2; ++side)
+	for (int side = 0; side < m_paneCount; ++side)
 	{
 		m_sides[side].props = props.at(side);
 		m_sides[side].cells.clear();
@@ -732,10 +767,10 @@ bool TableCompareView::loadSide(int side, const QString &path,
 
 bool TableCompareView::runDiff(QString *error)
 {
-	QTemporaryFile temp[2];
+	QTemporaryFile temp[3];
 	PathContext paths;
-	paths.SetSize(2);
-	for (int i = 0; i < 2; ++i)
+	paths.SetSize(m_paneCount);
+	for (int i = 0; i < m_paneCount; ++i)
 	{
 		if (!temp[i].open())
 		{
@@ -792,12 +827,13 @@ bool TableCompareView::runDiff(QString *error)
 		DIFFRANGE dr;
 		diffList.GetDiff(i, dr);
 		Block block{};
-		for (int side = 0; side < 2; ++side)
+		for (int side = 0; side < m_paneCount; ++side)
 		{
 			block.begin[side] = dr.begin[side];
 			block.end[side] = dr.end[side];
 		}
 		block.trivial = (dr.op == OP_TRIVIAL);
+		block.op = dr.op;
 		if (!block.trivial)
 			++m_diffCount;
 		m_blocks.push_back(block);
@@ -819,25 +855,25 @@ QList<int> TableCompareView::diffRowsForTest() const
 void TableCompareView::rebuildModel()
 {
 	// ghost-aligned view rows, same layout rules as the text panes
-	for (int side = 0; side < 2; ++side)
-		m_viewToReal[side].clear();
-	int realPos[2] = {};
+	for (QList<int> &rows : m_viewToReal)
+		rows.clear();
+	int realPos[3] = {};
 	int viewPos = 0;
 	for (Block &block : m_blocks)
 	{
 		const int commonLen = qMax(0, block.begin[0] - realPos[0]);
-		for (int side = 0; side < 2; ++side)
+		for (int side = 0; side < m_paneCount; ++side)
 			for (int k = 0; k < commonLen
 				&& realPos[side] < m_sides[side].rawLines.size(); ++k)
 				m_viewToReal[side].append(realPos[side]++);
 		viewPos += commonLen;
 
 		int maxLen = 0;
-		for (int side = 0; side < 2; ++side)
+		for (int side = 0; side < m_paneCount; ++side)
 			maxLen = qMax(maxLen, block.end[side] - block.begin[side] + 1);
 		block.viewBegin = viewPos;
 		block.viewEnd = viewPos + maxLen - 1;
-		for (int side = 0; side < 2; ++side)
+		for (int side = 0; side < m_paneCount; ++side)
 		{
 			const int len = qMax(0, block.end[side] - block.begin[side] + 1);
 			for (int k = 0; k < len; ++k)
@@ -847,11 +883,14 @@ void TableCompareView::rebuildModel()
 		}
 		viewPos += maxLen;
 	}
-	for (int side = 0; side < 2; ++side)
+	int totalRows = 0;
+	for (int side = 0; side < m_paneCount; ++side)
+	{
 		while (realPos[side] < m_sides[side].rawLines.size())
 			m_viewToReal[side].append(realPos[side]++);
-	const int totalRows = qMax(m_viewToReal[0].size(), m_viewToReal[1].size());
-	for (int side = 0; side < 2; ++side)
+		totalRows = qMax(totalRows, static_cast<int>(m_viewToReal[side].size()));
+	}
+	for (int side = 0; side < m_paneCount; ++side)
 		while (m_viewToReal[side].size() < totalRows)
 			m_viewToReal[side].append(-1);
 
@@ -864,10 +903,10 @@ void TableCompareView::rebuildModel()
 			m_modelRows.append(row);
 
 	int columns = 1;
-	for (int side = 0; side < 2; ++side)
+	for (int side = 0; side < m_paneCount; ++side)
 		for (const QStringList &row : m_sides[side].cells)
 			columns = qMax(columns, static_cast<int>(row.size()));
-	for (int side = 0; side < 2; ++side)
+	for (int side = 0; side < m_paneCount; ++side)
 		m_models[side]->refresh(columns);
 	fitRowHeights();
 }
@@ -877,30 +916,28 @@ void TableCompareView::rebuildModel()
     sides, so that the rows stay side by side. */
 void TableCompareView::fitRowHeights()
 {
-	for (QTableView *table : m_tables)
+	const int base = m_tables[0]->verticalHeader()->defaultSectionSize();
+	const int lineSpacing = m_tables[0]->fontMetrics().lineSpacing();
+	for (int modelRow = 0; modelRow < m_modelRows.size(); ++modelRow)
 	{
-		const int base = table->verticalHeader()->defaultSectionSize();
-		const int lineSpacing = table->fontMetrics().lineSpacing();
-		for (int modelRow = 0; modelRow < m_modelRows.size(); ++modelRow)
+		const int viewRow = m_modelRows.at(modelRow);
+		int lines = 1;
+		for (int side = 0; side < m_paneCount; ++side)
 		{
-			const int viewRow = m_modelRows.at(modelRow);
-			int lines = 1;
-			for (int side = 0; side < 2; ++side)
-			{
-				const int real = m_viewToReal[side].value(viewRow, -1);
-				if (real < 0 || real >= static_cast<int>(m_sides[side].cells.size()))
-					continue;
-				const QString &row = m_sides[side].rawLines.value(real);
-				if (!row.contains(QLatin1Char('\n')) && !row.contains(QLatin1Char('\r')))
-					continue;
-				for (const QString &cell : m_sides[side].cells[real])
-					lines = qMax(lines,
-						static_cast<int>(displayText(cell).count(QLatin1Char('\n'))) + 1);
-			}
-			if (lines > 1)
-				table->verticalHeader()->resizeSection(modelRow,
-					base + (lines - 1) * lineSpacing);
+			const int real = m_viewToReal[side].value(viewRow, -1);
+			if (real < 0 || real >= static_cast<int>(m_sides[side].cells.size()))
+				continue;
+			const QString &row = m_sides[side].rawLines.value(real);
+			if (!row.contains(QLatin1Char('\n')) && !row.contains(QLatin1Char('\r')))
+				continue;
+			for (const QString &cell : m_sides[side].cells[real])
+				lines = qMax(lines,
+					static_cast<int>(displayText(cell).count(QLatin1Char('\n'))) + 1);
 		}
+		if (lines > 1)
+			for (int side = 0; side < m_paneCount; ++side)
+				m_tables[side]->verticalHeader()->resizeSection(modelRow,
+					base + (lines - 1) * lineSpacing);
 	}
 }
 
@@ -913,8 +950,11 @@ void TableCompareView::hideLines()
 	if (!lm::lineFilterHides(m_displayFilter.get()))
 		return;
 	QList<lm::ComparedFile> files;
-	for (const Side &side : m_sides)
+	for (int pane = 0; pane < m_paneCount; ++pane)
+	{
+		const Side &side = m_sides[pane];
 		files.append({ side.path, side.unicoding, side.codepage, side.bom });
+	}
 	int ignored = 0;
 	for (const Block &block : m_blocks)
 		if (block.trivial)
@@ -981,6 +1021,14 @@ QStringList TableCompareView::shownRowsForTest(int side) const
 	return rows;
 }
 
+bool TableCompareView::cellDiffersForTest(int side, int modelRow, int column) const
+{
+	if (side < 0 || side >= m_paneCount)
+		return false;
+	const int real = m_viewToReal[side].value(m_modelRows.value(modelRow, -1), -1);
+	return real >= 0 && m_cellDiffs[side].contains(cellKey(real, column));
+}
+
 QString TableCompareView::displayFilter() const
 {
 	return QString::fromStdString(m_displayFilter->GetStringOrExpression());
@@ -1014,7 +1062,7 @@ void TableCompareView::hideFilterBar()
 void TableCompareView::closeDisplayFilterBar()
 {
 	hideFilterBar();
-	m_tables[m_tables[1]->hasFocus() ? 1 : 0]->setFocus();
+	m_tables[activeSide()]->setFocus();
 }
 
 void TableCompareView::showDisplayFilterBar()
@@ -1047,8 +1095,9 @@ void TableCompareView::applyDisplayFilter()
 		&& m_displayFilter->GetFilterExpression().errorCode == FILTER_ERROR_NO_ERROR)
 		m_filterBar->setFilterApplied(true);
 	// FlushAndRescan(true): the comparison runs again, and hides the rows
+	const int side = activeSide();
 	recompare();
-	m_tables[m_tables[1]->hasFocus() ? 1 : 0]->setFocus();
+	m_tables[side]->setFocus();
 	QGuiApplication::restoreOverrideCursor();
 }
 
@@ -1085,7 +1134,8 @@ void TableCompareView::addColumnToDisplayFilter(int side, int column, int dataTy
 	// a menu that is asked without being shown: the side's own columns,
 	// joined with AND
 	LineFilterMenu menu(this);
-	menu.setTarget(side == 1 ? 3 : side + 1, 0, column);
+	// upstream's sides: 1 left, 2 middle, 3 right
+	menu.setTarget(side == m_paneCount - 1 ? 3 : side + 1, 0, column);
 	const std::optional<QString> filter =
 		menu.apply(LineFilterMenu::ColumnText + dataType, displayFilter());
 	if (!filter.has_value())
@@ -1099,47 +1149,62 @@ void TableCompareView::addColumnToDisplayFilter(int side, int column, int dataTy
 void TableCompareView::autoFitColumns()
 {
 	// upstream measures every buffer's cells for one set of widths
-	for (QTableView *table : m_tables)
-		table->resizeColumnsToContents();
+	for (int side = 0; side < m_paneCount; ++side)
+		m_tables[side]->resizeColumnsToContents();
 	const int columns = m_models[0]->columnCount();
 	for (int column = 0; column < columns; ++column)
 	{
-		const int width = qMax(m_tables[0]->columnWidth(column), m_tables[1]->columnWidth(column));
-		for (QTableView *table : m_tables)
-			table->setColumnWidth(column, width);
+		int width = 0;
+		for (int side = 0; side < m_paneCount; ++side)
+			width = qMax(width, m_tables[side]->columnWidth(column));
+		for (int side = 0; side < m_paneCount; ++side)
+			m_tables[side]->setColumnWidth(column, width);
 	}
 }
 
-/** Cells that differ between the paired rows of each difference. */
+/** Cells that differ between the paired rows of each difference: with
+    three sides, a cell that differs from the same cell of any other side
+    that has the row. */
 void TableCompareView::computeCellDiffs()
 {
-	m_cellDiffs[0].clear();
-	m_cellDiffs[1].clear();
+	for (QSet<quint64> &cells : m_cellDiffs)
+		cells.clear();
 	for (const Block &block : m_blocks)
 	{
 		if (block.trivial)
 			continue;
-		const int len0 = block.end[0] - block.begin[0] + 1;
-		const int len1 = block.end[1] - block.begin[1] + 1;
-		const int pairs = qMin(qMax(0, len0), qMax(0, len1));
-		for (int k = 0; k < pairs; ++k)
+		int rows = 0;
+		for (int side = 0; side < m_paneCount; ++side)
+			rows = qMax(rows, block.end[side] - block.begin[side] + 1);
+		for (int k = 0; k < rows; ++k)
 		{
-			const int row0 = block.begin[0] + k;
-			const int row1 = block.begin[1] + k;
-			if (row0 >= static_cast<int>(m_sides[0].cells.size())
-				|| row1 >= static_cast<int>(m_sides[1].cells.size()))
-				continue;
-			const QStringList &cells0 = m_sides[0].cells[row0];
-			const QStringList &cells1 = m_sides[1].cells[row1];
-			const int columns = qMax(cells0.size(), cells1.size());
-			for (int col = 0; col < columns; ++col)
+			// the sides that have the k-th row of the difference
+			const QStringList *cells[3] = {};
+			int real[3] = { -1, -1, -1 };
+			for (int side = 0; side < m_paneCount; ++side)
 			{
-				const QString v0 = col < cells0.size() ? cells0.at(col) : QString();
-				const QString v1 = col < cells1.size() ? cells1.at(col) : QString();
-				if (v0 != v1)
+				const int row = block.begin[side] + k;
+				if (row <= block.end[side] && row >= 0
+					&& row < static_cast<int>(m_sides[side].cells.size()))
 				{
-					m_cellDiffs[0].insert(cellKey(row0, col));
-					m_cellDiffs[1].insert(cellKey(row1, col));
+					real[side] = row;
+					cells[side] = &m_sides[side].cells[row];
+				}
+			}
+			for (int a = 0; a < m_paneCount; ++a)
+			{
+				for (int b = a + 1; b < m_paneCount; ++b)
+				{
+					if (cells[a] == nullptr || cells[b] == nullptr)
+						continue;
+					const int columns = qMax(cells[a]->size(), cells[b]->size());
+					for (int col = 0; col < columns; ++col)
+					{
+						if (cells[a]->value(col) == cells[b]->value(col))
+							continue;
+						m_cellDiffs[a].insert(cellKey(real[a], col));
+						m_cellDiffs[b].insert(cellKey(real[b], col));
+					}
 				}
 			}
 		}
@@ -1167,15 +1232,18 @@ void TableCompareView::updateStatus()
 		const QChar delimiter = m_sides[side].props.delimiter;
 		return delimiter == QLatin1Char('\t') ? tr("tab") : QString(delimiter);
 	};
-	QString delimiters = delimiterName(0);
-	if (m_sides[1].props.delimiter != m_sides[0].props.delimiter)
-		delimiters += QStringLiteral(" | ") + delimiterName(1);
-	text += tr("  \xE2\x80\xA2  delimiter: %1").arg(delimiters);
-	bool modified = m_sides[0].modified || m_sides[1].modified;
-	if (modified)
+	bool sameDelimiter = true;
+	for (int side = 1; side < m_paneCount; ++side)
+		sameDelimiter = sameDelimiter
+			&& m_sides[side].props.delimiter == m_sides[0].props.delimiter;
+	QStringList delimiters{ delimiterName(0) };
+	for (int side = 1; !sameDelimiter && side < m_paneCount; ++side)
+		delimiters.append(delimiterName(side));
+	text += tr("  \xE2\x80\xA2  delimiter: %1").arg(delimiters.join(QStringLiteral(" | ")));
+	if (isModified())
 		text += tr("  \xE2\x80\xA2 unsaved changes");
 	m_status->setText(text);
-	for (int side = 0; side < 2; ++side)
+	for (int side = 0; side < m_paneCount; ++side)
 		updateHeader(side);
 }
 
@@ -1196,15 +1264,15 @@ void TableCompareView::gotoDiff(int blockIndex)
 		return;
 	m_current = blockIndex;
 	const int modelRow = modelRowOf(m_blocks[blockIndex].viewBegin);
-	m_models[0]->refresh(m_models[0]->columnCount());
-	m_models[1]->refresh(m_models[1]->columnCount());
+	for (int side = 0; side < m_paneCount; ++side)
+		m_models[side]->refresh(m_models[side]->columnCount());
 	// the rows as tall as their cells again before the scroll is judged
 	fitRowHeights();
 	if (modelRow >= 0)
 		scrollDiffIntoView(blockIndex);
 	// upstream's SelectDiff puts the cursor at the start of the difference,
 	// nothing selected
-	for (int i = 0; i < 2 && modelRow >= 0; ++i)
+	for (int i = 0; i < m_paneCount && modelRow >= 0; ++i)
 	{
 		m_tables[i]->selectionModel()->clearSelection();
 		m_tables[i]->selectionModel()->setCurrentIndex(
@@ -1243,28 +1311,27 @@ void TableCompareView::scrollDiffIntoView(int blockIndex)
 		if (startY - table->rowViewportPosition(0) > contextLinesAbove * line)
 			for (int above = 0; row > 0 && above < contextLinesAbove * line;)
 				above += table->rowHeight(--row);
-		for (int i = 0; i < 2; ++i)
+		for (int i = 0; i < m_paneCount; ++i)
 			m_tables[i]->scrollTo(m_models[i]->index(row, 0),
 				QAbstractItemView::PositionAtTop);
 	}
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < m_paneCount; ++i)
 		m_tables[i]->scrollTo(m_models[i]->index(start, 0),
 			QAbstractItemView::EnsureVisible);
 }
 
 int TableCompareView::activeSide() const
 {
-	if (m_tables[1]->hasFocus())
-		return 1;
-	if (m_tables[0]->hasFocus())
-		return 0;
-	return m_activeSide;
+	for (int side = 0; side < m_paneCount; ++side)
+		if (m_tables[side]->hasFocus())
+			return side;
+	return qMin(m_activeSide, m_paneCount - 1);
 }
 
 void TableCompareView::setActiveSide(int side)
 {
 	m_activeSide = side;
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < m_paneCount; ++i)
 		m_headers[i]->setActive(i == side);
 }
 
@@ -1289,15 +1356,15 @@ void TableCompareView::updateHeader(int side)
     MoveOnLoad. */
 bool TableCompareView::changeFile(int side, const QString &path, const QString &description)
 {
-	if (side < 0 || side > 1 || path.isEmpty())
+	if (side < 0 || side >= m_paneCount || path.isEmpty())
 		return false;
 	// PromptAndSaveIfNeeded
 	if (m_savePrompt && !m_savePrompt())
 		return false;
-	QString paths[2] = { m_sides[0].path, m_sides[1].path };
-	paths[side] = path;
+	QStringList files = paths();
+	files[side] = path;
 	// refuse before touching anything, as reload does
-	for (const QString &file : paths)
+	for (const QString &file : files)
 	{
 		QFile probe(file);
 		if (!file.isEmpty() && !probe.open(QIODevice::ReadOnly))
@@ -1308,7 +1375,7 @@ bool TableCompareView::changeFile(int side, const QString &path, const QString &
 	}
 	const bool wasModified = isModified();
 	QString error;
-	if (!compare(paths[0], paths[1], &error))
+	if (!compare(files, &error))
 	{
 		lm::showError(this, error);
 		return false;
@@ -1340,7 +1407,11 @@ bool TableCompareView::changeFile(int side, const QString &path, const QString &
 
 QString TableCompareView::untitledName(int side) const
 {
-	return side == 0 ? tr("Untitled Left") : tr("Untitled Right");
+	if (side == 0)
+		return tr("Untitled Left");
+	if (side == 1 && m_paneCount == 3)
+		return tr("Untitled Middle");
+	return tr("Untitled Right");
 }
 
 void TableCompareView::editActivePanePath()
@@ -1416,8 +1487,8 @@ void TableCompareView::deselectDiffIfCursorNotInCurrentDiff(int modelRow)
 	if (viewRow >= m_blocks[m_current].viewBegin && viewRow <= m_blocks[m_current].viewEnd)
 		return;
 	m_current = -1;
-	m_models[0]->recolor();
-	m_models[1]->recolor();
+	for (int side = 0; side < m_paneCount; ++side)
+		m_models[side]->recolor();
 	updateStatus();
 }
 
@@ -1477,8 +1548,7 @@ void TableCompareView::selectDiffAtModelRow(int modelRow)
 
 void TableCompareView::selectDiffAtCursor()
 {
-	const int side = m_tables[1]->hasFocus() ? 1 : 0;
-	const QModelIndex index = m_tables[side]->currentIndex();
+	const QModelIndex index = m_tables[activeSide()]->currentIndex();
 	if (index.isValid())
 		selectDiffAtModelRow(index.row());
 }
@@ -1562,10 +1632,13 @@ void TableCompareView::updateUndoActions()
 
 void TableCompareView::swapSides()
 {
-	// snapshots refer to sides by index, which a swap would scramble
+	// snapshots refer to sides by index, which a swap would scramble; the
+	// first side and the last trade places, as in the file comparison
 	clearHistory();
-	std::swap(m_sides[0], m_sides[1]);
-	std::swap(m_descriptions[0], m_descriptions[1]);
+	const int last = m_paneCount - 1;
+	std::swap(m_sides[0], m_sides[last]);
+	std::swap(m_descriptions[0], m_descriptions[last]);
+	std::swap(m_saveSerial[0], m_saveSerial[last]);
 	QString error;
 	runDiff(&error);
 	rebuildModel();
@@ -1576,12 +1649,27 @@ void TableCompareView::swapSides()
 
 void TableCompareView::focusNextPane()
 {
-	const int side = m_tables[0]->hasFocus() ? 1 : 0;
-	m_tables[side]->setFocus();
+	m_tables[(activeSide() + 1) % m_paneCount]->setFocus();
 }
 
-void TableCompareView::copyCurrentDiff(int sourceSide)
+void TableCompareView::copyToRight()
 {
+	const int target = qMin(activeSide() + 1, m_paneCount - 1);
+	copyCurrentDiff(target - 1, target);
+}
+
+void TableCompareView::copyToLeft()
+{
+	const int target = qMax(activeSide() - 1, 0);
+	copyCurrentDiff(target + 1, target);
+}
+
+void TableCompareView::copyCurrentDiff(int sourceSide, int targetSide)
+{
+	const int target = targetSide >= 0 ? targetSide : 1 - sourceSide;
+	if (sourceSide < 0 || sourceSide >= m_paneCount || target < 0
+		|| target >= m_paneCount || target == sourceSide)
+		return;
 	// upstream's OnX2Y: with no current difference, the one the cursor is
 	// in, and none when it is in none
 	if (m_current < 0)
@@ -1593,7 +1681,6 @@ void TableCompareView::copyCurrentDiff(int sourceSide)
 	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
 		return;
 	const Block block = m_blocks[m_current];
-	const int target = 1 - sourceSide;
 	pushUndo(captureEntry(target, block.viewBegin));
 
 	QStringList newLines;
@@ -1632,18 +1719,26 @@ void TableCompareView::copyCurrentDiff(int sourceSide)
 
 void TableCompareView::copyAllToRight()
 {
-	if (lm::askCopyAllDiffs(this))
-		copyAllFrom(0);
+	if (!lm::askCopyAllDiffs(this))
+		return;
+	const int target = qMin(activeSide() + 1, m_paneCount - 1);
+	copyAllFrom(target - 1, target);
 }
 
 void TableCompareView::copyAllToLeft()
 {
-	if (lm::askCopyAllDiffs(this))
-		copyAllFrom(1);
+	if (!lm::askCopyAllDiffs(this))
+		return;
+	const int target = qMax(activeSide() - 1, 0);
+	copyAllFrom(target + 1, target);
 }
 
-void TableCompareView::copyAllFrom(int sourceSide)
+void TableCompareView::copyAllFrom(int sourceSide, int targetSide)
 {
+	const int target = targetSide >= 0 ? targetSide : 1 - sourceSide;
+	if (sourceSide < 0 || sourceSide >= m_paneCount || target < 0
+		|| target >= m_paneCount || target == sourceSide)
+		return;
 	// CMergeDoc::CopyMultipleList: not with hidden lines among the
 	// differences to copy
 	if (hasInvisibleLines())
@@ -1653,10 +1748,12 @@ void TableCompareView::copyAllFrom(int sourceSide)
 			"filter settings to show all lines before merging."));
 		return;
 	}
-	const int target = 1 - sourceSide;
 	pushUndo(captureEntry(target, 0));
 	m_sides[target].rawLines = m_sides[sourceSide].rawLines;
-	m_sides[target].cells = m_sides[sourceSide].cells;
+	// the rows read by the target's own delimiter and quote
+	m_sides[target].cells.clear();
+	for (const QString &line : m_sides[target].rawLines)
+		m_sides[target].cells.push_back(splitRow(line, m_sides[target].props));
 	setSideModified(target, true);
 	QString error;
 	runDiff(&error);
@@ -1676,16 +1773,22 @@ void TableCompareView::refreshByUser()
 
 bool TableCompareView::encodingsDiffer() const
 {
-	return m_sides[0].unicoding != m_sides[1].unicoding
-		|| m_sides[0].codepage != m_sides[1].codepage
-		|| m_sides[0].bom != m_sides[1].bom;
+	for (int side = 1; side < m_paneCount; ++side)
+		if (m_sides[side].unicoding != m_sides[0].unicoding
+			|| m_sides[side].codepage != m_sides[0].codepage
+			|| m_sides[side].bom != m_sides[0].bom)
+			return true;
+	return false;
 }
 
 QString TableCompareView::changedPathOnDisk() const
 {
-	for (const Side &s : m_sides)
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		const Side &s = m_sides[side];
 		if (lm::fileChangedOnDisk(s.path, s.stamp) == lm::FileChange::Changed)
 			return s.path;
+	}
 	return QString();
 }
 
@@ -1693,8 +1796,9 @@ bool TableCompareView::reload(QString *error)
 {
 	// refuse before touching anything: a side already replaced could not
 	// be put back (WinMerge closes the comparison at this point instead)
-	for (const Side &s : m_sides)
+	for (int side = 0; side < m_paneCount; ++side)
 	{
+		const Side &s = m_sides[side];
 		// an untitled side starts over empty
 		if (!s.path.isEmpty() && !QFile(s.path).open(QIODevice::ReadOnly))
 		{
@@ -1706,9 +1810,9 @@ bool TableCompareView::reload(QString *error)
 
 	const bool wasModified = isModified();
 	// MoveOnLoad(nActivePane, pt.y): back to the current row afterwards
-	const int activeSide = m_tables[1]->hasFocus() ? 1 : 0;
+	const int activeSide = this->activeSide();
 	const int currentRow = m_tables[activeSide]->currentIndex().row();
-	const bool compared = compare(m_sides[0].path, m_sides[1].path, error);
+	const bool compared = compare(paths(), error);
 	m_actSave->setEnabled(isModified());
 	if (wasModified != isModified())
 		emit modifiedChanged(isModified());
@@ -1733,7 +1837,10 @@ void TableCompareView::recompare()
 
 bool TableCompareView::isModified() const
 {
-	return m_sides[0].modified || m_sides[1].modified;
+	for (int side = 0; side < m_paneCount; ++side)
+		if (m_sides[side].modified)
+			return true;
+	return false;
 }
 
 void TableCompareView::setSideModified(int side, bool modified)
@@ -1748,7 +1855,10 @@ void TableCompareView::setSideModified(int side, bool modified)
 
 QStringList TableCompareView::paths() const
 {
-	return { m_sides[0].path, m_sides[1].path };
+	QStringList files;
+	for (int side = 0; side < m_paneCount; ++side)
+		files.append(m_sides[side].path);
+	return files;
 }
 
 QString TableCompareView::tabTitle() const
@@ -1759,12 +1869,15 @@ QString TableCompareView::tabTitle() const
 		return m_sides[side].path.isEmpty() ? untitledName(side)
 			: QFileInfo(m_sides[side].path).fileName();
 	};
-	return name(0) + QString::fromUtf8(" \xE2\x86\x94 ") + name(1);
+	QStringList names;
+	for (int side = 0; side < m_paneCount; ++side)
+		names.append(name(side));
+	return names.join(QString::fromUtf8(" \xE2\x86\x94 "));
 }
 
 void TableCompareView::setSideDescription(int side, const QString &description)
 {
-	if (side < 0 || side >= 2)
+	if (side < 0 || side >= m_paneCount)
 		return;
 	m_descriptions[side] = description;
 	updateHeader(side);
@@ -1773,7 +1886,7 @@ void TableCompareView::setSideDescription(int side, const QString &description)
 bool TableCompareView::saveModified(QString *error)
 {
 	bool savedAny = false;
-	for (int side = 0; side < 2; ++side)
+	for (int side = 0; side < m_paneCount; ++side)
 	{
 		Side &s = m_sides[side];
 		if (!s.modified)

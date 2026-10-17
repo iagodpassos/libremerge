@@ -4502,6 +4502,11 @@ desde2	hasta2
         <translation>Abrir como texto</translation>
     </message>
     <message>
+        <source>a table comparison takes two or three files</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>una comparación de tablas recibe dos o tres archivos</translation>
+    </message>
+    <message>
         <source>cannot open %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>no se puede abrir %1</translation>
@@ -4610,6 +4615,10 @@ Borre el filtro de visualización o ajuste la configuración del filtro para mos
     <message>
         <source>Untitled Right</source>
         <translation>Derecho sin título</translation>
+    </message>
+    <message>
+        <source>Untitled Middle</source>
+        <translation>Central sin título</translation>
     </message>
 </context>
 <context>

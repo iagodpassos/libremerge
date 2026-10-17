@@ -574,7 +574,7 @@ MainWindow::MainWindow(QWidget *parent)
 	addMenuAction(mergeMenu, tr("Copy to &Right"),
 		QKeySequence(Qt::ALT | Qt::Key_Right), [fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->copyToRight();
-			else if (auto *table = tableView()) table->copyCurrentDiff(0);
+			else if (auto *table = tableView()) table->copyToRight();
 			else if (auto *image = imageView()) image->copyToRight();
 			else if (auto *hex = hexView()) hex->copyToRight();
 		});
@@ -582,7 +582,7 @@ MainWindow::MainWindow(QWidget *parent)
 		QKeySequence(Qt::ALT | Qt::Key_Left), [fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->copyToLeft();
 			else if (auto *table = tableView())
-				table->copyCurrentDiff(1);
+				table->copyToLeft();
 			else if (auto *image = imageView())
 				image->copyToLeft();
 			else if (auto *hex = hexView())
@@ -594,14 +594,14 @@ MainWindow::MainWindow(QWidget *parent)
 		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right),
 		[fileView, tableView]() {
 			if (auto *view = fileView()) view->copyToRight(true);
-			else if (auto *table = tableView()) table->copyCurrentDiff(0);
+			else if (auto *table = tableView()) table->copyToRight();
 		});
 	addMenuAction(mergeMenu, tr("Copy to Left and Advanc&e"),
 		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left),
 		[fileView, tableView]() {
 			if (auto *view = fileView()) view->copyToLeft(true);
 			else if (auto *table = tableView())
-				table->copyCurrentDiff(1);
+				table->copyToLeft();
 		});
 	addMenuAction(mergeMenu, tr("Copy All to Righ&t"), QKeySequence(),
 		[fileView, tableView, imageView, hexView]() {
@@ -869,16 +869,16 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 		}
 	}
 
-	// a file that the Table options' patterns take makes the pair a table
-	// comparison, side-by-side grids (WinMerge's SetTableProperties: one
-	// table file is enough); "Open as Text" in the table view forces the
-	// text path. The grids have two sides: three files compare as text
-	if (!forceText && paths.size() == 2
+	// a file that the Table options' patterns take makes the comparison a
+	// table one, side-by-side grids, two or three (WinMerge's
+	// SetTableProperties: one table file is enough); "Open as Text" in the
+	// table view forces the text path
+	if (!forceText && (paths.size() == 2 || paths.size() == 3)
 		&& std::any_of(paths.cbegin(), paths.cend(), [](const QString &path) {
 			return lm::tablePropertiesByFileName(path).isTable;
 		}))
 	{
-		openTableComparison(paths.at(0), paths.at(1));
+		openTableComparison(paths);
 		return;
 	}
 
@@ -904,12 +904,11 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 	attachFileView(view);
 }
 
-void MainWindow::openTableComparison(const QString &leftPath,
-	const QString &rightPath)
+void MainWindow::openTableComparison(const QStringList &paths)
 {
 	auto *view = new TableCompareView(this);
 	QString error;
-	if (!view->compare(leftPath, rightPath, &error))
+	if (!view->compare(paths, &error))
 	{
 		delete view;
 		lm::warning(this, tr("LibreMerge"),
@@ -939,9 +938,9 @@ void MainWindow::openTableComparison(const QString &leftPath,
 					view->paths().join(QStringLiteral("\n")));
 		});
 	connect(view, &TableCompareView::openAsTextRequested, this,
-		[this, view](const QString &left, const QString &right) {
+		[this, view](const QStringList &files) {
 			const int tabIndex = m_tabs->indexOf(view);
-			openFileComparison({ left, right }, {}, true);
+			openFileComparison(files, {}, true);
 			if (tabIndex >= 0 && !view->isModified())
 			{
 				m_tabs->removeTab(tabIndex);

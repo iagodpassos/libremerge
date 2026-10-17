@@ -4099,6 +4099,10 @@ de2	para2
         <translation>Abrir como Texto</translation>
     </message>
     <message>
+        <source>a table comparison takes two or three files</source>
+        <translation>uma comparação de tabelas recebe dois ou três arquivos</translation>
+    </message>
+    <message>
         <source>cannot open %1</source>
         <translation>não foi possível abrir %1</translation>
     </message>
@@ -4192,6 +4196,10 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     <message>
         <source>Untitled Right</source>
         <translation>Direita Sem Título</translation>
+    </message>
+    <message>
+        <source>Untitled Middle</source>
+        <translation>Meio Sem Título</translation>
     </message>
 </context>
 <context>
