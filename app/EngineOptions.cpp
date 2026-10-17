@@ -124,6 +124,22 @@ public:
 		m_settings.sync();
 		return COption::OPT_OK;
 	}
+	/** CIniOptionsMgr::ReadStoredSection: the string values the storage
+	    has under a section, after this process's own writes. */
+	std::map<String, String> ReadStoredSection(const String& section) override
+	{
+		m_settings.sync();
+		std::map<String, String> values;
+		m_settings.beginGroup(toKey(section));
+		for (const QString &key : m_settings.childKeys())
+		{
+			const QVariant value = m_settings.value(key);
+			if (value.typeId() == QMetaType::QString)
+				values.emplace(key.toStdString(), value.toString().toStdString());
+		}
+		m_settings.endGroup();
+		return values;
+	}
 	void SetSerializing(bool serializing = true) override { (void)serializing; }
 
 private:

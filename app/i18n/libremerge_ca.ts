@@ -392,7 +392,7 @@
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>Ara per ara no es poden combinar ni copiar diferències que contenen línies amagades.
 
 Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar totes les línies abans de combinar.</translation>
@@ -1174,6 +1174,11 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <source>Invalid directive</source>
         <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>Directiva no vàlida</translation>
+    </message>
+    <message>
+        <source>Invalid argument</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Argument no vàlid</translation>
     </message>
     <message>
         <source>Unknown error</source>
@@ -4903,7 +4908,7 @@ de2	a2
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>Ara per ara no es poden combinar ni copiar diferències que contenen línies amagades.
 
 Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar totes les línies abans de combinar.</translation>

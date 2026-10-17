@@ -81,6 +81,16 @@ bool AnyCodepageToUTF8(int codepage, String & filepath, bool bMayOverwrite)
 
 // --- PluginForFile / PackingInfo / PrediffingInfo (no plugin backend) ---
 
+/** Upstream checks the pipeline's plugins and filter expressions; without
+    plugins, only an empty pipeline is a valid one. */
+bool PluginForFile::Validate(String& errorMessage) const
+{
+	if (m_PluginPipeline.empty())
+		return true;
+	errorMessage = _("Plugins are not available on this platform yet");
+	return false;
+}
+
 std::vector<PluginForFile::PipelineItem> PluginForFile::ParsePluginPipeline(String& errorMessage) const
 {
 	return ParsePluginPipeline(m_PluginPipeline, errorMessage);
@@ -122,9 +132,9 @@ bool PackingInfo::GetPackUnpackPlugin(const String& filteredFilenames, bool bUrl
 }
 
 bool PackingInfo::Unpacking(int target, std::vector<int> * handlerSubcodes, String & filepath,
-	const String& filteredText, const std::vector<StringView>& variables)
+	const PluginPipelineContext& context)
 {
-	(void)target; (void)filepath; (void)filteredText; (void)variables;
+	(void)target; (void)filepath; (void)context;
 	if (handlerSubcodes != nullptr)
 		handlerSubcodes->clear();
 	return m_PluginPipeline.empty(); // nothing to unpack without plugins
@@ -138,10 +148,15 @@ bool PackingInfo::pack(int target, String & filepath, const String& dstFilepath,
 }
 
 bool PackingInfo::Packing(int target, const String& srcFilepath, const String& dstFilepath,
-	const std::vector<int>& handlerSubcodes, const std::vector<StringView>& variables) const
+	const std::vector<int>& handlerSubcodes, const PluginPipelineContext& context) const
 {
-	(void)target; (void)srcFilepath; (void)dstFilepath; (void)handlerSubcodes; (void)variables;
+	(void)target; (void)srcFilepath; (void)dstFilepath; (void)handlerSubcodes; (void)context;
 	return m_PluginPipeline.empty();
+}
+
+bool PackingInfo::Validate(String& errorMessage) const
+{
+	return PluginForFile::Validate(errorMessage);
 }
 
 String PackingInfo::GetUnpackedFileExtension(int target, const String& filteredFilenames,
@@ -167,11 +182,16 @@ bool PrediffingInfo::GetPrediffPlugin(const String& filteredFilenames, bool bRev
 	return true;
 }
 
-bool PrediffingInfo::Prediffing(int target, String & filepath, const String& filteredText,
-	bool bMayOverwrite, const std::vector<StringView>& variables)
+bool PrediffingInfo::Prediffing(int target, String & filepath, bool bMayOverwrite,
+	const PluginPipelineContext& context)
 {
-	(void)target; (void)filepath; (void)filteredText; (void)bMayOverwrite; (void)variables;
+	(void)target; (void)filepath; (void)bMayOverwrite; (void)context;
 	return true; // no prediffers to run
+}
+
+bool PrediffingInfo::Validate(String& errorMessage) const
+{
+	return PluginForFile::Validate(errorMessage);
 }
 
 #endif // !_WIN32

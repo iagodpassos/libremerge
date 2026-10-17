@@ -381,6 +381,20 @@ public:
 		return rawCell(line(pane, lineIndex), m_view->m_sides[pane].props,
 			columnIndex).toStdString();
 	}
+	/** CMergeDoc::GetColumns: the cells asked for, joined by the side's
+	    delimiter (a ColumnRange of a filter). */
+	std::string GetColumns(int pane, int lineIndex, const std::vector<int> &columns) const override
+	{
+		if (!valid(pane, lineIndex))
+			return std::string();
+		const lm::TableProps &props = m_view->m_sides[pane].props;
+		const QString text = line(pane, lineIndex);
+		QStringList cells;
+		for (const int column : columns)
+			cells.append(rawCell(text, props, column));
+		return cells.join(props.delimiter.isNull() ? QString() : QString(props.delimiter))
+			.toStdString();
+	}
 	int GetRealLineNumber(int pane, int lineIndex) const override
 	{
 		return valid(pane, lineIndex) ? m_realIndex[pane][lineIndex] : 0;

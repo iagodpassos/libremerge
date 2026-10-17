@@ -375,10 +375,9 @@
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Das Zusammenführen/Kopieren von Unterschieden, die ausgeblendete Zeilen enthalten, wird derzeit nicht unterstützt.
 
-Bitte löschen Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so an, dass vor dem Zusammenführen alle Zeilen angezeigt werden.</translation>
+Bitte deaktivieren Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so an, dass alle Zeilen angezeigt werden, bevor Sie die Unterschiede zusammenführen.</translation>
     </message>
     <message>
         <source>Swapping reloads both files. Discard unsaved changes?</source>
@@ -1012,6 +1011,10 @@ Bitte löschen Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so 
     <message>
         <source>Invalid directive</source>
         <translation>Ungültige Anweisung</translation>
+    </message>
+    <message>
+        <source>Invalid argument</source>
+        <translation>Ungültiges Argument</translation>
     </message>
     <message>
         <source>Unknown error</source>
@@ -2632,8 +2635,7 @@ Patches sind nicht betroffen.</translation>
 %1
 
 %2</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Kann Datei nicht öffnen\n%1\n\n%2&quot;.</translatorcomment>
-        <translation>Kann Dateien nicht öffnen
+        <translation>Datei(en) können nicht geöffnet werden
 %1
 
 %2</translation>
@@ -4608,10 +4610,9 @@ von2	zu2
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Das Zusammenführen/Kopieren von Unterschieden, die ausgeblendete Zeilen enthalten, wird derzeit nicht unterstützt.
 
-Bitte löschen Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so an, dass vor dem Zusammenführen alle Zeilen angezeigt werden.</translation>
+Bitte deaktivieren Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so an, dass alle Zeilen angezeigt werden, bevor Sie die Unterschiede zusammenführen.</translation>
     </message>
     <message>
         <source>Save As</source>

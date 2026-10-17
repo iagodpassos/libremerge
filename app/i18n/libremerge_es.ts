@@ -377,7 +377,7 @@
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>Por ahora no se pueden combinar ni copiar diferencias que contienen líneas ocultas.
 
 Borre el filtro de visualización o ajuste la configuración del filtro para mostrar todas las líneas antes de combinar.</translation>
@@ -1015,6 +1015,10 @@ Borre el filtro de visualización o ajuste la configuración del filtro para mos
     <message>
         <source>Invalid directive</source>
         <translation>Directiva no válida</translation>
+    </message>
+    <message>
+        <source>Invalid argument</source>
+        <translation>Argumento no válido</translation>
     </message>
     <message>
         <source>Unknown error</source>
@@ -4612,7 +4616,7 @@ desde2	hasta2
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>Por ahora no se pueden combinar ni copiar diferencias que contienen líneas ocultas.
 
 Borre el filtro de visualización o ajuste la configuración del filtro para mostrar todas las líneas antes de combinar.</translation>

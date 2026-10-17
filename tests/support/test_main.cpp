@@ -69,6 +69,11 @@ public:
 	}
 	int FlushOptions() override { return COption::OPT_OK; }
 	void SetSerializing(bool serializing = true) override { (void)serializing; }
+	std::map<String, String> ReadStoredSection(const String& section) override
+	{
+		(void)section;
+		return {};
+	}
 };
 
 } // namespace

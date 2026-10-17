@@ -969,6 +969,10 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
         <translation>Diretiva inválida</translation>
     </message>
     <message>
+        <source>Invalid argument</source>
+        <translation>Argumento inválido</translation>
+    </message>
+    <message>
         <source>Unknown error</source>
         <translation>Erro desconhecido</translation>
     </message>

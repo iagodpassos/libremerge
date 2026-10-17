@@ -91,6 +91,8 @@ QString filterErrorMessage(FilterErrorCode code)
 		return translated(QT_TRANSLATE_NOOP("FileFilters", "Invalid property name"));
 	case FILTER_ERROR_INVALID_DIRECTIVE:
 		return translated(QT_TRANSLATE_NOOP("FileFilters", "Invalid directive"));
+	case FILTER_ERROR_INVALID_ARGUMENT:
+		return translated(QT_TRANSLATE_NOOP("FileFilters", "Invalid argument"));
 	default:
 		return translated(QT_TRANSLATE_NOOP("FileFilters", "Unknown error"));
 	}

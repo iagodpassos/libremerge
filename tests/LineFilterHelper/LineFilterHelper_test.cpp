@@ -32,6 +32,10 @@ struct Lines : public ILineDataProvider
 	{
 		return GetLine(side, lineIndex);
 	}
+	std::string GetColumns(int side, int lineIndex, const std::vector<int> &) const override
+	{
+		return GetLine(side, lineIndex);
+	}
 	int GetRealLineNumber(int, int lineIndex) const override { return lineIndex; }
 	unsigned GetLineFlags(int side, int lineIndex) const override
 	{

@@ -69,7 +69,7 @@ Dependencies: a C++17 compiler, CMake ≥ 3.21, Ninja, Qt 6, POCO, ICU, Boost (h
 ```sh
 cmake -S . -B build -G Ninja
 cmake --build build
-ctest --test-dir build        # engine test suite (394 tests)
+ctest --test-dir build        # engine test suite (398 tests)
 ./build/app/LibreMerge        # (on macOS: build/app/LibreMerge.app)
 ```
 

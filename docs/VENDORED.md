@@ -3,7 +3,7 @@
 LibreMerge vendors the comparison engine of **WinMerge**.
 
 - **Origin repository:** https://github.com/WinMerge/winmerge
-- **Commit:** `5531fb6001725a1a9c0a94d9c6a99c1d3c53996e` (master, 2026-08-21)
+- **Commit:** `94a7a3fc5efee0f8b45d08a354299453509467b5` (master, 2026-10-17)
 - **License of vendored code:** GPL-2.0-or-later (original SPDX headers preserved in every file). `Externals/xdiff` is LGPL-2.1 (from git's LibXDiff fork). `Src/diffutils` is GPLv2+ (© Free Software Foundation).
 - **LibreMerge as a whole:** GPL-3.0-or-later (a valid downstream license of GPL-2.0-or-later + compatible with Qt 6 / LGPLv3).
 
@@ -15,10 +15,10 @@ LibreMerge vendors the comparison engine of **WinMerge**.
 | `engine/Externals/xdiff/` | `Externals/xdiff/` | git's xdiff (histogram/patience algorithms) |
 | `engine/Src/CompareEngines/` | `Src/CompareEngines/` | Folder-compare methods (byte, binary, time/size, existence, quick) |
 | `engine/Src/FilterEngine/` | `Src/FilterEngine/` | Filter expression language (re2c lexer, lemon parser) |
-| `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect` |
+| `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect`, `TableProps` (the table layout `DiffWrapper` takes) |
 | `engine/Src/Common/` | `Src/Common/` | Portable utilities: `unicoder`, `UnicodeString`, `UniFile`, `paths`, `OptionsMgr`/`IniOptionsMgr`, `charsets`, `TempFile` support |
 | `tests/` | `Testing/GoogleTest/` | Upstream unit tests for the engine + `TestData/` |
-| `engine/Externals/winimerge/src/WinIMergeLib/` | [WinMerge/winimerge](https://github.com/WinMerge/winimerge) `src/WinIMergeLib/` @ `57ef929c` (the commit WinMerge pins) | Image-compare core: `ImgDiffBuffer.hpp` (block diff, overlay, blink, wipe), `ImgMergeBuffer.hpp` (copy diff, undo, save), `Diff.hpp` (embedded xdiff for insertion/deletion alignment) — GPL-2.0-or-later |
+| `engine/Externals/winimerge/src/WinIMergeLib/` | [WinMerge/winimerge](https://github.com/WinMerge/winimerge) `src/WinIMergeLib/` @ `da639cdf` (the commit WinMerge pins) | Image-compare core: `ImgDiffBuffer.hpp` (block diff, overlay, blink, wipe), `ImgMergeBuffer.hpp` (copy diff, undo, save), `Diff.hpp` (embedded xdiff for insertion/deletion alignment) — GPL-2.0-or-later |
 
 The WinIMerge image wrapper (`image.hpp`, FreeImagePlus-based) and
 `ImgConverter.hpp` (WIC/Direct2D/GDI+, Windows-only) are **not** vendored;
@@ -65,9 +65,9 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 599 | 162 | 248 | 0 | 3 |
-| Spanish | 590 | 175 | 246 | 1 | 0 |
-| Catalan | 298 | 172 | 247 | 295 | 0 |
+| German | 603 | 161 | 246 | 0 | 3 |
+| Spanish | 591 | 175 | 244 | 3 | 0 |
+| Catalan | 298 | 172 | 245 | 298 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -106,7 +106,7 @@ so most portability lives outside the vendored files entirely.
 **Guarded includes/sections** (`#ifdef _WIN32` around windows.h and
 Windows-only code paths): `diffutils/src/util.c`, `unicoder.cpp`,
 `UniFile.cpp` (GetCompressedFileSize fallback), `OptionsMgr.cpp`,
-`IniOptionsMgr.cpp`, `stringdiffs.cpp`, `DirTravel.cpp`, `TempFile.cpp`
+`stringdiffs.cpp`, `DirTravel.cpp`, `TempFile.cpp`
 (WMrunning via kill() on POSIX), `FolderStats.cpp` (+ POSIX readdir
 branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
 (SyntaxColors include, ToWindowsPath call), `DiffContext.cpp`
@@ -147,8 +147,9 @@ branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
   to ICU (`ports/normalize_icu.cpp`)
 - `stringdiffs.cpp`: UTF-8 character break iterator
   (`ports/lm_utf8_break.h`) replaces the UChar-based one when tchar_t is
-  char; static `linelen` renamed `linelen_dw` (collides with coretools
-  under tchar_t == char)
+  char
+- `DiffWrapper.cpp`: static `linelen` renamed `linelen_dw` (collides with
+  coretools under tchar_t == char)
 - `Logger.h/.cpp`: `std::string` overload is `_UNICODE`-only (same
   signature as `String` otherwise)
 - `UnicodeString.h`: `%lld`/`%llu` instead of MSVC `%I64d`/`%I64u` on
@@ -165,11 +166,6 @@ branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
 - `FileFilterHelper.cpp` / `FileFilter.cpp`: filter match paths
   canonicalized with `paths::ToWindowsPath` — `.flt` regexes use `\\` as
   the separator and existing filters keep working unchanged
-- `FilterEngine/FilterExpressionNodes.cpp` (`compute`, `contains`): the
-  searcher's hash goes by the letter without its case, as its comparison
-  does. Upstream hashes the characters as they are, and the searcher
-  then skips past a match whose letters are in another case than the
-  text sought (`Name contains ".txt"` did not find `Readme.TXT`)
 
 **Test-suite adaptations** are listed in the commit history; the most
 notable is that upstream `paths_test.cpp` (Windows path semantics) is

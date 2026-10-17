@@ -227,6 +227,12 @@ public:
 	{
 		return GetLine(pane, lineIndex);
 	}
+	/** CMergeDoc::GetColumns out of table editing: the line, for any
+	    column asked. */
+	std::string GetColumns(int pane, int lineIndex, const std::vector<int> &columns) const override
+	{
+		return columns.empty() ? std::string() : GetLine(pane, lineIndex);
+	}
 	int GetRealLineNumber(int pane, int lineIndex) const override
 	{
 		return valid(pane, lineIndex) ? m_realIndex[pane][lineIndex] : 0;
