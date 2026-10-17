@@ -65,9 +65,9 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 603 | 161 | 246 | 0 | 3 |
-| Spanish | 591 | 175 | 244 | 3 | 0 |
-| Catalan | 298 | 172 | 245 | 298 | 0 |
+| German | 608 | 162 | 246 | 0 | 3 |
+| Spanish | 596 | 176 | 244 | 3 | 0 |
+| Catalan | 298 | 172 | 246 | 303 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -86,6 +86,8 @@ Cursorposition:" and the font size "Schriftgröße in Punkten:".
 
 - **All MFC GUI code** (`*Dlg`, `*Bar`, `*Menu`, `*View`, `*Frm`, `*Doc`, `Src/Common` widgets): MFC is Windows-only and non-redistributable. The UI is rebuilt in Qt.
 - `Src/CompareEngines/ImageCompare.cpp`: thin wrapper around the WinIMerge Win32 DLL. LibreMerge keeps the engine Qt-free with a hook (`ports/image_compare_stub.cpp`) that the Qt app fills in with the ported image core at startup.
+- `Src/FileTransform.cpp`: the plugins it runs are COM/ActiveX, Windows-only. `ports/file_transform_posix.cpp` carries over its pipeline parsing and its line expressions (the `le:` items, which a table comparison's Ignore This Column puts in the prediffer), and refuses a plugin by name.
+- `Src/TableProps.cpp`: it reads the Compare > Table patterns from WinMerge's options; LibreMerge keeps that page's settings in the Qt app, which answers `MakeTablePropertiesByFileName` through a hook (`ports/table_props_posix.cpp`).
 - **frhed** (hex editor): GPL-2.0-**only**, incompatible with GPLv3 distribution. The binary comparison (`app/HexView.*`) is LibreMerge's own editor, written after the behavior of the heksedit control WinMerge embeds without taking any of its code; WinMerge's own `CHexMergeDoc`, `CHexMergeView` and `CHexMergeFrame` (GPL-2.0-or-later) are what `app/HexCompareView.*` follows.
 - **7-Zip `Rar*` codecs**: unRAR license restriction is GPL-incompatible (archive support will use libarchive, without RAR).
 - **winwebdiff**: depends on WebView2 (proprietary, Windows-only).

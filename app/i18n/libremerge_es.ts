@@ -4558,6 +4558,31 @@ desde2	hasta2
         <translation>Autoajustar todas las columnas</translation>
     </message>
     <message>
+        <source>&amp;Ignore This Column</source>
+        <translation>&amp;Ignorar esta columna</translation>
+    </message>
+    <message>
+        <source>In &amp;All Panes</source>
+        <translation>En todos los p&amp;aneles</translation>
+    </message>
+    <message>
+        <source>In &amp;This Pane Only (Column Not in Other Files)</source>
+        <translation>Solo en es&amp;te panel (columna que no aparece en otros archivos)</translation>
+    </message>
+    <message>
+        <source>(⌘+Click to add another column)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;(Pulse Ctrl + clic para añadir otra columna)&quot;.</translatorcomment>
+        <translation>(Pulse ⌘ + clic para añadir otra columna)</translation>
+    </message>
+    <message>
+        <source>(Ctrl+Click to add another column)</source>
+        <translation>(Pulse Ctrl + clic para añadir otra columna)</translation>
+    </message>
+    <message>
+        <source>&amp;Reset All</source>
+        <translation>&amp;Restablecer todo</translation>
+    </message>
+    <message>
         <source>&amp;Filter by This Column</source>
         <translation>&amp;Filtrar por esta columna</translation>
     </message>

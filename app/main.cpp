@@ -108,6 +108,7 @@
 #include "LineFilterHelper.h"
 #include "IAbortable.h"
 #include "image_compare_hook.h"
+#include "table_props_hook.h"
 #include "ImgMergeBuffer.hpp"
 // engine (option names and the file filter, for the selftests)
 #include "OptionsDef.h"
@@ -267,6 +268,9 @@ int main(int argc, char *argv[])
 	lm::installEngineOptions();
 	lm::installFileFilters();
 	lm::SetImageCompareHook(&compareImageFiles);
+	// the line expressions of a prediffer read a file as a table by the
+	// Compare > Table options, as upstream's MakeTablePropertiesByFileName
+	lm::SetTablePropertiesHook(&lm::engineTablePropertiesByFileName);
 
 	QCommandLineParser parser;
 	parser.setApplicationDescription(
@@ -352,6 +356,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestTableEditOpt(QStringLiteral("selftest-table-edit"),
 		QStringLiteral("Edit the cells of a table comparison and copy selected cells, with undo (for testing)"));
 	parser.addOption(selftestTableEditOpt);
+	QCommandLineOption selftestTableIgnoreColumnOpt(QStringLiteral("selftest-table-ignore-column"),
+		QStringLiteral("Leave columns of a table comparison out of it from the header menu (for testing)"));
+	parser.addOption(selftestTableIgnoreColumnOpt);
 	QCommandLineOption selftestFolderSelectionOpt(QStringLiteral("selftest-folder-selection"),
 		QStringLiteral("Compare two or three selected items of a folder comparison with each other (for testing)"));
 	parser.addOption(selftestFolderSelectionOpt);
@@ -6769,8 +6776,12 @@ int main(int argc, char *argv[])
 			QStringList items;
 			for (const QAction *action : menu.actions())
 				items.append(action->isSeparator() ? QStringLiteral("-") : action->text());
+			QStringList ignores;
+			if (const QAction *ignore = menu.actions().value(3); ignore != nullptr && ignore->menu())
+				for (const QAction *action : ignore->menu()->actions())
+					ignores.append(action->isSeparator() ? QStringLiteral("-") : action->text());
 			QStringList kinds;
-			if (const QAction *last = menu.actions().value(3); last != nullptr && last->menu())
+			if (const QAction *last = menu.actions().value(4); last != nullptr && last->menu())
 				for (const QAction *action : last->menu()->actions())
 					kinds.append(action->text());
 			const auto t = [](const char *text) {
@@ -6781,8 +6792,16 @@ int main(int argc, char *argv[])
 			auto *byText = menu.findChild<QAction *>(QStringLiteral("filterColumnText"));
 			if (headers == nullptr || fit == nullptr || byText == nullptr)
 				return 1;
+#ifdef Q_OS_MACOS
+			const char *const hint = "(\u2318+Click to add another column)";
+#else
+			const char *const hint = "(Ctrl+Click to add another column)";
+#endif
 			check(items == QStringList{ t("Use First Line as Headers"), t("Auto-Fit All Columns"),
-					QStringLiteral("-"), t("&Filter by This Column") }
+					QStringLiteral("-"), t("&Ignore This Column"), t("&Filter by This Column") }
+				&& ignores == QStringList{ t("In &All Panes"),
+					t("In &This Pane Only (Column Not in Other Files)"), t(hint),
+					QStringLiteral("-"), t("&Reset All") }
 				&& kinds == QStringList{ t("&Text..."), t("&Number..."), t("&Date/Time...") }
 				&& headers->isChecked(),
 				"table, header menu: upstream's items");
@@ -11226,6 +11245,140 @@ int main(int argc, char *argv[])
 			view.editCell(1, 0, 1, QStringLiteral("b"));
 			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,b"),
 				"the middle one of three tables takes edits too");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestTableIgnoreColumnOpt))
+	{
+		// CMergeDoc::IgnoreColumnInComparison: the header menu leaves a
+		// column out by a ColumnRange("!N") line expression in the
+		// prediffer; without Ctrl it takes the place of the column left out
+		// before, with Ctrl it joins it, "In This Pane Only" is for one
+		// file (a column the others lack) and Reset All brings them back.
+		// The files themselves stay as they are.
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+		};
+		const auto action = [](QMenu &menu, const char *name)
+		{
+			return menu.findChild<QAction *>(QLatin1String(name));
+		};
+		const QString left = dir.filePath(QStringLiteral("left.csv"));
+		const QString right = dir.filePath(QStringLiteral("right.csv"));
+		const QByteArray leftBytes = "id,name,price,stock\n1,apple,10,5\n2,pear,20,7\n3,plum,30,1\n";
+		const QByteArray rightBytes = "id,name,price,stock\n1,apple,11,5\n2,pear,20,7\n3,plum,30,2\n";
+		write(left, leftBytes);
+		write(right, rightBytes);
+		{
+			TableCompareView view;
+			QString error;
+			if (!view.compare(left, right, &error))
+				return 2;
+			check(view.diffCount() == 2, "the price of one row and the stock of another differ");
+			{
+				QMenu menu;
+				view.buildHeaderMenu(0, -1, &menu);
+				QMenu *ignore = menu.findChild<QMenu *>(QStringLiteral("ignoreColumn"));
+				check(ignore != nullptr && !action(menu, "ignoreColumnInAllPanes")->isEnabled()
+						&& !action(menu, "ignoreColumnInThisPane")->isEnabled()
+						&& !action(menu, "ignoreColumnHint")->isEnabled()
+						&& action(menu, "ignoreColumnResetAll")->isEnabled(),
+					"past the last column the menu leaves nothing to ignore, Reset All aside");
+				// (in the system's language: the key's sign stays the same)
+#ifdef Q_OS_MACOS
+				check(action(menu, "ignoreColumnHint")->text().contains(QChar(0x2318)),
+					"the hint names the Command key on macOS");
+#else
+				check(!action(menu, "ignoreColumnHint")->text().contains(QChar(0x2318)),
+					"the hint names Ctrl");
+#endif
+			}
+			{
+				QMenu menu;
+				view.buildHeaderMenu(0, 2, &menu);
+				QAction *allPanes = action(menu, "ignoreColumnInAllPanes");
+				check(allPanes->isEnabled(), "a column clicked can be ignored");
+				allPanes->trigger();
+			}
+			printf("  pipeline: %s\n", qPrintable(view.prediffPipelineForTest()));
+			check(view.prediffPipelineForTest() == QStringLiteral("le:ColumnRange(\"!3\")")
+					&& view.diffCount() == 1 && !view.diffRowsForTest().contains(1),
+				"In All Panes leaves the price out: the stock is the one difference left");
+			view.ignoreColumnInComparison(3, QString(), true);
+			check(view.prediffPipelineForTest() == QStringLiteral("le:ColumnRange(\"!3,!4\")")
+					&& view.diffCount() == 0,
+				"Ctrl+Click adds the stock: no difference is left");
+			// upstream checks the specification as a whole against the
+			// column: in a list, the column goes in again, to no effect
+			view.ignoreColumnInComparison(3, QString(), true);
+			check(view.prediffPipelineForTest() == QStringLiteral("le:ColumnRange(\"!3,!4,!4\")")
+					&& view.diffCount() == 0,
+				"a column added again goes in twice, changing nothing");
+			view.ignoreColumnInComparison(1, QString(), false);
+			check(view.prediffPipelineForTest() == QStringLiteral("le:ColumnRange(\"!2\")")
+					&& view.diffCount() == 2,
+				"a click without Ctrl takes the place of the columns left out before");
+			{
+				QMenu menu;
+				view.buildHeaderMenu(1, 1, &menu);
+				action(menu, "ignoreColumnResetAll")->trigger();
+			}
+			check(view.prediffPipelineForTest().isEmpty() && view.diffCount() == 2,
+				"Reset All brings every column back");
+			check(!view.isModified() && read(left) == leftBytes && read(right) == rightBytes,
+				"the files stay as they were");
+		}
+
+		// a column one file has and the other lacks
+		write(left, "id,name,price\n1,apple,10\n2,pear,20\n");
+		write(right, "id,code,name,price\n1,A1,apple,10\n2,P2,pear,20\n");
+		{
+			TableCompareView view;
+			QString error;
+			if (!view.compare(left, right, &error))
+				return 2;
+			check(view.diffCount() == 1, "the extra column makes every row differ");
+			{
+				QMenu menu;
+				view.buildHeaderMenu(1, 1, &menu);
+				action(menu, "ignoreColumnInThisPane")->trigger();
+			}
+			printf("  pipeline: %s\n", qPrintable(view.prediffPipelineForTest()));
+			check(view.prediffPipelineForTest() == QStringLiteral("le:2:ColumnRange(\"!2\")")
+					&& view.diffCount() == 0,
+				"In This Pane Only leaves the right file's column out, and the tables agree");
+			view.ignoreColumnInComparison(3, QStringLiteral("2"), true);
+			check(view.prediffPipelineForTest() == QStringLiteral("le:2:ColumnRange(\"!2,!4\")")
+					&& view.diffCount() == 1,
+				"Ctrl+Click adds another column of that file");
+			view.ignoreColumnInComparison(2, QString(), false);
+			check(view.prediffPipelineForTest()
+					== QStringLiteral("le:2:ColumnRange(\"!2,!4\")|le:ColumnRange(\"!3\")"),
+				"a column of every file goes in an item of its own");
+			view.resetIgnoredColumnsInComparison();
+			check(view.prediffPipelineForTest().isEmpty() && view.diffCount() == 1,
+				"Reset All takes both items");
 		}
 
 		printf("ok: %d\n", ok);

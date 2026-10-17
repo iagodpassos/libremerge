@@ -4151,6 +4151,30 @@ de2	para2
         <translation>Ajustar Automaticamente Todas as Colunas</translation>
     </message>
     <message>
+        <source>&amp;Ignore This Column</source>
+        <translation>&amp;Ignorar Esta Coluna</translation>
+    </message>
+    <message>
+        <source>In &amp;All Panes</source>
+        <translation>Em Tod&amp;os os Painéis</translation>
+    </message>
+    <message>
+        <source>In &amp;This Pane Only (Column Not in Other Files)</source>
+        <translation>Apenas Nes&amp;te Painel (Coluna Não Presente em Outros Arquivos)</translation>
+    </message>
+    <message>
+        <source>(⌘+Click to add another column)</source>
+        <translation>(⌘+Clique para adicionar outra coluna)</translation>
+    </message>
+    <message>
+        <source>(Ctrl+Click to add another column)</source>
+        <translation>(Ctrl+Clique para adicionar outra coluna)</translation>
+    </message>
+    <message>
+        <source>&amp;Reset All</source>
+        <translation>&amp;Restaurar Tudo</translation>
+    </message>
+    <message>
         <source>&amp;Filter by This Column</source>
         <translation>&amp;Filtrar por Esta Coluna</translation>
     </message>

@@ -4555,6 +4555,31 @@ von2	zu2
         <translation>Alle Spalten automatisch anpassen</translation>
     </message>
     <message>
+        <source>&amp;Ignore This Column</source>
+        <translation>Diese Spalte &amp;ignorieren</translation>
+    </message>
+    <message>
+        <source>In &amp;All Panes</source>
+        <translation>In &amp;allen Bereichen</translation>
+    </message>
+    <message>
+        <source>In &amp;This Pane Only (Column Not in Other Files)</source>
+        <translation>Nur in diesem Bereich (Spal&amp;te kommt in anderen Dateien nicht vor)</translation>
+    </message>
+    <message>
+        <source>(⌘+Click to add another column)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;(Strg+Klick, um eine weitere Spalte hinzuzufügen)&quot;.</translatorcomment>
+        <translation>(⌘+Klick, um eine weitere Spalte hinzuzufügen)</translation>
+    </message>
+    <message>
+        <source>(Ctrl+Click to add another column)</source>
+        <translation>(Strg+Klick, um eine weitere Spalte hinzuzufügen)</translation>
+    </message>
+    <message>
+        <source>&amp;Reset All</source>
+        <translation>Alle zu&amp;rücksetzen</translation>
+    </message>
+    <message>
         <source>&amp;Filter by This Column</source>
         <translation>Nach dieser Spalte &amp;filtern</translation>
     </message>

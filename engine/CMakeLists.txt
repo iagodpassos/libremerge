@@ -106,6 +106,7 @@ set(L2_SOURCES
   Externals/crystaledit/editlib/TextDefinition.cpp
   ports/exconverter_icu.cpp
   ports/file_transform_posix.cpp
+  ports/table_props_posix.cpp
   ports/image_compare_stub.cpp
   ports/property_system_posix.cpp
   ports/merge_app_posix.cpp

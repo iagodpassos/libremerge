@@ -256,6 +256,10 @@ void installEngineOptions()
 	// engine asks for it by name: a folder comparison's context, and the
 	// filter expressions that read a file's content
 	options.InitOption(OPT_CP_DETECT, (50001 << 16) | 1, false);
+	// plugins are on, WinMerge's default: there is no setting for them
+	// here, and the line expressions of a prediffer (a table's "Ignore
+	// This Column") run as upstream runs them, when they are
+	options.InitOption(OPT_PLUGINS_ENABLED, true);
 	loadFilters(&options);
 
 	// "Ignore comment differences" asks this registry for a parser of the

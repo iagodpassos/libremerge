@@ -18,6 +18,7 @@ set(TEST_SOURCES
   LineFilterHelper/LineFilterHelper_test.cpp
   MoveDetection/RenameMoveDetection_test.cpp
   OptionsMgr/VariantValue_test.cpp
+  Plugins/FileTransformPosix_test.cpp
   StringDiffs/stringdiffs_test.cpp
   StringDiffs/stringdiffs_test_adds.cpp
   StringDiffs/stringdiffs_test_bugs.cpp

@@ -4849,6 +4849,36 @@ de2	a2
         <translation>Ajusta automàticament totes les columnes</translation>
     </message>
     <message>
+        <source>&amp;Ignore This Column</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>&amp;Ignora aquesta columna</translation>
+    </message>
+    <message>
+        <source>In &amp;All Panes</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>A &amp;totes les subfinestres</translation>
+    </message>
+    <message>
+        <source>In &amp;This Pane Only (Column Not in Other Files)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>&amp;Només en aquesta subfinestra (columna que no és als altres fitxers)</translation>
+    </message>
+    <message>
+        <source>(⌘+Click to add another column)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>(⌘+clic per a afegir una altra columna)</translation>
+    </message>
+    <message>
+        <source>(Ctrl+Click to add another column)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>(Ctrl+clic per a afegir una altra columna)</translation>
+    </message>
+    <message>
+        <source>&amp;Reset All</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>&amp;Reinicialitza-ho tot</translation>
+    </message>
+    <message>
         <source>&amp;Filter by This Column</source>
         <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>&amp;Filtra per aquesta columna</translation>

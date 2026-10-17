@@ -9,6 +9,7 @@
 #include "FileFilters.h"
 
 // engine
+#include "TableProps.h"
 #include "UnicodeString.h"
 
 namespace lm
@@ -102,6 +103,28 @@ QList<TableProps> tablePropertiesOfSides(const QStringList &paths)
 		if (!side.isTable)
 			side = props.at(tableSide);
 	return props;
+}
+
+::TableProps engineTableProps(const TableProps &props)
+{
+	bool fits = true;
+	const auto byte = [&fits](QChar ch) -> char {
+		if (ch.unicode() < 0x80)
+			return static_cast<char>(ch.unicode());
+		fits = false;
+		return 0;
+	};
+	::TableProps engine{};
+	engine.delimiter = byte(props.delimiter);
+	engine.quote = byte(props.quote);
+	engine.istable = props.isTable && fits;
+	engine.allowNewlinesInQuotes = props.allowNewlinesInQuotes;
+	return engine;
+}
+
+::TableProps engineTablePropertiesByFileName(const std::string &path)
+{
+	return engineTableProps(tablePropertiesByFileName(QString::fromStdString(path)));
 }
 
 QChar characterOfField(const QString &text)

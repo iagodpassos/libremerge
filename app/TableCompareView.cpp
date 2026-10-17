@@ -43,9 +43,13 @@
 #include "DiffWrapper.h"
 #include "DiffList.h"
 #include "EngineOptions.h"
+#include "FileTransform.h"
 #include "FilterEngine/FilterExpression.h"
 #include "FilterEngine/ILineDataProvider.h"
 #include "LineFilterHelper.h"
+#include "Logger.h"
+#include "OptionsDef.h"
+#include "OptionsMgr.h"
 #include "PathContext.h"
 #include "UniFile.h"
 
@@ -945,7 +949,15 @@ bool TableCompareView::runDiff(QString *error)
 	DIFFOPTIONS options = lm::currentDiffOptions();
 	DiffList diffList;
 	wrapper.SetCreateDiffList(&diffList);
-	wrapper.SetPaths(paths, false);
+	// CMergeDoc::Rescan: the plugins as the options have them, over the
+	// document's own temporary files, which the prediffer may overwrite;
+	// its line expressions read each side by that side's table layout
+	wrapper.EnablePlugins(GetOptionsMgr()->GetBool(OPT_PLUGINS_ENABLED));
+	wrapper.SetPaths(paths, true);
+	const PrediffingInfo prediffer(m_prediffPipeline.toStdString());
+	wrapper.SetPrediffer(&prediffer);
+	for (int i = 0; i < m_paneCount; ++i)
+		wrapper.SetTableProps(i, lm::engineTableProps(m_sides[i].props));
 	wrapper.SetOptions(&options);
 	// the line and substitution filters, and the language "Ignore comment
 	// differences" goes by, as in the text compare (WinMerge's table is the
@@ -1255,6 +1267,40 @@ void TableCompareView::buildHeaderMenu(int side, int column, QMenu *menu)
 	fit->setObjectName(QStringLiteral("autoFitAllColumns"));
 	connect(fit, &QAction::triggered, this, &TableCompareView::autoFitColumns);
 	menu->addSeparator();
+	QMenu *ignore = menu->addMenu(tr("&Ignore This Column"));
+	ignore->setObjectName(QStringLiteral("ignoreColumn"));
+	// OnUpdateIgnoreColumnInComparison: plugins on and a column clicked, in
+	// a table the engine can split (its delimiter and quote in ASCII)
+	const bool canIgnore = GetOptionsMgr()->GetBool(OPT_PLUGINS_ENABLED) && column >= 0
+		&& lm::engineTableProps(m_sides[side].props).istable;
+	// GetKeyState(VK_CONTROL) as the command runs: the key held on the
+	// click (Qt's Ctrl, the Command key on macOS) adds the column
+	const auto adding = []() {
+		return QGuiApplication::keyboardModifiers().testFlag(Qt::ControlModifier);
+	};
+	QAction *allPanes = ignore->addAction(tr("In &All Panes"));
+	allPanes->setObjectName(QStringLiteral("ignoreColumnInAllPanes"));
+	allPanes->setEnabled(canIgnore);
+	connect(allPanes, &QAction::triggered, this, [this, column, adding]() {
+		ignoreColumnInComparison(column, QString(), adding());
+	});
+	QAction *thisPane = ignore->addAction(tr("In &This Pane Only (Column Not in Other Files)"));
+	thisPane->setObjectName(QStringLiteral("ignoreColumnInThisPane"));
+	thisPane->setEnabled(canIgnore);
+	connect(thisPane, &QAction::triggered, this, [this, side, column, adding]() {
+		ignoreColumnInComparison(column, QString::number(side + 1), adding());
+	});
+#ifdef Q_OS_MACOS
+	QAction *hint = ignore->addAction(tr("(\u2318+Click to add another column)"));
+#else
+	QAction *hint = ignore->addAction(tr("(Ctrl+Click to add another column)"));
+#endif
+	hint->setObjectName(QStringLiteral("ignoreColumnHint"));
+	hint->setEnabled(false);
+	ignore->addSeparator();
+	QAction *reset = ignore->addAction(tr("&Reset All"));
+	reset->setObjectName(QStringLiteral("ignoreColumnResetAll"));
+	connect(reset, &QAction::triggered, this, &TableCompareView::resetIgnoredColumnsInComparison);
 	QMenu *filter = menu->addMenu(tr("&Filter by This Column"));
 	const struct { const char *text; const char *name; } kinds[] = {
 		{ QT_TR_NOOP("&Text..."), "filterColumnText" },
@@ -1287,6 +1333,101 @@ void TableCompareView::addColumnToDisplayFilter(int side, int column, int dataTy
 	m_displayFilter->SetStringOrExpression(filter->toStdString());
 	m_filterBar->setFilterText(displayFilter());
 	applyDisplayFilter();
+}
+
+void TableCompareView::ignoreColumnInComparison(int column, const QString &panePrefix, bool add)
+{
+	String errorMessage;
+	auto expressions = PluginForFile::ParsePluginPipeline(m_prediffPipeline.toStdString(), errorMessage);
+	if (!errorMessage.empty())
+	{
+		RootLogger::Error(errorMessage);
+		return;
+	}
+
+	uint8_t targetFlags = 0xff;
+	if (!panePrefix.isEmpty())
+	{
+		targetFlags = 0;
+		for (const QChar ch : panePrefix)
+		{
+			if (ch >= QLatin1Char('1') && ch <= QLatin1Char('3'))
+				targetFlags |= 1 << (ch.unicode() - '1');
+		}
+	}
+
+	const String expressionPrefix = _T("ColumnRange(\"");
+	const String columnNumber = strutils::format(_T("%d"), column + 1);
+	const String columnSuffix = _T("\")");
+
+	bool found = false;
+	for (auto &pipelineItem : expressions)
+	{
+		auto *lineExpression = std::get_if<PluginForFile::FilterExpressionPipelineItem>(&pipelineItem);
+		if (!lineExpression || lineExpression->targetFlags != targetFlags ||
+			lineExpression->expression.compare(0, expressionPrefix.size(), expressionPrefix) != 0 ||
+			lineExpression->expression.size() < expressionPrefix.size() + columnSuffix.size() ||
+			lineExpression->expression.compare(lineExpression->expression.size() - columnSuffix.size(),
+				columnSuffix.size(), columnSuffix) != 0)
+			continue;
+		// only the items this makes (their specification starts with '!')
+		const size_t checkBegin = expressionPrefix.size();
+		if (lineExpression->expression.size() <= checkBegin ||
+			lineExpression->expression[checkBegin] != _T('!'))
+			continue;
+		found = true;
+		const size_t specBegin = expressionPrefix.size();
+		const size_t specLength = lineExpression->expression.size() - specBegin - columnSuffix.size();
+		String specification = lineExpression->expression.substr(specBegin, specLength);
+		if (add)
+		{
+			if (specification == _T("!"))
+				specification += columnNumber;
+			else if (specification != _T("!") + columnNumber)
+			{
+				specification += _T(",!");
+				specification += columnNumber;
+			}
+		}
+		else
+			specification = _T("!") + columnNumber;
+		lineExpression->expression = expressionPrefix + specification + columnSuffix;
+		break;
+	}
+	if (!found)
+	{
+		expressions.push_back(PluginForFile::FilterExpressionPipelineItem{
+			targetFlags, expressionPrefix + _T("!") + columnNumber + columnSuffix });
+	}
+
+	m_prediffPipeline = QString::fromStdString(PluginForFile::MakePluginPipeline(expressions));
+	// FlushAndRescan(true)
+	recompare();
+}
+
+void TableCompareView::resetIgnoredColumnsInComparison()
+{
+	String errorMessage;
+	const auto expressions = PluginForFile::ParsePluginPipeline(m_prediffPipeline.toStdString(), errorMessage);
+	if (!errorMessage.empty())
+	{
+		RootLogger::Error(errorMessage);
+		return;
+	}
+	std::vector<PluginForFile::PipelineItem> updatedExpressions;
+	for (const auto &pipelineItem : expressions)
+	{
+		const auto *lineExpression = std::get_if<PluginForFile::FilterExpressionPipelineItem>(&pipelineItem);
+		const String ignorePrefix = _T("ColumnRange(\"!");
+		if (lineExpression &&
+			lineExpression->expression.compare(0, ignorePrefix.size(), ignorePrefix) == 0 &&
+			lineExpression->expression.size() >= ignorePrefix.size() + 2 &&
+			lineExpression->expression.compare(lineExpression->expression.size() - 2, 2, _T("\")")) == 0)
+			continue;
+		updatedExpressions.push_back(pipelineItem);
+	}
+	m_prediffPipeline = QString::fromStdString(PluginForFile::MakePluginPipeline(updatedExpressions));
+	recompare();
 }
 
 void TableCompareView::autoFitColumns()

@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <string>
 #include <QChar>
 #include <QList>
 #include <QString>
 #include <QStringList>
+
+// the engine's (TableProps.h)
+struct TableProps;
 
 namespace lm
 {
@@ -59,5 +63,15 @@ QChar characterOfField(const QString &text);
 /** WildcardRemoveDuplicatePatterns: a pattern that a later one of the
     list takes in goes. */
 QString removeDuplicatePatterns(const QString &patterns);
+
+/** The engine's TableProps for a side, for the line expressions of the
+    prediffer: the delimiter and the quote are one byte there (upstream's
+    tchar_t is UTF-16, the port's a byte of UTF-8), so a file whose
+    delimiter or quote is past ASCII is no table to the engine. */
+::TableProps engineTableProps(const TableProps &props);
+
+/** MakeTablePropertiesByFileName for the engine (the ports layer's hook):
+    tablePropertiesByFileName, as engineTableProps gives it. */
+::TableProps engineTablePropertiesByFileName(const std::string &path);
 
 } // namespace lm

@@ -132,6 +132,17 @@ public:
 	/** Upstream's "Auto-Fit All Columns": every column as wide as its
 	    widest cell on either side. */
 	void autoFitColumns();
+	/** CMergeDoc::IgnoreColumnInComparison: a column left out of the
+	    comparison by a ColumnRange("!N") line expression in the prediffer,
+	    for every file (an empty prefix) or for the files of the prefix
+	    ("2" the second); add keeps the columns left out before, as a
+	    Ctrl+Click on the menu item does, and the files compare again. */
+	void ignoreColumnInComparison(int column, const QString &panePrefix, bool add);
+	/** CMergeDoc::ResetIgnoredColumnsInComparison: those expressions go
+	    from the prediffer, and the files compare again. */
+	void resetIgnoredColumnsInComparison();
+	/** The comparison's prediffer pipeline (for tests). */
+	QString prediffPipelineForTest() const { return m_prediffPipeline; }
 	DisplayFilterBar *displayFilterBarForTest() const { return m_filterBar; }
 	QTableView *tableForTest(int side) const { return m_tables[side]; }
 	int currentDiffForTest() const { return m_current; }
@@ -253,6 +264,9 @@ private:
 	int m_activeSide = 0;
 	std::function<bool()> m_savePrompt;
 	Side m_sides[3];
+	// the document's prediffer (CMergeDoc's), where the columns "Ignore
+	// This Column" leaves out are
+	QString m_prediffPipeline;
 	std::vector<Block> m_blocks;
 	// view row -> real row per side (-1 = ghost)
 	QList<int> m_viewToReal[3];
