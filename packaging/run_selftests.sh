@@ -60,6 +60,7 @@ run_one selftest-image-options
 run_one selftest-table-3way
 run_one selftest-table-edit
 run_one selftest-table-ignore-column
+run_one selftest-tree-sitter
 run_one selftest-folder-selection
 run_one selftest-hex
 run_one selftest-hex-edit

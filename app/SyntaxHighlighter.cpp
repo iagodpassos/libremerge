@@ -4,11 +4,18 @@
 #include "SyntaxHighlighter.h"
 
 #include <QFileInfo>
+#include <QTextBlock>
+#include <QTextDocument>
+#include <string>
 #include <vector>
 
+#include "ISyntaxParser.h"
+#include "ITextBuffer.h"
 #include "SyntaxColors.h"
+#include "SyntaxParserRegistry.h"
 #include "TextDefinition.h"
 #include "Theme.h"
+#include "TreeSitterParser.h"
 
 namespace
 {
@@ -39,19 +46,86 @@ std::vector<int> byteToU16Map(const QString &text, int byteLength)
 
 } // namespace
 
+/** The document's lines as the engine's parsers read them (UTF-8), taken
+    when it is parsed again. */
+class DocumentTextBuffer : public LangServices::ITextBuffer
+{
+public:
+	void load(const QTextDocument *document)
+	{
+		m_lines.clear();
+		m_lines.reserve(static_cast<size_t>(document->blockCount()));
+		for (QTextBlock block = document->begin(); block.isValid(); block = block.next())
+			m_lines.push_back(block.text().toStdString());
+	}
+	/** Whether the blocks from one position to another read as when they
+	    were taken (a reformat marks blocks dirty without changing them). */
+	bool same(const QTextDocument *document, int from, int to) const
+	{
+		if (document->blockCount() != GetLineCount())
+			return false;
+		const QTextBlock last = document->findBlock(to);
+		for (QTextBlock block = document->findBlock(from); block.isValid(); block = block.next())
+		{
+			if (block.text().toStdString() != m_lines[static_cast<size_t>(block.blockNumber())])
+				return false;
+			if (block == last)
+				break;
+		}
+		return true;
+	}
+
+	int GetLineCount() const override { return static_cast<int>(m_lines.size()); }
+	const tchar_t *GetLineChars(int line) const override { return m_lines[static_cast<size_t>(line)].c_str(); }
+	int GetLineLength(int line) const override
+	{
+		return static_cast<int>(m_lines[static_cast<size_t>(line)].size());
+	}
+	int GetFullLineLength(int line) const override
+	{
+		return GetLineLength(line) + (line + 1 < GetLineCount() ? 1 : 0);
+	}
+
+private:
+	std::vector<std::string> m_lines;
+};
+
 SyntaxHighlighter::SyntaxHighlighter(QTextDocument *document, const QString &filePath)
-	: QSyntaxHighlighter(document)
+	// the document comes last (setDocument below): a parser of the whole
+	// document then hears of an edit before the highlighting does
+	: QSyntaxHighlighter(static_cast<QObject *>(document))
 {
 	const std::string ext = QFileInfo(filePath).suffix().toLower().toStdString();
-	if (ext.empty())
+	LangServices::TextDefinition *def = ext.empty() ? nullptr : LangServices::GetTextType(ext.c_str());
+	if (def != nullptr && def->type != LangServices::LanguageId::SRC_PLAIN)
+	{
+		// the parser WinMerge's view takes, the registry's for the
+		// language; a built-in one runs here line by line
+		auto parser = LangServices::SyntaxParserRegistry::GetInstance().CreateParser(def->type);
+		if (std::dynamic_pointer_cast<CTreeSitterParser>(parser))
+		{
+			m_buffer = std::make_unique<DocumentTextBuffer>();
+			m_parser = parser;
+			m_parser->SetTextBuffer(m_buffer.get());
+			connect(document, &QTextDocument::contentsChange, this, &SyntaxHighlighter::documentChanged);
+			// an edit can change the colors of lines far from it (a string
+			// opened): all of them, once the typing stops
+			m_rehighlightTimer.setSingleShot(true);
+			m_rehighlightTimer.setInterval(250);
+			connect(&m_rehighlightTimer, &QTimer::timeout, this, [this]() {
+				m_rehighlighting = true;
+				rehighlight();
+				m_rehighlighting = false;
+			});
+		}
+		else if (parser)
+			m_parse = GetParseFunc(def->type);
+		if (hasLanguage())
+			m_languageName = QString::fromUtf8(def->name);
+	}
+	setDocument(document);
+	if (!hasLanguage())
 		return;
-	LangServices::TextDefinition *def = LangServices::GetTextType(ext.c_str());
-	if (def == nullptr || def->type == LangServices::LanguageId::SRC_PLAIN)
-		return;
-	m_parse = GetParseFunc(def->type);
-	if (m_parse == nullptr)
-		return;
-	m_languageName = QString::fromUtf8(def->name);
 
 	// foreground only (diff colors own the background); classic light
 	// palette or a dark-editor equivalent, per the active theme
@@ -88,8 +162,42 @@ SyntaxHighlighter::SyntaxHighlighter(QTextDocument *document, const QString &fil
 	}
 }
 
+SyntaxHighlighter::~SyntaxHighlighter()
+{
+	// QSyntaxHighlighter's destructor takes the colors off the document,
+	// which tells of it: not to this part of the object, gone by then
+	if (QTextDocument *doc = document())
+		disconnect(doc, &QTextDocument::contentsChange, this, &SyntaxHighlighter::documentChanged);
+	m_rehighlightTimer.stop();
+}
+
+void SyntaxHighlighter::documentChanged(int position, int removed, int added)
+{
+	(void)removed;
+	if (m_rehighlighting)
+		return;
+	if (!m_stale && m_buffer->same(document(), position, position + added))
+		return;
+	m_stale = true;
+	m_rehighlightTimer.start();
+}
+
 void SyntaxHighlighter::highlightBlock(const QString &text)
 {
+	if (m_parser != nullptr)
+	{
+		// parsed again once after a change (CTreeSitterParser's lazy reparse)
+		if (m_stale)
+		{
+			m_buffer->load(document());
+			m_parser->Invalidate();
+			m_stale = false;
+		}
+		const int line = currentBlock().blockNumber();
+		if (line >= 0 && line < m_buffer->GetLineCount())
+			applyBlocks(text, text.toUtf8(), m_parser->ParseLine(line));
+		return;
+	}
 	if (m_parse == nullptr)
 		return;
 
@@ -101,7 +209,12 @@ void SyntaxHighlighter::highlightBlock(const QString &text)
 	const unsigned cookieOut = m_parse(cookieIn, utf8.constData(),
 		static_cast<int>(utf8.size()), &blocks);
 	setCurrentBlockState(static_cast<int>(cookieOut));
+	applyBlocks(text, utf8, blocks);
+}
 
+void SyntaxHighlighter::applyBlocks(const QString &text, const QByteArray &utf8,
+	const std::vector<LangServices::TEXTBLOCK> &blocks)
+{
 	if (blocks.empty())
 		return;
 	const std::vector<int> map = byteToU16Map(text, static_cast<int>(utf8.size()));

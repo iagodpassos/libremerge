@@ -19,6 +19,11 @@ namespace lm
     the comparison option defaults. */
 void installEngineOptions();
 
+/** The folder of the Tree-sitter grammars (WinMerge's TreeSitterGrammars):
+    the bundle's Resources on macOS, the installed one or the one next to
+    the binary elsewhere. */
+QString treeSitterGrammarsDir();
+
 /** Build the diffutils options from the current global option values. */
 DIFFOPTIONS currentDiffOptions();
 

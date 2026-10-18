@@ -53,12 +53,16 @@
 #include "MessageBoxes.h"
 #include <QTextBrowser>
 #include <QThread>
+#include <QTextBlock>
+#include <QTextLayout>
 #include <QThreadPool>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QTimer>
 #include <QTranslator>
 #include "FileCompareView.h"
+#include "SyntaxHighlighter.h"
+#include "SyntaxColors.h"
 #include "TableCompareView.h"
 #include "TableFiles.h"
 #include "ImageCompareView.h"
@@ -359,6 +363,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestTableIgnoreColumnOpt(QStringLiteral("selftest-table-ignore-column"),
 		QStringLiteral("Leave columns of a table comparison out of it from the header menu (for testing)"));
 	parser.addOption(selftestTableIgnoreColumnOpt);
+	QCommandLineOption selftestTreeSitterOpt(QStringLiteral("selftest-tree-sitter"),
+		QStringLiteral("Color YAML, TOML and Markdown through Tree-sitter, as the text changes too (for testing)"));
+	parser.addOption(selftestTreeSitterOpt);
 	QCommandLineOption selftestFolderSelectionOpt(QStringLiteral("selftest-folder-selection"),
 		QStringLiteral("Compare two or three selected items of a folder comparison with each other (for testing)"));
 	parser.addOption(selftestFolderSelectionOpt);
@@ -2605,6 +2612,11 @@ int main(int argc, char *argv[])
 		const QString rightPlain = dir.filePath(QStringLiteral("right.txt"));
 		write(leftPlain, leftCode);
 		write(rightPlain, rightCode);
+		// YAML, whose comments Tree-sitter's grammar tells (no built-in parser)
+		const QString leftYaml = dir.filePath(QStringLiteral("left.yaml"));
+		const QString rightYaml = dir.filePath(QStringLiteral("right.yaml"));
+		write(leftYaml, "total: 1 # the sum\ncount: 2\n");
+		write(rightYaml, "total: 1 # sum of everything\ncount: 2\n");
 		// a line break moved inside the same words; then with another
 		// number of lines; then with a real change next to it
 		const QString leftWrap = dir.filePath(QStringLiteral("wrap-left.txt"));
@@ -2671,6 +2683,8 @@ int main(int argc, char *argv[])
 			"comments: ignored, the files identical with the settings");
 		check(is(opened({ leftPlain, rightPlain }), 1, 0),
 			"comments: only where the language has them");
+		check(is(opened({ leftYaml, rightYaml }), 0, 1, { binaryDiffer }),
+			"comments: in YAML too, through Tree-sitter");
 		lm::setCompareFlagForTest(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES, true);
 		check(is(opened({ leftC, rightC }), 0, 0, { binaryDiffer }),
 			"comments: unhighlighted completely");
@@ -11245,6 +11259,150 @@ int main(int argc, char *argv[])
 			view.editCell(1, 0, 1, QStringLiteral("b"));
 			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,b"),
 				"the middle one of three tables takes edits too");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestTreeSitterOpt))
+	{
+		// WinMerge's highlighting of the languages its built-in parsers
+		// lack, through Tree-sitter ("Built-in first"): a YAML file's
+		// colors, which follow the text as it changes (the line typed in at
+		// once, the lines it affects once the typing stops), TOML and a
+		// YAML block inside Markdown, and the built-in parsers where they
+		// have the language
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 50; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		// the color a character of a line was given, and a color index's
+		const auto colorAt = [](FileCompareView &view, int side, int line, int pos)
+		{
+			const QTextBlock block = view.paneForTest(side)->document()->findBlockByNumber(line);
+			for (const QTextLayout::FormatRange &range : block.layout()->formats())
+				if (pos >= range.start && pos < range.start + range.length)
+					return range.format.foreground().color();
+			return QColor();
+		};
+		const auto color = [](FileCompareView &view, int side, int index)
+		{
+			return view.highlighterForTest(side)->formatForTest(index).foreground().color();
+		};
+
+		const QString leftYaml = dir.filePath(QStringLiteral("left.yaml"));
+		const QString rightYaml = dir.filePath(QStringLiteral("right.yaml"));
+		write(leftYaml, "name: \"LibreMerge\"  # the app\ncount: 3\n");
+		write(rightYaml, "name: \"LibreMerge\"  # the app\ncount: 4\n");
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(leftYaml, rightYaml, &error))
+				return 2;
+			view.resize(900, 400);
+			view.show();
+			settle();
+			check(view.highlighterForTest(0)->treeSitterForTest()
+					&& view.highlighterForTest(1)->treeSitterForTest()
+					&& view.highlighterForTest(0)->languageName() == QStringLiteral("YAML"),
+				"YAML: Tree-sitter colors both panes");
+			check(colorAt(view, 0, 0, 0) == color(view, 0, COLORINDEX_USER1)
+					&& colorAt(view, 0, 0, 6) == color(view, 0, COLORINDEX_STRING)
+					&& colorAt(view, 0, 0, 20) == color(view, 0, COLORINDEX_COMMENT)
+					&& colorAt(view, 1, 1, 7) == color(view, 1, COLORINDEX_NUMBER),
+				"YAML: keys, strings, comments and numbers");
+			view.typeAtForTest(0, 1, QStringLiteral("# "));
+			check(colorAt(view, 0, 1, 2) == color(view, 0, COLORINDEX_COMMENT),
+				"YAML: the line typed in takes its colors at once");
+		}
+
+		// a multi-line string closed on the third line: the second is in it
+		// (colored as the string, the inner of the captures holding it),
+		// until the opening line becomes a comment
+		const QString leftToml = dir.filePath(QStringLiteral("left.toml"));
+		const QString rightToml = dir.filePath(QStringLiteral("right.toml"));
+		write(leftToml, "s = \"\"\"\nb = 2\n\"\"\"\n");
+		write(rightToml, "s = \"\"\"\nb = 3\n\"\"\"\n");
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(leftToml, rightToml, &error))
+				return 2;
+			view.resize(900, 400);
+			view.show();
+			settle();
+			check(view.highlighterForTest(0)->treeSitterForTest()
+					&& colorAt(view, 0, 1, 0) == color(view, 0, COLORINDEX_STRING)
+					&& colorAt(view, 0, 1, 4) == color(view, 0, COLORINDEX_STRING),
+				"TOML: the line inside the multi-line string is no pair of its own");
+			view.typeAtForTest(0, 0, QStringLiteral("# "));
+			settle();
+			check(colorAt(view, 0, 0, 0) == color(view, 0, COLORINDEX_COMMENT)
+					&& colorAt(view, 0, 1, 0) == color(view, 0, COLORINDEX_USER1)
+					&& colorAt(view, 0, 1, 4) == color(view, 0, COLORINDEX_NUMBER),
+				"TOML: once the typing stops, the lines below follow the edit");
+		}
+
+		const QString leftMd = dir.filePath(QStringLiteral("left.md"));
+		const QString rightMd = dir.filePath(QStringLiteral("right.md"));
+		write(leftMd, "# Title\n\n```yaml\nkey: 1 # note\n```\n");
+		write(rightMd, "# Title\n\n```yaml\nkey: 2 # note\n```\n");
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(leftMd, rightMd, &error))
+				return 2;
+			view.resize(900, 400);
+			view.show();
+			settle();
+			check(view.highlighterForTest(0)->treeSitterForTest()
+					&& colorAt(view, 0, 3, 7) == color(view, 0, COLORINDEX_COMMENT),
+				"Markdown: a YAML block takes YAML's colors");
+		}
+
+		// a language of the built-in parsers keeps them
+		const QString leftPy = dir.filePath(QStringLiteral("left.py"));
+		const QString rightPy = dir.filePath(QStringLiteral("right.py"));
+		write(leftPy, "def f():\n    return 1  # one\nraise ValueError\n");
+		write(rightPy, "def f():\n    return 2  # two\nraise ValueError\n");
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(leftPy, rightPy, &error))
+				return 2;
+			view.resize(900, 400);
+			view.show();
+			settle();
+			check(view.highlighterForTest(0)->hasLanguage()
+					&& !view.highlighterForTest(0)->treeSitterForTest()
+					&& colorAt(view, 0, 1, 14) == color(view, 0, COLORINDEX_COMMENT),
+				"Python: the built-in parser, as WinMerge's \"Built-in first\"");
+			// its User 1 color (a built-in exception), past the 16 the
+			// formats once stopped at
+			check(colorAt(view, 0, 2, 6) == color(view, 0, COLORINDEX_USER1)
+					&& color(view, 0, COLORINDEX_USER1).isValid(),
+				"Python: the User 1 color of the built-in parser");
 		}
 
 		printf("ok: %d\n", ok);

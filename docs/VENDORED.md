@@ -15,9 +15,10 @@ LibreMerge vendors the comparison engine of **WinMerge**.
 | `engine/Externals/xdiff/` | `Externals/xdiff/` | git's xdiff (histogram/patience algorithms) |
 | `engine/Src/CompareEngines/` | `Src/CompareEngines/` | Folder-compare methods (byte, binary, time/size, existence, quick) |
 | `engine/Src/FilterEngine/` | `Src/FilterEngine/` | Filter expression language (re2c lexer, lemon parser) |
-| `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect`, `TableProps` (the table layout `DiffWrapper` takes) |
+| `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect`, `TableProps` (the table layout `DiffWrapper` takes), `TreeSitterParser` (Tree-sitter highlighting and comment detection) |
 | `engine/Src/Common/` | `Src/Common/` | Portable utilities: `unicoder`, `UnicodeString`, `UniFile`, `paths`, `OptionsMgr`/`IniOptionsMgr`, `charsets`, `TempFile` support |
 | `tests/` | `Testing/GoogleTest/` | Upstream unit tests for the engine + `TestData/` |
+| `engine/Externals/tree-sitter/` | `Externals/tree-sitter/` | [Tree-sitter](https://github.com/tree-sitter/tree-sitter)'s runtime, 0.25.10, as WinMerge vendors it (`lib.c` builds it) — MIT, its Unicode headers under ICU's license |
 | `engine/Externals/winimerge/src/WinIMergeLib/` | [WinMerge/winimerge](https://github.com/WinMerge/winimerge) `src/WinIMergeLib/` @ `da639cdf` (the commit WinMerge pins) | Image-compare core: `ImgDiffBuffer.hpp` (block diff, overlay, blink, wipe), `ImgMergeBuffer.hpp` (copy diff, undo, save), `Diff.hpp` (embedded xdiff for insertion/deletion alignment) — GPL-2.0-or-later |
 
 The WinIMerge image wrapper (`image.hpp`, FreeImagePlus-based) and
@@ -28,6 +29,35 @@ open CVEs). The vendored algorithm headers therefore run on identical BGRA
 scanlines and produce the same diffs; format support follows Qt's decoders
 instead of FreeImage's (writing GIF and multi-page files back is not
 supported, unlike WinMerge).
+
+## Tree-sitter grammars
+
+WinMerge colors the languages its built-in parsers lack through
+Tree-sitter (its default highlight mode, "Built-in first"), with
+grammars built apart, in
+[WinMerge/tree-sitter-grammars](https://github.com/WinMerge/tree-sitter-grammars)
+(pinned at `f3b6918a`, release 0.2.1). LibreMerge builds the same
+grammars from the same commits, downloaded at configure time with their
+SHA-256 checked (`engine/TreeSitterGrammars.cmake`), as modules that the
+engine's `TreeSitterRegistry` loads from a `TreeSitterGrammars` folder,
+and bundles their queries as that repository's `build-grammars.ps1` does:
+the bundled `.scm` files match the ones of WinMerge's release 0.2.1 byte
+for byte, line endings aside.
+
+| Grammar repository | Version | Grammars built | License |
+|---|---|---|---|
+| tree-sitter-grammars/tree-sitter-markdown | v0.5.3 | `markdown`, `markdown_inline` | MIT |
+| tree-sitter-grammars/tree-sitter-properties | v0.3.0 | `properties` | MIT |
+| tree-sitter-grammars/tree-sitter-toml | v0.7.0 | `toml` | MIT |
+| tree-sitter-grammars/tree-sitter-yaml | v0.7.2 | `yaml` | MIT |
+| tree-sitter/tree-sitter-typescript | v0.23.2 | `typescript`, `tsx` | MIT |
+| tree-sitter/tree-sitter-javascript | v0.25.0 | none: its queries, which TypeScript's take in | MIT |
+
+These are the grammars of the languages the built-in parsers lack. The
+license of each repository, and the runtime's, travel in
+`TreeSitterGrammars/licenses`. tree-sitter-typescript's `flow` grammar
+stays out: WinMerge builds it from the `tsx` sources, so its module holds
+`tree_sitter_tsx` and never loads.
 
 ## Translations
 
@@ -87,6 +117,7 @@ Cursorposition:" and the font size "Schriftgröße in Punkten:".
 - **All MFC GUI code** (`*Dlg`, `*Bar`, `*Menu`, `*View`, `*Frm`, `*Doc`, `Src/Common` widgets): MFC is Windows-only and non-redistributable. The UI is rebuilt in Qt.
 - `Src/CompareEngines/ImageCompare.cpp`: thin wrapper around the WinIMerge Win32 DLL. LibreMerge keeps the engine Qt-free with a hook (`ports/image_compare_stub.cpp`) that the Qt app fills in with the ported image core at startup.
 - `Src/FileTransform.cpp`: the plugins it runs are COM/ActiveX, Windows-only. `ports/file_transform_posix.cpp` carries over its pipeline parsing and its line expressions (the `le:` items, which a table comparison's Ignore This Column puts in the prediffer), and refuses a plugin by name.
+- WinMerge/tree-sitter-grammars' `build-grammars.ps1` (MSVC and PowerShell): the grammars build with CMake instead (see Tree-sitter grammars above).
 - `Src/TableProps.cpp`: it reads the Compare > Table patterns from WinMerge's options; LibreMerge keeps that page's settings in the Qt app, which answers `MakeTablePropertiesByFileName` through a hook (`ports/table_props_posix.cpp`).
 - **frhed** (hex editor): GPL-2.0-**only**, incompatible with GPLv3 distribution. The binary comparison (`app/HexView.*`) is LibreMerge's own editor, written after the behavior of the heksedit control WinMerge embeds without taking any of its code; WinMerge's own `CHexMergeDoc`, `CHexMergeView` and `CHexMergeFrame` (GPL-2.0-or-later) are what `app/HexCompareView.*` follows.
 - **7-Zip `Rar*` codecs**: unRAR license restriction is GPL-incompatible (archive support will use libarchive, without RAR).
@@ -159,6 +190,27 @@ branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
   conventions and copies the va_list per attempt
 - `OptionsMgr.h`: declares `GetOptionsMgr()` (upstream gets it from the
   MFC app layer)
+
+**`TreeSitterParser.{h,cpp}`** (WinMerge's Tree-sitter bridge): the wide
+strings become `String`, `tchar_t` and `_T()` (the same types on Windows),
+so the text goes to Tree-sitter in the editor's encoding, UTF-8 here, and
+its byte offsets count `sizeof(tchar_t)` per character; on POSIX the
+grammar modules are `tree-sitter-<language>.so`, loaded with `dlopen()`,
+the folder is listed with `std::filesystem` and the default one is next
+to the program (`env::GetProgPath()`). Three things it does unlike the
+Tree-sitter hosts its queries are written for are corrected (marked
+`LibreMerge:` in the code):
+- the queries' text predicates (`#eq?`, `#match?`, `#any-of?`, with their
+  `not-` and `any-` forms) are checked, so a pattern colors only the nodes
+  it names; upstream reads `#set!` alone, and javascript's rule for
+  `require` gave every TypeScript identifier the function color
+- of nested captures the inner one colors, and where it ends the outer
+  one's color comes back, across an injection too; upstream let the higher
+  color win where captures start together and gave back normal text, so
+  only `a` of a properties key `a.b` took the key's color, and the text of
+  a TOML multi-line string took its key's
+- a chunk of the line cache writes only its own lines; upstream wrote a
+  capture's every line, leaving unsorted blocks in a chunk built before
 
 **Portable fixes (bugs on all platforms, hidden by Win32 behavior):**
 - `DirItem::SetFile`: no longer appends a trailing dot to extensionless

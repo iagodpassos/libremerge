@@ -266,6 +266,7 @@ public:
 	QStringList shownLinesForTest(int side) const;
 	int currentDiffForTest() const { return m_current; }
 	DiffTextEdit *paneForTest(int side) const { return m_panes[side]; }
+	SyntaxHighlighter *highlighterForTest(int side) const { return m_highlighters[side].get(); }
 	LocationPane *locationPaneForTest() const { return m_locationPane; }
 	int activePaneForTest() const { return m_activePane; }
 	PaneSearch *paneSearchForTest(int side) const { return m_search[side]; }

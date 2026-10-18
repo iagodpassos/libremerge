@@ -6,6 +6,9 @@
 #include "EngineOptions.h"
 
 #include <mutex>
+#include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
 #include <QSettings>
 #include <QStringList>
 #include <QVariant>
@@ -22,6 +25,7 @@
 #include "stringdiffs.h"
 #include "SyntaxParserRegistry.h"
 #include "CrystalLineSyntaxParser.h"
+#include "TreeSitterParser.h"
 
 namespace
 {
@@ -262,12 +266,36 @@ void installEngineOptions()
 	options.InitOption(OPT_PLUGINS_ENABLED, true);
 	loadFilters(&options);
 
-	// "Ignore comment differences" asks this registry for a parser of the
-	// file's language, in file and folder comparisons alike: WinMerge fills
-	// it at startup (CMergeApp::InitSyntaxParserFactories). The built-in
-	// parsers are the ones carried here, the same the highlighting uses
-	LangServices::SyntaxParserRegistry::GetInstance().RegisterFactory(
-		&CrystalLineSyntaxParserFactory::GetInstance());
+	// "Ignore comment differences" and the highlighting ask this registry
+	// for a parser of the file's language, in file and folder comparisons
+	// alike: WinMerge fills it at startup (CMergeApp::InitSyntaxParserFactories),
+	// in the order of its highlight mode, "Built-in first" by default: the
+	// built-in parsers, then Tree-sitter's for the languages they lack
+	TreeSitterRegistry::Instance().Initialize(treeSitterGrammarsDir().toStdString());
+	auto &registry = LangServices::SyntaxParserRegistry::GetInstance();
+	registry.RegisterFactory(&CrystalLineSyntaxParserFactory::GetInstance());
+	registry.RegisterFactory(&TreeSitterSyntaxParserFactory::GetInstance());
+}
+
+QString treeSitterGrammarsDir()
+{
+	// the binary's own folder (see sharedFiltersDir)
+	const QDir appDir(QFileInfo(QCoreApplication::applicationFilePath()).canonicalPath());
+#ifdef Q_OS_MACOS
+	// the bundle's Contents/Resources/TreeSitterGrammars
+	const QStringList candidates = {
+		appDir.filePath(QStringLiteral("../Resources/TreeSitterGrammars")) };
+#else
+	// installed (or inside the AppImage), then next to a build's binary
+	const QStringList candidates = {
+		appDir.filePath(QStringLiteral(LM_TREE_SITTER_RELDIR)),
+		appDir.filePath(QStringLiteral("TreeSitterGrammars")),
+	};
+#endif
+	for (const QString &candidate : candidates)
+		if (QFileInfo(candidate).isDir())
+			return QDir::cleanPath(candidate);
+	return QDir::cleanPath(candidates.first());
 }
 
 int currentCompareMethod()

@@ -145,6 +145,7 @@ list(APPEND L2_SOURCES
   Externals/crystaledit/editlib/SyntaxParserRegistry.cpp
   Externals/crystaledit/editlib/CrystalLineSyntaxParser.cpp
   ${CRYSTAL_PARSER_SOURCES}
+  Src/TreeSitterParser.cpp
 )
 set_source_files_properties(Src/FilterEngine/FilterParser.cpp
   PROPERTIES OBJECT_DEPENDS ${FILTER_GEN_DIR}/FilterParser.c)
@@ -179,6 +180,19 @@ target_link_libraries(libremerge-engine PUBLIC
   Boost::boost
   ICU::uc ICU::i18n
 )
+
+# Tree-sitter's runtime as WinMerge vendors it (Externals/tree-sitter, MIT):
+# lib.c takes the other sources in. TreeSitterParser loads the grammars
+# with dlopen().
+add_library(tree-sitter STATIC Externals/tree-sitter/lib/src/lib.c)
+target_include_directories(tree-sitter
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Externals/tree-sitter/lib/include
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Externals/tree-sitter/lib/src)
+target_compile_definitions(tree-sitter PRIVATE _POSIX_C_SOURCE=200112L _DEFAULT_SOURCE)
+target_link_libraries(libremerge-engine PRIVATE tree-sitter ${CMAKE_DL_LIBS})
+
+# the grammars it loads
+include(TreeSitterGrammars.cmake)
 
 # Image-compare core: the vendored WinIMerge algorithm headers
 # (Externals/winimerge) over a Qt-backed image wrapper (ports/imgmerge).

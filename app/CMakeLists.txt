@@ -139,6 +139,21 @@ else()
       $<TARGET_FILE_DIR:LibreMerge>/Filters)
 endif()
 
+# WinMerge's TreeSitterGrammars folder (engine/TreeSitterGrammars.cmake):
+# the grammar modules and their queries, in the bundle's Resources on
+# macOS and next to a build's binary elsewhere (installed under the
+# libdir, see below)
+if(LM_TREE_SITTER_GRAMMARS)
+  add_dependencies(LibreMerge tree-sitter-grammars)
+  if(APPLE)
+    set(LM_TREE_SITTER_APP_DIR "$<TARGET_BUNDLE_CONTENT_DIR:LibreMerge>/Resources/TreeSitterGrammars")
+  else()
+    set(LM_TREE_SITTER_APP_DIR "$<TARGET_FILE_DIR:LibreMerge>/TreeSitterGrammars")
+  endif()
+  add_custom_command(TARGET LibreMerge POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${LM_TREE_SITTER_GRAMMARS_DIR}" "${LM_TREE_SITTER_APP_DIR}")
+endif()
+
 # the macOS the bundle needs (LSMinimumSystemVersion): the deployment
 # target of a release build, Qt 6.12's 14.4 otherwise, so that an older
 # macOS says so instead of the app failing to start
@@ -188,6 +203,17 @@ if(UNIX AND NOT APPLE)
     DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
   install(FILES ${LM_FILTER_FILES}
     DESTINATION ${CMAKE_INSTALL_DATADIR}/libremerge/Filters)
+  # the grammar modules are the platform's code: the libdir, with their
+  # queries beside them; the binary finds them relative to itself
+  set(LM_TREE_SITTER_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/libremerge/TreeSitterGrammars)
+  file(RELATIVE_PATH LM_TREE_SITTER_RELDIR "${CMAKE_INSTALL_FULL_BINDIR}"
+    "${CMAKE_INSTALL_FULL_LIBDIR}/libremerge/TreeSitterGrammars")
+  target_compile_definitions(LibreMerge PRIVATE
+    LM_TREE_SITTER_RELDIR="${LM_TREE_SITTER_RELDIR}")
+  if(LM_TREE_SITTER_GRAMMARS)
+    install(DIRECTORY "${LM_TREE_SITTER_GRAMMARS_DIR}/"
+      DESTINATION ${LM_TREE_SITTER_INSTALL_DIR} USE_SOURCE_PERMISSIONS)
+  endif()
   foreach(_size 16 32 64 128 256 512)
     install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/icons/libremerge-${_size}.png
       DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${_size}x${_size}/apps

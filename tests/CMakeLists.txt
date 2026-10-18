@@ -19,6 +19,7 @@ set(TEST_SOURCES
   MoveDetection/RenameMoveDetection_test.cpp
   OptionsMgr/VariantValue_test.cpp
   Plugins/FileTransformPosix_test.cpp
+  TreeSitter/TreeSitterParser_test.cpp
   StringDiffs/stringdiffs_test.cpp
   StringDiffs/stringdiffs_test_adds.cpp
   StringDiffs/stringdiffs_test_bugs.cpp
@@ -54,6 +55,11 @@ target_link_libraries(libremerge-tests PRIVATE
   libremerge-engine
   GTest::gtest
 )
+
+# the Tree-sitter grammars of the build, for TreeSitterParser_test
+add_dependencies(libremerge-tests tree-sitter-grammars)
+target_compile_definitions(libremerge-tests PRIVATE
+  LM_TEST_TREE_SITTER_DIR="${LM_TREE_SITTER_GRAMMARS_DIR}")
 
 if(NOT WIN32)
   target_compile_options(libremerge-tests PRIVATE

@@ -96,11 +96,22 @@ grep -q '^Translations' "$APP/Contents/Resources/qt.conf" \
 echo "==> Signing"
 IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
   | awk -F '"' '/Developer ID Application/ {print $2; exit}')"
+# the Tree-sitter grammar modules sit among the resources, where --deep
+# does not look: signed first, with the identity of the rest
+shopt -s nullglob
+GRAMMARS=("$APP"/Contents/Resources/TreeSitterGrammars/*.so)
+shopt -u nullglob
 if [ -n "$IDENTITY" ]; then
   echo "    using identity: $IDENTITY"
+  if [ ${#GRAMMARS[@]} -gt 0 ]; then
+    codesign --force --options runtime -s "$IDENTITY" "${GRAMMARS[@]}"
+  fi
   codesign --force --deep --options runtime -s "$IDENTITY" "$APP"
 else
   echo "    no Developer ID found - ad-hoc signature"
+  if [ ${#GRAMMARS[@]} -gt 0 ]; then
+    codesign --force -s - "${GRAMMARS[@]}"
+  fi
   codesign --force --deep -s - "$APP"
 fi
 codesign --verify --deep "$APP"
