@@ -94,6 +94,47 @@ TEST(TreeSitterParser, OnlyTheLanguagesOfTheGrammars)
 	EXPECT_EQ(nullptr, factory.Create(LangServices::LanguageId::SRC_ABAP));
 }
 
+TEST(TreeSitterParser, EveryGrammarOfWinMerge)
+{
+	if (!grammars())
+		GTEST_SKIP() << "built without the Tree-sitter grammars";
+	// the grammars WinMerge ships, each with a highlight query that compiles
+	// against it (one that does not leaves its language without a parser)
+	using LangServices::LanguageId;
+	auto &factory = TreeSitterSyntaxParserFactory::GetInstance();
+	for (LanguageId id : { LanguageId::SRC_C, LanguageId::SRC_CSHARP, LanguageId::SRC_CSS,
+		LanguageId::SRC_FSHARP, LanguageId::SRC_FSHARP_SIGNATURE, LanguageId::SRC_GO,
+		LanguageId::SRC_HTML, LanguageId::SRC_INI, LanguageId::SRC_JAVA,
+		LanguageId::SRC_JAVASCRIPT, LanguageId::SRC_JSON, LanguageId::SRC_MARKDOWN,
+		LanguageId::SRC_PHP, LanguageId::SRC_PROPERTIES, LanguageId::SRC_PYTHON,
+		LanguageId::SRC_RUBY, LanguageId::SRC_RUST, LanguageId::SRC_SH, LanguageId::SRC_TOML,
+		LanguageId::SRC_TSX, LanguageId::SRC_TYPESCRIPT, LanguageId::SRC_XML, LanguageId::SRC_YAML })
+		EXPECT_TRUE(factory.IsSupported(id)) << static_cast<int>(id);
+	// and the ones only other grammars take in
+	for (const tchar_t *name : { _T("c"), _T("dtd"), _T("markdown_inline"), _T("php_only") })
+		EXPECT_NE(nullptr, TreeSitterRegistry::Instance().GetLanguageForName(name)) << name;
+
+	// WinMerge's own query for C (custom_queries), on the C++ grammar
+	Lines c({ "#define MAX 10", "static int n;" });
+	auto cParser = parserFor(LanguageId::SRC_C, c);
+	ASSERT_NE(nullptr, cParser);
+	EXPECT_EQ(COLORINDEX_PREPROCESSOR, colorAt(*cParser, 0, 0)); // #define
+	EXPECT_EQ(COLORINDEX_KEYWORD, colorAt(*cParser, 1, 0));      // static
+	EXPECT_EQ(COLORINDEX_USER1, colorAt(*cParser, 1, 7));        // int
+
+	// a language inside another: JavaScript and CSS in HTML, and CSS in a
+	// tagged template of JavaScript, named by the tag
+	Lines html({ "<style>p { color: red; }</style>", "<script>const x = 1;</script>" });
+	auto htmlParser = parserFor(LanguageId::SRC_HTML, html);
+	ASSERT_NE(nullptr, htmlParser);
+	EXPECT_EQ(COLORINDEX_USER1, colorAt(*htmlParser, 0, 11));  // color
+	EXPECT_EQ(COLORINDEX_KEYWORD, colorAt(*htmlParser, 1, 8)); // const
+	Lines js({ "const s = css`a { color: red; }`;" });
+	auto jsParser = parserFor(LanguageId::SRC_JAVASCRIPT, js);
+	ASSERT_NE(nullptr, jsParser);
+	EXPECT_EQ(COLORINDEX_USER1, colorAt(*jsParser, 0, 18));    // color
+}
+
 TEST(TreeSitterParser, YamlColors)
 {
 	if (!grammars())

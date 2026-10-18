@@ -197,6 +197,9 @@ public:
 	    followed by rescanned(): WinMerge's OnRefresh, which reports
 	    identical files. */
 	void refreshByUser();
+	/** The highlighting as the options have it now (WinMerge's
+	    CMergeEditView::RefreshOptions sets each view's text type again). */
+	void refreshSyntaxHighlighting();
 	/** WinMerge's OnFileReload, past its save prompt: every pane is read
 	    from disk again (an untitled one emptied), the undo history goes
 	    and the cursor returns to the line it was on. Nothing is touched

@@ -32,9 +32,9 @@ supported, unlike WinMerge).
 
 ## Tree-sitter grammars
 
-WinMerge colors the languages its built-in parsers lack through
-Tree-sitter (its default highlight mode, "Built-in first"), with
-grammars built apart, in
+WinMerge colors files through Tree-sitter too, in the order its highlight
+mode sets (Options > Editor; by default "Built-in first", Tree-sitter for
+the languages its built-in parsers lack), with grammars built apart, in
 [WinMerge/tree-sitter-grammars](https://github.com/WinMerge/tree-sitter-grammars)
 (pinned at `f3b6918a`, release 0.2.1). LibreMerge builds the same
 grammars from the same commits, downloaded at configure time with their
@@ -46,18 +46,37 @@ for byte, line endings aside.
 
 | Grammar repository | Version | Grammars built | License |
 |---|---|---|---|
+| ionide/tree-sitter-fsharp | 0.3.12 | `fsharp`, `fsharp_signature` | MIT |
+| justinmk/tree-sitter-ini | v1.4.0 | `ini` | Apache-2.0 |
 | tree-sitter-grammars/tree-sitter-markdown | v0.5.3 | `markdown`, `markdown_inline` | MIT |
 | tree-sitter-grammars/tree-sitter-properties | v0.3.0 | `properties` | MIT |
 | tree-sitter-grammars/tree-sitter-toml | v0.7.0 | `toml` | MIT |
+| tree-sitter-grammars/tree-sitter-xml | v0.7.0 | `xml`, `dtd` | MIT |
 | tree-sitter-grammars/tree-sitter-yaml | v0.7.2 | `yaml` | MIT |
+| tree-sitter/tree-sitter-bash | v0.25.1 | `bash` | MIT |
+| tree-sitter/tree-sitter-cpp | v0.23.4 | `cpp` | MIT |
+| tree-sitter/tree-sitter-c-sharp | v0.23.5 | `c-sharp` | MIT |
+| tree-sitter/tree-sitter-css | v0.25.0 | `css` | MIT |
+| tree-sitter/tree-sitter-c | v0.24.2 | `c` | MIT |
+| tree-sitter/tree-sitter-go | v0.25.0 | `go` | MIT |
+| tree-sitter/tree-sitter-html | v0.23.2 | `html` | MIT |
+| tree-sitter/tree-sitter-javascript | v0.25.0 | `javascript` | MIT |
+| tree-sitter/tree-sitter-java | v0.23.5 | `java` | MIT |
+| tree-sitter/tree-sitter-json | v0.24.8 | `json` | MIT |
+| tree-sitter/tree-sitter-php | v0.25.0 | `php`, `php_only` | MIT |
+| tree-sitter/tree-sitter-python | v0.25.0 | `python` | MIT |
+| tree-sitter/tree-sitter-ruby | v0.23.1 | `ruby` | MIT |
+| tree-sitter/tree-sitter-rust | v0.24.2 | `rust` | MIT |
 | tree-sitter/tree-sitter-typescript | v0.23.2 | `typescript`, `tsx` | MIT |
-| tree-sitter/tree-sitter-javascript | v0.25.0 | none: its queries, which TypeScript's take in | MIT |
 
-These are the grammars of the languages the built-in parsers lack. The
-license of each repository, and the runtime's, travel in
+The license of each repository, and the runtime's, travel in
 `TreeSitterGrammars/licenses`. tree-sitter-typescript's `flow` grammar
 stays out: WinMerge builds it from the `tsx` sources, so its module holds
-`tree_sitter_tsx` and never loads.
+`tree_sitter_tsx` and never loads. Like `build-grammars.ps1`, the build
+puts WinMerge's own queries for C and C++ in place of the bundled ones:
+`c-highlights.scm` and `cpp-highlights.scm` of that repository's
+`custom_queries`, written by WinMerge's maintainer (the repository states
+no license), kept in `engine/Externals/tree-sitter-grammars/custom_queries`.
 
 ## Translations
 

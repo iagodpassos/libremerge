@@ -1395,33 +1395,35 @@ int main(int argc, char *argv[])
 	{
 		// WinMerge's Preferences layout: the page tree, a category opening
 		// its first page with the path in the title, the backup switch on
-		// Backup Files, and Defaults resetting the current page only.
+		// Backup Files, the highlighting on Editor > General, and Defaults
+		// resetting the current page only.
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
 			OptionsDialog::BinaryPage, OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
-			OptionsDialog::BackupPage };
-		bool ok = tree.size() == 9;
+			-1, OptionsDialog::EditorPage, OptionsDialog::BackupPage };
+		bool ok = tree.size() == 11;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
 
-		// the Compare category shows Compare > General
+		// the Compare category shows Compare > General, Editor its General
 		const int expectedPage[] = { OptionsDialog::GeneralPage,
 			OptionsDialog::ComparePage, OptionsDialog::ComparePage,
 			OptionsDialog::FolderPage, OptionsDialog::TablePage, OptionsDialog::BinaryPage,
-			OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage, OptionsDialog::BackupPage };
-		for (int i = 0; ok && i < 9; ++i)
+			OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
+			OptionsDialog::EditorPage, OptionsDialog::EditorPage, OptionsDialog::BackupPage };
+		for (int i = 0; ok && i < 11; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
 			printf("item %d: page %d, title \"%s\"\n", i,
 				dialog.currentPageForTest(), qPrintable(dialog.windowTitle()));
 			ok = dialog.currentPageForTest() == expectedPage[i]
-				&& nested == (i >= 1 && i <= 6);
+				&& nested == ((i >= 1 && i <= 6) || i == 8 || i == 9);
 		}
 
 		const auto boxes = [&dialog](OptionsDialog::Page page) {
@@ -1446,9 +1448,25 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(8); // Backup Files
+		dialog.selectCategoryForTest(10); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
+
+		// Editor > General: "Highlight syntax" on, "Built-in first" by default
+		{
+			const QList<QCheckBox *> editorBoxes = boxes(OptionsDialog::EditorPage);
+			auto *mode = dialog.pageForTest(OptionsDialog::EditorPage)->findChild<QComboBox *>();
+			ok = ok && editorBoxes.size() == 1 && mode != nullptr && mode->count() == 4;
+			if (ok)
+			{
+				editorBoxes.first()->setChecked(false);
+				mode->setCurrentIndex(3);
+				dialog.selectCategoryForTest(9);
+				dialog.restoreDefaultsForTest();
+				ok = editorBoxes.first()->isChecked() && mode->currentIndex() == 1;
+			}
+			printf("editor page: %s\n", ok ? "ok" : "wrong");
+		}
 
 		// every row of the Message Boxes list shows its check box (the
 		// macOS 27 style left all but the first one out)
@@ -11403,6 +11421,47 @@ int main(int argc, char *argv[])
 			check(colorAt(view, 0, 2, 6) == color(view, 0, COLORINDEX_USER1)
 					&& color(view, 0, COLORINDEX_USER1).isValid(),
 				"Python: the User 1 color of the built-in parser");
+
+			// WinMerge's Editor page: the highlight mode orders the parsers,
+			// for the files already open too (CMergeEditView::RefreshOptions),
+			// and "Highlight syntax" off leaves the text plain
+			lm::setSyntaxHighlightForTest(true, 2); // Tree-sitter first
+			view.refreshSyntaxHighlighting();
+			settle();
+			check(view.highlighterForTest(0)->treeSitterForTest()
+					&& colorAt(view, 0, 1, 14) == color(view, 0, COLORINDEX_COMMENT),
+				"Tree-sitter first: Python by Tree-sitter");
+			lm::setSyntaxHighlightForTest(true, 0); // Built-in only
+			view.refreshSyntaxHighlighting();
+			check(view.highlighterForTest(0)->hasLanguage()
+					&& !view.highlighterForTest(0)->treeSitterForTest(),
+				"Built-in only: Python by its built-in parser");
+			lm::setSyntaxHighlightForTest(false, 1);
+			view.refreshSyntaxHighlighting();
+			settle();
+			check(!view.highlighterForTest(0)->hasLanguage()
+					&& colorAt(view, 0, 1, 14) == QColor(),
+				"Highlight syntax off: plain text");
+		}
+		{
+			const QString leftSql = dir.filePath(QStringLiteral("left.sql"));
+			const QString rightSql = dir.filePath(QStringLiteral("right.sql"));
+			write(leftSql, "SELECT 1; -- one\n");
+			write(rightSql, "SELECT 2; -- two\n");
+			QString error;
+			lm::setSyntaxHighlightForTest(true, 0); // Built-in only
+			FileCompareView yaml;
+			if (!yaml.compare(leftYaml, rightYaml, &error))
+				return 2;
+			check(!yaml.highlighterForTest(0)->hasLanguage(),
+				"Built-in only: no parser for YAML");
+			lm::setSyntaxHighlightForTest(true, 3); // Tree-sitter only
+			FileCompareView sql;
+			if (!sql.compare(leftSql, rightSql, &error))
+				return 2;
+			check(!sql.highlighterForTest(0)->hasLanguage(),
+				"Tree-sitter only: no parser for SQL, which has no grammar");
+			lm::setSyntaxHighlightForTest(true, 1);
 		}
 
 		printf("ok: %d\n", ok);

@@ -82,6 +82,7 @@ public:
 		BinaryPage,  ///< Compare > Binary
 		ImagePage,   ///< Compare > Image
 		MessageBoxesPage,
+		EditorPage,  ///< Editor > General
 		BackupPage,
 	};
 	/** The tree's items in display order, with their depth and the page
@@ -121,6 +122,7 @@ private:
 	void loadMessageBoxes();
 	void resetMessageBoxes();
 	void syncMessageAnswer(int row);
+	QWidget *buildEditorPage();
 	QWidget *buildBackupPage();
 	void selectCategory(QTreeWidgetItem *item);
 	void load();
@@ -172,6 +174,9 @@ private:
 	QCheckBox *m_chkBlankOutIgnored;
 	// Compare > Folder
 	QComboBox *m_cmbCompareMethod;
+	// Editor > General
+	QCheckBox *m_chkHiliteSyntax = nullptr;
+	QComboBox *m_cmbHiliteSyntaxMode = nullptr;
 	// Message Boxes
 	QTreeWidget *m_messageList;
 	// the Answer drop-down of each question, by row (null for the

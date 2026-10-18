@@ -19,6 +19,14 @@ namespace lm
     the comparison option defaults. */
 void installEngineOptions();
 
+/** Fill the engine's syntax parser registry in the order of the highlight
+    mode (WinMerge's OPT_SYNTAX_HIGHLIGHT_MODE), as at startup and after
+    the Options dialog. */
+void initSyntaxParserFactories();
+/** Set the highlighting and its mode in memory only, the registry
+    filled again (for tests). */
+void setSyntaxHighlightForTest(bool on, int mode);
+
 /** The folder of the Tree-sitter grammars (WinMerge's TreeSitterGrammars):
     the bundle's Resources on macOS, the installed one or the one next to
     the binary elsewhere. */

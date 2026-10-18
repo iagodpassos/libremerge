@@ -20,7 +20,7 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - **Binary comparison** (2-way and 3-way), after WinMerge's hex view: the files as hex dumps side by side, each byte that differs at the same offset colored, next and previous difference, the selected bytes or all of them copied across, and the editing of the hex editor WinMerge embeds (overwrite or insert, by hex digit or by character, Cut, Copy and Paste, Find and Replace in Frhed's special syntax, Go to offset) with one undo history for the panes. Binary files and WinMerge's binary file patterns open it, and Options > Compare > Binary holds the editor's settings
 - **WinMerge's filters**: Tools > Filters with its three pages, file filters (one global folder filter with masks, expressions and presets, picked from the selection screen and built with the "=" helper menu), line filters (regular expressions that mark matching differences as trivial) and substitution filters; a **display filter bar** in the folder window (by comparison result, or per column) and in the file and table windows (hide the lines a text or a line expression does not match, with the "=" menu to build one); and **moved block detection**
 - **Find and Replace** in the compare panes with WinMerge's own dialogs: whole word, match case, regular expressions (their groups in the replacement), Replace All in a selection, F3 to search again, every occurrence of the text marked, and the Marker dialog for texts of your own marked in three colors
-- **Syntax highlighting** for 47 languages via WinMerge's own parsers, and for YAML, TOML, Markdown, TypeScript (TSX too) and properties files through Tree-sitter, as WinMerge colors them; "Ignore comment differences" knows the comments of all of them
+- **Syntax highlighting** as WinMerge colors files: its own parsers for 47 languages and Tree-sitter grammars for 23, the built-in parsers first by default (YAML, TOML, Markdown, TypeScript and properties files then come from Tree-sitter) or in the order picked in Options > Editor; "Ignore comment differences" knows the comments of all of them
 - **Light and dark themes** for the whole window, or follow the system (on Linux, the dark style of GNOME and KDE, picked up as you switch it), chosen under Options > General; **English, Spanish, Catalan, German and Brazilian Portuguese** interface following the system language
 - Drag & drop files or folders onto the window or the Dock icon; a WinMerge-style "Select Files or Folders" screen with history, paths verified as you type, auto completion, read-only flags and swap; a single file opens against a snapshot of itself, to review your own edits
 - Comparison options carried over from WinMerge: ignore whitespace/case/blank lines/EOL/numbers, diff algorithm selection (Myers, minimal, patience, histogram)
@@ -64,12 +64,12 @@ LibreMerge dirA/ dirB/                 # folder compare
 
 ## Build from source (macOS / Linux)
 
-Dependencies: a C++17 compiler, CMake ≥ 3.21, Ninja, Qt 6, POCO, ICU, Boost (headers), libarchive, re2c and lemon. The first configure downloads the sources of the Tree-sitter grammars WinMerge uses, about 2 MB (`-DLM_TREE_SITTER_GRAMMARS=OFF` builds without them). On macOS: `brew install cmake ninja qt poco icu4c boost googletest re2c lemon libarchive`. On Debian/Ubuntu see the package list in [`.github/workflows`](.github/workflows).
+Dependencies: a C++17 compiler, CMake ≥ 3.21, Ninja, Qt 6, POCO, ICU, Boost (headers), libarchive, re2c and lemon. The first configure downloads the sources of the Tree-sitter grammars WinMerge uses, about 12 MB (`-DLM_TREE_SITTER_GRAMMARS=OFF` builds without them). On macOS: `brew install cmake ninja qt poco icu4c boost googletest re2c lemon libarchive`. On Debian/Ubuntu see the package list in [`.github/workflows`](.github/workflows).
 
 ```sh
 cmake -S . -B build -G Ninja
 cmake --build build
-ctest --test-dir build        # engine test suite (416 tests)
+ctest --test-dir build        # engine test suite (417 tests)
 ./build/app/LibreMerge        # (on macOS: build/app/LibreMerge.app)
 ```
 

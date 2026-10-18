@@ -3590,6 +3590,10 @@ Checando identidade binária...</translation>
         <translation>Caixas de Mensagens</translation>
     </message>
     <message>
+        <source>Editor</source>
+        <translation>Editor</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Arquivos de Backup</translation>
     </message>
@@ -3748,6 +3752,30 @@ Checando identidade binária...</translation>
     <message>
         <source>Answer</source>
         <translation>Resposta</translation>
+    </message>
+    <message>
+        <source>Highlight syntax</source>
+        <translation>Destacar a sintaxe</translation>
+    </message>
+    <message>
+        <source>Built-in only</source>
+        <translation>Apenas o integrado</translation>
+    </message>
+    <message>
+        <source>Built-in first</source>
+        <translation>Primeiro o integrado</translation>
+    </message>
+    <message>
+        <source>Tree-sitter first</source>
+        <translation>Primeiro o Tree-sitter</translation>
+    </message>
+    <message>
+        <source>Tree-sitter only</source>
+        <translation>Apenas o Tree-sitter</translation>
+    </message>
+    <message>
+        <source>Highlight mode:</source>
+        <translation>Modo de destaque:</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

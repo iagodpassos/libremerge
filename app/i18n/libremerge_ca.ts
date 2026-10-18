@@ -4309,6 +4309,10 @@ S&apos;està comprovant la identitat binària...</translation>
         <translation>Quadres de missatges</translation>
     </message>
     <message>
+        <source>Editor</source>
+        <translation>Editor</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Fitxers de còpia de seguretat</translation>
     </message>
@@ -4522,6 +4526,36 @@ S&apos;està comprovant la identitat binària...</translation>
     <message>
         <source>Answer</source>
         <translation>Resposta</translation>
+    </message>
+    <message>
+        <source>Highlight syntax</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Highlight syntax&quot;.</translatorcomment>
+        <translation>Ressalta la sintaxi</translation>
+    </message>
+    <message>
+        <source>Built-in only</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Només l&apos;integrat</translation>
+    </message>
+    <message>
+        <source>Built-in first</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Primer l&apos;integrat</translation>
+    </message>
+    <message>
+        <source>Tree-sitter first</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Tree-sitter primer</translation>
+    </message>
+    <message>
+        <source>Tree-sitter only</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Només Tree-sitter</translation>
+    </message>
+    <message>
+        <source>Highlight mode:</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Mode de ressaltat:</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

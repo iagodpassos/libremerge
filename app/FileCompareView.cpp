@@ -1720,6 +1720,18 @@ void FileCompareView::updateHeader(int side)
 	m_headers[side]->setOriginalText(text);
 }
 
+void FileCompareView::refreshSyntaxHighlighting()
+{
+	for (int i = 0; i < 3; ++i)
+	{
+		if (m_highlighters[i] == nullptr)
+			continue;
+		m_highlighters[i].reset();
+		m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
+			m_panes[i]->document(), m_sides[i].path);
+	}
+}
+
 /** Apply the light (WinMerge classic) or dark palette to every themed
     part of the view: editor panes, gutters, diff pane, location pane,
     status strips, headers, syntax colors and diff highlights. */

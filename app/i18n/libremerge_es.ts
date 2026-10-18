@@ -4027,6 +4027,10 @@ Comprobando la identidad binaria...</translation>
         <translation>Cuadros de mensajes</translation>
     </message>
     <message>
+        <source>Editor</source>
+        <translation>Edición</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Copias de seguridad</translation>
     </message>
@@ -4236,6 +4240,32 @@ Comprobando la identidad binaria...</translation>
     <message>
         <source>Answer</source>
         <translation>Respuesta</translation>
+    </message>
+    <message>
+        <source>Highlight syntax</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Highlight syntax&quot;.</translatorcomment>
+        <translation>Resaltar sintaxis</translation>
+    </message>
+    <message>
+        <source>Built-in only</source>
+        <translation>Solo el integrado</translation>
+    </message>
+    <message>
+        <source>Built-in first</source>
+        <translation>Primero el integrado</translation>
+    </message>
+    <message>
+        <source>Tree-sitter first</source>
+        <translation>Tree-sitter primero</translation>
+    </message>
+    <message>
+        <source>Tree-sitter only</source>
+        <translation>Solo Tree-sitter</translation>
+    </message>
+    <message>
+        <source>Highlight mode:</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Highlight &amp;mode:&quot;.</translatorcomment>
+        <translation>Modo de resaltado:</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

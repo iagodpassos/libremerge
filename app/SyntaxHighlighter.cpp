@@ -11,6 +11,8 @@
 
 #include "ISyntaxParser.h"
 #include "ITextBuffer.h"
+#include "OptionsDef.h"
+#include "OptionsMgr.h"
 #include "SyntaxColors.h"
 #include "SyntaxParserRegistry.h"
 #include "TextDefinition.h"
@@ -97,6 +99,10 @@ SyntaxHighlighter::SyntaxHighlighter(QTextDocument *document, const QString &fil
 {
 	const std::string ext = QFileInfo(filePath).suffix().toLower().toStdString();
 	LangServices::TextDefinition *def = ext.empty() ? nullptr : LangServices::GetTextType(ext.c_str());
+	// WinMerge's "Highlight syntax" off: plain text (SRC_PLAIN)
+	const COptionsMgr *options = GetOptionsMgr();
+	if (options != nullptr && !options->GetBool(OPT_SYNTAX_HIGHLIGHT))
+		def = nullptr;
 	if (def != nullptr && def->type != LangServices::LanguageId::SRC_PLAIN)
 	{
 		// the parser WinMerge's view takes, the registry's for the

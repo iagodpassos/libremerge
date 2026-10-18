@@ -1694,7 +1694,15 @@ void MainWindow::showOptions()
 	// the auto-reload mode decides what is watched
 	updateFileWatches();
 	if (accepted)
+	{
+		// CMainFrame::OnOptions: the parsers in the highlight mode's order,
+		// then every merge document's options again
+		lm::initSyntaxParserFactories();
+		for (int i = 0; i < m_tabs->count(); ++i)
+			if (auto *file = qobject_cast<FileCompareView *>(m_tabs->widget(i)))
+				file->refreshSyntaxHighlighting();
 		applyDiffOptions();
+	}
 }
 
 void MainWindow::applyDiffOptions()

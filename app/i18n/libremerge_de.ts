@@ -4021,6 +4021,10 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <translation>Meldungen</translation>
     </message>
     <message>
+        <source>Editor</source>
+        <translation>Editor</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Sicherungsdateien</translation>
     </message>
@@ -4233,6 +4237,32 @@ Drücken Sie &apos;Zurücksetzen&apos;, um alle Meldungen wieder sichtbar zu sch
     <message>
         <source>Answer</source>
         <translation>Antwort</translation>
+    </message>
+    <message>
+        <source>Highlight syntax</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Highlight syntax&quot;.</translatorcomment>
+        <translation>Syntax hervorheben</translation>
+    </message>
+    <message>
+        <source>Built-in only</source>
+        <translation>Nur integrierte</translation>
+    </message>
+    <message>
+        <source>Built-in first</source>
+        <translation>Integrierte zuerst</translation>
+    </message>
+    <message>
+        <source>Tree-sitter first</source>
+        <translation>Tree-sitter zuerst</translation>
+    </message>
+    <message>
+        <source>Tree-sitter only</source>
+        <translation>Nur Tree-sitter</translation>
+    </message>
+    <message>
+        <source>Highlight mode:</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Highlight &amp;mode:&quot;.</translatorcomment>
+        <translation>Hervorhebungsmodus:</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

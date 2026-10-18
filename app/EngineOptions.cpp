@@ -6,6 +6,7 @@
 #include "EngineOptions.h"
 
 #include <mutex>
+#include <vector>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
@@ -266,15 +267,48 @@ void installEngineOptions()
 	options.InitOption(OPT_PLUGINS_ENABLED, true);
 	loadFilters(&options);
 
-	// "Ignore comment differences" and the highlighting ask this registry
-	// for a parser of the file's language, in file and folder comparisons
-	// alike: WinMerge fills it at startup (CMergeApp::InitSyntaxParserFactories),
-	// in the order of its highlight mode, "Built-in first" by default: the
-	// built-in parsers, then Tree-sitter's for the languages they lack
+	// WinMerge's Editor page: the highlighting, and the parsers it takes
+	options.InitOption(OPT_SYNTAX_HIGHLIGHT, true);
+	options.InitOption(OPT_SYNTAX_HIGHLIGHT_MODE, 1);
 	TreeSitterRegistry::Instance().Initialize(treeSitterGrammarsDir().toStdString());
+	initSyntaxParserFactories();
+}
+
+void initSyntaxParserFactories()
+{
+	// CMergeApp::InitSyntaxParserFactories: "Ignore comment differences"
+	// and the highlighting ask this registry for a parser of the file's
+	// language, in file and folder comparisons alike; it holds the
+	// built-in parsers and Tree-sitter's in the order of the highlight
+	// mode ("Built-in first" by default: the built-in parsers, then
+	// Tree-sitter's for the languages they lack)
 	auto &registry = LangServices::SyntaxParserRegistry::GetInstance();
-	registry.RegisterFactory(&CrystalLineSyntaxParserFactory::GetInstance());
-	registry.RegisterFactory(&TreeSitterSyntaxParserFactory::GetInstance());
+	LangServices::ISyntaxParserFactory *crystal = &CrystalLineSyntaxParserFactory::GetInstance();
+	LangServices::ISyntaxParserFactory *treeSitter = &TreeSitterSyntaxParserFactory::GetInstance();
+	registry.UnregisterFactory(crystal);
+	registry.UnregisterFactory(treeSitter);
+
+	const std::vector<LangServices::ISyntaxParserFactory *> modes[4] = {
+		{ crystal },              // Built-in only
+		{ crystal, treeSitter },  // Built-in first
+		{ treeSitter, crystal },  // Tree-sitter first
+		{ treeSitter },           // Tree-sitter only
+	};
+	int mode = GetOptionsMgr()->GetInt(OPT_SYNTAX_HIGHLIGHT_MODE);
+	if (mode < 0 || mode >= 4)
+		mode = 3;
+	for (LangServices::ISyntaxParserFactory *factory : modes[mode])
+		registry.RegisterFactory(factory);
+}
+
+void setSyntaxHighlightForTest(bool on, int mode)
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+	{
+		mgr->Set(OPT_SYNTAX_HIGHLIGHT, on);
+		mgr->Set(OPT_SYNTAX_HIGHLIGHT_MODE, mode);
+	}
+	initSyntaxParserFactories();
 }
 
 QString treeSitterGrammarsDir()

@@ -203,6 +203,8 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	addCategory(compare, tr("Binary"), BinaryPage);
 	addCategory(compare, tr("Image"), ImagePage);
 	addCategory(nullptr, tr("Message Boxes"), MessageBoxesPage);
+	QTreeWidgetItem *editor = addCategory(nullptr, tr("Editor"), -1);
+	addCategory(editor, tr("General"), EditorPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	m_categories->expandAll();
 	body->addWidget(m_categories);
@@ -216,6 +218,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildBinaryPage());
 	m_pages->addWidget(buildImagePage());
 	m_pages->addWidget(buildMessageBoxesPage());
+	m_pages->addWidget(buildEditorPage());
 	m_pages->addWidget(buildBackupPage());
 	pageArea->addWidget(m_pages, 1);
 	// every WinMerge page has its own Defaults button, resetting only it
@@ -617,6 +620,25 @@ void OptionsDialog::loadMessageBoxes()
 	}
 }
 
+/** WinMerge's Editor page (PropEditor): the highlighting and the parsers
+    it takes, from the built-in ones and Tree-sitter's; the EOL, tab and
+    rendering options are not offered yet. */
+QWidget *OptionsDialog::buildEditorPage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+
+	m_chkHiliteSyntax = new QCheckBox(tr("Highlight syntax"), page);
+	box->addWidget(m_chkHiliteSyntax);
+	m_cmbHiliteSyntaxMode = new QComboBox(page);
+	m_cmbHiliteSyntaxMode->addItems({ tr("Built-in only"), tr("Built-in first"),
+		tr("Tree-sitter first"), tr("Tree-sitter only") });
+	addLabeled(box, tr("Highlight mode:"), m_cmbHiliteSyntaxMode);
+
+	box->addStretch(1);
+	return page;
+}
+
 /** WinMerge's Backup Files page (PropBackups): the file compare switch;
     folder, name and the folder compare switch are not offered yet. */
 QWidget *OptionsDialog::buildBackupPage()
@@ -680,6 +702,8 @@ void OptionsDialog::load()
 		m_chkIndentHeuristic->setChecked(mgr->GetBool(OPT_CMP_INDENT_HEURISTIC));
 		m_chkBlankOutIgnored->setChecked(
 			mgr->GetBool(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES));
+		m_chkHiliteSyntax->setChecked(mgr->GetBool(OPT_SYNTAX_HIGHLIGHT));
+		m_cmbHiliteSyntaxMode->setCurrentIndex(mgr->GetInt(OPT_SYNTAX_HIGHLIGHT_MODE));
 	}
 	m_cmbCompareMethod->setCurrentIndex(lm::currentCompareMethod());
 	showTableSettings(lm::TableSettings::load());
@@ -735,6 +759,9 @@ void OptionsDialog::save()
 			m_chkIndentHeuristic->isChecked());
 		mgr->SaveOption(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES,
 			m_chkBlankOutIgnored->isChecked());
+		mgr->SaveOption(OPT_SYNTAX_HIGHLIGHT, m_chkHiliteSyntax->isChecked());
+		mgr->SaveOption(OPT_SYNTAX_HIGHLIGHT_MODE,
+			m_cmbHiliteSyntaxMode->currentIndex());
 		mgr->FlushOptions();
 	}
 	lm::saveCompareMethod(m_cmbCompareMethod->currentIndex());
@@ -831,6 +858,10 @@ void OptionsDialog::restoreDefaults(int page)
 	case MessageBoxesPage:
 		for (int i = 0; i < m_messageList->topLevelItemCount(); ++i)
 			m_messageList->topLevelItem(i)->setCheckState(0, Qt::Unchecked);
+		break;
+	case EditorPage:
+		m_chkHiliteSyntax->setChecked(true);
+		m_cmbHiliteSyntaxMode->setCurrentIndex(1); // Built-in first
 		break;
 	case BackupPage:
 		m_chkBackup->setChecked(true);
