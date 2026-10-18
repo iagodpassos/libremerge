@@ -27,5 +27,7 @@ protected:
 private:
 	ParseFunc m_parse = nullptr;
 	QString m_languageName;
-	QTextCharFormat m_formats[16];
+	// by COLORINDEX: the syntax colors run up to COLORINDEX_USER2 (21)
+	static constexpr int kFormatCount = 32;
+	QTextCharFormat m_formats[kFormatCount];
 };

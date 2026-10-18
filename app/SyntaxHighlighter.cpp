@@ -56,7 +56,7 @@ SyntaxHighlighter::SyntaxHighlighter(QTextDocument *document, const QString &fil
 	// foreground only (diff colors own the background); classic light
 	// palette or a dark-editor equivalent, per the active theme
 	auto set = [this](int index, const QColor &color, bool bold = false) {
-		if (index < 0 || index >= 16)
+		if (index < 0 || index >= kFormatCount)
 			return;
 		m_formats[index].setForeground(color);
 		if (bold)
@@ -108,7 +108,7 @@ void SyntaxHighlighter::highlightBlock(const QString &text)
 	for (size_t k = 0; k < blocks.size(); ++k)
 	{
 		const int colorIndex = blocks[k].m_nColorIndex & ~0xC0000000;
-		if (colorIndex <= 0 || colorIndex >= 16)
+		if (colorIndex <= 0 || colorIndex >= kFormatCount)
 			continue;
 		const QTextCharFormat &format = m_formats[colorIndex];
 		if (format.foreground().style() == Qt::NoBrush)
