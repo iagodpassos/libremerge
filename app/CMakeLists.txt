@@ -61,7 +61,7 @@ qt_add_resources(LibreMerge "i18n"
   PREFIX "/i18n"
   BASE i18n
   FILES i18n/libremerge_ca.qm i18n/libremerge_de.qm i18n/libremerge_es.qm
-    i18n/libremerge_pt_BR.qm
+    i18n/libremerge_fr.qm i18n/libremerge_pt_BR.qm
 )
 
 # About box: the contributors list (shown by the Contributors button) and
@@ -103,6 +103,7 @@ if(APPLE)
     ${CMAKE_SOURCE_DIR}/packaging/ca.lproj/ServicesMenu.strings
     ${CMAKE_SOURCE_DIR}/packaging/de.lproj/ServicesMenu.strings
     ${CMAKE_SOURCE_DIR}/packaging/es.lproj/ServicesMenu.strings
+    ${CMAKE_SOURCE_DIR}/packaging/fr.lproj/ServicesMenu.strings
     ${CMAKE_SOURCE_DIR}/packaging/pt.lproj/ServicesMenu.strings)
   set_source_files_properties(
     ${CMAKE_SOURCE_DIR}/packaging/en.lproj/ServicesMenu.strings
@@ -116,6 +117,9 @@ if(APPLE)
   set_source_files_properties(
     ${CMAKE_SOURCE_DIR}/packaging/es.lproj/ServicesMenu.strings
     PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/es.lproj")
+  set_source_files_properties(
+    ${CMAKE_SOURCE_DIR}/packaging/fr.lproj/ServicesMenu.strings
+    PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/fr.lproj")
   set_source_files_properties(
     ${CMAKE_SOURCE_DIR}/packaging/pt.lproj/ServicesMenu.strings
     PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/pt.lproj")

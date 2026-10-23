@@ -90,9 +90,11 @@ rest:
 | `app/i18n/libremerge_ca.ts` | `Catalan.po` | Jordi Vilar, Pere Orga |
 | `app/i18n/libremerge_de.ts` | `German.po` | Tim Gerundt; René Nicolaus, Winfried Peter, Jörg Schneider |
 | `app/i18n/libremerge_es.ts` | `Spanish.po` | Dean Grimm, Jesús M. Delgado 'MacK', Mario Angel, Nelson Ariza, P0rsche-911 |
+| `app/i18n/libremerge_fr.ts` | `French.po` | Lolo S.; Gil Andre, Laurent Ganier, Dominique Saussereau, Jean-F Jolin, Need74, t3chnob0y |
 | `app/i18n/libremerge_pt_BR.ts` | `Brazilian.po` | as listed in the catalog's header |
 
-In the files built from WinMerge's catalogs (German, Spanish, Catalan)
+In the files built from WinMerge's catalogs (German, Spanish, Catalan,
+French)
 every text that is not WinMerge's as it stands carries a translator
 comment, which Qt Linguist shows next to it:
 
@@ -114,9 +116,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 608 | 162 | 246 | 0 | 3 |
-| Spanish | 596 | 176 | 244 | 3 | 0 |
-| Catalan | 298 | 172 | 246 | 303 | 0 |
+| German | 613 | 164 | 246 | 0 | 3 |
+| Spanish | 601 | 178 | 244 | 3 | 0 |
+| Catalan | 299 | 173 | 246 | 308 | 0 |
+| French | 616 | 182 | 228 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -130,6 +133,14 @@ Dateien oder Ordner" reads oddly, the Shift+Delete hint of the path
 fields likewise "kürzlich verwendeten Pfad". In the binary comparison's
 own dialogs, the values at the caret read "Anzeige der Werte an der
 Cursorposition:" and the font size "Schriftgröße in Punkten:".
+
+The French catalog keeps WinMerge's French typography in LibreMerge's own
+texts too: a space before a colon or a question mark, and the panes
+named Gauche, Milieu and Droite. WinMerge's French gives no accelerator
+to the six Compare 3-way items of the View menu, to "Go to Line", to the
+search's "Don't wrap end of file" and to the Table page's delimiter, and
+gives the two Copy All items of the Merge menu the same letter, so these
+take one here.
 
 ## Deliberately excluded (and why)
 

@@ -86,6 +86,7 @@ LIBREMERGE_LANGUAGE=pt_BR run_one selftest-app-menu
 LIBREMERGE_LANGUAGE=de run_one selftest-app-menu
 LIBREMERGE_LANGUAGE=es run_one selftest-app-menu
 LIBREMERGE_LANGUAGE=ca run_one selftest-app-menu
+LIBREMERGE_LANGUAGE=fr run_one selftest-app-menu
 run_one selftest-about
 run_one selftest-options
 run_one selftest-general-options
@@ -103,13 +104,14 @@ LIBREMERGE_LANGUAGE=pt_BR run_one selftest-qt-i18n
 LIBREMERGE_LANGUAGE=de run_one selftest-qt-i18n
 LIBREMERGE_LANGUAGE=es run_one selftest-qt-i18n
 LIBREMERGE_LANGUAGE=ca run_one selftest-qt-i18n
+LIBREMERGE_LANGUAGE=fr run_one selftest-qt-i18n
 # the accelerator letters of the menus, one item each, in every catalog
 # (English keeps WinMerge's letters as they stand)
-for lang in pt_BR de es ca; do
+for lang in pt_BR de es ca fr; do
   LIBREMERGE_LANGUAGE=$lang run_one selftest-menu-mnemonics
 done
 # (the request for a star and the Help menu's pages, in every language)
-for lang in en pt_BR de es ca; do
+for lang in en pt_BR de es ca fr; do
   LIBREMERGE_LANGUAGE=$lang run_one selftest-star-prompt
 done
 run_one selftest-desktop-integration

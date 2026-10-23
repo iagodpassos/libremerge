@@ -10,6 +10,7 @@
 		<string>ca</string>
 		<string>de</string>
 		<string>es</string>
+		<string>fr</string>
 		<string>pt</string>
 	</array>
 	<key>CFBundleExecutable</key>
