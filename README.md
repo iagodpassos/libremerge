@@ -64,7 +64,7 @@ LibreMerge dirA/ dirB/                 # folder compare
 
 ## Build from source (macOS / Linux)
 
-Dependencies: a C++17 compiler, CMake ≥ 3.21, Ninja, Qt 6, POCO, ICU, Boost (headers), libarchive, re2c and lemon. The first configure downloads the sources of the Tree-sitter grammars WinMerge uses, about 12 MB (`-DLM_TREE_SITTER_GRAMMARS=OFF` builds without them). On macOS: `brew install cmake ninja qt poco icu4c boost googletest re2c lemon libarchive`. On Debian/Ubuntu see the package list in [`.github/workflows`](.github/workflows).
+Dependencies: a C++17 compiler, CMake ≥ 3.24, Ninja, Qt 6, POCO, ICU, Boost (headers), libarchive, re2c and lemon. The first configure downloads the sources of the Tree-sitter grammars WinMerge uses, about 12 MB (`-DLM_TREE_SITTER_GRAMMARS=OFF` builds without them). On macOS: `brew install cmake ninja qt poco icu4c boost googletest re2c lemon libarchive`. On Debian/Ubuntu see the package list in [`.github/workflows`](.github/workflows).
 
 ```sh
 cmake -S . -B build -G Ninja
