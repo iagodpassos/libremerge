@@ -1,6 +1,6 @@
 # Maintainer: Iago Passos <iago.dpassos@gmail.com>
 pkgname=libremerge
-pkgver=1.0.1
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="Diff and merge tool for files, folders and CSV tables - a Qt port of the WinMerge engine"
 arch=('x86_64' 'aarch64')
@@ -56,7 +56,7 @@ noextract=('tree-sitter-fsharp-aefd0c8741bdf3aeb827a228aa4a996a6536697e.tar.gz'
            'tree-sitter-ruby-71bd32fb7607035768799732addba884a37a6210.tar.gz'
            'tree-sitter-rust-77a3747266f4d621d0757825e6b11edcbf991ca5.tar.gz'
            'tree-sitter-typescript-f975a621f4e7f532fe322e13c4f79495e0a7b2e7.tar.gz')
-sha256sums=('87445adff9e86d1e4bda2ea43209d74342849889a96020c03c52de0f081b8e49'
+sha256sums=('c13614df94b2bafc030e10b86312b8789f5179fc814a36fa7305b8565f670412'
             '5c40b126e9c4641ac8775d2cd9d390503fd3ec1307531412143969f263b0f0ad'
             '349a11172a4b0853a7af8e8e2f9e66811bf718dc742cc76b5798b0dd71239fe2'
             '45ec28324b75ec80788775a6aed26888f55b306981fede9cbe35d7348ae80469'
