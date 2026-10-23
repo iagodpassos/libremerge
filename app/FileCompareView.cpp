@@ -447,8 +447,10 @@ FileCompareView::FileCompareView(QWidget *parent)
 			[this, i](const QString &path) { changeFile(i, path, QString()); });
 		m_panes[i]->setContextMenuHook(
 			[this, i](QMenu *menu) { buildPaneMenu(i, menu); });
-		m_panes[i]->setTabStopDistance(
-			4 * QFontMetricsF(mono).horizontalAdvance(QLatin1Char(' ')));
+		// the tabs of the Editor page (CMergeEditView::DocumentsLoaded,
+		// RefreshOptions)
+		m_panes[i]->setTabSize(lm::tabSize());
+		m_panes[i]->setInsertTabs(lm::insertTabs());
 		// debug spy: LM_DEBUG_EDITS=1 prints every real document edit
 		if (qEnvironmentVariableIsSet("LM_DEBUG_EDITS"))
 			connect(m_panes[i]->document(), &QTextDocument::contentsChange,
@@ -520,6 +522,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 		m_diffPaneEdits[i] = edit;
 		diffPaneLayout->addWidget(edit);
 	}
+	applyDiffPaneTabStops();
 	auto *splitter = new QSplitter(Qt::Vertical, this);
 	splitter->addWidget(panesWidget);
 	splitter->addWidget(m_diffPaneWidget);
@@ -558,6 +561,27 @@ FileCompareView::FileCompareView(QWidget *parent)
 		applyZoom(savedSize);
 }
 
+/** The diff pane's tab stops, those of the pane each of its lines comes
+    from (upstream's views of a file share its buffer's tab size). */
+void FileCompareView::applyDiffPaneTabStops()
+{
+	for (int i = 0; i < 3; ++i)
+		m_diffPaneEdits[i]->setTabStopDistance(m_panes[i]->tabSize()
+			* QFontMetricsF(m_diffPaneEdits[i]->font()).horizontalAdvance(QLatin1Char(' ')));
+}
+
+void FileCompareView::refreshEditorOptions()
+{
+	for (int i = 0; i < 3; ++i)
+	{
+		m_panes[i]->setInsertTabs(lm::insertTabs());
+		m_panes[i]->setTabSize(lm::tabSize());
+	}
+	applyDiffPaneTabStops();
+	for (int i = 0; i < m_paneCount; ++i)
+		updatePaneStatus(i);
+}
+
 /** Set the comparison text size on the panes, gutters, tab stops and
     the diff pane (which stays one point smaller). */
 void FileCompareView::applyZoom(qreal pointSize)
@@ -568,11 +592,10 @@ void FileCompareView::applyZoom(qreal pointSize)
 		QFont font = m_panes[i]->font();
 		font.setPointSizeF(pointSize);
 		m_panes[i]->setFont(font);
-		m_panes[i]->setTabStopDistance(
-			4 * QFontMetricsF(font).horizontalAdvance(QLatin1Char(' ')));
 		font.setPointSizeF(qMax<qreal>(6.0, pointSize - 1));
 		m_diffPaneEdits[i]->setFont(font);
 	}
+	applyDiffPaneTabStops();
 	// another text size, other lines in the view
 	updateLocationViewport();
 	QSettings().setValue(QStringLiteral("FileCompare/FontPointSize"), pointSize);
@@ -1691,11 +1714,15 @@ void FileCompareView::updatePaneStatus(int side)
 		if (realLine < 0)
 			realLine = 1;
 	}
-	const int col = cursor.positionInBlock() + 1;
-	// like WinMerge, the maximum column is the line length + 1
-	const int maxCol = qMax(1, cursor.block().length());
-	m_posLabels[side]->setText(tr("Ln: %1  Col: %2/%3  Ch: %2/%3")
-		.arg(realLine).arg(col).arg(maxCol));
+	// like WinMerge, the column on screen (a tab taking it to the next tab
+	// stop) and the character, each up to the line's end + 1
+	const QTextBlock block = cursor.block();
+	const int col = m_panes[side]->actualOffset(block, cursor.positionInBlock()) + 1;
+	const int maxCol = m_panes[side]->actualOffset(block, block.length() - 1) + 1;
+	const int ch = cursor.positionInBlock() + 1;
+	const int maxCh = qMax(1, block.length());
+	m_posLabels[side]->setText(tr("Ln: %1  Col: %2/%3  Ch: %4/%5")
+		.arg(realLine).arg(col).arg(maxCol).arg(ch).arg(maxCh));
 }
 
 void FileCompareView::setSideCaption(int side, const QString &caption)
@@ -1810,6 +1837,11 @@ void FileCompareView::selectAllAndCopyForTest(int side)
 {
 	m_panes[side]->selectAll();
 	m_panes[side]->copy();
+}
+
+QString FileCompareView::positionTextForTest(int side) const
+{
+	return m_posLabels[side]->text();
 }
 
 void FileCompareView::typeAtForTest(int side, int viewLine, const QString &text)

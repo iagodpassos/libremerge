@@ -15,6 +15,8 @@
 #include <QHeaderView>
 #include <QRadioButton>
 #include <QKeyEvent>
+#include <QFocusEvent>
+#include <QFontMetricsF>
 #include <QMenu>
 #include <QMenuBar>
 #include <QLabel>
@@ -366,6 +368,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestTreeSitterOpt(QStringLiteral("selftest-tree-sitter"),
 		QStringLiteral("Color YAML, TOML and Markdown through Tree-sitter, as the text changes too (for testing)"));
 	parser.addOption(selftestTreeSitterOpt);
+	QCommandLineOption selftestEditorTabsOpt(QStringLiteral("selftest-editor-tabs"),
+		QStringLiteral("Exercise the tabs of Options > Editor: the tab size, the Tab and Shift+Tab keys and the column in the status bar (for testing)"));
+	parser.addOption(selftestEditorTabsOpt);
 	QCommandLineOption selftestFolderSelectionOpt(QStringLiteral("selftest-folder-selection"),
 		QStringLiteral("Compare two or three selected items of a folder comparison with each other (for testing)"));
 	parser.addOption(selftestFolderSelectionOpt);
@@ -11280,6 +11285,211 @@ int main(int argc, char *argv[])
 		}
 
 		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestEditorTabsOpt))
+	{
+		// WinMerge's tabs (Options > Editor): the page's field and its
+		// warning, the tab stops of the panes and of the diff pane, the
+		// column in the status bar, and the Tab and Shift+Tab keys
+		// (CCrystalEditView::OnEditTab, OnEditUntab) on a line, on the
+		// lines of a selection, a ghost line among them, and on the cursor
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 50; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto press = [](QWidget *widget, int key,
+			Qt::KeyboardModifiers mods = Qt::NoModifier, const QString &text = QString())
+		{
+			QKeyEvent event(QEvent::KeyPress, key, mods, text);
+			QApplication::sendEvent(widget, &event);
+		};
+		const auto leave = [](QWidget *widget, Qt::FocusReason reason)
+		{
+			QFocusEvent focus(QEvent::FocusOut, reason);
+			QApplication::sendEvent(widget, &focus);
+		};
+		QStringList messages;
+		lm::setMessageSinkForTest([&messages](const QString &text) { messages << text; });
+
+		// the page: 4 and tabs by default; a size out of range told as the
+		// field is left, and kept within range as it is saved
+		{
+			OptionsDialog dialog;
+			QWidget *page = dialog.pageForTest(OptionsDialog::EditorPage);
+			auto *size = page->findChild<QLineEdit *>(QStringLiteral("tabSize"));
+			auto *tabs = page->findChild<QRadioButton *>(QStringLiteral("insertTabs"));
+			auto *spaces = page->findChild<QRadioButton *>(QStringLiteral("insertSpaces"));
+			if (size == nullptr || tabs == nullptr || spaces == nullptr)
+				return 2;
+			check(size->text() == QStringLiteral("4") && tabs->isChecked() && !spaces->isChecked(),
+				"page: a tab size of 4 and Insert tabs by default");
+			const QString outOfRange =
+				OptionsDialog::tr("Tab size value is out of range. Please use 1 - %1.").arg(64);
+			size->setText(QStringLiteral("70"));
+			leave(size, Qt::TabFocusReason);
+			size->setText(QStringLiteral("0"));
+			leave(size, Qt::MouseFocusReason);
+			check(messages == QStringList({ outOfRange, outOfRange }),
+				"page: 70 and 0 told out of range as the field is left");
+			messages.clear();
+			size->setText(QStringLiteral("8"));
+			leave(size, Qt::TabFocusReason);
+			size->setText(QStringLiteral("99"));
+			leave(size, Qt::ActiveWindowFocusReason);
+			leave(size, Qt::OtherFocusReason);
+			check(messages.isEmpty(),
+				"page: nothing told for 8, nor as the window goes to the back or closes");
+			dialog.saveForTest();
+			check(lm::tabSize() == 64 && lm::insertTabs(), "page: 99 saved as 64");
+			size->setText(QStringLiteral("0"));
+			spaces->setChecked(true);
+			dialog.saveForTest();
+			check(lm::tabSize() == 1 && !lm::insertTabs(), "page: 0 saved as 1, and Insert spaces");
+			dialog.selectCategoryForTest(9); // Editor > General
+			dialog.restoreDefaultsForTest();
+			check(size->text() == QStringLiteral("4") && tabs->isChecked(),
+				"page: Defaults bring 4 and Insert tabs back");
+			messages.clear();
+		}
+
+		// the left pane: a tab, a ghost line (the right has a line more),
+		// then two lines
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		write(left, "\tab\nline two\nthree\n");
+		write(right, "\tab\nextra\nline two\nthree\n");
+		lm::setTabsForTest(8, true);
+		FileCompareView view;
+		QString error;
+		if (!view.compare(left, right, &error))
+			return 2;
+		view.resize(900, 400);
+		view.show();
+		settle();
+		DiffTextEdit *pane = view.paneForTest(0);
+		QTextDocument *doc = pane->document();
+		const auto line = [doc](int viewLine) { return doc->findBlockByNumber(viewLine); };
+		const auto place = [pane, &line](int viewLine, int pos, int anchorLine = -1, int anchorPos = 0)
+		{
+			QTextCursor cursor(pane->document());
+			if (anchorLine >= 0)
+				cursor.setPosition(line(anchorLine).position() + anchorPos);
+			cursor.setPosition(line(viewLine).position() + pos,
+				anchorLine >= 0 ? QTextCursor::KeepAnchor : QTextCursor::MoveAnchor);
+			pane->setTextCursor(cursor);
+		};
+		const auto position = [](int ln, int col, int cols, int ch, int chs)
+		{
+			return FileCompareView::tr("Ln: %1  Col: %2/%3  Ch: %4/%5")
+				.arg(ln).arg(col).arg(cols).arg(ch).arg(chs);
+		};
+		check(isGhostBlock(line(1)) && line(2).text() == QStringLiteral("line two"),
+			"the left pane has a ghost line");
+
+		const qreal space = QFontMetricsF(pane->font()).horizontalAdvance(QLatin1Char(' '));
+		QPlainTextEdit *diffPane = view.diffPaneEditForTest(0);
+		const qreal diffSpace =
+			QFontMetricsF(diffPane->font()).horizontalAdvance(QLatin1Char(' '));
+		check(qAbs(pane->tabStopDistance() - 8 * space) < 0.01
+				&& qAbs(diffPane->tabStopDistance() - 8 * diffSpace) < 0.01,
+			"tab size 8: the tab stops of the panes and of the diff pane");
+		// the column takes the tab to its stop, the character does not
+		place(0, 2);
+		check(view.positionTextForTest(0) == position(1, 10, 11, 3, 4),
+			"status bar: Col 10/11, Ch 3/4 after a tab and a character");
+		lm::setTabsForTest(4, true);
+		view.refreshEditorOptions();
+		check(qAbs(pane->tabStopDistance() - 4 * space) < 0.01
+				&& view.positionTextForTest(0) == position(1, 6, 7, 3, 4),
+			"the options again: a tab size of 4 at once");
+
+		// Insert tabs: a tab at the cursor
+		place(2, 4);
+		press(pane, Qt::Key_Tab, Qt::NoModifier, QStringLiteral("\t"));
+		check(line(2).text() == QStringLiteral("line\t two")
+				&& pane->textCursor().positionInBlock() == 5,
+			"Tab: a tab at the cursor");
+		// Insert spaces: up to the next tab stop, from the cursor's column
+		// (column 5, after the tab: three spaces, where upstream's count
+		// from the character would give two)
+		lm::setTabsForTest(4, false);
+		view.refreshEditorOptions();
+		place(0, 2);
+		press(pane, Qt::Key_Tab, Qt::NoModifier, QStringLiteral("\t"));
+		check(line(0).text() == QStringLiteral("\ta   b")
+				&& pane->textCursor().positionInBlock() == 5,
+			"Tab with Insert spaces: spaces to the next tab stop");
+
+		// a selection over lines: each one indented, the ghost line left
+		// alone, as one undo step; the selection then takes the whole lines
+		int undoSteps = 0;
+		const QMetaObject::Connection undoCounter = QObject::connect(doc,
+			&QTextDocument::undoCommandAdded, [&undoSteps]() { ++undoSteps; });
+		place(2, 3, 0, 1);
+		press(pane, Qt::Key_Tab, Qt::NoModifier, QStringLiteral("\t"));
+		check(line(0).text() == QStringLiteral("    \ta   b") && isGhostBlock(line(1))
+				&& line(2).text() == QStringLiteral("    line\t two")
+				&& line(3).text() == QStringLiteral("three"),
+			"Tab over lines: each indented, the ghost line left alone");
+		QObject::disconnect(undoCounter);
+		check(undoSteps == 1, "Tab over lines: one undo step");
+		check(pane->textCursor().selectionStart() == line(0).position()
+				&& pane->textCursor().selectionEnd() == line(3).position(),
+			"Tab over lines: the whole lines selected");
+		// Shift+Tab over them: a tab's worth of spaces, then the tab
+		press(pane, Qt::Key_Backtab, Qt::ShiftModifier);
+		check(line(0).text() == QStringLiteral("\ta   b")
+				&& line(2).text() == QStringLiteral("line\t two"),
+			"Shift+Tab over lines: four spaces each");
+		press(pane, Qt::Key_Backtab, Qt::ShiftModifier);
+		check(line(0).text() == QStringLiteral("a   b")
+				&& line(2).text() == QStringLiteral("line\t two"),
+			"Shift+Tab over lines: then the tab, the line without one left as it is");
+		// spaces short of a tab's worth, then a tab: all of them go
+		view.typeAtForTest(0, 3, QStringLiteral("  \t"));
+		place(3, 2, 2, 0);
+		press(pane, Qt::Key_Backtab, Qt::ShiftModifier);
+		check(line(3).text() == QStringLiteral("three")
+				&& pane->textCursor().selectionEnd() == line(3).position() + line(3).length() - 1,
+			"Shift+Tab: two spaces and a tab; the selection to the text's end");
+		// without a selection, the cursor goes back to the tab stop before
+		// it: past "line\t two" (column 12) to 8, after the tab, then to 4
+		place(2, 9);
+		press(pane, Qt::Key_Backtab, Qt::ShiftModifier);
+		const int afterTab = pane->textCursor().positionInBlock();
+		press(pane, Qt::Key_Backtab, Qt::ShiftModifier);
+		check(afterTab == 5 && pane->textCursor().positionInBlock() == 4
+				&& line(2).text() == QStringLiteral("line\t two"),
+			"Shift+Tab: the cursor back to the tab stops, the text untouched");
+
+		settle();
+		check(view.realLinesForTest(0)
+				== QStringList({ QStringLiteral("a   b"), QStringLiteral("line\t two"),
+					QStringLiteral("three") }),
+			"the lines as edited, once compared again");
+		check(messages.isEmpty(), "no message on the way");
 		return ok ? 0 : 1;
 	}
 

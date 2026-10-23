@@ -16,6 +16,7 @@
 #include <QPainter>
 #include <QPlainTextDocumentLayout>
 #include <QTextBlock>
+#include <QTextBoundaryFinder>
 #include <QTimer>
 #include <QUrl>
 
@@ -88,6 +89,7 @@ DiffTextEdit::DiffTextEdit(QWidget *parent)
 	connect(lm::Theme::instance(), &lm::Theme::changed,
 		this, &DiffTextEdit::scheduleMarkerRefresh);
 	updateGutterWidth();
+	applyTabStops();
 }
 
 // --- hidden lines ---
@@ -292,11 +294,235 @@ void DiffTextEdit::removeSelectionKeepingHidden()
 		removeKeepingHidden(cursor.selectionStart(), cursor.selectionEnd());
 }
 
+// --- tabs ---
+
+void DiffTextEdit::setTabSize(int tabSize)
+{
+	m_tabSize = qBound(1, tabSize, 64);
+	applyTabStops();
+}
+
+/** A tab stop every tab size columns, a column being the font's space. */
+void DiffTextEdit::applyTabStops()
+{
+	setTabStopDistance(m_tabSize * QFontMetricsF(font()).horizontalAdvance(QLatin1Char(' ')));
+}
+
+void DiffTextEdit::changeEvent(QEvent *event)
+{
+	QPlainTextEdit::changeEvent(event);
+	// another text size, other columns
+	if (event->type() == QEvent::FontChange)
+		applyTabStops();
+}
+
+int DiffTextEdit::cellCount(const QString &grapheme) const
+{
+	const char16_t ch = grapheme.at(0).unicode();
+	if (ch <= 0x7F)
+		return ch <= 0x1F ? 3 : 1; // (a tab is counted apart)
+	// upstream measures the glyph against the font's character: one wider
+	// than one and a half takes two columns
+	const QFontMetricsF metrics(font());
+	return metrics.horizontalAdvance(grapheme) * 10
+		> metrics.horizontalAdvance(QLatin1Char(' ')) * 15 ? 2 : 1;
+}
+
+int DiffTextEdit::actualOffset(const QTextBlock &block, int positionInBlock) const
+{
+	const QString text = block.text();
+	const int end = qBound(0, positionInBlock, static_cast<int>(text.size()));
+	QTextBoundaryFinder graphemes(QTextBoundaryFinder::Grapheme, text);
+	int offset = 0;
+	for (int i = 0; i < end;)
+	{
+		graphemes.setPosition(i);
+		const int next = qMax(i + 1, static_cast<int>(graphemes.toNextBoundary()));
+		if (text.at(i) == QLatin1Char('\t'))
+			offset += m_tabSize - offset % m_tabSize;
+		else
+			offset += cellCount(text.mid(i, next - i));
+		i = next;
+	}
+	return offset;
+}
+
+DiffTextEdit::TabifyRange DiffTextEdit::tabifyRange(const QTextCursor &cursor) const
+{
+	// the selection's lines, the last one left out when the selection
+	// ends at its start; the selection then goes on to the start of the
+	// line after the last one, or to the end of the text's last line
+	const QTextDocument *doc = document();
+	const QTextBlock last = doc->findBlock(cursor.selectionEnd());
+	TabifyRange range;
+	range.firstLine = doc->findBlock(cursor.selectionStart()).blockNumber();
+	range.lastLine = last.blockNumber();
+	range.endLine = range.lastLine;
+	if (cursor.selectionEnd() > last.position())
+	{
+		if (range.lastLine == doc->blockCount() - 1)
+			range.endsAtLineEnd = true;
+		else
+			++range.endLine;
+	}
+	else
+		--range.lastLine;
+	return range;
+}
+
+void DiffTextEdit::selectTabified(const TabifyRange &range)
+{
+	QTextDocument *doc = document();
+	QTextCursor selection(doc);
+	selection.setPosition(doc->findBlockByNumber(range.firstLine).position());
+	const QTextBlock end = doc->findBlockByNumber(range.endLine);
+	selection.setPosition(range.endsAtLineEnd ? end.position() + end.length() - 1
+		: end.position(), QTextCursor::KeepAnchor);
+	setTextCursor(selection);
+	ensureCursorVisible();
+}
+
+void DiffTextEdit::editTab()
+{
+	QTextCursor cursor = textCursor();
+	QTextDocument *doc = document();
+	const bool tabify = cursor.hasSelection()
+		&& doc->findBlock(cursor.selectionStart()) != doc->findBlock(cursor.selectionEnd());
+	QString text = QStringLiteral("\t");
+	if (!m_insertTabs)
+	{
+		// spaces to the next tab stop, a whole tab's worth over a
+		// selection. Upstream counts from the cursor's character rather
+		// than its column, which a tab before the cursor puts out of
+		// step: the column here
+		const int column = cursor.hasSelection()
+			? 0 : actualOffset(cursor.block(), cursor.positionInBlock());
+		text = QString(m_tabSize - column % m_tabSize, QLatin1Char(' '));
+	}
+	if (tabify)
+	{
+		// every line of the selection, as one undo step
+		const TabifyRange range = tabifyRange(cursor);
+		QTextCursor edit(doc);
+		edit.beginEditBlock();
+		for (int line = range.firstLine; line <= range.lastLine; ++line)
+		{
+			const QTextBlock block = doc->findBlockByNumber(line);
+			// a ghost line stays one (CGhostTextBuffer::IsIndentableLine)
+			if (isGhostBlock(block))
+				continue;
+			edit.setPosition(block.position());
+			edit.insertText(text);
+		}
+		edit.endEditBlock();
+		selectTabified(range);
+		return;
+	}
+	// in place of the selection, or at the cursor
+	cursor.beginEditBlock();
+	cursor.insertText(text);
+	cursor.endEditBlock();
+	setTextCursor(cursor);
+	ensureCursorVisible();
+}
+
+void DiffTextEdit::editUntab()
+{
+	QTextCursor cursor = textCursor();
+	QTextDocument *doc = document();
+	const bool tabify = cursor.hasSelection()
+		&& doc->findBlock(cursor.selectionStart()) != doc->findBlock(cursor.selectionEnd());
+	if (tabify)
+	{
+		// from every line of the selection, as one undo step: a tab's
+		// worth of spaces, or the spaces up to a tab and the tab
+		const TabifyRange range = tabifyRange(cursor);
+		QTextCursor edit(doc);
+		edit.beginEditBlock();
+		for (int line = range.firstLine; line <= range.lastLine; ++line)
+		{
+			const QTextBlock block = doc->findBlockByNumber(line);
+			const QString text = block.text();
+			int pos = 0;
+			int offset = 0;
+			while (pos < text.size())
+			{
+				if (text.at(pos) == QLatin1Char(' '))
+				{
+					++pos;
+					if (++offset >= m_tabSize)
+						break;
+				}
+				else
+				{
+					if (text.at(pos) == QLatin1Char('\t'))
+						++pos;
+					break;
+				}
+			}
+			if (pos == 0)
+				continue;
+			edit.setPosition(block.position());
+			edit.setPosition(block.position() + pos, QTextCursor::KeepAnchor);
+			edit.removeSelectedText();
+		}
+		edit.endEditBlock();
+		selectTabified(range);
+		return;
+	}
+	// without one, the cursor goes back to the tab stop before it
+	const QTextBlock block = cursor.block();
+	const int position = cursor.positionInBlock();
+	if (position == 0)
+		return;
+	const int offset = actualOffset(block, position);
+	int newOffset = offset / m_tabSize * m_tabSize;
+	if (offset == newOffset && newOffset > 0)
+		newOffset -= m_tabSize;
+	// the character at that column, the columns counted as the cursor's
+	// were (upstream counts one for each character here, which a wide
+	// one puts out of step)
+	const QString text = block.text();
+	QTextBoundaryFinder graphemes(QTextBoundaryFinder::Grapheme, text);
+	int column = 0;
+	int i = 0;
+	while (column < newOffset && i < text.size())
+	{
+		graphemes.setPosition(i);
+		const int next = qMax(i + 1, static_cast<int>(graphemes.toNextBoundary()));
+		if (text.at(i) == QLatin1Char('\t'))
+			column = column / m_tabSize * m_tabSize + m_tabSize;
+		else
+			column += cellCount(text.mid(i, next - i));
+		i = next;
+	}
+	cursor.setPosition(block.position() + i);
+	setTextCursor(cursor);
+	ensureCursorVisible();
+}
+
 /** What a key is about to remove stops at the hidden lines: the
     selection it types over, cuts or deletes, or the stretch a Backspace
-    or a Delete takes without one. */
+    or a Delete takes without one. Tab and Shift+Tab are upstream's own
+    commands. */
 void DiffTextEdit::keyPressEvent(QKeyEvent *event)
 {
+	if (!isReadOnly())
+	{
+		const Qt::KeyboardModifiers modifiers = event->modifiers() & ~Qt::KeypadModifier;
+		if (event->key() == Qt::Key_Tab && modifiers == Qt::NoModifier)
+		{
+			editTab();
+			return;
+		}
+		if ((event->key() == Qt::Key_Backtab
+				&& (modifiers == Qt::ShiftModifier || modifiers == Qt::NoModifier))
+			|| (event->key() == Qt::Key_Tab && modifiers == Qt::ShiftModifier))
+		{
+			editUntab();
+			return;
+		}
+	}
 	if (!m_hasHiddenLines || isReadOnly())
 	{
 		QPlainTextEdit::keyPressEvent(event);

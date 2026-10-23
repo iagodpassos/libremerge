@@ -200,6 +200,11 @@ public:
 	/** The highlighting as the options have it now (WinMerge's
 	    CMergeEditView::RefreshOptions sets each view's text type again). */
 	void refreshSyntaxHighlighting();
+	/** The tabs as the options have them now: what the Tab key inserts
+	    (CMergeEditView::RefreshOptions), and the tab size too, which
+	    upstream only sets as the files load (DocumentsLoaded), so that
+	    the comparisons open kept the one they had. */
+	void refreshEditorOptions();
 	/** WinMerge's OnFileReload, past its save prompt: every pane is read
 	    from disk again (an untitled one emptied), the undo history goes
 	    and the cursor returns to the line it was on. Nothing is touched
@@ -273,6 +278,10 @@ public:
 	LocationPane *locationPaneForTest() const { return m_locationPane; }
 	int activePaneForTest() const { return m_activePane; }
 	PaneSearch *paneSearchForTest(int side) const { return m_search[side]; }
+	/** A pane's position in the status bar, and the diff pane's view of
+	    its lines (for tests). */
+	QString positionTextForTest(int side) const;
+	QPlainTextEdit *diffPaneEditForTest(int side) const { return m_diffPaneEdits[side]; }
 
 signals:
 	/** A recompare asked for by the user is about to run: WinMerge's
@@ -351,6 +360,7 @@ private:
 	void updatePaneStatus(int side);
 	void applyTheme();
 	void applyZoom(qreal pointSize);
+	void applyDiffPaneTabStops();
 	void updateHeader(int side);
 	void updateHeaderStyles();
 	void gotoDiff(int blockIndex, bool scroll = true);

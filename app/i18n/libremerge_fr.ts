@@ -358,9 +358,8 @@
         <translation>  • changements non enregistrés</translation>
     </message>
     <message>
-        <source>Ln: %1  Col: %2/%3  Ch: %2/%3</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Ln : %1  Col : %2/%3  Ch : %2/%3</translation>
+        <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
+        <translation>Ln : %1  Col : %2/%3  Ch : %4/%5</translation>
     </message>
     <message>
         <source>The merge target is read-only.</source>
@@ -3988,6 +3987,10 @@ Vérification de l&apos;identité binaire...</translation>
         <translation>En&amp;codage...</translation>
     </message>
     <message>
+        <source>Tab size value is out of range. Please use 1 - %1.</source>
+        <translation>La valeur de la taille des tabulations est hors limites. Veuillez utiliser 1 - %1.</translation>
+    </message>
+    <message>
         <source>Options</source>
         <translation>Préférences</translation>
     </message>
@@ -4255,6 +4258,22 @@ Vérification de l&apos;identité binaire...</translation>
         <source>Highlight mode:</source>
         <translatorcomment>After WinMerge&apos;s &quot;Highlight &amp;mode:&quot;.</translatorcomment>
         <translation>Mode de surbrillance :</translation>
+    </message>
+    <message>
+        <source>Tabs</source>
+        <translation>Tabulations</translation>
+    </message>
+    <message>
+        <source>&amp;Tab size:</source>
+        <translation>&amp;Taille des tabulations :</translation>
+    </message>
+    <message>
+        <source>&amp;Insert tabs</source>
+        <translation>&amp;Insérer des tabulations</translation>
+    </message>
+    <message>
+        <source>Insert &amp;spaces</source>
+        <translation>Insérer des e&amp;spaces</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

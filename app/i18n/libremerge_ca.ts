@@ -374,11 +374,6 @@
         <translation>  • canvis sense desar</translation>
     </message>
     <message>
-        <source>Ln: %1  Col: %2/%3  Ch: %2/%3</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Lín: %1  Col: %2/%3  Car: %2/%3</translation>
-    </message>
-    <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
@@ -387,6 +382,10 @@
         <source>The merge target is read-only.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>La destinació de la combinació és de només lectura.</translation>
+    </message>
+    <message>
+        <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
+        <translation>Lin: %1  Col: %2/%3  Car: %4/%5</translation>
     </message>
     <message>
         <source>Merging/copying differences that contain hidden lines is not currently supported.
@@ -4281,6 +4280,13 @@ S&apos;està comprovant la identitat binària...</translation>
         <translation>Taula de &amp;codificació de caràcters...</translation>
     </message>
     <message>
+        <source>Tab size value is out of range. Please use 1 - %1.</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Tab size value is out of range. Please use 1 - %1.&quot;.</translatorcomment>
+        <translation>El valor del camp de la mida de les tabulacions no és dins el rang que accepta el LibreMerge.
+
+Useu valors entre 1 i %1.</translation>
+    </message>
+    <message>
         <source>Options</source>
         <translation>Opcions</translation>
     </message>
@@ -4556,6 +4562,22 @@ S&apos;està comprovant la identitat binària...</translation>
         <source>Highlight mode:</source>
         <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>Mode de ressaltat:</translation>
+    </message>
+    <message>
+        <source>Tabs</source>
+        <translation>Tabulacions</translation>
+    </message>
+    <message>
+        <source>&amp;Tab size:</source>
+        <translation>&amp;Mida de les tabulacions:</translation>
+    </message>
+    <message>
+        <source>&amp;Insert tabs</source>
+        <translation>&amp;Insereix tabulacions</translation>
+    </message>
+    <message>
+        <source>Insert &amp;spaces</source>
+        <translation>In&amp;sereix espais</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

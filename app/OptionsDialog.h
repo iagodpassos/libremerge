@@ -110,6 +110,9 @@ public:
 	void resetMessageBoxesForTest() { resetMessageBoxes(); }
 	void saveForTest() { save(); }
 
+protected:
+	bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
 	QWidget *buildGeneralPage();
 	QWidget *buildComparePage();
@@ -177,6 +180,9 @@ private:
 	// Editor > General
 	QCheckBox *m_chkHiliteSyntax = nullptr;
 	QComboBox *m_cmbHiliteSyntaxMode = nullptr;
+	QLineEdit *m_editTabSize = nullptr;
+	QRadioButton *m_radInsertTabs = nullptr;
+	QRadioButton *m_radInsertSpaces = nullptr;
 	// Message Boxes
 	QTreeWidget *m_messageList;
 	// the Answer drop-down of each question, by row (null for the

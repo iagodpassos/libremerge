@@ -116,10 +116,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 613 | 164 | 246 | 0 | 3 |
-| Spanish | 601 | 178 | 244 | 3 | 0 |
-| Catalan | 299 | 173 | 246 | 308 | 0 |
-| French | 616 | 182 | 228 | 0 | 0 |
+| German | 618 | 165 | 245 | 0 | 3 |
+| Spanish | 606 | 179 | 243 | 3 | 0 |
+| Catalan | 304 | 174 | 245 | 308 | 0 |
+| French | 622 | 182 | 227 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -141,6 +141,24 @@ to the six Compare 3-way items of the View menu, to "Go to Line", to the
 search's "Don't wrap end of file" and to the Table page's delimiter, and
 gives the two Copy All items of the Merge menu the same letter, so these
 take one here.
+
+## WinMerge behaviors corrected in LibreMerge's own code
+
+Parts of WinMerge's editor are written again in `app/`, after upstream's
+code. Where that code has an evident slip, the rewrite corrects it and
+says so in a comment:
+
+- The tab size of Options > Editor reaches the open comparisons as the
+  dialog is accepted. Upstream sets it only as files load
+  (`CMergeEditView::DocumentsLoaded`), so they kept the old size until
+  reloaded.
+- Tab with "Insert spaces" (`CCrystalEditView::OnEditTab`) inserts spaces
+  up to the next tab stop from the cursor's column. Upstream counts from
+  the cursor's character, which a tab before the cursor puts out of step.
+- Shift+Tab without a selection (`OnEditUntab`) goes back to the tab stop
+  before the cursor counting columns as the cursor's column is counted.
+  Upstream counts one per character there, so a wide character left the
+  cursor off the tab stop.
 
 ## Deliberately excluded (and why)
 

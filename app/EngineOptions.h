@@ -27,6 +27,14 @@ void initSyntaxParserFactories();
     filled again (for tests). */
 void setSyntaxHighlightForTest(bool on, int mode);
 
+/** The columns a tab takes in the editor (WinMerge's OPT_TAB_SIZE), 1 to
+    64, and whether the Tab key inserts a tab rather than spaces
+    (OPT_TAB_TYPE 0). */
+int tabSize();
+bool insertTabs();
+/** Set both in memory only (for tests). */
+void setTabsForTest(int tabSize, bool insertTabs);
+
 /** The folder of the Tree-sitter grammars (WinMerge's TreeSitterGrammars):
     the bundle's Resources on macOS, the installed one or the one next to
     the binary elsewhere. */

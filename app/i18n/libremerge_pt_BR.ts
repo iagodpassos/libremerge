@@ -272,10 +272,6 @@
         <translation>Sem Título</translation>
     </message>
     <message>
-        <source>Ln: %1  Col: %2/%3  Ch: %2/%3</source>
-        <translation>Lin: %1  Col: %2/%3  Car: %2/%3</translation>
-    </message>
-    <message>
         <source>cannot open %1</source>
         <translation>não foi possível abrir %1</translation>
     </message>
@@ -333,6 +329,10 @@
     <message>
         <source>The merge target is read-only.</source>
         <translation>O destino da mesclagem é somente leitura.</translation>
+    </message>
+    <message>
+        <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
+        <translation>Lin: %1  Col: %2/%3  Car: %4/%5</translation>
     </message>
     <message>
         <source>Merging/copying differences that contain hidden lines is not currently supported.
@@ -3759,23 +3759,39 @@ Checando identidade binária...</translation>
     </message>
     <message>
         <source>Built-in only</source>
-        <translation>Apenas o integrado</translation>
+        <translation>Integrado apenas</translation>
     </message>
     <message>
         <source>Built-in first</source>
-        <translation>Primeiro o integrado</translation>
+        <translation>Integrado primeiro</translation>
     </message>
     <message>
         <source>Tree-sitter first</source>
-        <translation>Primeiro o Tree-sitter</translation>
+        <translation>Tree-sitter primeiro</translation>
     </message>
     <message>
         <source>Tree-sitter only</source>
-        <translation>Apenas o Tree-sitter</translation>
+        <translation>Tree-sitter apenas</translation>
     </message>
     <message>
         <source>Highlight mode:</source>
         <translation>Modo de destaque:</translation>
+    </message>
+    <message>
+        <source>Tabs</source>
+        <translation>Tabulações</translation>
+    </message>
+    <message>
+        <source>&amp;Tab size:</source>
+        <translation>&amp;Tamanho da tabulação:</translation>
+    </message>
+    <message>
+        <source>&amp;Insert tabs</source>
+        <translation>&amp;Inserir tabulações</translation>
+    </message>
+    <message>
+        <source>Insert &amp;spaces</source>
+        <translation>Inserir &amp;espaços</translation>
     </message>
     <message>
         <source>Create backup files for:</source>
@@ -3884,6 +3900,10 @@ Checando identidade binária...</translation>
     <message>
         <source>&amp;Character Set...</source>
         <translation>C&amp;onjunto de Caracteres...</translation>
+    </message>
+    <message>
+        <source>Tab size value is out of range. Please use 1 - %1.</source>
+        <translation>O valor do tamanho da tabulação está fora do intervalo. Por favor, use 1 - %1.</translation>
     </message>
     <message>
         <source>Ignore numbers</source>

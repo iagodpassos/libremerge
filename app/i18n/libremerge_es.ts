@@ -359,11 +359,6 @@
         <translation>  • cambios sin guardar</translation>
     </message>
     <message>
-        <source>Ln: %1  Col: %2/%3  Ch: %2/%3</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Línea: %1  Columna: %2/%3  Carácter: %2/%3</translation>
-    </message>
-    <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
@@ -372,6 +367,10 @@
         <source>The merge target is read-only.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>El destino de la combinación es de solo lectura.</translation>
+    </message>
+    <message>
+        <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
+        <translation>Línea: %1  Columna: %2/%3  Carácter: %4/%5</translation>
     </message>
     <message>
         <source>Merging/copying differences that contain hidden lines is not currently supported.
@@ -3999,6 +3998,13 @@ Comprobando la identidad binaria...</translation>
         <translation>&amp;Conjunto de caracteres...</translation>
     </message>
     <message>
+        <source>Tab size value is out of range. Please use 1 - %1.</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Tab size value is out of range. Please use 1 - %1.&quot;.</translatorcomment>
+        <translation>El valor del tamaño de la tabulación no está en el rango aceptado por LibreMerge.
+
+Por favor, use valores entre 1 y %1.</translation>
+    </message>
+    <message>
         <source>Options</source>
         <translation>Opciones</translation>
     </message>
@@ -4266,6 +4272,22 @@ Comprobando la identidad binaria...</translation>
         <source>Highlight mode:</source>
         <translatorcomment>After WinMerge&apos;s &quot;Highlight &amp;mode:&quot;.</translatorcomment>
         <translation>Modo de resaltado:</translation>
+    </message>
+    <message>
+        <source>Tabs</source>
+        <translation>Tabulaciones</translation>
+    </message>
+    <message>
+        <source>&amp;Tab size:</source>
+        <translation>&amp;Tamaño de tabulación:</translation>
+    </message>
+    <message>
+        <source>&amp;Insert tabs</source>
+        <translation>&amp;Insertar tabulaciones</translation>
+    </message>
+    <message>
+        <source>Insert &amp;spaces</source>
+        <translation>Insertar e&amp;spacios</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

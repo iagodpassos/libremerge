@@ -123,6 +123,18 @@ public:
 	    between them stay. One undo step. */
 	void removeKeepingHidden(int from, int to);
 
+	/** The tabs of WinMerge's Editor page: the columns a tab takes
+	    (CCrystalTextView::SetTabSize, 1 to 64), and whether the Tab key
+	    inserts a tab or spaces (CCrystalTextBuffer::SetInsertTabs). */
+	void setTabSize(int tabSize);
+	int tabSize() const { return m_tabSize; }
+	void setInsertTabs(bool insertTabs) { m_insertTabs = insertTabs; }
+	/** CCrystalTextView::CalculateActualOffset: the column a position of
+	    a line is at on screen, from 0, a tab going on to the next tab
+	    stop, a control character taking three columns and a character
+	    wider than one and a half taking two. */
+	int actualOffset(const QTextBlock &block, int positionInBlock) const;
+
 	int gutterWidth() const;
 	void paintGutter(QPaintEvent *event);
 
@@ -138,6 +150,7 @@ signals:
 
 protected:
 	bool event(QEvent *event) override;
+	void changeEvent(QEvent *event) override;
 	void paintEvent(QPaintEvent *event) override;
 	void mouseDoubleClickEvent(QMouseEvent *event) override;
 	void mouseReleaseEvent(QMouseEvent *event) override;
@@ -166,8 +179,29 @@ private:
 	bool endsShownStretch(const QTextBlock &block) const;
 	bool selectionSpansHiddenLine() const;
 	void removeSelectionKeepingHidden();
+	/** CCrystalEditView::OnEditTab and OnEditUntab, the Tab and Shift+Tab
+	    keys. */
+	void editTab();
+	void editUntab();
+	/** The lines a selection over more than one line indents or
+	    unindents, and where it ends once they are done. */
+	struct TabifyRange
+	{
+		int firstLine = 0;
+		int lastLine = -1;
+		int endLine = 0;
+		bool endsAtLineEnd = false;
+	};
+	TabifyRange tabifyRange(const QTextCursor &cursor) const;
+	void selectTabified(const TabifyRange &range);
+	void applyTabStops();
+	/** CCrystalTextView::GetCharCellCountFromChar, for a character with
+	    what combines with it. */
+	int cellCount(const QString &grapheme) const;
 
 	QWidget *m_gutter;
+	int m_tabSize = 4;
+	bool m_insertTabs = true;
 	bool m_hasHiddenLines = false;
 	bool m_movingCursor = false;
 	int m_lastCursorPosition = 0;

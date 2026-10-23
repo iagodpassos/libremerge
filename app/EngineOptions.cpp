@@ -5,6 +5,7 @@
 #include "pch.h"
 #include "EngineOptions.h"
 
+#include <algorithm>
 #include <mutex>
 #include <vector>
 #include <QCoreApplication>
@@ -39,6 +40,8 @@ QString toKey(const String &name)
 class QSettingsOptionsMgr : public COptionsMgr
 {
 public:
+	// the one with a range too, which resets a saved value out of it
+	using COptionsMgr::InitOption;
 	int InitOption(const String& name, const varprop::VariantValue& defaultValue) override
 	{
 		const int result = AddOption(name, defaultValue);
@@ -270,6 +273,9 @@ void installEngineOptions()
 	// WinMerge's Editor page: the highlighting, and the parsers it takes
 	options.InitOption(OPT_SYNTAX_HIGHLIGHT, true);
 	options.InitOption(OPT_SYNTAX_HIGHLIGHT_MODE, 1);
+	// and its tabs
+	options.InitOption(OPT_TAB_SIZE, 4, 0, 64);
+	options.InitOption(OPT_TAB_TYPE, 0, 0, 1); // 0 means tabs inserted
 	TreeSitterRegistry::Instance().Initialize(treeSitterGrammarsDir().toStdString());
 	initSyntaxParserFactories();
 }
@@ -309,6 +315,29 @@ void setSyntaxHighlightForTest(bool on, int mode)
 		mgr->Set(OPT_SYNTAX_HIGHLIGHT_MODE, mode);
 	}
 	initSyntaxParserFactories();
+}
+
+int tabSize()
+{
+	// the page keeps it within 1 to 64 (PropEditor); a 0 left in the
+	// settings would divide by zero where the tab stops are worked out
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr != nullptr ? std::clamp(mgr->GetInt(OPT_TAB_SIZE), 1, 64) : 4;
+}
+
+bool insertTabs()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr == nullptr || mgr->GetInt(OPT_TAB_TYPE) == 0;
+}
+
+void setTabsForTest(int tabSize, bool insertTabs)
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+	{
+		mgr->Set(OPT_TAB_SIZE, tabSize);
+		mgr->Set(OPT_TAB_TYPE, insertTabs ? 0 : 1);
+	}
 }
 
 QString treeSitterGrammarsDir()

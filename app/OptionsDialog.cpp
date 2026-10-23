@@ -12,9 +12,11 @@
 #include "TableFiles.h"
 #include "Theme.h"
 
+#include <algorithm>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QFocusEvent>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -22,6 +24,8 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QRegularExpression>
+#include <QRegularExpressionValidator>
 #include <QSettings>
 #include <QStackedWidget>
 #include <QTreeWidget>
@@ -48,6 +52,8 @@ const QString kAutoComplete = QStringLiteral("General/AutoCompleteSource");
 const QString kAutoReload = QStringLiteral("General/AutoReloadModifiedFiles");
 const QString kBackup = QStringLiteral("Backup/FileCompare");
 const QString kLanguage = QStringLiteral("Appearance/Language");
+// PropEditor's MAX_TABSIZE
+const int kMaxTabSize = 64;
 
 /** A label over its control, the way WinMerge's pages stack them; its
     accelerator letter goes to the control. */
@@ -622,8 +628,10 @@ void OptionsDialog::loadMessageBoxes()
 }
 
 /** WinMerge's Editor page (PropEditor): the highlighting and the parsers
-    it takes, from the built-in ones and Tree-sitter's; the EOL, tab and
-    rendering options are not offered yet. */
+    it takes, from the built-in ones and Tree-sitter's, and the tabs. The
+    original EOL is not offered yet; the rendering mode (GDI or one of
+    DirectWrite's) is Windows' own, which upstream turns off where
+    DirectWrite is missing. */
 QWidget *OptionsDialog::buildEditorPage()
 {
 	auto *page = new QWidget(this);
@@ -636,8 +644,46 @@ QWidget *OptionsDialog::buildEditorPage()
 		tr("Tree-sitter first"), tr("Tree-sitter only") });
 	addLabeled(box, tr("Highlight mode:"), m_cmbHiliteSyntaxMode);
 
+	auto *tabs = new QGroupBox(tr("Tabs"), page);
+	auto *tabsLayout = new QVBoxLayout(tabs);
+	// digits only, two at most (ES_NUMBER, DDV_MaxChars)
+	m_editTabSize = characterField(tabs);
+	m_editTabSize->setObjectName(QStringLiteral("tabSize"));
+	m_editTabSize->setMaxLength(2);
+	m_editTabSize->setAlignment(Qt::AlignRight);
+	m_editTabSize->setValidator(new QRegularExpressionValidator(
+		QRegularExpression(QStringLiteral("[0-9]*")), m_editTabSize));
+	m_editTabSize->installEventFilter(this);
+	addLabeled(tabsLayout, tr("&Tab size:"), m_editTabSize);
+	m_radInsertTabs = new QRadioButton(tr("&Insert tabs"), tabs);
+	m_radInsertTabs->setObjectName(QStringLiteral("insertTabs"));
+	tabsLayout->addWidget(m_radInsertTabs);
+	m_radInsertSpaces = new QRadioButton(tr("Insert &spaces"), tabs);
+	m_radInsertSpaces->setObjectName(QStringLiteral("insertSpaces"));
+	tabsLayout->addWidget(m_radInsertSpaces);
+	box->addWidget(tabs);
+
 	box->addStretch(1);
 	return page;
+}
+
+/** PropEditor::OnEnKillfocusTabEdit: a tab size out of range is told as
+    the field is left for another control, by key, click or accelerator
+    (the page saves it within range all the same). Not when the window
+    goes to the back or closes. */
+bool OptionsDialog::eventFilter(QObject *watched, QEvent *event)
+{
+	if (watched == m_editTabSize && event->type() == QEvent::FocusOut)
+	{
+		const Qt::FocusReason reason = static_cast<QFocusEvent *>(event)->reason();
+		const bool left = reason == Qt::TabFocusReason || reason == Qt::BacktabFocusReason
+			|| reason == Qt::MouseFocusReason || reason == Qt::ShortcutFocusReason;
+		const int value = m_editTabSize->text().toInt();
+		if (left && (value < 1 || value > kMaxTabSize))
+			lm::showWarning(this, tr("Tab size value is out of range. Please use 1 - %1.")
+				.arg(kMaxTabSize));
+	}
+	return QDialog::eventFilter(watched, event);
 }
 
 /** WinMerge's Backup Files page (PropBackups): the file compare switch;
@@ -705,6 +751,9 @@ void OptionsDialog::load()
 			mgr->GetBool(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES));
 		m_chkHiliteSyntax->setChecked(mgr->GetBool(OPT_SYNTAX_HIGHLIGHT));
 		m_cmbHiliteSyntaxMode->setCurrentIndex(mgr->GetInt(OPT_SYNTAX_HIGHLIGHT_MODE));
+		m_editTabSize->setText(QString::number(mgr->GetInt(OPT_TAB_SIZE)));
+		(mgr->GetInt(OPT_TAB_TYPE) == 0 ? m_radInsertTabs : m_radInsertSpaces)
+			->setChecked(true);
 	}
 	m_cmbCompareMethod->setCurrentIndex(lm::currentCompareMethod());
 	showTableSettings(lm::TableSettings::load());
@@ -763,6 +812,9 @@ void OptionsDialog::save()
 		mgr->SaveOption(OPT_SYNTAX_HIGHLIGHT, m_chkHiliteSyntax->isChecked());
 		mgr->SaveOption(OPT_SYNTAX_HIGHLIGHT_MODE,
 			m_cmbHiliteSyntaxMode->currentIndex());
+		mgr->SaveOption(OPT_TAB_SIZE,
+			std::clamp(m_editTabSize->text().toInt(), 1, kMaxTabSize));
+		mgr->SaveOption(OPT_TAB_TYPE, m_radInsertTabs->isChecked() ? 0 : 1);
 		mgr->FlushOptions();
 	}
 	lm::saveCompareMethod(m_cmbCompareMethod->currentIndex());
@@ -863,6 +915,8 @@ void OptionsDialog::restoreDefaults(int page)
 	case EditorPage:
 		m_chkHiliteSyntax->setChecked(true);
 		m_cmbHiliteSyntaxMode->setCurrentIndex(1); // Built-in first
+		m_editTabSize->setText(QStringLiteral("4"));
+		m_radInsertTabs->setChecked(true);
 		break;
 	case BackupPage:
 		m_chkBackup->setChecked(true);

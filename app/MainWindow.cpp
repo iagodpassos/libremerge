@@ -1700,7 +1700,10 @@ void MainWindow::showOptions()
 		lm::initSyntaxParserFactories();
 		for (int i = 0; i < m_tabs->count(); ++i)
 			if (auto *file = qobject_cast<FileCompareView *>(m_tabs->widget(i)))
+			{
 				file->refreshSyntaxHighlighting();
+				file->refreshEditorOptions();
+			}
 		applyDiffOptions();
 	}
 }

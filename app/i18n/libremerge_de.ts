@@ -357,11 +357,6 @@
         <translation>  • ungespeicherte Änderungen</translation>
     </message>
     <message>
-        <source>Ln: %1  Col: %2/%3  Ch: %2/%3</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Zeile: %1  Spalte: %2/%3  Zeichen: %2/%3</translation>
-    </message>
-    <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
@@ -370,6 +365,10 @@
         <source>The merge target is read-only.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Das Ziel der Zusammenführung ist schreibgeschützt.</translation>
+    </message>
+    <message>
+        <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
+        <translation>Zeile: %1  Spalte: %2/%3  Zeichen: %4/%5</translation>
     </message>
     <message>
         <source>Merging/copying differences that contain hidden lines is not currently supported.
@@ -3993,6 +3992,13 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <translation>&amp;Zeichensatz...</translation>
     </message>
     <message>
+        <source>Tab size value is out of range. Please use 1 - %1.</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Tab size value is out of range. Please use 1 - %1.&quot;.</translatorcomment>
+        <translation>Der Wert im Feld Tabulator-Größe ist nicht im Bereich, den LibreMerge akzeptiert.
+
+Bitte benutzen Sie Werte von 1 - %1.</translation>
+    </message>
+    <message>
         <source>Options</source>
         <translation>Einstellungen</translation>
     </message>
@@ -4263,6 +4269,22 @@ Drücken Sie &apos;Zurücksetzen&apos;, um alle Meldungen wieder sichtbar zu sch
         <source>Highlight mode:</source>
         <translatorcomment>After WinMerge&apos;s &quot;Highlight &amp;mode:&quot;.</translatorcomment>
         <translation>Hervorhebungsmodus:</translation>
+    </message>
+    <message>
+        <source>Tabs</source>
+        <translation>Tabulatoren</translation>
+    </message>
+    <message>
+        <source>&amp;Tab size:</source>
+        <translation>&amp;Tabulator-Größe:</translation>
+    </message>
+    <message>
+        <source>&amp;Insert tabs</source>
+        <translation>Tabulatoren &amp;einfügen</translation>
+    </message>
+    <message>
+        <source>Insert &amp;spaces</source>
+        <translation>&amp;Leerzeichen einfügen</translation>
     </message>
     <message>
         <source>Create backup files for:</source>
