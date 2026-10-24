@@ -23,7 +23,7 @@ struct TableSettings;
  * The application options dialog, laid out like WinMerge's (Preferences
  * dialog): a page tree on the left, where a category's pages sit indented
  * under it (General; Compare > General, Folder, Table, Binary, Image;
- * Message Boxes; Backup Files), and the
+ * Message Boxes; Editor > General; Backup Files; Codepage), and the
  * selected page on the right with its own Defaults button. Every option
  * sits on the page and at the position WinMerge gives it.
  */
@@ -84,6 +84,7 @@ public:
 		MessageBoxesPage,
 		EditorPage,  ///< Editor > General
 		BackupPage,
+		CodepagePage,
 	};
 	/** The tree's items in display order, with their depth and the page
 	    each opens (for tests). */
@@ -127,6 +128,9 @@ private:
 	void syncMessageAnswer(int row);
 	QWidget *buildEditorPage();
 	QWidget *buildBackupPage();
+	QWidget *buildCodepagePage();
+	void showCustomCodepage(int codepage);
+	void showAutodetectType(int type);
 	void selectCategory(QTreeWidgetItem *item);
 	void load();
 	void save();
@@ -191,4 +195,10 @@ private:
 	QList<QComboBox *> m_messageAnswers;
 	// Backup Files
 	QCheckBox *m_chkBackup;
+	// Codepage
+	QRadioButton *m_radCodepage[3] = {};
+	QComboBox *m_cmbCustomCodepage = nullptr;
+	QCheckBox *m_chkDetectCodepage = nullptr;
+	QCheckBox *m_chkDetectCodepage2 = nullptr;
+	QComboBox *m_cmbAutodetectType = nullptr;
 };

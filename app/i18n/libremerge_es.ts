@@ -4034,6 +4034,10 @@ Comprobando la identidad binaria...</translation>
         <translation>&amp;Conjunto de caracteres...</translation>
     </message>
     <message>
+        <source>Codepage</source>
+        <translation>Codificación</translation>
+    </message>
+    <message>
         <source>Tab size value is out of range. Please use 1 - %1.</source>
         <translatorcomment>After WinMerge&apos;s &quot;Tab size value is out of range. Please use 1 - %1.&quot;.</translatorcomment>
         <translation>El valor del tamaño de la tabulación no está en el rango aceptado por LibreMerge.
@@ -4342,6 +4346,66 @@ Por favor, use valores entre 1 y %1.</translation>
         <source>The backup is written next to the original file, with the .bak extension.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>La copia de seguridad se guarda junto al archivo original, con la extensión .bak.</translation>
+    </message>
+    <message>
+        <source>Default Codepage</source>
+        <translation>Codificación predeterminada</translation>
+    </message>
+    <message>
+        <source>Select the default codepage for non-Unicode files:</source>
+        <translation>Seleccione la codificación predeterminada para archivos no Unicode:</translation>
+    </message>
+    <message>
+        <source>System codepage</source>
+        <translation>Codificación del sistema</translation>
+    </message>
+    <message>
+        <source>According to LibreMerge User Interface</source>
+        <translatorcomment>After WinMerge&apos;s &quot;According to WinMerge User Interface&quot;.</translatorcomment>
+        <translation>Según la interfaz de usuario de LibreMerge</translation>
+    </message>
+    <message>
+        <source>Custom codepage:</source>
+        <translation>Codificación personalizada:</translation>
+    </message>
+    <message>
+        <source>Detect codepage for: .html, .rc, .xml
+Restart required.</source>
+        <translation>Detectar codificación para estos tipos de archivos: .html, .rc, .xml
+Necesita reiniciar sesión.</translation>
+    </message>
+    <message>
+        <source>Detect codepage for files with ICU
+Restart required.</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Detect codepage for files with mlang.dll
+Restart required.&quot;.</translatorcomment>
+        <translation>Detectar codificación para archivos de texto usando ICU
+Necesita reiniciar sesión.</translation>
+    </message>
+    <message>
+        <source>Auto-Select</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Selección automática</translation>
+    </message>
+    <message>
+        <source>Chinese Simplified (Auto-Select)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Chino simplificado (selección automática)</translation>
+    </message>
+    <message>
+        <source>Chinese Traditional (Auto-Select)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Chino tradicional (selección automática)</translation>
+    </message>
+    <message>
+        <source>Japanese (Auto-Select)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Japonés (selección automática)</translation>
+    </message>
+    <message>
+        <source>Korean (Auto-Select)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Coreano (selección automática)</translation>
     </message>
 </context>
 <context>

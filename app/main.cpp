@@ -123,6 +123,7 @@
 #include "ImgMergeBuffer.hpp"
 // engine (option names and the file filter, for the selftests)
 #include "OptionsDef.h"
+#include "unicoder.h"
 #include "FileFilterHelper.h"
 
 namespace
@@ -286,6 +287,10 @@ int runCommandLine(const lm::CommandLine &cmd)
 		lm::useFileFilterMask(cmd.fileFilter);
 	if (cmd.compareMethod.has_value())
 		lm::useCompareMethod(*cmd.compareMethod);
+	// the default codepage, by the options -cfg may have set, or -cp
+	lm::updateCodepageModule();
+	if (cmd.codepage != 0)
+		lm::updateDefaultCodepage(2, cmd.codepage);
 	// no message box waits for anybody (-noninteractive)
 	if (cmd.nonInteractive)
 		lm::setUnattended(true);
@@ -425,6 +430,9 @@ int main(int argc, char *argv[])
 	if (appTranslator.load(locale, QStringLiteral("libremerge"),
 			QStringLiteral("_"), QStringLiteral(":/i18n")))
 		app.installTranslator(&appTranslator);
+	// the codepage "According to LibreMerge User Interface" takes
+	lm::setInterfaceLanguage(appTranslator.isEmpty()
+		? QStringLiteral("en") : appTranslator.language());
 
 	lm::installEngineOptions();
 	lm::installFileFilters();
@@ -544,6 +552,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestSubfoldersOpt(QStringLiteral("selftest-subfolders"),
 		QStringLiteral("Compare folders without their subfolders: folder items, \"..\", opening in place, the selection screen's box and -r (for testing)"));
 	parser.addOption(selftestSubfoldersOpt);
+	QCommandLineOption selftestCodepageOpt(QStringLiteral("selftest-codepage"),
+		QStringLiteral("Exercise Options > Codepage: the default codepage, -cp and the detection of a file's encoding (for testing)"));
+	parser.addOption(selftestCodepageOpt);
 	QCommandLineOption selftestFolderSelectionOpt(QStringLiteral("selftest-folder-selection"),
 		QStringLiteral("Compare two or three selected items of a folder comparison with each other (for testing)"));
 	parser.addOption(selftestFolderSelectionOpt);
@@ -1573,17 +1584,17 @@ int main(int argc, char *argv[])
 	{
 		// WinMerge's Preferences layout: the page tree, a category opening
 		// its first page with the path in the title, the backup switch on
-		// Backup Files, the highlighting on Editor > General, and Defaults
-		// resetting the current page only.
+		// Backup Files, the highlighting on Editor > General, Codepage
+		// last, and Defaults resetting the current page only.
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
 			OptionsDialog::BinaryPage, OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
-			-1, OptionsDialog::EditorPage, OptionsDialog::BackupPage };
-		bool ok = tree.size() == 11;
+			-1, OptionsDialog::EditorPage, OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
+		bool ok = tree.size() == 12;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1593,8 +1604,9 @@ int main(int argc, char *argv[])
 			OptionsDialog::ComparePage, OptionsDialog::ComparePage,
 			OptionsDialog::FolderPage, OptionsDialog::TablePage, OptionsDialog::BinaryPage,
 			OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
-			OptionsDialog::EditorPage, OptionsDialog::EditorPage, OptionsDialog::BackupPage };
-		for (int i = 0; ok && i < 11; ++i)
+			OptionsDialog::EditorPage, OptionsDialog::EditorPage, OptionsDialog::BackupPage,
+			OptionsDialog::CodepagePage };
+		for (int i = 0; ok && i < 12; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
@@ -11925,6 +11937,253 @@ int main(int argc, char *argv[])
 			"-inifile: its options read and kept; -noprefs: the defaults");
 
 		printf("command line: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestCodepageOpt))
+	{
+		// WinMerge's Codepage page (PropCodepage) and what it decides: the
+		// codepage the files without a BOM read and save in, the default
+		// one (the system's, the interface's or a custom one, -cp too) or
+		// the one detected (an HTML file's charset, ICU's detector), valid
+		// UTF-8 reading as UTF-8 whatever the default
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		const QString cafe = QString::fromUtf8("caf\xc3\xa9");
+		const QString latin = dir.filePath(QStringLiteral("latin1.txt"));
+		const QString utf8 = dir.filePath(QStringLiteral("utf8.txt"));
+		write(latin, cafe.toLatin1() + "\n");
+		write(utf8, cafe.toUtf8() + "\n");
+		QString error;
+
+		// the page, after Backup Files: its controls, WinMerge's defaults,
+		// what is saved and shown again, and the Defaults button
+		{
+			OptionsDialog dialog;
+			const QList<OptionsDialog::CategoryInfo> categories = dialog.categoriesForTest();
+			check(categories.size() > 1 && categories.last().page == OptionsDialog::CodepagePage
+					&& categories.last().text == OptionsDialog::tr("Codepage")
+					&& categories.at(categories.size() - 2).page == OptionsDialog::BackupPage,
+				"page: Codepage, after Backup Files");
+			QWidget *page = dialog.pageForTest(OptionsDialog::CodepagePage);
+			auto *system = page->findChild<QRadioButton *>(QStringLiteral("codepageMode0"));
+			auto *customMode = page->findChild<QRadioButton *>(QStringLiteral("codepageMode2"));
+			auto *custom = page->findChild<QComboBox *>(QStringLiteral("customCodepage"));
+			auto *detect = page->findChild<QCheckBox *>(QStringLiteral("detectCodepage"));
+			auto *detect2 = page->findChild<QCheckBox *>(QStringLiteral("detectCodepage2"));
+			auto *type = page->findChild<QComboBox *>(QStringLiteral("autodetectType"));
+			if (system == nullptr || customMode == nullptr || custom == nullptr
+				|| detect == nullptr || detect2 == nullptr || type == nullptr)
+				return 2;
+			check(system->isChecked() && !custom->isEnabled() && custom->currentData().toInt() == 65001
+					&& detect->isChecked() && !detect2->isChecked() && !type->isEnabled()
+					&& type->count() == 5 && type->currentData().toInt() == 50001,
+				"page: the system codepage (UTF-8) and the declared charsets by default");
+			const int windows1252 = custom->findData(1252);
+			check(windows1252 >= 0 && custom->itemText(windows1252).startsWith(QStringLiteral(" 1252 - "))
+					&& custom->findData(28591) >= 0 && custom->findData(932) >= 0
+					&& custom->findData(437) >= 0 && custom->findData(65000) >= 0
+					&& custom->itemText(0).compare(custom->itemText(1), Qt::CaseInsensitive) < 0,
+				"page: the codepages, \"% 5d - name\" and sorted, upstream's added by hand too");
+			customMode->setChecked(true);
+			detect2->setChecked(true);
+			check(custom->isEnabled() && type->isEnabled(),
+				"page: the fields with Custom codepage and the detector");
+			// typed in by its name, as GetEncodingCodePageFromNameString takes it
+			custom->setEditText(QStringLiteral("Windows-1252"));
+			type->setCurrentIndex(type->findData(50932));
+			dialog.saveForTest();
+			check(mgr->GetInt(OPT_CP_DEFAULT_MODE) == 2 && mgr->GetInt(OPT_CP_DEFAULT_CUSTOM) == 1252
+					&& mgr->GetInt(OPT_CP_DETECT) == ((50932 << 16) | 3),
+				"page: saved, the codepage typed in by its name");
+			dialog.selectCategoryForTest(categories.size() - 1);
+			dialog.restoreDefaultsForTest();
+			check(system->isChecked() && !custom->isEnabled() && custom->currentData().toInt() == 65001
+					&& detect->isChecked() && !detect2->isChecked() && type->currentData().toInt() == 50001,
+				"page: Defaults");
+		}
+		{
+			OptionsDialog dialog;
+			QWidget *page = dialog.pageForTest(OptionsDialog::CodepagePage);
+			auto *custom = page->findChild<QComboBox *>(QStringLiteral("customCodepage"));
+			auto *type = page->findChild<QComboBox *>(QStringLiteral("autodetectType"));
+			check(page->findChild<QRadioButton *>(QStringLiteral("codepageMode2"))->isChecked()
+					&& custom->isEnabled() && custom->currentData().toInt() == 1252
+					&& page->findChild<QCheckBox *>(QStringLiteral("detectCodepage2"))->isChecked()
+					&& type->isEnabled() && type->currentData().toInt() == 50932,
+				"page: shows what was saved");
+		}
+		mgr->SaveOption(OPT_CP_DEFAULT_MODE, 0);
+		mgr->SaveOption(OPT_CP_DEFAULT_CUSTOM, 65001);
+		mgr->SaveOption(OPT_CP_DETECT, (50001 << 16) | 1);
+		lm::updateCodepageModule();
+
+		// the system codepage, UTF-8: a Latin-1 file does not read as such
+		{
+			FileCompareView view;
+			if (!view.compare(latin, utf8, &error))
+				return 2;
+			check(view.realLinesForTest(1) == QStringList({ cafe })
+					&& view.realLinesForTest(0) != QStringList({ cafe })
+					&& view.encodingTextForTest(1).startsWith(QStringLiteral("UTF-8")),
+				"system codepage: UTF-8 without a BOM reads as UTF-8, Latin-1 not as cafe");
+		}
+		// a custom one: the Latin-1 file reads and saves in it, UTF-8
+		// still reads as UTF-8
+		lm::updateDefaultCodepage(2, 1252);
+		{
+			FileCompareView view;
+			if (!view.compare(latin, utf8, &error))
+				return 2;
+			check(view.realLinesForTest(0) == QStringList({ cafe })
+					&& view.realLinesForTest(1) == QStringList({ cafe }) && view.diffCount() == 0
+					&& view.encodingTextForTest(0).startsWith(QStringLiteral("Windows-1252"))
+					&& view.encodingTextForTest(1).startsWith(QStringLiteral("UTF-8")),
+				"custom 1252: Latin-1 reads as cafe, UTF-8 as UTF-8");
+			view.typeAtForTest(0, 0, QString::fromUtf8("\xc3\xa0"));
+			check(view.saveSideAt(0, &error) && read(latin) == "\xe0" "caf\xe9\n",
+				"custom 1252: saved in it");
+		}
+		write(latin, cafe.toLatin1() + "\n");
+		// a table as well
+		const QString latinCsv = dir.filePath(QStringLiteral("latin1.csv"));
+		const QString utf8Csv = dir.filePath(QStringLiteral("utf8.csv"));
+		write(latinCsv, "id,name\n1," + cafe.toLatin1() + "\n");
+		write(utf8Csv, "id,name\n1," + cafe.toUtf8() + "\n");
+		{
+			TableCompareView view;
+			if (!view.compare(latinCsv, utf8Csv, &error))
+				return 2;
+			check(view.diffCount() == 0 && view.shownRowsForTest(0).contains(QStringLiteral("1,") + cafe),
+				"custom 1252: a table reads in it too");
+		}
+		lm::updateDefaultCodepage(0, 0);
+		{
+			TableCompareView view;
+			if (!view.compare(latinCsv, utf8Csv, &error))
+				return 2;
+			check(view.diffCount() == 1, "system codepage: the table's Latin-1 row differs");
+		}
+		// the interface's codepage, Windows' one of its language
+		const auto interfaceCodepage = [](const char *language) {
+			lm::setInterfaceLanguage(QString::fromLatin1(language));
+			lm::updateDefaultCodepage(1, 0);
+			return ucr::getDefaultCodepage();
+		};
+		check(interfaceCodepage("en") == 1252 && interfaceCodepage("pt_BR") == 1252
+				&& interfaceCodepage("de") == 1252 && interfaceCodepage("es") == 1252
+				&& interfaceCodepage("ca") == 1252 && interfaceCodepage("fr") == 1252
+				&& interfaceCodepage("ru") == 1251 && interfaceCodepage("ja") == 932
+				&& interfaceCodepage("zh_CN") == 936 && interfaceCodepage("zh_TW") == 950,
+			"interface: the Windows codepage of its language");
+		lm::setInterfaceLanguage(QStringLiteral("en"));
+		lm::updateDefaultCodepage(0, 0);
+
+		// an HTML file by the charset it declares (the first detection)
+		const QString html = dir.filePath(QStringLiteral("page.html"));
+		write(html, "<meta charset=\"iso-8859-1\">\n<p>" + cafe.toLatin1() + "</p>\n");
+		// the same text in UTF-8, in a file whose charset nothing reads
+		const QString htmlUtf8 = dir.filePath(QStringLiteral("page8.txt"));
+		write(htmlUtf8, "<meta charset=\"iso-8859-1\">\n<p>" + cafe.toUtf8() + "</p>\n");
+		{
+			FileCompareView view;
+			if (!view.compare(html, htmlUtf8, &error))
+				return 2;
+			check(view.realLinesForTest(0).value(1) == QStringLiteral("<p>") + cafe + QStringLiteral("</p>")
+					&& view.diffCount() == 0,
+				"HTML: read in the charset it declares");
+		}
+		mgr->Set(OPT_CP_DETECT, 50001 << 16);
+		{
+			FileCompareView view;
+			if (!view.compare(html, htmlUtf8, &error))
+				return 2;
+			check(view.diffCount() == 1, "HTML: not without the detection");
+		}
+		// ICU's detector (the second): the encoding of a French text in
+		// Latin-1, and of a Japanese one in Shift_JIS among Japanese's
+		const QString french = dir.filePath(QStringLiteral("french.txt"));
+		const QString frenchText = QString::fromUtf8("Le caf\xc3\xa9 de la gare a ferm\xc3\xa9 ce soir.\n"
+			"La fa\xc3\xa7" "ade a \xc3\xa9t\xc3\xa9 repeinte en d\xc3\xa9" "cembre.\n"
+			"Un \xc3\xa9tudiant a r\xc3\xa9pondu, le pr\xc3\xa9sident a d\xc3\xa9" "cid\xc3\xa9.\n");
+		write(french, frenchText.toLatin1());
+		const QString frenchUtf8 = dir.filePath(QStringLiteral("french8.txt"));
+		write(frenchUtf8, frenchText.toUtf8());
+		const QString japanese = dir.filePath(QStringLiteral("japanese.txt"));
+		write(japanese, QByteArray::fromHex("82b182f182c982bf82cd90a28a45814293fa967b8cea82cc"
+			"8365834c8358836782c582b781420a82b182ea82cd8356837483674a495382c58f9182a982ea"
+			"82c482a282dc82b781420a"));
+		const QString japaneseUtf8 = dir.filePath(QStringLiteral("japanese8.txt"));
+		write(japaneseUtf8, QString::fromUtf8("\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1"
+			"\xe3\x81\xaf\xe4\xb8\x96\xe7\x95\x8c\xe3\x80\x82\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e"
+			"\xe3\x81\xae\xe3\x83\x86\xe3\x82\xad\xe3\x82\xb9\xe3\x83\x88\xe3\x81\xa7\xe3\x81\x99"
+			"\xe3\x80\x82\n\xe3\x81\x93\xe3\x82\x8c\xe3\x81\xaf\xe3\x82\xb7\xe3\x83\x95\xe3\x83\x88"
+			"JIS\xe3\x81\xa7\xe6\x9b\xb8\xe3\x81\x8b\xe3\x82\x8c\xe3\x81\xa6\xe3\x81\x84\xe3\x81\xbe"
+			"\xe3\x81\x99\xe3\x80\x82\n").toUtf8());
+		const auto sameText = [&error](const QString &a, const QString &b) {
+			FileCompareView view;
+			return view.compare(a, b, &error) && view.diffCount() == 0;
+		};
+		check(!sameText(french, frenchUtf8) && !sameText(japanese, japaneseUtf8),
+			"detector off: Latin-1 and Shift_JIS do not read as such");
+		mgr->Set(OPT_CP_DETECT, (50001 << 16) | 2);
+		check(sameText(french, frenchUtf8) && sameText(japanese, japaneseUtf8),
+			"detector, Auto-Select: Latin-1 and Shift_JIS detected");
+		mgr->Set(OPT_CP_DETECT, (50932 << 16) | 2);
+		check(!sameText(french, frenchUtf8) && sameText(japanese, japaneseUtf8),
+			"detector, Japanese (Auto-Select): Japanese's encodings only");
+		mgr->Set(OPT_CP_DETECT, (50001 << 16) | 1);
+
+		// -cp: the default codepage for the run, the comparison exiting 0
+		// with it (the codepage difference ignored) and 1 without it
+		using Cmd = lm::CommandLine;
+		// after a colon the value keeps it, which upstream's atoi reads as
+		// none
+		check(Cmd::parse({ QStringLiteral("-cp"), QStringLiteral("1252") }).codepage == 1252
+				&& Cmd::parse({ QStringLiteral("-CP"), QStringLiteral("1250") }).codepage == 1250
+				&& Cmd::parse({ QStringLiteral("-cp:1250") }).codepage == 0
+				&& Cmd::parse({ QStringLiteral("-cp"), QStringLiteral("1252") }).unsupported.isEmpty()
+				&& Cmd::parse({ latin }).codepage == 0,
+			"-cp: its value, the next argument");
+		const auto run = [](const QStringList &arguments) {
+			QProcess process;
+			process.start(QCoreApplication::applicationFilePath(), arguments);
+			if (!process.waitForFinished(60000))
+			{
+				process.kill();
+				process.waitForFinished();
+				return -100;
+			}
+			return process.exitStatus() == QProcess::NormalExit ? process.exitCode() : -101;
+		};
+		const QStringList unattended = { QStringLiteral("-noninteractive"),
+			QStringLiteral("-enableexitcode"), QStringLiteral("-noprefs"),
+			QStringLiteral("-ignorecodepage:1") };
+		check(run(unattended + QStringList{ QStringLiteral("-cp"), QStringLiteral("1252"), latin, utf8 }) == 0
+				&& run(unattended + QStringList{ latin, utf8 }) == 1,
+			"-cp: the files read in it for the run");
+
+		printf("codepage: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

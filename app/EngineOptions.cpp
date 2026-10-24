@@ -12,6 +12,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QLocale>
 #include <QSettings>
 #include <QStringList>
 #include <QVariant>
@@ -25,6 +26,8 @@
 #include "OptionsDef.h"
 #include "options_global.h"
 #include "UnicodeString.h"
+#include "charsets.h"
+#include "unicoder.h"
 #include "stringdiffs.h"
 #include "SyntaxParserRegistry.h"
 #include "CrystalLineSyntaxParser.h"
@@ -233,6 +236,78 @@ void loadFilters(COptionsMgr *options)
 	store.substitutionFilters.Initialize(options);
 }
 
+/** OptionsInit's OPT_CP_DETECT by the user's language: valid UTF-8 reads
+    as UTF-8 and HTML/XML/.rc files by their declared charset; in the CJK
+    languages, the detector guesses the others among their encodings. */
+int defaultCodepageDetection()
+{
+	const QLocale locale = QLocale::system();
+	switch (locale.language())
+	{
+	case QLocale::Japanese:
+		return (50932 << 16) | 3;
+	case QLocale::Korean:
+		return (50949 << 16) | 3;
+	case QLocale::Chinese:
+		return locale.script() == QLocale::TraditionalHanScript
+			? (50950 << 16) | 3 : (50936 << 16) | 3;
+	default:
+		return (50001 << 16) | 1;
+	}
+}
+
+/** Windows' ANSI codepage of a language (LOCALE_IDEFAULTANSICODEPAGE),
+    0 for those written in Unicode only. */
+int ansiCodepage(const QLocale &locale)
+{
+	switch (locale.language())
+	{
+	case QLocale::Thai:
+		return 874;
+	case QLocale::Japanese:
+		return 932;
+	case QLocale::Korean:
+		return 949;
+	case QLocale::Chinese:
+		return locale.script() == QLocale::TraditionalHanScript ? 950 : 936;
+	case QLocale::Albanian: case QLocale::Croatian: case QLocale::Czech:
+	case QLocale::Hungarian: case QLocale::Polish: case QLocale::Romanian:
+	case QLocale::Slovak: case QLocale::Slovenian: case QLocale::Bosnian:
+		return 1250;
+	case QLocale::Serbian:
+		return locale.script() == QLocale::LatinScript ? 1250 : 1251;
+	case QLocale::Belarusian: case QLocale::Bulgarian: case QLocale::Kazakh:
+	case QLocale::Kyrgyz: case QLocale::Macedonian: case QLocale::Mongolian:
+	case QLocale::Russian: case QLocale::Tatar: case QLocale::Ukrainian:
+		return 1251;
+	case QLocale::Greek:
+		return 1253;
+	case QLocale::Azerbaijani: case QLocale::Turkish: case QLocale::Uzbek:
+		return 1254;
+	case QLocale::Hebrew:
+		return 1255;
+	case QLocale::Arabic: case QLocale::Persian: case QLocale::Urdu:
+		return 1256;
+	case QLocale::Estonian: case QLocale::Latvian: case QLocale::Lithuanian:
+		return 1257;
+	case QLocale::Vietnamese:
+		return 1258;
+	case QLocale::Armenian: case QLocale::Georgian: case QLocale::Hindi:
+	case QLocale::Bengali: case QLocale::Tamil: case QLocale::Telugu:
+	case QLocale::Marathi: case QLocale::Gujarati: case QLocale::Kannada:
+	case QLocale::Malayalam: case QLocale::Punjabi: case QLocale::Nepali:
+		return 0;
+	default:
+		return 1252;
+	}
+}
+
+QString &interfaceLanguage()
+{
+	static QString language = QStringLiteral("en");
+	return language;
+}
+
 } // namespace
 
 namespace lm
@@ -260,12 +335,14 @@ void installEngineOptions()
 	options.InitOption(OPT_CMP_MOVED_BLOCKS, false);    // upstream default
 	options.InitOption(OPT_CMP_METHOD, static_cast<int>(CMP_CONTENT));
 	options.InitOption(OPT_CMP_INCLUDE_SUBDIRS, true);
-	// how a file's encoding is guessed, WinMerge's default outside the CJK
-	// locales: valid UTF-8 reads as UTF-8, HTML/XML/.rc files by their
-	// declared charset. Not an option here (it is not saved), but the
-	// engine asks for it by name: a folder comparison's context, and the
-	// filter expressions that read a file's content
-	options.InitOption(OPT_CP_DETECT, (50001 << 16) | 1, false);
+	// WinMerge's Codepage page: how the files that are not Unicode read,
+	// in the system's codepage (UTF-8 here) by default, and how a file's
+	// encoding is guessed
+	charsets_init();
+	options.InitOption(OPT_CP_DEFAULT_MODE, 0);
+	options.InitOption(OPT_CP_DEFAULT_CUSTOM, static_cast<int>(GetACP()));
+	options.InitOption(OPT_CP_DETECT, defaultCodepageDetection());
+	updateCodepageModule();
 	// plugins are on, WinMerge's default: there is no setting for them
 	// here, and the line expressions of a prediffer (a table's "Ignore
 	// This Column") run as upstream runs them, when they are
@@ -353,6 +430,41 @@ void setTabsForTest(int tabSize, bool insertTabs)
 		mgr->Set(OPT_TAB_SIZE, tabSize);
 		mgr->Set(OPT_TAB_TYPE, insertTabs ? 0 : 1);
 	}
+}
+
+void setInterfaceLanguage(const QString &language)
+{
+	interfaceLanguage() = language;
+}
+
+void updateDefaultCodepage(int mode, int customCodepage)
+{
+	// CMergeApp::UpdateDefaultCodepage
+	switch (mode)
+	{
+	case 1:
+		ucr::setDefaultCodepage(ansiCodepage(QLocale(interfaceLanguage())));
+		break;
+	case 2:
+		ucr::setDefaultCodepage(customCodepage);
+		break;
+	default:
+		ucr::setDefaultCodepage(static_cast<int>(GetACP()));
+		break;
+	}
+}
+
+void updateCodepageModule()
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+		updateDefaultCodepage(mgr->GetInt(OPT_CP_DEFAULT_MODE),
+			mgr->GetInt(OPT_CP_DEFAULT_CUSTOM));
+}
+
+int codepageDetection()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr != nullptr ? mgr->GetInt(OPT_CP_DETECT) : (50001 << 16) | 1;
 }
 
 QString treeSitterGrammarsDir()

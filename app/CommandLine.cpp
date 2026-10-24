@@ -295,8 +295,10 @@ CommandLine CommandLine::parse(const QStringList &arguments)
 		else if (param == QStringLiteral("noprefs"))
 			cmd.noPrefs = true;
 		// upstream's, which LibreMerge does not act on yet
+		else if (param == QStringLiteral("cp"))
+			cmd.codepage = value().toInt();
 		else if (param == QStringLiteral("or") || param == QStringLiteral("unpacker")
-			|| param == QStringLiteral("prediffer") || param == QStringLiteral("cp"))
+			|| param == QStringLiteral("prediffer"))
 		{
 			value();
 			unsupported(param);
@@ -357,6 +359,7 @@ QString CommandLine::usage()
 		"  -l line, -c character\n"
 		"                  go to that line and character when the files open\n"
 		"  -fileext ext    color the text as files of that extension\n"
+		"  -cp codepage    read the files that are not Unicode in that codepage\n"
 		"  -table-delimiter c, -table-quote c, -table-allownewlinesinquotes y|n\n"
 		"                  how the files read as tables\n"
 		"  -ignorews[:0|1|2], -ignoreblanklines[:0|1], -ignorecase[:0|1],\n"

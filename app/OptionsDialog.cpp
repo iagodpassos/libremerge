@@ -34,8 +34,10 @@
 #include <QVBoxLayout>
 
 // engine
+#include "ExConverter.h"
 #include "OptionsMgr.h"
 #include "OptionsDef.h"
+#include "charsets.h"
 
 namespace
 {
@@ -213,6 +215,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	QTreeWidgetItem *editor = addCategory(nullptr, tr("Editor"), -1);
 	addCategory(editor, tr("General"), EditorPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
+	addCategory(nullptr, tr("Codepage"), CodepagePage);
 	m_categories->expandAll();
 	body->addWidget(m_categories);
 
@@ -227,6 +230,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildMessageBoxesPage());
 	m_pages->addWidget(buildEditorPage());
 	m_pages->addWidget(buildBackupPage());
+	m_pages->addWidget(buildCodepagePage());
 	pageArea->addWidget(m_pages, 1);
 	// every WinMerge page has its own Defaults button, resetting only it
 	auto *defaultsRow = new QHBoxLayout;
@@ -711,6 +715,110 @@ QWidget *OptionsDialog::buildBackupPage()
 	return page;
 }
 
+/** WinMerge's Codepage page (PropCodepage): the codepage the files that
+    are not Unicode read in, and how a file's encoding is detected. The
+    detector is ICU's, where upstream's is Windows' mlang.dll. */
+QWidget *OptionsDialog::buildCodepagePage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+
+	auto *group = new QGroupBox(tr("Default Codepage"), page);
+	auto *groupLayout = new QVBoxLayout(group);
+	groupLayout->addWidget(noteLabel(
+		tr("Select the default codepage for non-Unicode files:"), group));
+	m_radCodepage[0] = new QRadioButton(tr("System codepage"), group);
+	m_radCodepage[1] = new QRadioButton(
+		tr("According to LibreMerge User Interface"), group);
+	m_radCodepage[2] = new QRadioButton(tr("Custom codepage:"), group);
+	for (int i = 0; i < 3; ++i)
+	{
+		m_radCodepage[i]->setObjectName(QStringLiteral("codepageMode%1").arg(i));
+		groupLayout->addWidget(m_radCodepage[i]);
+	}
+	// the codepages ICU converts and the ones upstream adds by hand, each
+	// "% 5d - name" and sorted as text (CBS_SORT); a number or a name can
+	// be typed in too
+	m_cmbCustomCodepage = new QComboBox(group);
+	m_cmbCustomCodepage->setObjectName(QStringLiteral("customCodepage"));
+	m_cmbCustomCodepage->setEditable(true);
+	m_cmbCustomCodepage->setInsertPolicy(QComboBox::NoInsert);
+	QList<QPair<QString, int>> codepages;
+	const auto entry = [](int codepage, const String &desc) {
+		return QStringLiteral("%1 - %2").arg(codepage, 5)
+			.arg(QString::fromStdString(desc));
+	};
+	if (IExconverter *converter = Exconverter::getInstance())
+	{
+		for (const CodePageInfo &info : converter->enumCodePages())
+			if (info.codepage != 1200) // UNICODE
+				codepages.append({ entry(info.codepage, info.desc), info.codepage });
+		for (const int codepage : { 437, 850, 858, 860, 863, 861, 1200, 1201, 65000 })
+		{
+			String desc;
+			converter->getCodepageDescription(codepage, desc);
+			const QString text = entry(codepage, desc);
+			if (std::none_of(codepages.cbegin(), codepages.cend(),
+					[&text](const QPair<QString, int> &item) { return item.first == text; }))
+				codepages.append({ text, codepage });
+		}
+	}
+	std::sort(codepages.begin(), codepages.end(),
+		[](const QPair<QString, int> &a, const QPair<QString, int> &b) {
+			return a.first.compare(b.first, Qt::CaseInsensitive) < 0;
+		});
+	for (const auto &item : codepages)
+		m_cmbCustomCodepage->addItem(item.first, item.second);
+	groupLayout->addWidget(m_cmbCustomCodepage);
+	box->addWidget(group);
+	// the field only with "Custom codepage:"
+	connect(m_radCodepage[2], &QRadioButton::toggled,
+		m_cmbCustomCodepage, &QWidget::setEnabled);
+
+	m_chkDetectCodepage = new QCheckBox(
+		tr("Detect codepage for: .html, .rc, .xml\nRestart required."), page);
+	m_chkDetectCodepage->setObjectName(QStringLiteral("detectCodepage"));
+	box->addWidget(m_chkDetectCodepage);
+	m_chkDetectCodepage2 = new QCheckBox(
+		tr("Detect codepage for files with ICU\nRestart required."), page);
+	m_chkDetectCodepage2->setObjectName(QStringLiteral("detectCodepage2"));
+	box->addWidget(m_chkDetectCodepage2);
+	// the language the detector picks among, mlang's auto-select types
+	m_cmbAutodetectType = new QComboBox(page);
+	m_cmbAutodetectType->setObjectName(QStringLiteral("autodetectType"));
+	m_cmbAutodetectType->addItem(tr("Auto-Select"), 50001);
+	m_cmbAutodetectType->addItem(tr("Chinese Simplified (Auto-Select)"), 50936);
+	m_cmbAutodetectType->addItem(tr("Chinese Traditional (Auto-Select)"), 50950);
+	m_cmbAutodetectType->addItem(tr("Japanese (Auto-Select)"), 50932);
+	m_cmbAutodetectType->addItem(tr("Korean (Auto-Select)"), 50949);
+	auto *typeRow = new QHBoxLayout;
+	typeRow->addSpacing(16);
+	typeRow->addWidget(m_cmbAutodetectType, 1);
+	box->addLayout(typeRow);
+	connect(m_chkDetectCodepage2, &QCheckBox::toggled,
+		m_cmbAutodetectType, &QWidget::setEnabled);
+
+	box->addStretch(1);
+	return page;
+}
+
+/** The custom codepage's item, or its number alone when none is it. */
+void OptionsDialog::showCustomCodepage(int codepage)
+{
+	const int index = m_cmbCustomCodepage->findData(codepage);
+	if (index >= 0)
+		m_cmbCustomCodepage->setCurrentIndex(index);
+	else
+		m_cmbCustomCodepage->setEditText(QString::number(codepage));
+}
+
+void OptionsDialog::showAutodetectType(int type)
+{
+	const int index = m_cmbAutodetectType->findData(type != 0 ? type : 50001);
+	if (index >= 0)
+		m_cmbAutodetectType->setCurrentIndex(index);
+}
+
 void OptionsDialog::load()
 {
 	QSettings settings;
@@ -758,6 +866,15 @@ void OptionsDialog::load()
 		m_editTabSize->setText(QString::number(mgr->GetInt(OPT_TAB_SIZE)));
 		(mgr->GetInt(OPT_TAB_TYPE) == 0 ? m_radInsertTabs : m_radInsertSpaces)
 			->setChecked(true);
+		const int mode = mgr->GetInt(OPT_CP_DEFAULT_MODE);
+		m_radCodepage[mode >= 0 && mode < 3 ? mode : 0]->setChecked(true);
+		m_cmbCustomCodepage->setEnabled(m_radCodepage[2]->isChecked());
+		showCustomCodepage(mgr->GetInt(OPT_CP_DEFAULT_CUSTOM));
+		const int detect = mgr->GetInt(OPT_CP_DETECT);
+		m_chkDetectCodepage->setChecked((detect & 1) != 0);
+		m_chkDetectCodepage2->setChecked((detect & 2) != 0);
+		m_cmbAutodetectType->setEnabled(m_chkDetectCodepage2->isChecked());
+		showAutodetectType(static_cast<int>(static_cast<unsigned>(detect) >> 16));
 	}
 	m_cmbCompareMethod->setCurrentIndex(lm::currentCompareMethod());
 	showTableSettings(lm::TableSettings::load());
@@ -820,6 +937,23 @@ void OptionsDialog::save()
 		mgr->SaveOption(OPT_TAB_SIZE,
 			std::clamp(m_editTabSize->text().toInt(), 1, kMaxTabSize));
 		mgr->SaveOption(OPT_TAB_TYPE, m_radInsertTabs->isChecked() ? 0 : 1);
+		int mode = 0;
+		for (int i = 0; i < 3; ++i)
+			if (m_radCodepage[i]->isChecked())
+				mode = i;
+		mgr->SaveOption(OPT_CP_DEFAULT_MODE, mode);
+		// GetEncodingCodePageFromNameString: the number the text starts
+		// with, or else the codepage it names; neither keeps the old one
+		const QString custom = m_cmbCustomCodepage->currentText();
+		int codepage = QRegularExpression(QStringLiteral("^\\s*([+-]?\\d+)"))
+			.match(custom).captured(1).toInt();
+		if (codepage == 0)
+			codepage = static_cast<int>(GetEncodingCodePageFromName(custom.toUtf8().constData()));
+		if (codepage != 0)
+			mgr->SaveOption(OPT_CP_DEFAULT_CUSTOM, codepage);
+		mgr->SaveOption(OPT_CP_DETECT, (m_chkDetectCodepage->isChecked() ? 1 : 0)
+			| (m_chkDetectCodepage2->isChecked() ? 2 : 0)
+			| (m_cmbAutodetectType->currentData().toInt() << 16));
 		mgr->FlushOptions();
 	}
 	lm::saveCompareMethod(m_cmbCompareMethod->currentIndex());
@@ -928,6 +1062,17 @@ void OptionsDialog::restoreDefaults(int page)
 		break;
 	case BackupPage:
 		m_chkBackup->setChecked(true);
+		break;
+	case CodepagePage:
+		if (COptionsMgr *mgr = GetOptionsMgr())
+		{
+			m_radCodepage[mgr->GetDefault<int>(OPT_CP_DEFAULT_MODE)]->setChecked(true);
+			showCustomCodepage(mgr->GetDefault<int>(OPT_CP_DEFAULT_CUSTOM));
+			const unsigned detect = mgr->GetDefault<unsigned>(OPT_CP_DETECT);
+			m_chkDetectCodepage->setChecked((detect & 1) != 0);
+			m_chkDetectCodepage2->setChecked((detect & 2) != 0);
+			showAutodetectType(static_cast<int>(detect >> 16));
+		}
 		break;
 	}
 }

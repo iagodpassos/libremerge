@@ -1909,8 +1909,9 @@ void MainWindow::showOptions()
 	if (accepted)
 	{
 		// CMainFrame::OnOptions: the parsers in the highlight mode's order,
-		// then every merge document's options again
+		// the default codepage, then every merge document's options again
 		lm::initSyntaxParserFactories();
+		lm::updateCodepageModule();
 		for (int i = 0; i < m_tabs->count(); ++i)
 			if (auto *file = qobject_cast<FileCompareView *>(m_tabs->widget(i)))
 			{

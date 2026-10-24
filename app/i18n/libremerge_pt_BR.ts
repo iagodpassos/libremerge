@@ -3846,6 +3846,58 @@ Checando identidade binária...</translation>
         <translation>O backup é gravado na mesma pasta do arquivo original, com a extensão .bak.</translation>
     </message>
     <message>
+        <source>Default Codepage</source>
+        <translation>Página de Código Padrão</translation>
+    </message>
+    <message>
+        <source>Select the default codepage for non-Unicode files:</source>
+        <translation>Selecionar a página de código padrão para arquivos não Unicode:</translation>
+    </message>
+    <message>
+        <source>System codepage</source>
+        <translation>Página de código do sistema</translation>
+    </message>
+    <message>
+        <source>According to LibreMerge User Interface</source>
+        <translation>De Acordo com a Interface de Usuário do LibreMerge</translation>
+    </message>
+    <message>
+        <source>Custom codepage:</source>
+        <translation>Página de código personalizada:</translation>
+    </message>
+    <message>
+        <source>Detect codepage for: .html, .rc, .xml
+Restart required.</source>
+        <translation>Detectar página de código para: .html, .rc, .xml 
+Reinicialização necessária.</translation>
+    </message>
+    <message>
+        <source>Detect codepage for files with ICU
+Restart required.</source>
+        <translation>Detectar página de código para arquivos com o ICU
+Reinicialização necessária.</translation>
+    </message>
+    <message>
+        <source>Auto-Select</source>
+        <translation>Seleção automática</translation>
+    </message>
+    <message>
+        <source>Chinese Simplified (Auto-Select)</source>
+        <translation>Chinês simplificado (seleção automática)</translation>
+    </message>
+    <message>
+        <source>Chinese Traditional (Auto-Select)</source>
+        <translation>Chinês tradicional (seleção automática)</translation>
+    </message>
+    <message>
+        <source>Japanese (Auto-Select)</source>
+        <translation>Japonês (seleção automática)</translation>
+    </message>
+    <message>
+        <source>Korean (Auto-Select)</source>
+        <translation>Coreano (seleção automática)</translation>
+    </message>
+    <message>
         <source>Ask before closing a window with multiple tabs</source>
         <translation>Perguntar antes de fechar uma janela com várias abas</translation>
     </message>
@@ -3940,6 +3992,10 @@ Checando identidade binária...</translation>
     <message>
         <source>&amp;Character Set...</source>
         <translation>C&amp;onjunto de Caracteres...</translation>
+    </message>
+    <message>
+        <source>Codepage</source>
+        <translation>Página de código</translation>
     </message>
     <message>
         <source>Tab size value is out of range. Please use 1 - %1.</source>

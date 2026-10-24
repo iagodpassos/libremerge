@@ -24,7 +24,7 @@ LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winm
 - **Light and dark themes** for the whole window, or follow the system (on Linux, the dark style of GNOME and KDE, picked up as you switch it), chosen under Options > General; **English, Spanish, Catalan, French, German and Brazilian Portuguese** interface following the system language
 - Drag & drop files or folders onto the window or the Dock icon; a WinMerge-style "Select Files or Folders" screen with history, paths verified as you type, auto completion, read-only flags and swap; a single file opens against a snapshot of itself, to review your own edits
 - Comparison options carried over from WinMerge: ignore whitespace/case/blank lines/EOL/numbers, diff algorithm selection (Myers, minimal, patience, histogram)
-- An **Options dialog laid out like WinMerge's**, with its General settings (close with Esc, preserve file times on save, verify paths, auto completion, reload of files changed by other applications), its Compare page (whitespace, case, blank lines, EOL, numbers, codepage and comment differences, moved blocks, indent heuristic, diff algorithm) and its Message Boxes page, where notices such as "files are identical" can be hidden and brought back
+- An **Options dialog laid out like WinMerge's**, with its General settings (close with Esc, preserve file times on save, verify paths, auto completion, reload of files changed by other applications), its Compare page (whitespace, case, blank lines, EOL, numbers, codepage and comment differences, moved blocks, indent heuristic, diff algorithm), its Message Boxes page, where notices such as "files are identical" can be hidden and brought back, and its Codepage page: the codepage files without a BOM read and save in (the system's UTF-8, the interface language's or a custom one), HTML/XML/.rc files read by the charset they declare, and an encoding detector (ICU's, where WinMerge has Windows' mlang)
 
 | Dark theme | Folder comparison |
 | --- | --- |
@@ -126,13 +126,13 @@ LibreMerge reads WinMerge's command line, with `-` in front of each switch (`/` 
 libremerge -e -u -wl -dl "Base" -dr "Mine" base.txt mine.txt
 ```
 
-These work today: the descriptions (`-dl`, `-dm`, `-dr`), read-only sides (`-wl`, `-wm`, `-wr`), the focus (`-fl`, `-fm`, `-fr`), `-e`, `-x` and `-xq`, `-u`, the window type (`-t`), the compare method (`-m`), the subfolders (`-r`, `-r-`), the file filter (`-f`), the line and character to go to (`-l`, `-c`), `-fileext`, the table switches, the compare options (`-ignorews` and the like, and any option of the Options by WinMerge's name with `-cfg`), the output file (`-o`), `-noprefs`, `-inifile`, `-self-compare`, `-new`, `-minimize`, `-maximize` and `-show-dialog`. For scripts, `-noninteractive` answers every message box with Cancel (its text goes to the terminal) and closes once the comparison is done, without a window where Qt's offscreen platform is there, and `-enableexitcode` makes the exit code 0 for identical files or folders, 1 for different ones and 2 on an error:
+These work today: the descriptions (`-dl`, `-dm`, `-dr`), read-only sides (`-wl`, `-wm`, `-wr`), the focus (`-fl`, `-fm`, `-fr`), `-e`, `-x` and `-xq`, `-u`, the window type (`-t`), the compare method (`-m`), the subfolders (`-r`, `-r-`), the file filter (`-f`), the line and character to go to (`-l`, `-c`), `-fileext`, the codepage (`-cp`), the table switches, the compare options (`-ignorews` and the like, and any option of the Options by WinMerge's name with `-cfg`), the output file (`-o`), `-noprefs`, `-inifile`, `-self-compare`, `-new`, `-minimize`, `-maximize` and `-show-dialog`. For scripts, `-noninteractive` answers every message box with Cancel (its text goes to the terminal) and closes once the comparison is done, without a window where Qt's offscreen platform is there, and `-enableexitcode` makes the exit code 0 for identical files or folders, 1 for different ones and 2 on an error:
 
 ```sh
 libremerge -noninteractive -enableexitcode -noprefs old/ new/ && echo same
 ```
 
-Not yet: `-or`, `-cp`, auto-merge (`-al`, `-am`, `-ar`) and plugins; LibreMerge says so on the terminal when it meets them. Windows' own switches for a single instance (`-s`, `-sw`, `-g`) are taken and have no effect: each run is a separate LibreMerge, which a caller waits for anyway.
+Not yet: `-or`, auto-merge (`-al`, `-am`, `-ar`) and plugins; LibreMerge says so on the terminal when it meets them. Windows' own switches for a single instance (`-s`, `-sw`, `-g`) are taken and have no effect: each run is a separate LibreMerge, which a caller waits for anyway.
 
 ## Known limitations
 

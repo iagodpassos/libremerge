@@ -173,9 +173,8 @@ FolderCompareResult compareFolders(const QStringList &dirs,
 	// and the line filters
 	ctxt.m_nQuickCompareLimit = 4 * 1024 * 1024;
 	ctxt.m_nBinaryCompareLimit = 64 * 1024 * 1024;
-	// OPT_CP_DETECT (see installEngineOptions): valid UTF-8 reads as
-	// UTF-8, HTML/XML/.rc files by their declared charset
-	ctxt.m_iGuessEncodingType = GetOptionsMgr()->GetInt(OPT_CP_DETECT);
+	// how the files' encodings are guessed (Options > Codepage)
+	ctxt.m_iGuessEncodingType = codepageDetection();
 	// off, the same text in another encoding is a difference
 	ctxt.m_bIgnoreCodepage = ignoreCodepageDifferences();
 	ctxt.m_pFilterList = currentLineFilters();

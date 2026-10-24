@@ -4318,6 +4318,10 @@ S&apos;està comprovant la identitat binària...</translation>
         <translation>Taula de &amp;codificació de caràcters...</translation>
     </message>
     <message>
+        <source>Codepage</source>
+        <translation>Codificació de caràcters</translation>
+    </message>
+    <message>
         <source>Tab size value is out of range. Please use 1 - %1.</source>
         <translatorcomment>After WinMerge&apos;s &quot;Tab size value is out of range. Please use 1 - %1.&quot;.</translatorcomment>
         <translation>El valor del camp de la mida de les tabulacions no és dins el rang que accepta el LibreMerge.
@@ -4634,6 +4638,66 @@ Useu valors entre 1 i %1.</translation>
         <source>The backup is written next to the original file, with the .bak extension.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>La còpia de seguretat es desa al costat del fitxer original, amb l&apos;extensió .bak.</translation>
+    </message>
+    <message>
+        <source>Default Codepage</source>
+        <translation>Codificació de caràcters predeterminada</translation>
+    </message>
+    <message>
+        <source>Select the default codepage for non-Unicode files:</source>
+        <translation>Selecciona la codificació de caràcters predeterminada que s&apos;utilitzarà en carregar fitxers no-Unicode:</translation>
+    </message>
+    <message>
+        <source>System codepage</source>
+        <translation>Codificació de caràcters del sistema</translation>
+    </message>
+    <message>
+        <source>According to LibreMerge User Interface</source>
+        <translatorcomment>After WinMerge&apos;s &quot;According to WinMerge User Interface&quot;.</translatorcomment>
+        <translation>En funció de l&apos;idioma de l&apos;interfície d&apos;usuari del LibreMerge</translation>
+    </message>
+    <message>
+        <source>Custom codepage:</source>
+        <translation>Codificació de caràcters personalitzada:</translation>
+    </message>
+    <message>
+        <source>Detect codepage for: .html, .rc, .xml
+Restart required.</source>
+        <translation>Detecta la codificació de caràcters en aquest tipus de fitxers: .html, .rc, .xml
+Cal reiniciar l&apos;aplicació.</translation>
+    </message>
+    <message>
+        <source>Detect codepage for files with ICU
+Restart required.</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Detect codepage for files with mlang.dll
+Restart required.&quot;.</translatorcomment>
+        <translation>Detecta la codificació de caràcters en fitxers de text amb ICU
+Cal reiniciar l&apos;aplicació.</translation>
+    </message>
+    <message>
+        <source>Auto-Select</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Selecció automàtica</translation>
+    </message>
+    <message>
+        <source>Chinese Simplified (Auto-Select)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Xinès simplificat (selecció automàtica)</translation>
+    </message>
+    <message>
+        <source>Chinese Traditional (Auto-Select)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Xinès tradicional (selecció automàtica)</translation>
+    </message>
+    <message>
+        <source>Japanese (Auto-Select)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Japonès (selecció automàtica)</translation>
+    </message>
+    <message>
+        <source>Korean (Auto-Select)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Coreà (selecció automàtica)</translation>
     </message>
 </context>
 <context>

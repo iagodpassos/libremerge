@@ -9,12 +9,30 @@
 #include "charsets.h"
 #include "lm_icu.h"
 #include <cstring>
+#include <set>
+#include <string>
 #include <unicode/ucnv.h>
 #include <unicode/ucsdet.h>
 #include <unicode/ustring.h>
 
 namespace
 {
+
+/** Whether a codepage ICU detected in a language is one of the
+    auto-select type's (mlang's 5000x types). */
+bool ofAutodetectType(int autodetectType, unsigned codepage, const char *language)
+{
+	const std::string lang = language != nullptr ? language : "";
+	switch (autodetectType)
+	{
+	case 50932: return lang == "ja";
+	case 50949: return lang == "ko";
+	// Chinese: GB18030 and ISO-2022-CN are Simplified, Big5 Traditional
+	case 50936: return lang == "zh" && codepage != 950;
+	case 50950: return lang == "zh" && codepage == 950;
+	default: return true;
+	}
+}
 
 class ExconverterICU : public IExconverter
 {
@@ -106,23 +124,30 @@ public:
 
 	int detectInputCodepage(int autodetectType, int defcodepage, const char *data, size_t size) override
 	{
-		(void)autodetectType;
+		// mlang detects among the encodings of the auto-select type's
+		// language (50932 Japanese, 50936 Simplified Chinese, 50949
+		// Korean, 50950 Traditional Chinese, 50001 any): here the most
+		// likely of ICU's matches in that language
 		UErrorCode err = U_ZERO_ERROR;
 		UCharsetDetector *det = ucsdet_open(&err);
 		if (U_FAILURE(err))
 			return defcodepage;
 		int result = defcodepage;
 		ucsdet_setText(det, data, static_cast<int32_t>(size), &err);
-		const UCharsetMatch *match = ucsdet_detect(det, &err);
-		if (U_SUCCESS(err) && match != nullptr)
+		int32_t count = 0;
+		const UCharsetMatch **matches = ucsdet_detectAll(det, &count, &err);
+		for (int32_t i = 0; U_SUCCESS(err) && i < count; ++i)
 		{
-			const char *name = ucsdet_getName(match, &err);
-			if (U_SUCCESS(err) && name != nullptr)
-			{
-				unsigned cp = GetEncodingCodePageFromName(name);
-				if (cp != 0)
-					result = static_cast<int>(cp);
-			}
+			UErrorCode matchErr = U_ZERO_ERROR;
+			const char *name = ucsdet_getName(matches[i], &matchErr);
+			const char *language = ucsdet_getLanguage(matches[i], &matchErr);
+			if (U_FAILURE(matchErr) || name == nullptr)
+				continue;
+			const unsigned cp = GetEncodingCodePageFromName(name);
+			if (cp == 0 || !ofAutodetectType(autodetectType, cp, language))
+				continue;
+			result = static_cast<int>(cp);
+			break;
 		}
 		ucsdet_close(det);
 		return result;
@@ -130,17 +155,29 @@ public:
 
 	std::vector<CodePageInfo> enumCodePages() override
 	{
+		// each codepage once, by the first of a converter's names the
+		// charset table knows, and only those ICU opens by number
 		std::vector<CodePageInfo> list;
+		std::set<int> listed;
 		const int32_t count = ucnv_countAvailable();
 		for (int32_t i = 0; i < count; ++i)
 		{
 			const char *name = ucnv_getAvailableName(i);
+			UErrorCode err = U_ZERO_ERROR;
+			const uint16_t aliases = ucnv_countAliases(name, &err);
 			unsigned cp = GetEncodingCodePageFromName(name);
-			if (cp == 0)
+			for (uint16_t a = 0; cp == 0 && U_SUCCESS(err) && a < aliases; ++a)
+			{
+				const char *alias = ucnv_getAlias(name, a, &err);
+				if (U_SUCCESS(err) && alias != nullptr)
+					cp = GetEncodingCodePageFromName(alias);
+			}
+			if (cp == 0 || listed.count(static_cast<int>(cp)) != 0 || !isValidCodepage(static_cast<int>(cp)))
 				continue;
+			listed.insert(static_cast<int>(cp));
 			CodePageInfo info;
 			info.codepage = static_cast<int>(cp);
-			info.desc = name;
+			getCodepageDescription(info.codepage, info.desc);
 			list.push_back(std::move(info));
 		}
 		return list;

@@ -12,6 +12,7 @@
 #include <string>
 #include <unicode/ucnv.h>
 #include <unicode/ustring.h>
+#include "charsets.h"
 
 // Redeclare here what posix_compat.h (force-included) already declared;
 // this file provides the definitions.
@@ -52,6 +53,16 @@ UConverter *lmOpenConverter(unsigned codepage)
 		std::snprintf(alt, sizeof(alt), "cp%u", codepage);
 		err = U_ZERO_ERROR;
 		conv = ucnv_open(alt, &err);
+	}
+	// what ICU knows by neither number, ISO-8859-1 (28591) or EUC-JP
+	// (51932) for one, by the name the engine's charset table gives it
+	if (U_FAILURE(err))
+	{
+		if (const char *iana = GetEncodingNameFromCodePage(codepage))
+		{
+			err = U_ZERO_ERROR;
+			conv = ucnv_open(iana, &err);
+		}
 	}
 	return U_FAILURE(err) ? nullptr : conv;
 }

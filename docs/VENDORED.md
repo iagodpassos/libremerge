@@ -116,10 +116,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 625 | 165 | 245 | 0 | 3 |
-| Spanish | 613 | 179 | 243 | 3 | 0 |
-| Catalan | 311 | 174 | 245 | 308 | 0 |
-| French | 629 | 182 | 227 | 0 | 0 |
+| German | 631 | 167 | 250 | 0 | 3 |
+| Spanish | 619 | 181 | 248 | 3 | 0 |
+| Catalan | 317 | 176 | 250 | 308 | 0 |
+| French | 635 | 184 | 232 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -210,6 +210,7 @@ handle, is not offered.
 - `Src/CompareEngines/ImageCompare.cpp`: thin wrapper around the WinIMerge Win32 DLL. LibreMerge keeps the engine Qt-free with a hook (`ports/image_compare_stub.cpp`) that the Qt app fills in with the ported image core at startup.
 - `Src/FileTransform.cpp`: the plugins it runs are COM/ActiveX, Windows-only. `ports/file_transform_posix.cpp` carries over its pipeline parsing and its line expressions (the `le:` items, which a table comparison's Ignore This Column puts in the prediffer), and refuses a plugin by name.
 - WinMerge/tree-sitter-grammars' `build-grammars.ps1` (MSVC and PowerShell): the grammars build with CMake instead (see Tree-sitter grammars above).
+- `Src/Common/ExConverter.cpp`: Windows' MLang (`IMultiLanguage2`) converts and detects encodings there. `ports/exconverter_icu.cpp` does both over ICU, and the Codepage page names ICU where upstream names mlang.dll: the detector's auto-select type keeps the most likely of ICU's matches in its language (Japanese, Korean, Simplified or Traditional Chinese), which mlang detects among. The codepages offered are those ICU converts, named as the engine's charset table names them, where mlang gives Windows' descriptions.
 - `Src/TableProps.cpp`: it reads the Compare > Table patterns from WinMerge's options; LibreMerge keeps that page's settings in the Qt app, which answers `MakeTablePropertiesByFileName` through a hook (`ports/table_props_posix.cpp`).
 - **frhed** (hex editor): GPL-2.0-**only**, incompatible with GPLv3 distribution. The binary comparison (`app/HexView.*`) is LibreMerge's own editor, written after the behavior of the heksedit control WinMerge embeds without taking any of its code; WinMerge's own `CHexMergeDoc`, `CHexMergeView` and `CHexMergeFrame` (GPL-2.0-or-later) are what `app/HexCompareView.*` follows.
 - **7-Zip `Rar*` codecs**: unRAR license restriction is GPL-incompatible (archive support will use libarchive, without RAR).
@@ -269,7 +270,11 @@ branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
   `wchar_t` on Windows, `char16_t` elsewhere) with the ports-layer ICU
   API — Win32 casts packed UTF-16LE buffers to `wchar_t*`, which only
   works when `wchar_t` is 2 bytes; POSIX normalization/case-mapping route
-  to ICU (`ports/normalize_icu.cpp`)
+  to ICU (`ports/normalize_icu.cpp`). `maketstring`'s 8-bit branch
+  converts a line to UTF-8 (`GetACP()`) on POSIX, not to the default
+  codepage: that branch is the old ANSI build's, where a `String` was in
+  the default codepage, and with a default other than UTF-8 a file's
+  bytes went into the text unconverted
 - `stringdiffs.cpp`: UTF-8 character break iterator
   (`ports/lm_utf8_break.h`) replaces the UChar-based one when tchar_t is
   char

@@ -53,6 +53,8 @@
 #include "OptionsMgr.h"
 #include "PathContext.h"
 #include "UniFile.h"
+#include "codepage_detect.h"
+#include "unicoder.h"
 
 namespace
 {
@@ -872,6 +874,12 @@ bool TableCompareView::loadSide(int side, const QString &path,
 		return false;
 	}
 	file.ReadBom();
+	// FileLocationGuessEncodings and LoadFromFile: a file without a BOM
+	// reads in the codepage guessed for it (valid UTF-8 as UTF-8, the
+	// others in the default codepage unless detected otherwise)
+	if (file.GetUnicoding() == ucr::NONE)
+		file.SetCodepage(codepage_detect::Guess(path.toStdString(),
+			lm::codepageDetection()).m_codepage);
 
 	Side &s = m_sides[side];
 	s.path = path;

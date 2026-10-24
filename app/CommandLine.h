@@ -77,6 +77,8 @@ struct CommandLine
 	QString rightDesc;
 	QString fileFilter; ///< mask or expression (-f)
 	QString fileExt;    ///< with its dot (-fileext)
+	/** The default codepage for this run, 0 for the saved one (-cp). */
+	int codepage = 0;
 	QStringList paths;
 	/** Options by name, set for this run (-ignorews..., -cfg). */
 	QList<std::pair<QString, QString>> options;

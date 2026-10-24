@@ -628,7 +628,13 @@ bool maketstring(String & str, const char* lpd, size_t len, int codepage, bool *
 	}
 
 #else
+#ifdef _WIN32
 	int dstcodepage = IsValidCodePage(defcodepage) ? defcodepage : GetACP();
+#else
+	// LibreMerge: String holds UTF-8 here (GetACP()), whatever the default
+	// codepage, which only says how the file's bytes read
+	int dstcodepage = GetACP();
+#endif
 
 	if (EqualCodepages(codepage, dstcodepage))
 	{

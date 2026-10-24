@@ -43,6 +43,23 @@ void setTabsForTest(int tabSize, bool insertTabs);
 bool allowMixedEol();
 void setAllowMixedEolForTest(bool on);
 
+/** The language the interface is in, as a locale's name ("pt_BR"): the
+    codepage of "According to LibreMerge User Interface" follows it. */
+void setInterfaceLanguage(const QString &language);
+/** WinMerge's UpdateDefaultCodepage: how the files that are not Unicode
+    read, mode 0 in the system's codepage (UTF-8), 1 in the interface
+    language's Windows codepage, 2 in the custom one (the command line's
+    -cp too). */
+void updateDefaultCodepage(int mode, int customCodepage);
+/** The same from the saved options (OPT_CP_DEFAULT_MODE and
+    OPT_CP_DEFAULT_CUSTOM), at startup and after the Options dialog. */
+void updateCodepageModule();
+/** WinMerge's OPT_CP_DETECT, the guessing codepage_detect::Guess does:
+    bit 1 for HTML/XML/.rc files by their declared charset, bit 2 for the
+    detector, its auto-select type in the high word; valid UTF-8 reads
+    as UTF-8 with either. */
+int codepageDetection();
+
 /** The folder of the Tree-sitter grammars (WinMerge's TreeSitterGrammars):
     the bundle's Resources on macOS, the installed one or the one next to
     the binary elsewhere. */
