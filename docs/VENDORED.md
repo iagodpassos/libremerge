@@ -171,6 +171,19 @@ on the one of macOS and Linux:
   the line it was split from, or as most of the file's lines; upstream's
   take Windows' ending (`GetDefaultEol` of `CRLFSTYLE::MIXED`).
 
+The command line (`app/CommandLine.*`) reads WinMerge's switches after
+`MergeCmdLineInfo`, from the arguments as the shell splits them rather
+than from one line of text:
+
+- a switch starts with `-` only, since `/` starts a path; upstream also
+  takes `/`;
+- `-?` prints the switches on the terminal, where upstream opens its
+  manual on that page;
+- `-s`, `-s-`, `-sw`, `-g`, `-show-compare-as-menu` and
+  `-set-usertasks-to-jumplist` belong to Windows (one instance, the
+  Explorer's menu, the jump list) and are taken without effect;
+- Qt's `--help` and `--version`, and LibreMerge's `--new`, keep working.
+
 ## Deliberately excluded (and why)
 
 - **All MFC GUI code** (`*Dlg`, `*Bar`, `*Menu`, `*View`, `*Frm`, `*Doc`, `Src/Common` widgets): MFC is Windows-only and non-redistributable. The UI is rebuilt in Qt.

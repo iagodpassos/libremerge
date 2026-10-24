@@ -6,6 +6,7 @@
 #include <QHash>
 #include <QMainWindow>
 
+#include "CommandLine.h"
 #include "FileOps.h"
 
 class QFileSystemWatcher;
@@ -56,6 +57,12 @@ public:
 	/** One file against a snapshot of itself, WinMerge's self-compare
 	    (what Compare does with a single file). */
 	void openSelfComparison(const QString &path);
+
+	/** CMergeApp::ParseArgsAndDoOpen: what the command line opens and
+	    how (its paths, descriptions, read-only sides, window type,
+	    focus, line...), and what it asks of the window from then on
+	    (-e, -x). */
+	void openFromCommandLine(const lm::CommandLine &cmd);
 
 	/** Route paths dropped on the window or opened via Finder/Dock. */
 	void handleIncomingPaths(const QStringList &paths);
@@ -143,6 +150,9 @@ private:
 	void attachFileView(FileCompareView *view);
 	/** Record a successful comparison in File > Recent Files or Folders. */
 	void rememberComparison(const QStringList &paths);
+	/** Name the sides of a comparison just opened, the ones given only,
+	    in its panes and its tab. */
+	void describeSides(QWidget *page, const QStringList &descriptions);
 	/** Reopen a recent comparison (folders or files). */
 	void reopenComparison(const QStringList &paths);
 
@@ -155,4 +165,9 @@ private:
 	bool m_askingToClose = false; // closeEvent is waiting for an answer
 	QElapsedTimer m_lastFileQuestion; // since the reload question closed
 	QHash<QString, lm::FileStamp> m_watchedStamps; // as the watcher last saw them
+	// the command line's: Esc closes LibreMerge (-e), and closing when the
+	// first comparison finds the files identical (-x, -xq)
+	bool m_escShutdown = false;
+	lm::CommandLine::ExitNoDiff m_exitIfNoDiff = lm::CommandLine::ExitNoDiff::Disabled;
+	const lm::CommandLine *m_openingCommandLine = nullptr; // while it opens
 };

@@ -45,6 +45,9 @@ QString fileFilterMask();
 /** Take another one and save it; an empty one is "*.*" (what
     COpenView::OnOK does with the screen's filter field). */
 void setFileFilterMask(const QString &mask);
+/** Take another one for this run only, unsaved (the command line's -f,
+    CMergeApp::ParseArgsAndDoOpen). */
+void useFileFilterMask(const QString &mask);
 
 /** The global filter itself: the Filters page's New, Install and Delete
     change its presets along with the page's own copy. */

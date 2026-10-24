@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <QSet>
 #include <QStringList>
 #include <QWidget>
@@ -110,6 +111,11 @@ public:
 	/** CMergeDoc::RefreshOptions: the comparison takes the options as
 	    they are, a Yes to the question about line endings going. */
 	void refreshDiffOptions() { m_ignoreEol = false; }
+	/** The command line's table settings (-table-delimiter,
+	    -table-quote, -table-allownewlinesinquotes), over the Table
+	    options' for every side, from the next compare on. */
+	void setTableOverrides(std::optional<QChar> delimiter, std::optional<QChar> quote,
+		std::optional<bool> allowNewlinesInQuotes);
 	/** Whether a side's file ends its rows in more than one way, and
 	    whether this comparison treats line endings as the same (for
 	    tests). */
@@ -312,6 +318,9 @@ private:
 	int m_current = -1;
 	bool m_syncing = false;
 	bool m_ignoreEol = false; // Yes to the question, for this comparison
+	std::optional<QChar> m_delimiterOverride;
+	std::optional<QChar> m_quoteOverride;
+	std::optional<bool> m_newlinesOverride;
 
 	friend class TableSideModel;
 };

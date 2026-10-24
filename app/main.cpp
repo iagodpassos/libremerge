@@ -81,6 +81,7 @@
 #include <archive_entry.h>
 #include <QDir>
 #include "AboutDialog.h"
+#include "CommandLine.h"
 #include "DesktopIntegration.h"
 #include "ArchiveCompare.h"
 #include "MainWindow.h"
@@ -201,6 +202,64 @@ bool writeTestArchive(const QString &path, bool tarGz,
 	return ok;
 }
 
+/** A run that is no test: WinMerge's command line, read and opened
+    (CMergeApp::InitInstance, ParseArgsAndDoOpen). */
+int runCommandLine(const lm::CommandLine &cmd)
+{
+	// upstream writes these to the console (OutputConsole) and goes on
+	for (const QString &error : cmd.errors)
+		fprintf(stderr, "%s\n", qPrintable(error));
+	for (const QString &option : cmd.unsupported)
+		fprintf(stderr, "Option '%s' is not supported by LibreMerge yet\n", qPrintable(option));
+	if (cmd.showUsage)
+	{
+		printf("%s", qPrintable(lm::CommandLine::usage()));
+		return 0;
+	}
+	if (cmd.showVersion)
+	{
+		printf("%s %s\n", qPrintable(QCoreApplication::applicationName()),
+			qPrintable(QCoreApplication::applicationVersion()));
+		return 0;
+	}
+	// the options for this run, the filter and the compare method
+	for (const QString &name : lm::useOptions(cmd.options))
+		fprintf(stderr, "Invalid key '%s' specified in -config option\n", qPrintable(name));
+	if (!cmd.fileFilter.isEmpty())
+		lm::useFileFilterMask(cmd.fileFilter);
+	if (cmd.compareMethod.has_value())
+		lm::useCompareMethod(*cmd.compareMethod);
+	// a dialog alone (ShowDialog)
+	if (cmd.dialogType == lm::CommandLine::DialogType::Options)
+	{
+		OptionsDialog dialog;
+		dialog.exec();
+		return 0;
+	}
+	if (cmd.dialogType == lm::CommandLine::DialogType::About)
+	{
+		AboutDialog dialog;
+		dialog.exec();
+		return 0;
+	}
+
+	// a day of use, for the request that waits for a few of them (see
+	// StarPrompt), counted before the first screen asks whether it is due
+	lm::StarPrompt::instance()->noteAppStarted();
+	MainWindow window;
+#ifdef Q_OS_MACOS
+	lm::installMacServices(&window);
+#endif
+	window.openFromCommandLine(cmd);
+	if (cmd.showWindow == lm::CommandLine::ShowWindow::Minimize)
+		window.showMinimized();
+	else if (cmd.showWindow == lm::CommandLine::ShowWindow::Maximize)
+		window.showMaximized();
+	else
+		window.show();
+	return QApplication::exec();
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -277,6 +336,19 @@ int main(int argc, char *argv[])
 	// the line expressions of a prediffer read a file as a table by the
 	// Compare > Table options, as upstream's MakeTablePropertiesByFileName
 	lm::SetTablePropertiesHook(&lm::engineTablePropertiesByFileName);
+
+	// WinMerge's command line, but for the selftests and the screenshots,
+	// which keep Qt's parser and its own switches
+	{
+		const QStringList arguments = QCoreApplication::arguments().mid(1);
+		const bool testRun = std::any_of(arguments.cbegin(), arguments.cend(),
+			[](const QString &argument) {
+				return argument.startsWith(QStringLiteral("--selftest"))
+					|| argument.startsWith(QStringLiteral("--screenshot"));
+			});
+		if (!testRun)
+			return runCommandLine(lm::CommandLine::parse(arguments));
+	}
 
 	QCommandLineParser parser;
 	parser.setApplicationDescription(
@@ -374,6 +446,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestEolOpt(QStringLiteral("selftest-eol"),
 		QStringLiteral("Exercise the line endings: files of mixed endings kept, real endings compared and the question about files that end their lines otherwise (for testing)"));
 	parser.addOption(selftestEolOpt);
+	QCommandLineOption selftestCommandLineOpt(QStringLiteral("selftest-command-line"),
+		QStringLiteral("Read WinMerge's command line switches and open what they ask for (for testing)"));
+	parser.addOption(selftestCommandLineOpt);
 	QCommandLineOption selftestFolderSelectionOpt(QStringLiteral("selftest-folder-selection"),
 		QStringLiteral("Compare two or three selected items of a folder comparison with each other (for testing)"));
 	parser.addOption(selftestFolderSelectionOpt);
@@ -11293,6 +11368,220 @@ int main(int argc, char *argv[])
 		}
 
 		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestCommandLineOpt))
+	{
+		// WinMerge's command line (MergeCmdLineInfo, ParseArgsAndDoOpen):
+		// its switches read as upstream reads them, "-" only in front, and
+		// what they open: descriptions, read-only sides, the window type,
+		// the focus and the line, the language, the recent comparisons, a
+		// self-compare, and Esc and identical files closing LibreMerge
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 30; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		using Cmd = lm::CommandLine;
+		const auto parse = [](const QStringList &arguments) { return Cmd::parse(arguments); };
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		write(left, "a\nb\nc\n");
+		write(right, "a\nx\nc\n");
+
+		// reading
+		{
+			const Cmd cmd = parse({ QStringLiteral("-dl"), QStringLiteral("Base"),
+				QStringLiteral("-DR"), QStringLiteral("Mine"), QStringLiteral("-wl"),
+				QStringLiteral("-u"), QStringLiteral("-e"), QStringLiteral("-x"), left,
+				QStringLiteral("right.txt") });
+			check(cmd.leftDesc == QStringLiteral("Base") && cmd.rightDesc == QStringLiteral("Mine")
+					&& cmd.leftFlags == (Cmd::ReadOnly | Cmd::NoMru) && cmd.rightFlags == Cmd::NoMru
+					&& cmd.escShutdown && cmd.exitIfNoDiff == Cmd::ExitNoDiff::Exit
+					&& cmd.paths == QStringList({ left, QDir::current().absoluteFilePath(QStringLiteral("right.txt")) })
+					&& cmd.errors.isEmpty() && cmd.unsupported.isEmpty(),
+				"read: descriptions, flags, -e, -x, paths in full, names in any case");
+		}
+		{
+			const Cmd cmd = parse({ QStringLiteral("-ignorews:2"), QStringLiteral("-ignorecase"),
+				QStringLiteral("-cfg"), QStringLiteral("Settings/IgnoreBlankLines=1"),
+				QStringLiteral("-cfg:Settings/IgnoreEOL=1"), QStringLiteral("-m"),
+				QStringLiteral("Date and Size"), QStringLiteral("-t"), QStringLiteral("table"),
+				QStringLiteral("-l"), QStringLiteral("5"), QStringLiteral("-c"), QStringLiteral("3"),
+				QStringLiteral("-table-delimiter"), QStringLiteral("tab"),
+				QStringLiteral("-table-quote"), QStringLiteral("sq"),
+				QStringLiteral("-table-allownewlinesinquotes"), QStringLiteral("no"),
+				QStringLiteral("-fileext"), QStringLiteral("py"), QStringLiteral("/tmp/a") });
+			const QList<std::pair<QString, QString>> options = {
+				{ QString::fromStdString(OPT_CMP_IGNORE_WHITESPACE), QStringLiteral("2") },
+				{ QString::fromStdString(OPT_CMP_IGNORE_CASE), QStringLiteral("1") },
+				{ QStringLiteral("Settings/IgnoreBlankLines"), QStringLiteral("1") },
+				{ QStringLiteral("Settings/IgnoreEOL"), QStringLiteral("1") } };
+			check(cmd.options == options && cmd.compareMethod == 4
+					&& cmd.windowType == Cmd::WindowType::Table
+					&& cmd.lineIndex == 4 && cmd.charIndex == 2
+					&& cmd.tableDelimiter == QLatin1Char('\t') && cmd.tableQuote == QLatin1Char('\'')
+					&& cmd.tableAllowNewlinesInQuotes == false
+					&& cmd.fileExt == QStringLiteral(".py")
+					&& cmd.paths == QStringList({ QStringLiteral("/tmp/a") }) && cmd.errors.isEmpty(),
+				"read: options after a colon or as -cfg, method, type, line, table, extension; / starts a path");
+		}
+		{
+			const Cmd cmd = parse({ QStringLiteral("-s"), QStringLiteral("-sw"), QStringLiteral("-g"),
+				QStringLiteral("group"), QStringLiteral("-show-compare-as-menu"), QStringLiteral("-o"),
+				QStringLiteral("out.txt"), QStringLiteral("-r:0"), QStringLiteral("-noninteractive"),
+				QStringLiteral("-t"), QStringLiteral("web"), QStringLiteral("-l"), QStringLiteral("0"),
+				QStringLiteral("-xyz"), QStringLiteral("--new"), QStringLiteral("-new"), QStringLiteral("-?") });
+			check(cmd.paths.isEmpty()
+					&& cmd.unsupported == QStringList({ QStringLiteral("-o"), QStringLiteral("-r"),
+						QStringLiteral("-noninteractive"), QStringLiteral("-t webpage") })
+					&& cmd.errors == QStringList({ QStringLiteral("Invalid line number specified"),
+						QStringLiteral("Unknown option '-xyz'") })
+					&& cmd.newCompare && cmd.showUsage,
+				"read: Windows' own taken in silence, the others told, values not taken for paths");
+		}
+		// options by name, for this run
+		{
+			const QStringList unknown = lm::useOptions({
+				{ QStringLiteral("Settings/IgnoreCase"), QStringLiteral("1") },
+				{ QStringLiteral("IgnoreBlankLines"), QStringLiteral("1") },
+				{ QStringLiteral("NoSuchOption"), QStringLiteral("1") } });
+			const DIFFOPTIONS options = lm::currentDiffOptions();
+			check(unknown == QStringList({ QStringLiteral("NoSuchOption") })
+					&& options.bIgnoreCase && options.bIgnoreBlankLines,
+				"options by their name or the end of it, an unknown one told");
+			lm::setCompareOptionsForTest(0);
+		}
+
+		// opening
+		QApplication::setQuitOnLastWindowClosed(false);
+		const auto recent = []() {
+			return QSettings().value(QStringLiteral("RecentComparisons/List")).toStringList();
+		};
+		const auto fileView = [](MainWindow &window) {
+			return qobject_cast<FileCompareView *>(window.findChild<QTabWidget *>()->currentWidget());
+		};
+		{
+			MainWindow window;
+			window.openFromCommandLine(parse({ QStringLiteral("-dl"), QStringLiteral("Base"),
+				QStringLiteral("-dr"), QStringLiteral("Mine"), QStringLiteral("-wl"),
+				QStringLiteral("-fr"), QStringLiteral("-l"), QStringLiteral("3"), QStringLiteral("-c"),
+				QStringLiteral("2"), QStringLiteral("-u"), left, right }));
+			window.show();
+			settle();
+			FileCompareView *view = fileView(window);
+			check(view != nullptr && view->sideCaption(0) == QStringLiteral("Base")
+					&& view->sideCaption(1) == QStringLiteral("Mine")
+					&& view->isSideReadOnly(0) && !view->isSideReadOnly(1),
+				"open: the descriptions, the left side read-only");
+			check(view != nullptr && view->activePaneForTest() == 1
+					&& view->cursorViewLineForTest(1) == 2
+					&& view->paneForTest(1)->textCursor().positionInBlock() == 1,
+				"open: the focus on the right, at line 3, character 2");
+			check(recent().isEmpty(), "open: -u leaves the recent comparisons alone");
+		}
+		{
+			MainWindow window;
+			window.openFromCommandLine(parse({ left, right }));
+			check(recent().size() == 1, "open: without -u, a recent comparison");
+		}
+		// the window type and the language
+		const QString table = dir.filePath(QStringLiteral("data.txt"));
+		const QString table2 = dir.filePath(QStringLiteral("data2.txt"));
+		write(table, "id;name\n1;a\n");
+		write(table2, "id;name\n1;b\n");
+		{
+			MainWindow window;
+			window.openFromCommandLine(parse({ QStringLiteral("-t"), QStringLiteral("table"),
+				QStringLiteral("-table-delimiter"), QStringLiteral(";"), table, table2 }));
+			auto *view = qobject_cast<TableCompareView *>(
+				window.findChild<QTabWidget *>()->currentWidget());
+			check(view != nullptr && view->diffCount() == 1 && view->diffRowsForTest() == QList<int>({ 1 }),
+				"-t table: text files as tables, by the delimiter given");
+		}
+		const QString script = dir.filePath(QStringLiteral("script"));
+		const QString script2 = dir.filePath(QStringLiteral("script2"));
+		write(script, "x = 1  # one\n");
+		write(script2, "x = 2  # two\n");
+		{
+			MainWindow window;
+			window.openFromCommandLine(parse({ QStringLiteral("-fileext"), QStringLiteral("py"),
+				script, script2 }));
+			FileCompareView *view = fileView(window);
+			check(view != nullptr && view->highlighterForTest(0) != nullptr
+					&& view->highlighterForTest(0)->languageName() == QStringLiteral("Python"),
+				"-fileext: colored as Python");
+		}
+		// self-compare
+		{
+			MainWindow window;
+			window.openFromCommandLine(parse({ QStringLiteral("-self-compare"), left }));
+			FileCompareView *view = fileView(window);
+			check(view != nullptr && view->paths().value(1) == left
+					&& view->sideCaption(0) == MainWindow::tr("Original File"),
+				"-self-compare: the file against a copy of itself");
+		}
+		// Esc closes LibreMerge with one comparison open (-e)
+		{
+			MainWindow window;
+			window.openFromCommandLine(parse({ QStringLiteral("-e"), left, right }));
+			window.show();
+			settle();
+			QKeyEvent press(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+			QCoreApplication::sendEvent(&window, &press);
+			settle();
+			check(!window.isVisible(), "-e: Esc closes LibreMerge");
+		}
+		// identical files: -x says so and closes, -xq closes quietly, and
+		// only the first comparison does
+		QStringList messages;
+		lm::setMessageSinkForTest([&messages](const QString &text) { messages << text; });
+		{
+			MainWindow window;
+			window.openFromCommandLine(parse({ QStringLiteral("-x"), left, left }));
+			window.show();
+			settle();
+			check(messages.size() == 1 && !window.isVisible(), "-x: told, and closed");
+		}
+		messages.clear();
+		{
+			MainWindow window;
+			window.openFromCommandLine(parse({ QStringLiteral("-xq"), left, left }));
+			window.show();
+			settle();
+			check(messages.isEmpty() && !window.isVisible(), "-xq: closed without a word");
+		}
+		{
+			MainWindow window;
+			window.openFromCommandLine(parse({ QStringLiteral("-x"), left, right }));
+			window.show();
+			settle();
+			window.openFileComparison({ left, left });
+			settle();
+			check(window.isVisible(), "-x: different files stay, and so does what opens next");
+		}
+		lm::setMessageSinkForTest([](const QString &) {});
+		printf("command line: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

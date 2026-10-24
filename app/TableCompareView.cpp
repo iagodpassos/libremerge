@@ -805,7 +805,14 @@ bool TableCompareView::compare(const QStringList &paths, QString *error)
 	}
 	// each side by the Table options' group its file is in (WinMerge's
 	// SetTableProperties), as the files are opened or opened again
-	const QList<lm::TableProps> props = lm::tablePropertiesOfSides(paths);
+	QList<lm::TableProps> props = lm::tablePropertiesOfSides(paths);
+	// the command line's, over them (OpenTableFileParams)
+	for (lm::TableProps &side : props)
+	{
+		side.delimiter = m_delimiterOverride.value_or(side.delimiter);
+		side.quote = m_quoteOverride.value_or(side.quote);
+		side.allowNewlinesInQuotes = m_newlinesOverride.value_or(side.allowNewlinesInQuotes);
+	}
 	for (int side = 0; side < paths.size(); ++side)
 		if (!loadSide(side, paths.at(side), props.at(side), error))
 			return false;
@@ -924,6 +931,14 @@ bool TableCompareView::loadSide(int side, const QString &path,
 		s.eol = QStringLiteral("\n");
 	s.modified = false;
 	return true;
+}
+
+void TableCompareView::setTableOverrides(std::optional<QChar> delimiter,
+	std::optional<QChar> quote, std::optional<bool> allowNewlinesInQuotes)
+{
+	m_delimiterOverride = delimiter;
+	m_quoteOverride = quote;
+	m_newlinesOverride = allowNewlinesInQuotes;
 }
 
 QString TableCompareView::rowEol(int side, int row) const

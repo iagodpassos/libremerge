@@ -116,6 +116,18 @@ To use it, run `git mergetool` after a conflict: resolve it in the middle pane, 
 - LibreMerge writes a `.bak` copy next to the file it saves, which is WinMerge's default behavior. Turn it off under Options > Backup Files if you prefer.
 - `git mergetool` itself keeps a `.orig` file unless you set `git config --global mergetool.keepBackup false`.
 
+WinMerge's switches work in these commands too: for the merge tool, `-e -u -wl -wr -fm -dl Local -dm Merged -dr Remote` in front of the paths makes Esc close the window, keeps the files out of the recent comparisons, opens the outer panes read-only with the focus on the middle one, and names the three panes.
+
+## Command line
+
+LibreMerge reads WinMerge's command line, with `-` in front of each switch (`/` starts a path on macOS and Linux); `libremerge -?` lists the switches. For example:
+
+```sh
+libremerge -e -u -wl -dl "Base" -dr "Mine" base.txt mine.txt
+```
+
+These work today: the descriptions (`-dl`, `-dm`, `-dr`), read-only sides (`-wl`, `-wm`, `-wr`), the focus (`-fl`, `-fm`, `-fr`), `-e`, `-x` and `-xq`, `-u`, the window type (`-t`), the compare method (`-m`), the file filter (`-f`), the line and character to go to (`-l`, `-c`), `-fileext`, the table switches, the compare options (`-ignorews` and the like, and any option by name with `-cfg`), `-self-compare`, `-new`, `-minimize`, `-maximize` and `-show-dialog`. Not yet: `-noninteractive`, `-enableexitcode`, `-o`, `-or`, `-r`, `-noprefs`, `-inifile`, `-cp`, auto-merge (`-al`, `-am`, `-ar`) and plugins; LibreMerge says so on the terminal when it meets them. Windows' own switches for a single instance (`-s`, `-sw`, `-g`) are taken and have no effect: each run is a separate LibreMerge, which a caller waits for anyway.
+
 ## Known limitations
 
 - Archive comparison works on extracted copies: edits are not packed back into the archive (WinMerge behaves the same)

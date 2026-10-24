@@ -51,9 +51,11 @@ void resetHiddenMessages();
 /** CMergeFrameCommon::ShowIdenticalMessage: tell that the compared files
     are identical, or that the same file sits in two panes. exactCheck
     (every pane saved to disk) adds WinMerge's binary identity check,
-    since the ignore options may hide byte differences. */
+    since the ignore options may hide byte differences. always (the
+    command line's -x) says so even when the message was hidden, with no
+    box to hide it. */
 void showIdenticalMessage(QWidget *parent, const QStringList &paths,
-	bool exactCheck);
+	bool exactCheck, bool always = false);
 
 /** CEditReplaceDlg::OnEditReplaceAll's message: how many strings Replace
     All replaced. "Don't display this message again" hides it. */

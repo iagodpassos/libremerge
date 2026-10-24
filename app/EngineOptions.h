@@ -3,7 +3,10 @@
 
 #include <memory>
 #include <string>
+#include <utility>
+#include <QList>
 #include <QString>
+#include <QStringList>
 #include "CompareOptions.h"
 
 class FilterList;
@@ -87,6 +90,13 @@ constexpr int kCompareMethodCount = 7;
 QString compareMethodName(int method);
 /** Set the method in memory only, like setCompareOptionsForTest. */
 void setCompareMethodForTest(int method);
+/** Set it for this run only, unsaved (the command line's -m). */
+void useCompareMethod(int method);
+/** Set options by name for this run only, unsaved (the command line's
+    -ignorews... and -cfg, CMergeApp::ApplyCommandLineConfigOptions): a
+    name may be the end of one, when only one ends so. What names no
+    option comes back. */
+QStringList useOptions(const QList<std::pair<QString, QString>> &options);
 
 /** Turn every ignore option off except whitespace, which takes the
     given OPT_CMP_IGNORE_WHITESPACE value; in memory only, the saved

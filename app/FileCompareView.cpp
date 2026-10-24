@@ -663,7 +663,7 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 			return false;
 		m_panes[i]->setReadOnly(m_readOnly[i]);
 		m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
-			m_panes[i]->document(), paths.at(i));
+			m_panes[i]->document(), highlightPath(paths.at(i)));
 	}
 	suggestIgnoreEol();
 	if (!runDiff(error))
@@ -908,6 +908,39 @@ QString FileCompareView::lineEol(int side, const QTextBlock &block) const
 	return s.eol;
 }
 
+QString FileCompareView::highlightPath(const QString &path) const
+{
+	return m_fileExt.isEmpty() ? path : QStringLiteral("file") + m_fileExt;
+}
+
+void FileCompareView::setFileExtension(const QString &extension)
+{
+	m_fileExt = extension;
+	refreshSyntaxHighlighting();
+	recompare();
+}
+
+void FileCompareView::moveOnLoad(int pane, int line, int character)
+{
+	if (pane < 0 || pane >= m_paneCount)
+		pane = m_activePane;
+	if (line < 0)
+	{
+		m_activePane = pane;
+		m_panes[pane]->setFocus();
+		updateHeaderStyles();
+		return;
+	}
+	gotoLine(line, true, pane, true);
+	if (character > 0)
+	{
+		QTextCursor cursor = m_panes[pane]->textCursor();
+		cursor.setPosition(cursor.block().position()
+			+ qMin(character, cursor.block().length() - 1));
+		m_panes[pane]->setTextCursor(cursor);
+	}
+}
+
 QString FileCompareView::encodingTextForTest(int side) const
 {
 	return m_encLabels[side]->text();
@@ -989,7 +1022,7 @@ bool FileCompareView::runDiff(QString *error)
 	// from code: the first pane's, as WinMerge's Rescan takes it (the temp
 	// files carry no extension)
 	wrapper.SetFilterCommentsSourceDef(
-		QFileInfo(m_sides[0].path).suffix().toLower().toStdString());
+		QFileInfo(highlightPath(m_sides[0].path)).suffix().toLower().toStdString());
 
 	COptionsMgr *mgr = GetOptionsMgr();
 	const bool detectMoved = mgr != nullptr
@@ -1874,7 +1907,7 @@ void FileCompareView::refreshSyntaxHighlighting()
 			continue;
 		m_highlighters[i].reset();
 		m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
-			m_panes[i]->document(), m_sides[i].path);
+			m_panes[i]->document(), highlightPath(m_sides[i].path));
 	}
 }
 
@@ -1915,7 +1948,7 @@ void FileCompareView::applyTheme()
 		// syntax palettes are theme-specific: rebuild and rehighlight
 		if (m_highlighters[i] != nullptr)
 			m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
-				m_panes[i]->document(), m_sides[i].path);
+				m_panes[i]->document(), highlightPath(m_sides[i].path));
 	}
 	QPalette locPal = m_locationPane->palette();
 	locPal.setColor(QPalette::Base,
@@ -2012,7 +2045,7 @@ bool FileCompareView::changeFile(int side, const QString &path, const QString &d
 		return false;
 	}
 	m_highlighters[side] = std::make_unique<SyntaxHighlighter>(
-		m_panes[side]->document(), path);
+		m_panes[side]->document(), highlightPath(path));
 	updateHeader(side);
 
 	// MoveOnLoad: the first difference when the option asks, the first
@@ -2964,7 +2997,7 @@ FileCompareView::SaveResult FileCompareView::saveSide(int side, QString *error)
 		s.caption.clear();
 		s.described = false;
 		m_highlighters[side] = std::make_unique<SyntaxHighlighter>(
-			m_panes[side]->document(), chosen);
+			m_panes[side]->document(), highlightPath(chosen));
 		updateHeader(side);
 		emit pathsChanged();
 	}

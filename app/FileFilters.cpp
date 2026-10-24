@@ -200,6 +200,11 @@ void setFileFilterMask(const QString &mask)
 	}
 }
 
+void useFileFilterMask(const QString &mask)
+{
+	globalFilter().SetMaskOrExpression(mask.toStdString());
+}
+
 FileFilterHelper *globalFileFilter()
 {
 	return &globalFilter();

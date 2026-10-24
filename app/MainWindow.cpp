@@ -907,6 +907,9 @@ void MainWindow::openFileComparison(const QStringList &paths, const QList<bool> 
 void MainWindow::openTableComparison(const QStringList &paths)
 {
 	auto *view = new TableCompareView(this);
+	if (m_openingCommandLine != nullptr)
+		view->setTableOverrides(m_openingCommandLine->tableDelimiter,
+			m_openingCommandLine->tableQuote, m_openingCommandLine->tableAllowNewlinesInQuotes);
 	QString error;
 	if (!view->compare(paths, &error))
 	{
@@ -1116,6 +1119,11 @@ void MainWindow::watchIdentical(QWidget *page)
 
 void MainWindow::reportIfIdentical(QWidget *page, bool opening)
 {
+	// the command line's -x and -xq hold for the first comparison only
+	const lm::CommandLine::ExitNoDiff exitIfNoDiff =
+		opening ? m_exitIfNoDiff : lm::CommandLine::ExitNoDiff::Disabled;
+	if (opening)
+		m_exitIfNoDiff = lm::CommandLine::ExitNoDiff::Disabled;
 	QStringList paths;
 	int diffs = -1;
 	bool modified = false;
@@ -1156,8 +1164,130 @@ void MainWindow::reportIfIdentical(QWidget *page, bool opening)
 	// "Don't show message if new buffers created": never for File > New
 	if (opening && std::all_of(paths.cbegin(), paths.cend(), empty))
 		return;
-	lm::showIdenticalMessage(this, paths,
-		std::none_of(paths.cbegin(), paths.cend(), empty) && !modified);
+	// -x says so whatever was hidden, -xq says nothing; either closes
+	// LibreMerge then (ShowIdenticalMessage)
+	if (exitIfNoDiff != lm::CommandLine::ExitNoDiff::ExitQuiet)
+		lm::showIdenticalMessage(this, paths,
+			std::none_of(paths.cbegin(), paths.cend(), empty) && !modified,
+			exitIfNoDiff == lm::CommandLine::ExitNoDiff::Exit);
+	if (exitIfNoDiff != lm::CommandLine::ExitNoDiff::Disabled)
+		QTimer::singleShot(0, this, &QWidget::close);
+}
+
+void MainWindow::describeSides(QWidget *page, const QStringList &descriptions)
+{
+	for (int side = 0; side < descriptions.size(); ++side)
+	{
+		const QString &description = descriptions.at(side);
+		if (description.isEmpty())
+			continue;
+		if (auto *file = qobject_cast<FileCompareView *>(page))
+			file->setSideDescription(side, description);
+		else if (auto *table = qobject_cast<TableCompareView *>(page))
+			table->setSideDescription(side, description);
+		else if (auto *image = qobject_cast<ImageCompareView *>(page))
+			image->setSideDescription(side, description);
+		else if (auto *hex = qobject_cast<HexCompareView *>(page))
+			hex->setSideDescription(side, description);
+	}
+	const int index = m_tabs->indexOf(page);
+	if (index < 0)
+		return;
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+		m_tabs->setTabText(index, file->tabTitle());
+	else if (auto *table = qobject_cast<TableCompareView *>(page))
+		m_tabs->setTabText(index, table->tabTitle());
+	else if (auto *image = qobject_cast<ImageCompareView *>(page))
+		m_tabs->setTabText(index, image->tabTitle());
+	else if (auto *hex = qobject_cast<HexCompareView *>(page))
+		m_tabs->setTabText(index, hex->tabTitle());
+}
+
+void MainWindow::openFromCommandLine(const lm::CommandLine &cmd)
+{
+	using Cmd = lm::CommandLine;
+	m_escShutdown = cmd.escShutdown;
+	m_exitIfNoDiff = cmd.exitIfNoDiff;
+	m_openingCommandLine = &cmd;
+	// the sides in the order of the panes: left and right, or left,
+	// middle and right
+	const QStringList &paths = cmd.paths;
+	const bool threeWay = paths.size() > 2;
+	const QStringList descriptions = threeWay
+		? QStringList{ cmd.leftDesc, cmd.middleDesc, cmd.rightDesc }
+		: QStringList{ cmd.leftDesc, cmd.rightDesc };
+	const QList<unsigned> flags = threeWay
+		? QList<unsigned>{ cmd.leftFlags, cmd.middleFlags, cmd.rightFlags }
+		: QList<unsigned>{ cmd.leftFlags, cmd.rightFlags };
+	QList<bool> readOnly;
+	int focusPane = -1;
+	for (int side = 0; side < flags.size(); ++side)
+	{
+		readOnly.append((flags.at(side) & Cmd::ReadOnly) != 0);
+		if (flags.at(side) & Cmd::SetFocus)
+			focusPane = side; // GetActivePaneFromFlags: the last one asked
+	}
+
+	QWidget *const before = m_tabs->currentWidget();
+	const int count = m_tabs->count();
+	if (paths.size() == 2 || paths.size() == 3)
+	{
+		switch (cmd.windowType)
+		{
+		case Cmd::WindowType::Text:
+			openFileComparison(paths, readOnly, true);
+			break;
+		case Cmd::WindowType::Table:
+			openTableComparison(paths);
+			break;
+		case Cmd::WindowType::Binary:
+			openHexComparison(paths, readOnly);
+			break;
+		case Cmd::WindowType::Image:
+			openImageComparison(paths, readOnly);
+			break;
+		case Cmd::WindowType::Folder:
+			openFolderComparison(paths);
+			break;
+		default:
+			// folders and archives, in any mix, compare as folders
+			if (allFolderLike(paths))
+				openFolderComparison(paths);
+			else
+				openFileComparison(paths, readOnly);
+			break;
+		}
+	}
+	else if (paths.size() == 1 && cmd.selfCompare)
+		openSelfComparison(paths.first());
+	else if (!paths.isEmpty())
+		openSelector(paths);
+	else if (cmd.newCompare)
+		openBlankComparison();
+	else if (OptionsDialog::showSelectorAtStartup())
+		// WinMerge's "show Select Files or Folders at startup" option
+		openSelector();
+	else
+		// like WinMerge, start on a fresh (blank) comparison; the
+		// selector stays one Cmd+O away
+		openBlankComparison();
+	m_openingCommandLine = nullptr;
+
+	// the comparison just opened: the sides' descriptions, then the pane
+	// and the line it opens on (MoveOnLoad) and its language
+	QWidget *page = m_tabs->currentWidget();
+	if (page == nullptr || (page == before && m_tabs->count() == count))
+		return;
+	describeSides(page, descriptions);
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+	{
+		if (!cmd.fileExt.isEmpty())
+			file->setFileExtension(cmd.fileExt);
+		if (focusPane >= 0 || cmd.lineIndex >= 0)
+			file->moveOnLoad(focusPane, cmd.lineIndex, cmd.charIndex);
+	}
+	if (cmd.gotoFirstDiff)
+		gotoFirstDifference();
 }
 
 /** Recompare checks the files first, like WinMerge's Rescan for text and
@@ -1471,27 +1601,14 @@ void MainWindow::openSelfComparison(const QString &path)
 		return;
 	QWidget *page = m_tabs->currentWidget();
 	owner.release()->setParent(page);
-	const QString description = tr("Original File");
-	if (auto *file = qobject_cast<FileCompareView *>(page))
-		file->setSideDescription(0, description);
-	else if (auto *table = qobject_cast<TableCompareView *>(page))
-		table->setSideDescription(0, description);
-	else if (auto *image = qobject_cast<ImageCompareView *>(page))
-		image->setSideDescription(0, description);
-	else if (auto *hex = qobject_cast<HexCompareView *>(page))
-		hex->setSideDescription(0, description);
-	const int index = m_tabs->indexOf(page);
-	if (auto *file = qobject_cast<FileCompareView *>(page))
-		m_tabs->setTabText(index, file->tabTitle());
-	else if (auto *table = qobject_cast<TableCompareView *>(page))
-		m_tabs->setTabText(index, table->tabTitle());
-	else if (auto *image = qobject_cast<ImageCompareView *>(page))
-		m_tabs->setTabText(index, image->tabTitle());
-	else if (auto *hex = qobject_cast<HexCompareView *>(page))
-		m_tabs->setTabText(index, hex->tabTitle());
-	m_tabs->setTabToolTip(index, path);
+	describeSides(page, { tr("Original File") });
+	m_tabs->setTabToolTip(m_tabs->indexOf(page), path);
 
 	// the snapshot pair went into the recent list: keep the file instead
+	// (unless the command line leaves it out)
+	if (m_openingCommandLine != nullptr
+		&& (m_openingCommandLine->leftFlags & lm::CommandLine::NoMru))
+		return;
 	QSettings settings;
 	const QString key = QStringLiteral("RecentComparisons/List");
 	QStringList entries = settings.value(key).toStringList();
@@ -1793,7 +1910,10 @@ void MainWindow::newComparison()
 
 void MainWindow::rememberComparison(const QStringList &paths)
 {
-	if (paths.size() < 2)
+	// AddToRecentDocs: not for a command line that leaves the left side
+	// out of the recent ones (-u, -ul)
+	if (paths.size() < 2 || (m_openingCommandLine != nullptr
+			&& (m_openingCommandLine->leftFlags & lm::CommandLine::NoMru)))
 		return;
 	for (const QString &path : paths)
 		if (path.isEmpty())
@@ -2003,7 +2123,8 @@ void MainWindow::handleEscape()
 		closeTab(m_tabs->currentIndex());
 		return;
 	}
-	if (mode == OptionsDialog::EscMainWindowIfOneTab && count <= 1)
+	// the command line's -e too (CMainFrame::PreTranslateMessage)
+	if ((m_escShutdown || mode == OptionsDialog::EscMainWindowIfOneTab) && count <= 1)
 	{
 		close();
 		return;

@@ -251,7 +251,7 @@ void resetHiddenMessages()
 }
 
 void showIdenticalMessage(QWidget *parent, const QStringList &paths,
-	bool exactCheck)
+	bool exactCheck, bool always)
 {
 	// the same path in two panes: a message of its own, so it can be
 	// hidden alone (a case-insensitive match, as upstream's)
@@ -262,8 +262,15 @@ void showIdenticalMessage(QWidget *parent, const QStringList &paths,
 				&& paths.at(i).compare(paths.at(j), Qt::CaseInsensitive) == 0;
 	if (samePath)
 	{
-		if (!messageHidden(kFileToItself))
+		if (always)
+			showInformation(parent, fileToItselfText());
+		else if (!messageHidden(kFileToItself))
 			showHideable(parent, kFileToItself, fileToItselfText());
+		return;
+	}
+	if (always)
+	{
+		showInformation(parent, exactCheck ? identityText(byteIdentity(paths)) : filesSameText());
 		return;
 	}
 	if (messageHidden(kFilesSame))

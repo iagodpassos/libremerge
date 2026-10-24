@@ -209,6 +209,13 @@ public:
 	/** CMergeDoc::RefreshOptions: the comparison takes the options as
 	    they are, a Yes to the question about line endings going. */
 	void refreshDiffOptions() { m_ignoreEol = false; }
+	/** CMergeDoc::MoveOnLoad as the command line asks for it: the pane
+	    that takes the focus, and the line and the character (from 0) the
+	    cursor goes to; -1 leaves either as opening put it. */
+	void moveOnLoad(int pane, int line, int character);
+	/** The extension the text is colored by, and its comments told by,
+	    in place of the files' own (the command line's -fileext). */
+	void setFileExtension(const QString &extension);
 	/** WinMerge's OnFileReload, past its save prompt: every pane is read
 	    from disk again (an untitled one emptied), the undo history goes
 	    and the cursor returns to the line it was on. Nothing is touched
@@ -445,6 +452,10 @@ private:
 	QStringList m_realLines[3];      // side's real lines as of the last diff run
 	QStringList m_realEols[3];       // and their line endings
 	bool m_ignoreEol = false;        // Yes to the question, for this comparison
+	QString m_fileExt;               // the language's extension, by the command line
+	/** The path the highlighting goes by: the file's, or one with the
+	    command line's extension. */
+	QString highlightPath(const QString &path) const;
 	QSet<int> m_movedLines[3];       // real lines inside moved blocks
 	QHash<int, int> m_movedRight;    // the first file's moved lines -> the second's
 	std::vector<int> m_realToView[3]; // real line -> view line, ditto

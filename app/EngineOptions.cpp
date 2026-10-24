@@ -406,8 +406,33 @@ QString compareMethodName(int method)
 
 void setCompareMethodForTest(int method)
 {
+	useCompareMethod(method);
+}
+
+void useCompareMethod(int method)
+{
 	if (COptionsMgr *mgr = GetOptionsMgr())
 		mgr->Set(OPT_CMP_METHOD, method);
+}
+
+QStringList useOptions(const QList<std::pair<QString, QString>> &options)
+{
+	QStringList unknown;
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr)
+		return unknown;
+	for (const auto &[name, value] : options)
+	{
+		const String key = name.toStdString();
+		if (mgr->Set(key, value.toStdString()) != COption::OPT_NOTFOUND)
+			continue;
+		const String longName = mgr->ExpandShortName(key);
+		if (!longName.empty())
+			mgr->Set(longName, value.toStdString());
+		else
+			unknown.append(name);
+	}
+	return unknown;
 }
 
 DIFFOPTIONS currentDiffOptions()
