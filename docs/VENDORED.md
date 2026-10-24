@@ -279,6 +279,13 @@ branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
   codepage: that branch is the old ANSI build's, where a `String` was in
   the default codepage, and with a default other than UTF-8 a file's
   bytes went into the text unconverted
+- `UniFile.cpp` (`UniMemFile::ReadString`): a UTF-8 lead byte that the
+  end of the file or a byte that does not continue it cuts short reads
+  as one bad byte, `?`, as upstream reads the other bad bytes. Upstream
+  took the bytes after it into the character, or ended the line at the
+  end of the file without it, so a file that is not valid UTF-8 read in
+  UTF-8, the default codepage here, lost the characters after each of
+  its 8-bit bytes
 - `stringdiffs.cpp`: UTF-8 character break iterator
   (`ports/lm_utf8_break.h`) replaces the UChar-based one when tchar_t is
   char

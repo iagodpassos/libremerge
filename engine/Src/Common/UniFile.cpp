@@ -572,17 +572,19 @@ bool UniMemFile::ReadString(String & line, String & eol, bool * lossy)
 
 		if (m_unicoding == ucr::UTF8)
 		{
-			// check for end in middle of UTF-8 character
+			// LibreMerge: a lead byte whose sequence the end of the file or
+			// a byte that does not continue it cuts short is a bad byte
+			// alone. Upstream read the bytes after it into the character,
+			// or ended the line at the end of the file without it, so a
+			// file that is not UTF-8 lost the characters after its bytes
 			utf8len = ucr::Utf8len_fromLeadByte(*m_current);
-			if (m_current - m_base + utf8len > m_filesize)
-			{
-				ch = '?';
-				m_current = m_base + m_filesize;
-				doneline = true;
-			}
+			bool complete = utf8len >= 1 && utf8len <= 4
+				&& m_current - m_base + utf8len <= m_filesize;
+			for (int i = 1; complete && i < utf8len; ++i)
+				complete = (m_current[i] & 0xC0) == 0x80;
 			// Handle bad UTF-8 or UTF-8 outside of UCS-2
 			// (Convert bad bytes individually to '?'
-			else if (utf8len < 1 || utf8len > 4)
+			if (!complete)
 			{
 				ch = '?';
 				utf8len = 1;

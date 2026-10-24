@@ -11968,6 +11968,12 @@ int main(int argc, char *argv[])
 			QFile f(path);
 			return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
 		};
+		// what a comparison read, for a failure on another system
+		const auto show = [](const char *what, const FileCompareView &view) {
+			printf("  %s: %s | %s, %d difference(s), \"%s\"\n", what,
+				qPrintable(view.encodingTextForTest(0)), qPrintable(view.encodingTextForTest(1)),
+				view.diffCount(), qPrintable(view.realLinesForTest(0).join(QLatin1Char('|'))));
+		};
 		COptionsMgr *mgr = GetOptionsMgr();
 		const QString cafe = QString::fromUtf8("caf\xc3\xa9");
 		const QString latin = dir.filePath(QStringLiteral("latin1.txt"));
@@ -11999,6 +12005,10 @@ int main(int argc, char *argv[])
 					&& detect->isChecked() && !detect2->isChecked() && !type->isEnabled()
 					&& type->count() == 5 && type->currentData().toInt() == 50001,
 				"page: the system codepage (UTF-8) and the declared charsets by default");
+			printf("  %d codepages, %s ... %s; 1252 at %d, 28591 at %d, 932 at %d\n",
+				custom->count(), qPrintable(custom->itemText(0)),
+				qPrintable(custom->itemText(custom->count() - 1)), custom->findData(1252),
+				custom->findData(28591), custom->findData(932));
 			const int windows1252 = custom->findData(1252);
 			check(windows1252 >= 0 && custom->itemText(windows1252).startsWith(QStringLiteral(" 1252 - "))
 					&& custom->findData(28591) >= 0 && custom->findData(932) >= 0
@@ -12043,10 +12053,11 @@ int main(int argc, char *argv[])
 			FileCompareView view;
 			if (!view.compare(latin, utf8, &error))
 				return 2;
+			show("system", view);
 			check(view.realLinesForTest(1) == QStringList({ cafe })
-					&& view.realLinesForTest(0) != QStringList({ cafe })
+					&& view.realLinesForTest(0) == QStringList({ QStringLiteral("caf?") })
 					&& view.encodingTextForTest(1).startsWith(QStringLiteral("UTF-8")),
-				"system codepage: UTF-8 without a BOM reads as UTF-8, Latin-1 not as cafe");
+				"system codepage: UTF-8 without a BOM reads as UTF-8, Latin-1's byte as ?");
 		}
 		// a custom one: the Latin-1 file reads and saves in it, UTF-8
 		// still reads as UTF-8
@@ -12055,6 +12066,7 @@ int main(int argc, char *argv[])
 			FileCompareView view;
 			if (!view.compare(latin, utf8, &error))
 				return 2;
+			show("1252", view);
 			check(view.realLinesForTest(0) == QStringList({ cafe })
 					&& view.realLinesForTest(1) == QStringList({ cafe }) && view.diffCount() == 0
 					&& view.encodingTextForTest(0).startsWith(QStringLiteral("Windows-1252"))
@@ -12074,6 +12086,8 @@ int main(int argc, char *argv[])
 			TableCompareView view;
 			if (!view.compare(latinCsv, utf8Csv, &error))
 				return 2;
+			printf("  table: %d difference(s), \"%s\"\n", view.diffCount(),
+				qPrintable(view.shownRowsForTest(0).join(QLatin1Char('|'))));
 			check(view.diffCount() == 0 && view.shownRowsForTest(0).contains(QStringLiteral("1,") + cafe),
 				"custom 1252: a table reads in it too");
 		}
@@ -12109,6 +12123,7 @@ int main(int argc, char *argv[])
 			FileCompareView view;
 			if (!view.compare(html, htmlUtf8, &error))
 				return 2;
+			show("HTML", view);
 			check(view.realLinesForTest(0).value(1) == QStringLiteral("<p>") + cafe + QStringLiteral("</p>")
 					&& view.diffCount() == 0,
 				"HTML: read in the charset it declares");
@@ -12140,12 +12155,23 @@ int main(int argc, char *argv[])
 			"\xe3\x80\x82\n\xe3\x81\x93\xe3\x82\x8c\xe3\x81\xaf\xe3\x82\xb7\xe3\x83\x95\xe3\x83\x88"
 			"JIS\xe3\x81\xa7\xe6\x9b\xb8\xe3\x81\x8b\xe3\x82\x8c\xe3\x81\xa6\xe3\x81\x84\xe3\x81\xbe"
 			"\xe3\x81\x99\xe3\x80\x82\n").toUtf8());
-		const auto sameText = [&error](const QString &a, const QString &b) {
+		const auto sameText = [&error, &show](const QString &a, const QString &b) {
 			FileCompareView view;
-			return view.compare(a, b, &error) && view.diffCount() == 0;
+			const bool compared = view.compare(a, b, &error);
+			show(qPrintable(QFileInfo(a).fileName()), view);
+			return compared && view.diffCount() == 0;
 		};
 		check(!sameText(french, frenchUtf8) && !sameText(japanese, japaneseUtf8),
 			"detector off: Latin-1 and Shift_JIS do not read as such");
+		// read as UTF-8, each 8-bit byte goes alone, the text after it kept
+		{
+			FileCompareView view;
+			if (!view.compare(french, frenchUtf8, &error))
+				return 2;
+			check(view.realLinesForTest(0).value(0) == QStringLiteral("Le caf? de la gare a ferm? ce soir.")
+					&& view.realLinesForTest(0).size() == 3,
+				"detector off: a byte that is no UTF-8 reads as ?, the text after it kept");
+		}
 		mgr->Set(OPT_CP_DETECT, (50001 << 16) | 2);
 		check(sameText(french, frenchUtf8) && sameText(japanese, japaneseUtf8),
 			"detector, Auto-Select: Latin-1 and Shift_JIS detected");
@@ -12179,8 +12205,10 @@ int main(int argc, char *argv[])
 		const QStringList unattended = { QStringLiteral("-noninteractive"),
 			QStringLiteral("-enableexitcode"), QStringLiteral("-noprefs"),
 			QStringLiteral("-ignorecodepage:1") };
-		check(run(unattended + QStringList{ QStringLiteral("-cp"), QStringLiteral("1252"), latin, utf8 }) == 0
-				&& run(unattended + QStringList{ latin, utf8 }) == 1,
+		const int withCp = run(unattended + QStringList{ QStringLiteral("-cp"), QStringLiteral("1252"), latin, utf8 });
+		const int withoutCp = run(unattended + QStringList{ latin, utf8 });
+		printf("  -cp 1252 exits %d, without it %d\n", withCp, withoutCp);
+		check(withCp == 0 && withoutCp == 1,
 			"-cp: the files read in it for the run");
 
 		printf("codepage: %s\n", ok ? "ok" : "FAILED");
