@@ -37,10 +37,12 @@ PNG
 fails=0
 run_one() { # $1 = selftest name, $2/$3[/$4] = files
   make_fixtures
-  if "$BIN" "--$1" "${@:2}" > /dev/null 2>&1; then
+  if "$BIN" "--$1" "${@:2}" > "$TMP/output.txt" 2>&1; then
     echo "ok: $1"
   else
     echo "FAIL: $1 (exit $?)"
+    # what it printed, Qt's own messages left out
+    grep -v '^qt\.' "$TMP/output.txt" | tail -n 40 | sed 's/^/    /'
     fails=$((fails + 1))
   fi
 }
