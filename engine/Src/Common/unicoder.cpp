@@ -326,14 +326,33 @@ void maketchar(String & ch, unsigned unich, bool & lossy, unsigned codepage)
 		ch = (tchar_t)unich;
 		return;
 	}
+#ifndef _WIN32
+	// LibreMerge: tchar_t holds UTF-8 here (CP_ACP), which takes every
+	// code point: written out at once, not through a converter opened
+	// for each character
+	if (codepage == CP_ACP || codepage == CP_UTF_8)
+	{
+		if (unich < 0x110000 && (unich < 0xd800 || unich > 0xdfff))
+		{
+			unsigned char utf8[8];
+			ch.assign(reinterpret_cast<const char *>(utf8), Ucs4_to_Utf8(unich, utf8));
+			return;
+		}
+		lossy = true;
+		ch = _T("?");
+		return;
+	}
+#endif
 	wchar_t wch = (wchar_t)unich;
 	if (!lossy)
 	{
 		// So far it isn't lossy, so try for lossless conversion
-		char outch[3] = {0};
+		// LibreMerge: room for the zero after a character of four bytes;
+		// a 3-byte character filled upstream's three and read on past them
+		char outch[5] = {0};
 		BOOL defaulted = FALSE;
 		DWORD flags = WC_NO_BEST_FIT_CHARS;
-		if (WideCharToMultiByte(codepage, flags, &wch, 1, outch, sizeof(outch), nullptr, &defaulted)
+		if (WideCharToMultiByte(codepage, flags, &wch, 1, outch, sizeof(outch) - 1, nullptr, &defaulted)
 				&& !defaulted)
 		{
 			ch = outch;

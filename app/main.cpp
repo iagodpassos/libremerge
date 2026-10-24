@@ -12180,6 +12180,32 @@ int main(int argc, char *argv[])
 			"detector, Japanese (Auto-Select): Japanese's encodings only");
 		mgr->Set(OPT_CP_DETECT, (50001 << 16) | 1);
 
+		// the Unicode files the engine decodes itself, UTF-16 and UTF-8
+		// with a BOM, with characters of three and four bytes in UTF-8
+		const QString wide = QString::fromUtf8("\xe2\x82\xac \xe2\x80\x9cquotes\xe2\x80\x9d "
+			"\xe3\x81\x93\xe3\x82\x93 \xf0\x9f\x98\x80\n");
+		const auto utf16le = [](const QString &text) {
+			QByteArray bytes("\xff\xfe", 2);
+			bytes.append(reinterpret_cast<const char *>(text.utf16()), text.size() * 2);
+			return bytes;
+		};
+		const QString utf16 = dir.filePath(QStringLiteral("utf16.txt"));
+		write(utf16, utf16le(wide));
+		const QString utf8Bom = dir.filePath(QStringLiteral("utf8bom.txt"));
+		write(utf8Bom, "\xef\xbb\xbf" + wide.toUtf8());
+		const QString utf8Wide = dir.filePath(QStringLiteral("utf8wide.txt"));
+		write(utf8Wide, wide.toUtf8());
+		check(sameText(utf16, utf8Wide) && sameText(utf8Bom, utf8Wide),
+			"Unicode: UTF-16 and UTF-8 with a BOM read as the same text, emoji too");
+		{
+			FileCompareView view;
+			if (!view.compare(utf16, utf8Wide, &error))
+				return 2;
+			view.typeAtForTest(0, 0, QStringLiteral("x"));
+			check(view.saveSideAt(0, &error) && read(utf16) == utf16le(QStringLiteral("x") + wide),
+				"Unicode: UTF-16 saved as UTF-16, emoji too");
+		}
+
 		// -cp: the default codepage for the run, the comparison exiting 0
 		// with it (the codepage difference ignored) and 1 without it
 		using Cmd = lm::CommandLine;

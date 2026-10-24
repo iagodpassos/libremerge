@@ -466,6 +466,58 @@ bool UniMemFile::ReadString(String & line, String & eol, bool * lossy)
 		return true;
 	}
 #else
+	// LibreMerge: a String holds UTF-8 here, so a UTF-8 file's line goes in
+	// as it is, each bad byte a '?' as the loop below makes it; the loop
+	// takes one character at a time
+	if (m_unicoding == ucr::UTF8 && ucr::EqualCodepages(ucr::CP_UTF_8, GetACP()))
+	{
+		unsigned char * const end = m_base + m_filesize;
+		// If there aren't any bytes left in the file, return `false` to indicate EOF
+		if (m_current >= end)
+			return false;
+		unsigned char *eolptr = m_current;
+		while (eolptr < end && *eolptr != '\n' && *eolptr != '\r')
+		{
+			if (!*eolptr)
+				RecordZero(m_txtstats, eolptr - m_base);
+			++eolptr;
+		}
+		const unsigned char *run = m_current;
+		for (const unsigned char *p = m_current; p < eolptr; )
+		{
+			const int utf8len = ucr::Utf8len_fromLeadByte(*p);
+			bool complete = utf8len >= 1 && utf8len <= 4 && utf8len <= eolptr - p;
+			for (int i = 1; complete && i < utf8len; ++i)
+				complete = (p[i] & 0xC0) == 0x80;
+			if (complete)
+			{
+				p += utf8len;
+				continue;
+			}
+			line.append(reinterpret_cast<const char *>(run), p - run);
+			line += '?';
+			run = ++p;
+		}
+		line.append(reinterpret_cast<const char *>(run), eolptr - run);
+		m_current = eolptr;
+		if (eolptr < end)
+		{
+			eol += static_cast<char>(*eolptr);
+			++m_current;
+			if (*eolptr == '\r' && m_current < end && *m_current == '\n')
+			{
+				eol += '\n';
+				++m_current;
+				++m_txtstats.ncrlfs;
+			}
+			else if (*eolptr == '\r')
+				++m_txtstats.ncrs;
+			else
+				++m_txtstats.nlfs;
+			++m_lineno;
+		}
+		return true;
+	}
 	if (m_unicoding == ucr::NONE && ucr::EqualCodepages(m_codepage, GetACP()))
 	{
 		int cchLine = 0;
@@ -597,6 +649,24 @@ bool UniMemFile::ReadString(String & line, String & eol, bool * lossy)
 		else
 		{
 			ch = ucr::get_unicode_char(m_current, (ucr::UNICODESET)m_unicoding, m_codepage);
+#ifndef _UNICODE
+			// LibreMerge: a surrogate pair is one character. Upstream's
+			// wchar_t String takes its two halves as they come; one at a
+			// time into UTF-8, each became '?'
+			if ((m_unicoding == ucr::UCS2LE || m_unicoding == ucr::UCS2BE)
+				&& ch >= 0xd800 && ch < 0xdc00
+				&& m_current - m_base + 2 * m_charsize - 1 < m_filesize)
+			{
+				const unsigned low = ucr::get_unicode_char(m_current + m_charsize,
+					(ucr::UNICODESET)m_unicoding, m_codepage);
+				if (low >= 0xdc00 && low < 0xe000)
+				{
+					ch = 0x10000 + ((ch - 0xd800) << 10) + (low - 0xdc00);
+					// past the high half; the loop steps past the low one
+					m_current += m_charsize;
+				}
+			}
+#endif
 		}
 		// convert from Unicode codepoint to tchar_t string
 		// could be multicharacter if decomposition took place, for example

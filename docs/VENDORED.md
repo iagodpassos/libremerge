@@ -285,7 +285,17 @@ branch), `DirScan.cpp` (Plugins/MergeAppCOMClass), `DiffWrapper.cpp`
   took the bytes after it into the character, or ended the line at the
   end of the file without it, so a file that is not valid UTF-8 read in
   UTF-8, the default codepage here, lost the characters after each of
-  its 8-bit bytes
+  its 8-bit bytes. A UTF-8 file's line goes into the `String` as it is
+  (UTF-8 too on POSIX), its bad bytes `?`, rather than a character at a
+  time; and in UTF-16 a surrogate pair is one character, where
+  upstream's `wchar_t` `String` takes the two halves as they come and
+  one at a time into UTF-8 each became `?`
+- `unicoder.cpp` (`maketchar`): on POSIX a code point is written out in
+  UTF-8 at once. Upstream's ANSI branch converted it into a buffer of
+  three bytes, which a 3-byte UTF-8 character fills without the zero
+  after it, so CJK text, `€` or curly quotes in a UTF-16 file or a UTF-8
+  file with a BOM picked up whatever followed on the stack (seen on
+  Linux), and it opened a converter for every character
 - `stringdiffs.cpp`: UTF-8 character break iterator
   (`ports/lm_utf8_break.h`) replaces the UChar-based one when tchar_t is
   char
