@@ -374,6 +374,14 @@
         <translation>  • canvis sense desar</translation>
     </message>
     <message>
+        <source>None</source>
+        <translation>Cap</translation>
+    </message>
+    <message>
+        <source>Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6</source>
+        <translation>Lïn: %1  Col: %2/%3  Car: %4/%5  EOL: %6</translation>
+    </message>
+    <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
@@ -4578,6 +4586,10 @@ Useu valors entre 1 i %1.</translation>
         <source>Highlight mode:</source>
         <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>Mode de ressaltat:</translation>
+    </message>
+    <message>
+        <source>&amp;Preserve original EOL</source>
+        <translation>&amp;Preserva els caràcters de salt de línia originals</translation>
     </message>
     <message>
         <source>Tabs</source>

@@ -362,6 +362,14 @@
         <translation>  • changements non enregistrés</translation>
     </message>
     <message>
+        <source>None</source>
+        <translation>Aucun</translation>
+    </message>
+    <message>
+        <source>Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6</source>
+        <translation>Ln : %1  Col : %2/%3  Ch : %4/%5  EOL : %6</translation>
+    </message>
+    <message>
         <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
         <translation>Ln : %1  Col : %2/%3  Ch : %4/%5</translation>
     </message>
@@ -4274,6 +4282,10 @@ Vérification de l&apos;identité binaire...</translation>
         <source>Highlight mode:</source>
         <translatorcomment>After WinMerge&apos;s &quot;Highlight &amp;mode:&quot;.</translatorcomment>
         <translation>Mode de surbrillance :</translation>
+    </message>
+    <message>
+        <source>&amp;Preserve original EOL</source>
+        <translation>&amp;Préserver les EOL d&apos;origine</translation>
     </message>
     <message>
         <source>Tabs</source>

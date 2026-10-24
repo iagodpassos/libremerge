@@ -357,6 +357,14 @@
         <translation>  • ungespeicherte Änderungen</translation>
     </message>
     <message>
+        <source>None</source>
+        <translation>Keines</translation>
+    </message>
+    <message>
+        <source>Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6</source>
+        <translation>Zeile: %1  Spalte: %2/%3  Zeichen: %4/%5  EOL: %6</translation>
+    </message>
+    <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
@@ -4285,6 +4293,10 @@ Drücken Sie &apos;Zurücksetzen&apos;, um alle Meldungen wieder sichtbar zu sch
         <source>Highlight mode:</source>
         <translatorcomment>After WinMerge&apos;s &quot;Highlight &amp;mode:&quot;.</translatorcomment>
         <translation>Hervorhebungsmodus:</translation>
+    </message>
+    <message>
+        <source>&amp;Preserve original EOL</source>
+        <translation>&amp;Ursprüngliche Zeilenende-Zeichen bewahren</translation>
     </message>
     <message>
         <source>Tabs</source>

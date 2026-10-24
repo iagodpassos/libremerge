@@ -180,6 +180,7 @@ private:
 	// Editor > General
 	QCheckBox *m_chkHiliteSyntax = nullptr;
 	QComboBox *m_cmbHiliteSyntaxMode = nullptr;
+	QCheckBox *m_chkMixedEol = nullptr;
 	QLineEdit *m_editTabSize = nullptr;
 	QRadioButton *m_radInsertTabs = nullptr;
 	QRadioButton *m_radInsertSpaces = nullptr;

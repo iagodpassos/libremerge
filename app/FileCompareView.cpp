@@ -874,7 +874,7 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
     kept. */
 void FileCompareView::suggestIgnoreEol()
 {
-	if (m_ignoreEol || lm::currentDiffOptions().bIgnoreEol)
+	if (m_ignoreEol || lm::currentDiffOptions().bIgnoreEol || lm::allowMixedEol())
 		return;
 	const auto style = [this](int side) {
 		return m_sides[side].mixedEol ? QStringLiteral("mixed") : m_sides[side].eol;
@@ -891,10 +891,15 @@ void FileCompareView::suggestIgnoreEol()
 			mgr->SaveOption(OPT_CMP_IGNORE_EOL, true);
 }
 
+bool FileCompareView::perLineEol(int side) const
+{
+	return m_sides[side].mixedEol || lm::allowMixedEol();
+}
+
 QString FileCompareView::lineEol(int side, const QTextBlock &block) const
 {
 	const Side &s = m_sides[side];
-	if (s.mixedEol)
+	if (perLineEol(side))
 	{
 		const QVariant eol = block.blockFormat().property(kEolProperty);
 		if (eol.isValid())
@@ -1819,6 +1824,22 @@ void FileCompareView::updatePaneStatus(int side)
 	const int maxCol = m_panes[side]->actualOffset(block, block.length() - 1) + 1;
 	const int ch = cursor.positionInBlock() + 1;
 	const int maxCh = qMax(1, block.length());
+	// and the line's ending where lines keep their own, none on a ghost
+	// line (the "EOL:" part of OnUpdateCaret, its EolString's names)
+	if (perLineEol(side) && !isGhostBlock(block))
+	{
+		QTextBlock last = m_panes[side]->document()->lastBlock();
+		while (last.isValid() && isGhostBlock(last))
+			last = last.previous();
+		const QString eol = block == last && !m_sides[side].hadFinalEol
+			? QString() : lineEol(side, block);
+		const QString name = eol == QStringLiteral("\r\n") ? QStringLiteral("CRLF")
+			: eol == QStringLiteral("\n") ? QStringLiteral("LF")
+			: eol == QStringLiteral("\r") ? QStringLiteral("CR") : tr("None");
+		m_posLabels[side]->setText(tr("Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6")
+			.arg(realLine).arg(col).arg(maxCol).arg(ch).arg(maxCh).arg(name));
+		return;
+	}
 	m_posLabels[side]->setText(tr("Ln: %1  Col: %2/%3  Ch: %4/%5")
 		.arg(realLine).arg(col).arg(maxCol).arg(ch).arg(maxCh));
 }
@@ -2329,23 +2350,21 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide,
 	cursor.setPosition(lastBlock.position() + lastBlock.length() - 1,
 		QTextCursor::KeepAnchor);
 	cursor.insertText(newLines.join(QChar('\n')));
-	// into a file of mixed endings the lines take their own along, as
-	// upstream's lines carry theirs; another file gives them its ending
-	if (m_sides[target].mixedEol)
+	// the lines take their own endings along, as upstream's lines carry
+	// theirs: kept where lines keep their own, a file that keeps one
+	// ending giving them its own as it is saved
+	QTextCursor line(tgtDoc);
+	for (int v = block.viewBegin; v <= block.viewEnd; ++v)
 	{
-		QTextCursor line(tgtDoc);
-		for (int v = block.viewBegin; v <= block.viewEnd; ++v)
-		{
-			const QTextBlock tb = tgtDoc->findBlockByNumber(v);
-			const QString eol = lineEol(sourceSide, srcDoc->findBlockByNumber(v));
-			QTextBlockFormat format = tb.blockFormat();
-			if (eol == m_sides[target].eol)
-				format.clearProperty(kEolProperty);
-			else
-				format.setProperty(kEolProperty, eol);
-			line.setPosition(tb.position());
-			line.setBlockFormat(format);
-		}
+		const QTextBlock tb = tgtDoc->findBlockByNumber(v);
+		const QString eol = lineEol(sourceSide, srcDoc->findBlockByNumber(v));
+		QTextBlockFormat format = tb.blockFormat();
+		if (eol == m_sides[target].eol)
+			format.clearProperty(kEolProperty);
+		else
+			format.setProperty(kEolProperty, eol);
+		line.setPosition(tb.position());
+		line.setBlockFormat(format);
 	}
 	cursor.endEditBlock();
 	for (int v = block.viewBegin; v <= block.viewEnd; ++v)

@@ -1464,14 +1464,17 @@ int main(int argc, char *argv[])
 		{
 			const QList<QCheckBox *> editorBoxes = boxes(OptionsDialog::EditorPage);
 			auto *mode = dialog.pageForTest(OptionsDialog::EditorPage)->findChild<QComboBox *>();
-			ok = ok && editorBoxes.size() == 1 && mode != nullptr && mode->count() == 4;
+			// (and "Preserve original EOL" off)
+			ok = ok && editorBoxes.size() == 2 && mode != nullptr && mode->count() == 4;
 			if (ok)
 			{
 				editorBoxes.first()->setChecked(false);
+				editorBoxes.last()->setChecked(true);
 				mode->setCurrentIndex(3);
 				dialog.selectCategoryForTest(9);
 				dialog.restoreDefaultsForTest();
-				ok = editorBoxes.first()->isChecked() && mode->currentIndex() == 1;
+				ok = editorBoxes.first()->isChecked() && !editorBoxes.last()->isChecked()
+					&& mode->currentIndex() == 1;
 			}
 			printf("editor page: %s\n", ok ? "ok" : "wrong");
 		}
@@ -11512,6 +11515,92 @@ int main(int argc, char *argv[])
 		}
 		answer = false;
 		asked.clear();
+
+		// "Preserve original EOL" (OPT_ALLOW_MIXED_EOL): off by default on
+		// the Editor page; off, the lines copied into a file of one ending
+		// take its ending as it is saved, and the status bar names no line
+		// ending
+		{
+			OptionsDialog dialog;
+			auto *preserve = dialog.pageForTest(OptionsDialog::EditorPage)
+				->findChild<QCheckBox *>(QStringLiteral("mixedEol"));
+			if (preserve == nullptr)
+				return 2;
+			const bool wasOff = !preserve->isChecked();
+			preserve->setChecked(true);
+			dialog.saveForTest();
+			const bool saved = lm::allowMixedEol();
+			dialog.selectCategoryForTest(9); // Editor > General
+			dialog.restoreDefaultsForTest();
+			check(wasOff && saved && !preserve->isChecked(),
+				"Preserve original EOL: off by default, saved, off again with Defaults");
+			lm::setAllowMixedEolForTest(false);
+		}
+		const auto status = [](int ln, int col, int cols, int ch, int chs, const QString &eol)
+		{
+			return eol.isNull()
+				? FileCompareView::tr("Ln: %1  Col: %2/%3  Ch: %4/%5")
+					.arg(ln).arg(col).arg(cols).arg(ch).arg(chs)
+				: FileCompareView::tr("Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6")
+					.arg(ln).arg(col).arg(cols).arg(ch).arg(chs).arg(eol);
+		};
+		const auto toLine = [](FileCompareView &view, int side, int line)
+		{
+			DiffTextEdit *pane = view.paneForTest(side);
+			pane->setTextCursor(QTextCursor(pane->document()->findBlockByNumber(line)));
+		};
+		write(left, "a\r\nb\r\n");
+		write(right, "a\nx\n");
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			view.copyAllFrom(1, 0);
+			toLine(view, 0, 0);
+			check(view.saveSideAt(0, &error) && read(left) == "a\r\nx\r\n"
+					&& view.positionTextForTest(0) == status(1, 1, 2, 1, 2, QString()),
+				"Preserve original EOL off: the lines copied in end as the file does");
+		}
+		asked.clear();
+		lm::setAllowMixedEolForTest(true);
+		write(left, "a\r\nb\r\n");
+		{
+			// on: no question, the lines that end otherwise differ, those
+			// copied in keep theirs, and the status bar names each one's
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			check(asked.isEmpty() && view.diffCount() == 1
+					&& view.diffLinesForTest() == QList<int>({ 0, 1 }),
+				"Preserve original EOL on: no question, every line differs");
+			toLine(view, 0, 0);
+			const bool crlf = view.positionTextForTest(0) == status(1, 1, 2, 1, 2, QStringLiteral("CRLF"));
+			view.copyAllFrom(1, 0);
+			toLine(view, 0, 1);
+			check(crlf && view.saveSideAt(0, &error) && read(left) == "a\nx\n"
+					&& view.positionTextForTest(0) == status(2, 1, 2, 1, 2, QStringLiteral("LF")),
+				"Preserve original EOL on: the lines copied in keep theirs, named in the status bar");
+		}
+		write(left, "a\nb");
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			toLine(view, 0, 1);
+			check(view.positionTextForTest(0) == status(2, 1, 2, 1, 2, FileCompareView::tr("None")),
+				"Preserve original EOL on: a last line without one ends in None");
+		}
+		write(leftTable, "id\r\n1\r\n");
+		write(rightTable, "id\n2\n");
+		{
+			TableCompareView view;
+			if (!view.compare(leftTable, rightTable, &error))
+				return 2;
+			view.copyAllFrom(1, 0);
+			check(asked.isEmpty() && view.saveModified(&error) && read(leftTable) == "id\n2\n",
+				"Preserve original EOL on, table: the rows copied in keep theirs");
+		}
+		lm::setAllowMixedEolForTest(false);
 
 		lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
 		printf("eol: %s\n", ok ? "ok" : "FAILED");

@@ -368,8 +368,11 @@ private:
 	void refreshSideMaps(int side);
 	QStringList collectRealLines(int side, QList<bool> *ghostFlags = nullptr,
 		QStringList *eols = nullptr) const;
-	/** The line ending a line is saved with: its own in a file of mixed
-	    endings, the file's otherwise. */
+	/** Each line keeps its own ending: in a file of mixed endings, and
+	    in every file with Preserve original EOL on. */
+	bool perLineEol(int side) const;
+	/** The line ending a line is compared and saved with: its own where
+	    lines keep theirs, the file's otherwise. */
 	QString lineEol(int side, const QTextBlock &block) const;
 	/** CMergeDoc::OpenDocs' question about files whose lines end
 	    otherwise. */

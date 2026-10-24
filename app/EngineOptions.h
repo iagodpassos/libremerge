@@ -34,6 +34,11 @@ int tabSize();
 bool insertTabs();
 /** Set both in memory only (for tests). */
 void setTabsForTest(int tabSize, bool insertTabs);
+/** WinMerge's "Preserve original EOL" (OPT_ALLOW_MIXED_EOL): each line is
+    compared and saved with its own line ending, and set in memory only
+    (for tests). */
+bool allowMixedEol();
+void setAllowMixedEolForTest(bool on);
 
 /** The folder of the Tree-sitter grammars (WinMerge's TreeSitterGrammars):
     the bundle's Resources on macOS, the installed one or the one next to

@@ -628,10 +628,9 @@ void OptionsDialog::loadMessageBoxes()
 }
 
 /** WinMerge's Editor page (PropEditor): the highlighting and the parsers
-    it takes, from the built-in ones and Tree-sitter's, and the tabs. The
-    original EOL is not offered yet; the rendering mode (GDI or one of
-    DirectWrite's) is Windows' own, which upstream turns off where
-    DirectWrite is missing. */
+    it takes, from the built-in ones and Tree-sitter's, the original EOL
+    and the tabs. The rendering mode (GDI or one of DirectWrite's) is
+    Windows' own, which upstream turns off where DirectWrite is missing. */
 QWidget *OptionsDialog::buildEditorPage()
 {
 	auto *page = new QWidget(this);
@@ -643,6 +642,9 @@ QWidget *OptionsDialog::buildEditorPage()
 	m_cmbHiliteSyntaxMode->addItems({ tr("Built-in only"), tr("Built-in first"),
 		tr("Tree-sitter first"), tr("Tree-sitter only") });
 	addLabeled(box, tr("Highlight mode:"), m_cmbHiliteSyntaxMode);
+	m_chkMixedEol = new QCheckBox(tr("&Preserve original EOL"), page);
+	m_chkMixedEol->setObjectName(QStringLiteral("mixedEol"));
+	box->addWidget(m_chkMixedEol);
 
 	auto *tabs = new QGroupBox(tr("Tabs"), page);
 	auto *tabsLayout = new QVBoxLayout(tabs);
@@ -751,6 +753,7 @@ void OptionsDialog::load()
 			mgr->GetBool(OPT_CMP_COMPLETELY_BLANK_OUT_IGNORED_CHANGES));
 		m_chkHiliteSyntax->setChecked(mgr->GetBool(OPT_SYNTAX_HIGHLIGHT));
 		m_cmbHiliteSyntaxMode->setCurrentIndex(mgr->GetInt(OPT_SYNTAX_HIGHLIGHT_MODE));
+		m_chkMixedEol->setChecked(mgr->GetBool(OPT_ALLOW_MIXED_EOL));
 		m_editTabSize->setText(QString::number(mgr->GetInt(OPT_TAB_SIZE)));
 		(mgr->GetInt(OPT_TAB_TYPE) == 0 ? m_radInsertTabs : m_radInsertSpaces)
 			->setChecked(true);
@@ -812,6 +815,7 @@ void OptionsDialog::save()
 		mgr->SaveOption(OPT_SYNTAX_HIGHLIGHT, m_chkHiliteSyntax->isChecked());
 		mgr->SaveOption(OPT_SYNTAX_HIGHLIGHT_MODE,
 			m_cmbHiliteSyntaxMode->currentIndex());
+		mgr->SaveOption(OPT_ALLOW_MIXED_EOL, m_chkMixedEol->isChecked());
 		mgr->SaveOption(OPT_TAB_SIZE,
 			std::clamp(m_editTabSize->text().toInt(), 1, kMaxTabSize));
 		mgr->SaveOption(OPT_TAB_TYPE, m_radInsertTabs->isChecked() ? 0 : 1);
@@ -915,6 +919,7 @@ void OptionsDialog::restoreDefaults(int page)
 	case EditorPage:
 		m_chkHiliteSyntax->setChecked(true);
 		m_cmbHiliteSyntaxMode->setCurrentIndex(1); // Built-in first
+		m_chkMixedEol->setChecked(false);
 		m_editTabSize->setText(QStringLiteral("4"));
 		m_radInsertTabs->setChecked(true);
 		break;

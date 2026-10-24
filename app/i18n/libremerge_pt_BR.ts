@@ -323,6 +323,14 @@
         <translation>  • alterações não salvas</translation>
     </message>
     <message>
+        <source>None</source>
+        <translation>Nenhum</translation>
+    </message>
+    <message>
+        <source>Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6</source>
+        <translation>Lin: %1  Col: %2/%3  Car: %4/%5  EOL: %6</translation>
+    </message>
+    <message>
         <source>LibreMerge</source>
         <translation>LibreMerge</translation>
     </message>
@@ -3792,6 +3800,10 @@ Checando identidade binária...</translation>
     <message>
         <source>Highlight mode:</source>
         <translation>Modo de destaque:</translation>
+    </message>
+    <message>
+        <source>&amp;Preserve original EOL</source>
+        <translation>&amp;Preservar o caractere EOL original</translation>
     </message>
     <message>
         <source>Tabs</source>

@@ -273,7 +273,8 @@ void installEngineOptions()
 	// WinMerge's Editor page: the highlighting, and the parsers it takes
 	options.InitOption(OPT_SYNTAX_HIGHLIGHT, true);
 	options.InitOption(OPT_SYNTAX_HIGHLIGHT_MODE, 1);
-	// and its tabs
+	// its original EOL, and its tabs
+	options.InitOption(OPT_ALLOW_MIXED_EOL, false);
 	options.InitOption(OPT_TAB_SIZE, 4, 0, 64);
 	options.InitOption(OPT_TAB_TYPE, 0, 0, 1); // 0 means tabs inserted
 	TreeSitterRegistry::Instance().Initialize(treeSitterGrammarsDir().toStdString());
@@ -329,6 +330,18 @@ bool insertTabs()
 {
 	COptionsMgr *mgr = GetOptionsMgr();
 	return mgr == nullptr || mgr->GetInt(OPT_TAB_TYPE) == 0;
+}
+
+bool allowMixedEol()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr != nullptr && mgr->GetBool(OPT_ALLOW_MIXED_EOL);
+}
+
+void setAllowMixedEolForTest(bool on)
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+		mgr->Set(OPT_ALLOW_MIXED_EOL, on);
 }
 
 void setTabsForTest(int tabSize, bool insertTabs)

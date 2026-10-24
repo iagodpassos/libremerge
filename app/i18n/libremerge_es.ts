@@ -359,6 +359,14 @@
         <translation>  • cambios sin guardar</translation>
     </message>
     <message>
+        <source>None</source>
+        <translation>Ninguno</translation>
+    </message>
+    <message>
+        <source>Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6</source>
+        <translation>Línea: %1  Columna: %2/%3  Carácter: %4/%5  EOL: %6</translation>
+    </message>
+    <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
@@ -4288,6 +4296,10 @@ Por favor, use valores entre 1 y %1.</translation>
         <source>Highlight mode:</source>
         <translatorcomment>After WinMerge&apos;s &quot;Highlight &amp;mode:&quot;.</translatorcomment>
         <translation>Modo de resaltado:</translation>
+    </message>
+    <message>
+        <source>&amp;Preserve original EOL</source>
+        <translation>&amp;Conservar fin de línea original</translation>
     </message>
     <message>
         <source>Tabs</source>

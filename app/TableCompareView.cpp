@@ -928,18 +928,22 @@ bool TableCompareView::loadSide(int side, const QString &path,
 
 QString TableCompareView::rowEol(int side, int row) const
 {
+	// its own in a file of mixed endings, and in every file with
+	// Preserve original EOL on
 	const Side &s = m_sides[side];
-	if (s.mixedEol && row >= 0 && row < s.rowEols.size() && !s.rowEols.at(row).isEmpty())
+	if ((s.mixedEol || lm::allowMixedEol()) && row >= 0 && row < s.rowEols.size()
+		&& !s.rowEols.at(row).isEmpty())
 		return s.rowEols.at(row);
 	return s.eol;
 }
 
 /** As in the text compare (FileCompareView::suggestIgnoreEol): with
-    "Ignore carriage return differences" off, files that end their lines
-    in different ways bring up upstream's question first. */
+    neither "Ignore carriage return differences" nor "Preserve original
+    EOL" on, files that end their lines in different ways bring up
+    upstream's question first. */
 void TableCompareView::suggestIgnoreEol()
 {
-	if (m_ignoreEol || lm::currentDiffOptions().bIgnoreEol)
+	if (m_ignoreEol || lm::currentDiffOptions().bIgnoreEol || lm::allowMixedEol())
 		return;
 	const auto style = [this](int side) {
 		return m_sides[side].mixedEol ? QStringLiteral("mixed") : m_sides[side].eol;
