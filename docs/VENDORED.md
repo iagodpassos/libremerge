@@ -116,10 +116,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 631 | 167 | 250 | 0 | 3 |
-| Spanish | 619 | 181 | 248 | 3 | 0 |
-| Catalan | 317 | 176 | 250 | 308 | 0 |
-| French | 635 | 184 | 232 | 0 | 0 |
+| German | 630 | 168 | 250 | 0 | 3 |
+| Spanish | 618 | 182 | 248 | 3 | 0 |
+| Catalan | 316 | 177 | 250 | 308 | 0 |
+| French | 634 | 185 | 232 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -155,6 +155,10 @@ says so in a comment:
 - Tab with "Insert spaces" (`CCrystalEditView::OnEditTab`) inserts spaces
   up to the next tab stop from the cursor's column. Upstream counts from
   the cursor's character, which a tab before the cursor puts out of step.
+- The Codepage page leaves out the "Restart required." upstream writes
+  under its two detection boxes (`IDD_PROPPAGE_CODEPAGE`): the detection
+  applies to the next file opened, in WinMerge as well
+  (`FileLocationGuessEncodings` reads `OPT_CP_DETECT` each time).
 - Shift+Tab without a selection (`OnEditUntab`) goes back to the tab stop
   before the cursor counting columns as the cursor's column is counted.
   Upstream counts one per character there, so a wide character left the

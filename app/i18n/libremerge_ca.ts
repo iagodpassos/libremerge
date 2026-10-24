@@ -4661,18 +4661,16 @@ Useu valors entre 1 i %1.</translation>
         <translation>Codificació de caràcters personalitzada:</translation>
     </message>
     <message>
-        <source>Detect codepage for: .html, .rc, .xml
-Restart required.</source>
-        <translation>Detecta la codificació de caràcters en aquest tipus de fitxers: .html, .rc, .xml
-Cal reiniciar l&apos;aplicació.</translation>
+        <source>Detect codepage for: .html, .rc, .xml</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Detect codepage for: .html, .rc, .xml
+Restart required.&quot;.</translatorcomment>
+        <translation>Detecta la codificació de caràcters en aquest tipus de fitxers: .html, .rc, .xml</translation>
     </message>
     <message>
-        <source>Detect codepage for files with ICU
-Restart required.</source>
+        <source>Detect codepage for files with ICU</source>
         <translatorcomment>After WinMerge&apos;s &quot;Detect codepage for files with mlang.dll
 Restart required.&quot;.</translatorcomment>
-        <translation>Detecta la codificació de caràcters en fitxers de text amb ICU
-Cal reiniciar l&apos;aplicació.</translation>
+        <translation>Detecta la codificació de caràcters en fitxers de text amb ICU</translation>
     </message>
     <message>
         <source>Auto-Select</source>

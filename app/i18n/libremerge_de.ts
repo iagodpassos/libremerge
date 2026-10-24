@@ -4368,18 +4368,16 @@ Drücken Sie &apos;Zurücksetzen&apos;, um alle Meldungen wieder sichtbar zu sch
         <translation>Benutzerdefiniert:</translation>
     </message>
     <message>
-        <source>Detect codepage for: .html, .rc, .xml
-Restart required.</source>
-        <translation>Codeseite für folgende Dateien ermitteln: .html, .rc, .xml
-Benötigt einen Neustart des Programmes.</translation>
+        <source>Detect codepage for: .html, .rc, .xml</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Detect codepage for: .html, .rc, .xml
+Restart required.&quot;.</translatorcomment>
+        <translation>Codeseite für folgende Dateien ermitteln: .html, .rc, .xml</translation>
     </message>
     <message>
-        <source>Detect codepage for files with ICU
-Restart required.</source>
+        <source>Detect codepage for files with ICU</source>
         <translatorcomment>After WinMerge&apos;s &quot;Detect codepage for files with mlang.dll
 Restart required.&quot;.</translatorcomment>
-        <translation>Codeseite für Textdateien mit Hilfe von ICU ermitteln
-Benötigt einen Neustart des Programmes.</translation>
+        <translation>Codeseite für Textdateien mit Hilfe von ICU ermitteln</translation>
     </message>
     <message>
         <source>Auto-Select</source>

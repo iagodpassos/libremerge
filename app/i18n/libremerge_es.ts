@@ -4369,18 +4369,16 @@ Por favor, use valores entre 1 y %1.</translation>
         <translation>Codificación personalizada:</translation>
     </message>
     <message>
-        <source>Detect codepage for: .html, .rc, .xml
-Restart required.</source>
-        <translation>Detectar codificación para estos tipos de archivos: .html, .rc, .xml
-Necesita reiniciar sesión.</translation>
+        <source>Detect codepage for: .html, .rc, .xml</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Detect codepage for: .html, .rc, .xml
+Restart required.&quot;.</translatorcomment>
+        <translation>Detectar codificación para estos tipos de archivos: .html, .rc, .xml</translation>
     </message>
     <message>
-        <source>Detect codepage for files with ICU
-Restart required.</source>
+        <source>Detect codepage for files with ICU</source>
         <translatorcomment>After WinMerge&apos;s &quot;Detect codepage for files with mlang.dll
 Restart required.&quot;.</translatorcomment>
-        <translation>Detectar codificación para archivos de texto usando ICU
-Necesita reiniciar sesión.</translation>
+        <translation>Detectar codificación para archivos de texto usando ICU</translation>
     </message>
     <message>
         <source>Auto-Select</source>

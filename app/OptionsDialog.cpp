@@ -775,12 +775,14 @@ QWidget *OptionsDialog::buildCodepagePage()
 	connect(m_radCodepage[2], &QRadioButton::toggled,
 		m_cmbCustomCodepage, &QWidget::setEnabled);
 
+	// without upstream's "Restart required.": the detection applies to the
+	// next file opened, here as in WinMerge
 	m_chkDetectCodepage = new QCheckBox(
-		tr("Detect codepage for: .html, .rc, .xml\nRestart required."), page);
+		tr("Detect codepage for: .html, .rc, .xml"), page);
 	m_chkDetectCodepage->setObjectName(QStringLiteral("detectCodepage"));
 	box->addWidget(m_chkDetectCodepage);
 	m_chkDetectCodepage2 = new QCheckBox(
-		tr("Detect codepage for files with ICU\nRestart required."), page);
+		tr("Detect codepage for files with ICU"), page);
 	m_chkDetectCodepage2->setObjectName(QStringLiteral("detectCodepage2"));
 	box->addWidget(m_chkDetectCodepage2);
 	// the language the detector picks among, mlang's auto-select types

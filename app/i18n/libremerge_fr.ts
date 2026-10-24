@@ -4355,18 +4355,16 @@ Vérification de l&apos;identité binaire...</translation>
         <translation>Page de code personnalisée :</translation>
     </message>
     <message>
-        <source>Detect codepage for: .html, .rc, .xml
-Restart required.</source>
-        <translation>Détecter la page de code pour les fichiers .html, .rc et .xml
-Redémarrage requis.</translation>
+        <source>Detect codepage for: .html, .rc, .xml</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Detect codepage for: .html, .rc, .xml
+Restart required.&quot;.</translatorcomment>
+        <translation>Détecter la page de code pour les fichiers .html, .rc et .xml</translation>
     </message>
     <message>
-        <source>Detect codepage for files with ICU
-Restart required.</source>
+        <source>Detect codepage for files with ICU</source>
         <translatorcomment>After WinMerge&apos;s &quot;Detect codepage for files with mlang.dll
 Restart required.&quot;.</translatorcomment>
-        <translation>Détecter la page de code pour les fichiers avec ICU
-Redémarrage requis.</translation>
+        <translation>Détecter la page de code pour les fichiers avec ICU</translation>
     </message>
     <message>
         <source>Auto-Select</source>

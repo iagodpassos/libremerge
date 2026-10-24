@@ -3866,16 +3866,12 @@ Checando identidade binária...</translation>
         <translation>Página de código personalizada:</translation>
     </message>
     <message>
-        <source>Detect codepage for: .html, .rc, .xml
-Restart required.</source>
-        <translation>Detectar página de código para: .html, .rc, .xml 
-Reinicialização necessária.</translation>
+        <source>Detect codepage for: .html, .rc, .xml</source>
+        <translation>Detectar página de código para: .html, .rc, .xml</translation>
     </message>
     <message>
-        <source>Detect codepage for files with ICU
-Restart required.</source>
-        <translation>Detectar página de código para arquivos com o ICU
-Reinicialização necessária.</translation>
+        <source>Detect codepage for files with ICU</source>
+        <translation>Detectar página de código para arquivos com o ICU</translation>
     </message>
     <message>
         <source>Auto-Select</source>
