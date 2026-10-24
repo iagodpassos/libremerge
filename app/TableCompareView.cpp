@@ -411,14 +411,16 @@ public:
 	{
 		if (!valid(pane, lineIndex))
 			return EOL_NONE;
-		// the file's line ending, which every row of a side shares here;
-		// the last row has none when the file ends without one
+		// the row's ending, the file's unless its rows end in more than
+		// one way; the last row has none when the file ends without one
 		const Side &side = m_view->m_sides[pane];
-		if (!side.hadFinalEol && m_realIndex[pane][lineIndex] == m_realCount[pane] - 1)
+		const int real = m_realIndex[pane][lineIndex];
+		if (!side.hadFinalEol && real == m_realCount[pane] - 1)
 			return EOL_NONE;
-		if (side.eol == QStringLiteral("\r\n"))
+		const QString eol = m_view->rowEol(pane, real);
+		if (eol == QStringLiteral("\r\n"))
 			return EOL_CRLF;
-		return side.eol == QStringLiteral("\r") ? EOL_CR : EOL_LF;
+		return eol == QStringLiteral("\r") ? EOL_CR : EOL_LF;
 	}
 
 private:
@@ -829,6 +831,7 @@ bool TableCompareView::compare(const QStringList &paths, QString *error)
 			m_sides[side].cells.push_back(splitRow(line, m_sides[side].props));
 	}
 
+	suggestIgnoreEol();
 	if (!runDiff(error))
 		return false;
 	m_current = -1;
@@ -847,6 +850,8 @@ bool TableCompareView::loadSide(int side, const QString &path,
 		Side &s = m_sides[side];
 		s = Side();
 		s.unicoding = ucr::UTF8;
+		// upstream's InitNew: one line, without a line ending
+		s.hadFinalEol = false;
 		return true;
 	}
 	// taken before the content: a change made while reading shows later
@@ -867,6 +872,7 @@ bool TableCompareView::loadSide(int side, const QString &path,
 	s.codepage = file.GetCodepage();
 	s.bom = file.HasBom();
 	s.rawLines.clear();
+	s.rowEols.clear();
 	s.cells.clear();
 
 	int crlf = 0, lf = 0, cr = 0;
@@ -883,10 +889,17 @@ bool TableCompareView::loadSide(int side, const QString &path,
 	{
 		const QString text =
 			QString::fromUtf8(line.data(), static_cast<int>(line.size()));
+		// a row ends as its last line does
 		if (inQuote)
+		{
 			s.rawLines.last().append(pendingEol + text);
+			s.rowEols.last() = QString::fromStdString(eol);
+		}
 		else
+		{
 			s.rawLines.append(text);
+			s.rowEols.append(QString::fromStdString(eol));
+		}
 		if (joinLines)
 		{
 			for (const QChar c : text)
@@ -902,6 +915,7 @@ bool TableCompareView::loadSide(int side, const QString &path,
 	file.Close();
 
 	s.hadFinalEol = s.rawLines.isEmpty() ? false : lastHadEol;
+	s.mixedEol = (crlf > 0) + (lf > 0) + (cr > 0) > 1;
 	if (crlf >= lf && crlf >= cr && crlf > 0)
 		s.eol = QStringLiteral("\r\n");
 	else if (cr > lf)
@@ -910,6 +924,36 @@ bool TableCompareView::loadSide(int side, const QString &path,
 		s.eol = QStringLiteral("\n");
 	s.modified = false;
 	return true;
+}
+
+QString TableCompareView::rowEol(int side, int row) const
+{
+	const Side &s = m_sides[side];
+	if (s.mixedEol && row >= 0 && row < s.rowEols.size() && !s.rowEols.at(row).isEmpty())
+		return s.rowEols.at(row);
+	return s.eol;
+}
+
+/** As in the text compare (FileCompareView::suggestIgnoreEol): with
+    "Ignore carriage return differences" off, files that end their lines
+    in different ways bring up upstream's question first. */
+void TableCompareView::suggestIgnoreEol()
+{
+	if (m_ignoreEol || lm::currentDiffOptions().bIgnoreEol)
+		return;
+	const auto style = [this](int side) {
+		return m_sides[side].mixedEol ? QStringLiteral("mixed") : m_sides[side].eol;
+	};
+	bool differ = false;
+	for (int side = 1; side < m_paneCount; ++side)
+		differ = differ || style(side) != style(0);
+	bool remembered = false;
+	if (!differ || !lm::askSuggestIgnoreEol(this, &remembered))
+		return;
+	m_ignoreEol = true;
+	if (remembered)
+		if (COptionsMgr *mgr = GetOptionsMgr())
+			mgr->SaveOption(OPT_CMP_IGNORE_EOL, true);
 }
 
 bool TableCompareView::runDiff(QString *error)
@@ -925,11 +969,12 @@ bool TableCompareView::runDiff(QString *error)
 				*error = tr("cannot create temporary file");
 			return false;
 		}
-		// every row goes with its line ending, the last one too (see the
-		// text compare's runDiff); the line breaks inside a row go escaped,
-		// so that a row stays one line (DiffTextBuffer's SaveToFile for a
-		// table's temporary file)
-		QStringList rows = m_sides[i].rawLines;
+		// every row goes with its line ending, as the text compare hands
+		// its lines (the last row's only when the file ends with one); the
+		// line breaks inside a row go escaped, so that a row stays one line
+		// (DiffTextBuffer's SaveToFile for a table's temporary file)
+		const Side &s = m_sides[i];
+		QStringList rows = s.rawLines;
 		if (m_sides[i].props.allowNewlinesInQuotes)
 			for (QString &row : rows)
 			{
@@ -937,9 +982,13 @@ bool TableCompareView::runDiff(QString *error)
 				row.replace(QLatin1Char('\r'), QStringLiteral("\x1br"));
 				row.replace(QLatin1Char('\n'), QStringLiteral("\x1bn"));
 			}
-		QByteArray bytes = rows.join(QChar('\n')).toUtf8();
-		if (!rows.isEmpty())
-			bytes.append('\n');
+		QByteArray bytes;
+		for (int k = 0; k < rows.size(); ++k)
+		{
+			bytes += rows.at(k).toUtf8();
+			if (k + 1 < rows.size() || s.hadFinalEol)
+				bytes += rowEol(i, k).toUtf8();
+		}
 		temp[i].write(bytes);
 		temp[i].flush();
 		paths.SetPath(i, temp[i].fileName().toStdString(), false);
@@ -947,6 +996,8 @@ bool TableCompareView::runDiff(QString *error)
 
 	CDiffWrapper wrapper;
 	DIFFOPTIONS options = lm::currentDiffOptions();
+	if (m_ignoreEol)
+		options.bIgnoreEol = true;
 	DiffList diffList;
 	wrapper.SetCreateDiffList(&diffList);
 	// CMergeDoc::Rescan: the plugins as the options have them, over the
@@ -1840,8 +1891,10 @@ void TableCompareView::selectDiffAtCursor()
 TableCompareView::UndoEntry TableCompareView::captureEntry(int side,
 	int viewBegin) const
 {
-	return { side, m_sides[side].rawLines, m_sides[side].modified,
+	UndoEntry entry { side, m_sides[side].rawLines, m_sides[side].modified,
 		m_saveSerial[side], viewBegin };
+	entry.eols = m_sides[side].rowEols;
+	return entry;
 }
 
 /** Swap the given side's live content with the snapshot (WinMerge's
@@ -1851,6 +1904,7 @@ void TableCompareView::applyEntry(const UndoEntry &entry)
 {
 	Side &side = m_sides[entry.side];
 	side.rawLines = entry.lines;
+	side.rowEols = entry.eols;
 	side.cells.clear();
 	for (const QString &line : side.rawLines)
 		side.cells.push_back(splitRow(line, side.props));
@@ -1993,6 +2047,7 @@ void TableCompareView::editCell(int side, int modelRow, int column, const QStrin
 		pushUndo(entry);
 		const QString line = withCell(QString(), s.props, column, rawValue(value, s.props, false));
 		s.rawLines.insert(insertAt, line);
+		s.rowEols.insert(insertAt, s.eol);
 		s.cells.insert(s.cells.begin() + insertAt, splitRow(line, s.props));
 		real = insertAt;
 	}
@@ -2058,16 +2113,27 @@ bool TableCompareView::copySelectedCells(int sourceSide, int targetSide)
 		for (auto it = blocks.rbegin(); it != blocks.rend(); ++it)
 		{
 			const Block &block = m_blocks[*it];
+			// the rows take their line endings along
 			QStringList rows;
+			QStringList eols;
 			for (int row = block.begin[sourceSide];
 				row <= block.end[sourceSide] && row < from.rawLines.size(); ++row)
+			{
 				rows.append(from.rawLines.at(qMax(0, row)));
+				eols.append(rowEol(sourceSide, qMax(0, row)));
+			}
 			const int first = block.begin[targetSide];
 			const int count = qMax(0, block.end[targetSide] - block.begin[targetSide] + 1);
 			for (int k = 0; k < count; ++k)
+			{
 				to.rawLines.removeAt(first);
+				to.rowEols.removeAt(first);
+			}
 			for (int k = 0; k < rows.size(); ++k)
+			{
 				to.rawLines.insert(first + k, rows.at(k));
+				to.rowEols.insert(first + k, eols.at(k));
+			}
 		}
 		to.cells.clear();
 		for (const QString &line : to.rawLines)
@@ -2153,19 +2219,31 @@ void TableCompareView::copyCurrentDiff(int sourceSide, int targetSide)
 	const Block block = m_blocks[m_current];
 	pushUndo(captureEntry(target, block.viewBegin));
 
+	// the rows take their line endings along
 	QStringList newLines;
+	QStringList newEols;
 	for (int row = block.begin[sourceSide];
 		row <= block.end[sourceSide]
 			&& row < m_sides[sourceSide].rawLines.size(); ++row)
+	{
 		newLines.append(m_sides[sourceSide].rawLines.at(qMax(0, row)));
+		newEols.append(rowEol(sourceSide, qMax(0, row)));
+	}
 
 	QStringList &lines = m_sides[target].rawLines;
+	QStringList &eols = m_sides[target].rowEols;
 	const int first = block.begin[target];
 	const int count = qMax(0, block.end[target] - block.begin[target] + 1);
 	for (int k = 0; k < count; ++k)
+	{
 		lines.removeAt(first);
+		eols.removeAt(first);
+	}
 	for (int k = 0; k < newLines.size(); ++k)
+	{
 		lines.insert(first + k, newLines.at(k));
+		eols.insert(first + k, newEols.at(k));
+	}
 	m_sides[target].cells.clear();
 	for (const QString &line : lines)
 		m_sides[target].cells.push_back(splitRow(line, m_sides[target].props));
@@ -2220,6 +2298,9 @@ void TableCompareView::copyAllFrom(int sourceSide, int targetSide)
 	}
 	pushUndo(captureEntry(target, 0));
 	m_sides[target].rawLines = m_sides[sourceSide].rawLines;
+	m_sides[target].rowEols.clear();
+	for (int row = 0; row < m_sides[sourceSide].rawLines.size(); ++row)
+		m_sides[target].rowEols.append(rowEol(sourceSide, row));
 	// the rows read by the target's own delimiter and quote
 	m_sides[target].cells.clear();
 	for (const QString &line : m_sides[target].rawLines)
@@ -2409,12 +2490,13 @@ bool TableCompareView::saveModified(QString *error)
 		file.SetCodepage(s.codepage);
 		file.SetBom(s.bom);
 		file.WriteBom();
-		const std::string eol = s.eol.toStdString();
+		// each row ends as the file does, or as its own in a file of
+		// mixed endings
 		for (int i = 0; i < s.rawLines.size(); ++i)
 		{
 			file.WriteString(s.rawLines.at(i).toStdString());
 			if (i + 1 < s.rawLines.size() || s.hadFinalEol)
-				file.WriteString(eol);
+				file.WriteString(rowEol(side, i).toStdString());
 		}
 		file.Close();
 		lm::restoreFileTime(s.path, originalTime);

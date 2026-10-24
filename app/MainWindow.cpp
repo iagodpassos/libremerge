@@ -1705,6 +1705,8 @@ void MainWindow::showOptions()
 				file->refreshEditorOptions();
 				file->refreshDiffOptions();
 			}
+			else if (auto *table = qobject_cast<TableCompareView *>(m_tabs->widget(i)))
+				table->refreshDiffOptions();
 		applyDiffOptions();
 	}
 }

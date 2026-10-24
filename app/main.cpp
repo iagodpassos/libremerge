@@ -11468,6 +11468,51 @@ int main(int argc, char *argv[])
 				"untitled: its line has no line break");
 		}
 
+		// the table compare likewise: rows of mixed endings kept and taken
+		// along, and the question for files that end their rows otherwise
+		const QString leftTable = dir.filePath(QStringLiteral("left.csv"));
+		const QString rightTable = dir.filePath(QStringLiteral("right.csv"));
+		write(leftTable, "id,name\r\n1,a\n2,b\r\n");
+		write(rightTable, "id,name\r\n1,a\r\n2,b\n");
+		{
+			TableCompareView view;
+			if (!view.compare(leftTable, rightTable, &error))
+				return 2;
+			check(asked.isEmpty() && view.mixedEolForTest(0) && view.mixedEolForTest(1)
+					&& view.diffCount() == 1 && view.diffRowsForTest() == QList<int>({ 1, 2 }),
+				"table, mixed endings: no question, rows that end otherwise differ");
+			view.copyAllFrom(1, 0);
+			check(view.saveModified(&error) && read(leftTable) == read(rightTable),
+				"table, mixed endings: the rows copied in take theirs along");
+			view.undo();
+			check(view.saveModified(&error) && read(leftTable) == "id,name\r\n1,a\n2,b\r\n",
+				"table, mixed endings: undone and saved with each row's own");
+		}
+		write(leftTable, "id\r\n1\r\n");
+		write(rightTable, "id\n1\n");
+		{
+			TableCompareView view;
+			if (!view.compare(leftTable, rightTable, &error))
+				return 2;
+			check(asked == QStringList({ question }) && !view.ignoresEolForTest()
+					&& view.diffCount() == 1 && view.diffRowsForTest() == QList<int>({ 0, 1 }),
+				"table, Win against Unix: asked, No leaves every row different");
+		}
+		answer = true;
+		{
+			TableCompareView view;
+			if (!view.compare(leftTable, rightTable, &error))
+				return 2;
+			check(asked.size() == 2 && view.ignoresEolForTest() && view.diffCount() == 0,
+				"table, Win against Unix: Yes treats them as the same");
+			view.refreshDiffOptions();
+			view.recompare();
+			check(!view.ignoresEolForTest() && view.diffCount() == 1,
+				"table: the options again, and the Yes goes");
+		}
+		answer = false;
+		asked.clear();
+
 		lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
 		printf("eol: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;

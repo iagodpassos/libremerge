@@ -107,6 +107,14 @@ public:
 	    is selected again. Nothing is touched when a file cannot be
 	    read. */
 	bool reload(QString *error);
+	/** CMergeDoc::RefreshOptions: the comparison takes the options as
+	    they are, a Yes to the question about line endings going. */
+	void refreshDiffOptions() { m_ignoreEol = false; }
+	/** Whether a side's file ends its rows in more than one way, and
+	    whether this comparison treats line endings as the same (for
+	    tests). */
+	bool mixedEolForTest(int side) const { return m_sides[side].mixedEol; }
+	bool ignoresEolForTest() const { return m_ignoreEol; }
 	/** The first side's file that another application changed since it
 	    was loaded or saved here (CheckFileChanged); empty when none. */
 	QString changedPathOnDisk() const;
@@ -182,11 +190,15 @@ private:
 		int codepage = 65001;
 		bool bom = false;
 		QString eol = QStringLiteral("\n");
+		/** The rows end in more than one way (upstream's
+		    CRLFSTYLE::MIXED): each keeps its own ending. */
+		bool mixedEol = false;
 		bool hadFinalEol = true;
 		bool modified = false;
 		lm::FileStamp stamp;                  // the file as loaded or last saved
 		lm::TableProps props;                 // delimiter and quote, by the Table options
 		QStringList rawLines;                 // file content, one per row
+		QStringList rowEols;                  // each row's line ending, beside it
 		std::vector<QStringList> cells;       // parsed per row
 	};
 
@@ -202,6 +214,7 @@ private:
 		int viewBegin;    // where the change was, to reselect
 		int realRow = -1; // an edited cell's row and column, to go back to
 		int column = -1;
+		QStringList eols; // the rows' line endings
 	};
 
 	class LineProvider;
@@ -211,6 +224,12 @@ private:
 	/** The rows a cell of several lines makes taller, as tall on both sides. */
 	void fitRowHeights();
 	bool runDiff(QString *error);
+	/** The line ending a row is saved with: its own in a file of mixed
+	    endings, the file's otherwise. */
+	QString rowEol(int side, int row) const;
+	/** CMergeDoc::OpenDocs' question about files whose lines end
+	    otherwise. */
+	void suggestIgnoreEol();
 	void rebuildModel();
 	void hideLines();
 	bool blockFiltered(int blockIndex) const;
@@ -292,6 +311,7 @@ private:
 	int m_diffCount = 0;
 	int m_current = -1;
 	bool m_syncing = false;
+	bool m_ignoreEol = false; // Yes to the question, for this comparison
 
 	friend class TableSideModel;
 };
