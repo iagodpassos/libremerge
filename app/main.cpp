@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // LibreMerge: Qt application entry point.
 #include <functional>
+#include <memory>
+#include <optional>
 #include <QHash>
 #include <QApplication>
 #include <QClipboard>
@@ -29,6 +31,7 @@
 #include <QStyleHints>
 #include <QToolTip>
 #include <QTemporaryDir>
+#include <QProcess>
 #include <QAbstractItemView>
 #include <QComboBox>
 #include <QCompleter>
@@ -67,6 +70,7 @@
 #include "SyntaxColors.h"
 #include "TableCompareView.h"
 #include "TableFiles.h"
+#include "Settings.h"
 #include "ImageCompareView.h"
 #include "ImageFormats.h"
 #include "BinaryFiles.h"
@@ -202,6 +206,59 @@ bool writeTestArchive(const QString &path, bool tarGz,
 	return ok;
 }
 
+/** A run for the selftests or the screenshots, which keep Qt's parser
+    and switches of their own. */
+bool isTestRun(int argc, char *argv[])
+{
+	for (int i = 1; i < argc; ++i)
+		if (std::strncmp(argv[i], "--selftest", 10) == 0
+			|| std::strncmp(argv[i], "--screenshot", 12) == 0)
+			return true;
+	return false;
+}
+
+/** Where a run keeps its settings: the saved ones; none read and none
+    kept (-noprefs); or those of an INI file (-inifile), which the run
+    works on a copy of and writes back as it ends. */
+class RunSettings
+{
+public:
+	explicit RunSettings(const lm::CommandLine &cmd)
+	{
+		if (!cmd.noPrefs && cmd.iniFile.isEmpty())
+			return;
+		m_dir = std::make_unique<QTemporaryDir>();
+		QSettings::setDefaultFormat(QSettings::IniFormat);
+		QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_dir->path());
+		if (cmd.noPrefs)
+			return;
+		m_iniFile = cmd.iniFile;
+		const QString working = QSettings().fileName();
+		QDir().mkpath(QFileInfo(working).path());
+		if (QFile::exists(m_iniFile))
+			QFile::copy(m_iniFile, working);
+	}
+
+	/** The INI file again, with what the run saved. */
+	void writeBack()
+	{
+		if (m_iniFile.isEmpty())
+			return;
+		QSettings settings;
+		settings.sync();
+		const QString working = settings.fileName();
+		if (!QFile::exists(working))
+			return;
+		QDir().mkpath(QFileInfo(m_iniFile).path());
+		QFile::remove(m_iniFile);
+		QFile::copy(working, m_iniFile);
+	}
+
+private:
+	std::unique_ptr<QTemporaryDir> m_dir;
+	QString m_iniFile;
+};
+
 /** A run that is no test: WinMerge's command line, read and opened
     (CMergeApp::InitInstance, ParseArgsAndDoOpen). */
 int runCommandLine(const lm::CommandLine &cmd)
@@ -229,6 +286,9 @@ int runCommandLine(const lm::CommandLine &cmd)
 		lm::useFileFilterMask(cmd.fileFilter);
 	if (cmd.compareMethod.has_value())
 		lm::useCompareMethod(*cmd.compareMethod);
+	// no message box waits for anybody (-noninteractive)
+	if (cmd.nonInteractive)
+		lm::setUnattended(true);
 	// a dialog alone (ShowDialog)
 	if (cmd.dialogType == lm::CommandLine::DialogType::Options)
 	{
@@ -257,7 +317,15 @@ int runCommandLine(const lm::CommandLine &cmd)
 		window.showMaximized();
 	else
 		window.show();
-	return QApplication::exec();
+	const int status = QApplication::exec();
+	// -enableexitcode: the last comparison's result, 0 identical, 1
+	// different, 2 an error or none (ConvertLastCompareResultToExitCode)
+	if (cmd.enableExitCode)
+	{
+		const int result = window.lastCompareResult();
+		return result == 0 ? 0 : (result > 0 ? 1 : 2);
+	}
+	return status;
 }
 
 } // namespace
@@ -269,6 +337,25 @@ int main(int argc, char *argv[])
 	const int integration = lm::runDesktopIntegrationCommand(argc, argv);
 	if (integration >= 0)
 		return integration;
+
+	// an unattended run (-noninteractive) needs no screen: it runs on Qt's
+	// offscreen platform where it is there, so that it works without a
+	// display and flashes no window
+	const bool testRun = isTestRun(argc, argv);
+	if (!testRun && !qEnvironmentVariableIsSet("QT_QPA_PLATFORM"))
+	{
+		QStringList arguments;
+		for (int i = 1; i < argc; ++i)
+			arguments.append(QString::fromLocal8Bit(argv[i]));
+		if (lm::CommandLine::parse(arguments).nonInteractive)
+		{
+#ifdef Q_OS_MACOS
+			qputenv("QT_QPA_PLATFORM", "offscreen;cocoa");
+#else
+			qputenv("QT_QPA_PLATFORM", "offscreen;wayland;xcb");
+#endif
+		}
+	}
 
 	QApplication app(argc, argv);
 	QGuiApplication::setDesktopFileName(QStringLiteral("libremerge"));
@@ -302,6 +389,15 @@ int main(int argc, char *argv[])
 			FiltersDialog::setEditorForTest([](const QString &) {});
 			break;
 		}
+	}
+	// WinMerge's command line, read before any setting is: -noprefs and
+	// -inifile say where the settings are
+	std::optional<lm::CommandLine> commandLine;
+	std::unique_ptr<RunSettings> runSettings;
+	if (!testRun)
+	{
+		commandLine = lm::CommandLine::parse(QCoreApplication::arguments().mid(1));
+		runSettings = std::make_unique<RunSettings>(*commandLine);
 	}
 	// the folder scan runs the engine on QtConcurrent's pool; the engine
 	// expects Windows' 1 MiB thread stacks and macOS gives 512 KiB, so use
@@ -339,15 +435,11 @@ int main(int argc, char *argv[])
 
 	// WinMerge's command line, but for the selftests and the screenshots,
 	// which keep Qt's parser and its own switches
+	if (commandLine.has_value())
 	{
-		const QStringList arguments = QCoreApplication::arguments().mid(1);
-		const bool testRun = std::any_of(arguments.cbegin(), arguments.cend(),
-			[](const QString &argument) {
-				return argument.startsWith(QStringLiteral("--selftest"))
-					|| argument.startsWith(QStringLiteral("--screenshot"));
-			});
-		if (!testRun)
-			return runCommandLine(lm::CommandLine::parse(arguments));
+		const int status = runCommandLine(*commandLine);
+		runSettings->writeBack();
+		return status;
 	}
 
 	QCommandLineParser parser;
@@ -11453,12 +11545,24 @@ int main(int argc, char *argv[])
 				QStringLiteral("-t"), QStringLiteral("web"), QStringLiteral("-l"), QStringLiteral("0"),
 				QStringLiteral("-xyz"), QStringLiteral("--new"), QStringLiteral("-new"), QStringLiteral("-?") });
 			check(cmd.paths.isEmpty()
-					&& cmd.unsupported == QStringList({ QStringLiteral("-o"), QStringLiteral("-r"),
-						QStringLiteral("-noninteractive"), QStringLiteral("-t webpage") })
+					&& cmd.unsupported == QStringList({ QStringLiteral("-r"), QStringLiteral("-t webpage") })
 					&& cmd.errors == QStringList({ QStringLiteral("Invalid line number specified"),
 						QStringLiteral("Unknown option '-xyz'") })
 					&& cmd.newCompare && cmd.showUsage,
 				"read: Windows' own taken in silence, the others told, values not taken for paths");
+		}
+		{
+			const Cmd cmd = parse({ QStringLiteral("-noninteractive"), QStringLiteral("-EnableExitCode"),
+				QStringLiteral("-noprefs"), QStringLiteral("-o"), QStringLiteral("out.txt"),
+				QStringLiteral("-inifile"), QStringLiteral("opts.ini") });
+			check(cmd.nonInteractive && cmd.enableExitCode && cmd.noPrefs
+					&& cmd.outputPath == QDir::current().absoluteFilePath(QStringLiteral("out.txt"))
+					&& cmd.iniFile == QDir::current().absoluteFilePath(QStringLiteral("opts.ini"))
+					&& cmd.paths.isEmpty() && cmd.unsupported.isEmpty() && cmd.errors.isEmpty(),
+				"read: the switches of an unattended run");
+			check(!parse({ QStringLiteral("-noninteractive"), QStringLiteral("-show-dialog"),
+					QStringLiteral("about") }).nonInteractive,
+				"read: a dialog shown alone is no unattended run");
 		}
 		// options by name, for this run
 		{
@@ -11471,6 +11575,18 @@ int main(int argc, char *argv[])
 					&& options.bIgnoreCase && options.bIgnoreBlankLines,
 				"options by their name or the end of it, an unknown one told");
 			lm::setCompareOptionsForTest(0);
+			// and those LibreMerge keeps itself, by WinMerge's names, until
+			// the Options are saved
+			const QStringList unknownToo = lm::useOptions({
+				{ QStringLiteral("Settings/ScrollToFirst"), QStringLiteral("1") },
+				{ QStringLiteral("PreserveFiletimes"), QStringLiteral("1") },
+				{ QStringLiteral("Settings/CSVDelimiterCharacter"), QStringLiteral(";") } });
+			const bool set = unknownToo.isEmpty() && OptionsDialog::scrollToFirstDiff()
+				&& OptionsDialog::preserveFileTime()
+				&& lm::TableSettings::load().csvDelimiter == QStringLiteral(";");
+			lm::forgetCommandLineSettings();
+			check(set && !OptionsDialog::scrollToFirstDiff() && !OptionsDialog::preserveFileTime(),
+				"-cfg: the options of the Options pages by WinMerge's names, for this run");
 		}
 
 		// opening
@@ -11581,6 +11697,78 @@ int main(int argc, char *argv[])
 			check(window.isVisible(), "-x: different files stay, and so does what opens next");
 		}
 		lm::setMessageSinkForTest([](const QString &) {});
+
+		// -o: a side saves to the output path, and goes on with it
+		{
+			const QString output = dir.filePath(QStringLiteral("merged.txt"));
+			MainWindow window;
+			window.openFromCommandLine(parse({ QStringLiteral("-o"), output, left, right }));
+			FileCompareView *view = fileView(window);
+			QString error;
+			if (view != nullptr)
+			{
+				view->typeAtForTest(0, 0, QStringLiteral("z"));
+				view->saveSideAt(0, &error);
+			}
+			QFile merged(output);
+			QFile original(left);
+			check(view != nullptr && merged.open(QIODevice::ReadOnly)
+					&& merged.readAll() == "za\nb\nc\n" && original.open(QIODevice::ReadOnly)
+					&& original.readAll() == "a\nb\nc\n" && view->paths().value(0) == output,
+				"-o: saved to the output path, the pane going on with it");
+		}
+
+		// unattended runs of LibreMerge itself (with -noprefs or -inifile,
+		// so that nothing of the user's is read or written): the exit code
+		// of identical, different and missing files and folders, the
+		// message on the terminal, and an INI file's options
+		const auto run = [](const QStringList &arguments, QByteArray *output = nullptr) {
+			QProcess process;
+			process.start(QCoreApplication::applicationFilePath(), arguments);
+			if (!process.waitForFinished(60000))
+			{
+				process.kill();
+				process.waitForFinished();
+				return -100;
+			}
+			if (output != nullptr)
+				*output = process.readAllStandardError();
+			return process.exitStatus() == QProcess::NormalExit ? process.exitCode() : -101;
+		};
+		const QStringList unattended = { QStringLiteral("-noninteractive"),
+			QStringLiteral("-enableexitcode"), QStringLiteral("-noprefs") };
+		const QString same = dir.filePath(QStringLiteral("same.txt"));
+		write(same, "a\nb\nc\n");
+		QByteArray said;
+		check(run(unattended + QStringList{ left, same }, &said) == 0
+				&& said.contains(QCoreApplication::translate("MessageBoxes",
+					"Selected files are identical (binary match).").toUtf8()),
+			"-noninteractive -enableexitcode: identical files exit 0, the message on the terminal");
+		check(run(unattended + QStringList{ left, right }) == 1, "different files exit 1");
+		check(run(unattended + QStringList{ left, dir.filePath(QStringLiteral("missing.txt")) }) == 2,
+			"a file that cannot be compared exits 2");
+		const QString folderA = dir.filePath(QStringLiteral("a"));
+		const QString folderB = dir.filePath(QStringLiteral("b"));
+		QDir().mkpath(folderA);
+		QDir().mkpath(folderB);
+		write(folderA + QStringLiteral("/x.txt"), "1\n");
+		write(folderB + QStringLiteral("/x.txt"), "1\n");
+		const int foldersSame = run(unattended + QStringList{ folderA, folderB });
+		write(folderB + QStringLiteral("/x.txt"), "2\n");
+		check(foldersSame == 0 && run(unattended + QStringList{ folderA, folderB }) == 1,
+			"folders: 0 when identical, 1 when not, once the comparison ends");
+		const QString upper = dir.filePath(QStringLiteral("upper.txt"));
+		write(upper, "A\nB\nC\n");
+		const QString ini = dir.filePath(QStringLiteral("options.ini"));
+		write(ini, "[Settings]\nIgnoreCase=true\n");
+		const QStringList withIni = { QStringLiteral("-noninteractive"),
+			QStringLiteral("-enableexitcode"), QStringLiteral("-inifile"), ini };
+		const int caseIgnored = run(withIni + QStringList{ left, upper });
+		QFile iniFile(ini);
+		check(caseIgnored == 0 && run(unattended + QStringList{ left, upper }) == 1
+				&& iniFile.open(QIODevice::ReadOnly) && iniFile.readAll().contains("IgnoreCase=true"),
+			"-inifile: its options read and kept; -noprefs: the defaults");
+
 		printf("command line: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}

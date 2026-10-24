@@ -1119,6 +1119,27 @@ void MainWindow::watchIdentical(QWidget *page)
 
 void MainWindow::reportIfIdentical(QWidget *page, bool opening)
 {
+	// the comparison's result, for the command line's -enableexitcode
+	{
+		int diffs = -1;
+		bool otherEncoding = false;
+		if (auto *file = qobject_cast<FileCompareView *>(page))
+		{
+			diffs = file->diffCount();
+			otherEncoding = file->encodingsDiffer();
+		}
+		else if (auto *table = qobject_cast<TableCompareView *>(page))
+		{
+			diffs = table->diffCount();
+			otherEncoding = table->encodingsDiffer();
+		}
+		else if (auto *image = qobject_cast<ImageCompareView *>(page))
+			diffs = image->diffCount();
+		else if (auto *hex = qobject_cast<HexCompareView *>(page))
+			diffs = hex->diffCount();
+		noteCompareResult(diffs == 0 && (!otherEncoding || lm::ignoreCodepageDifferences())
+			? 0 : 1);
+	}
 	// the command line's -x and -xq hold for the first comparison only
 	const lm::CommandLine::ExitNoDiff exitIfNoDiff =
 		opening ? m_exitIfNoDiff : lm::CommandLine::ExitNoDiff::Disabled;
@@ -1172,6 +1193,26 @@ void MainWindow::reportIfIdentical(QWidget *page, bool opening)
 			exitIfNoDiff == lm::CommandLine::ExitNoDiff::Exit);
 	if (exitIfNoDiff != lm::CommandLine::ExitNoDiff::Disabled)
 		QTimer::singleShot(0, this, &QWidget::close);
+}
+
+void MainWindow::noteCompareResult(int result)
+{
+	m_lastCompareResult = result;
+}
+
+void MainWindow::closeWhenIdle()
+{
+	// IsReallyIdle: no folder comparison still running
+	auto *timer = new QTimer(this);
+	connect(timer, &QTimer::timeout, this, [this, timer]() {
+		for (int i = 0; i < m_tabs->count(); ++i)
+			if (auto *folder = qobject_cast<FolderCompareView *>(m_tabs->widget(i)))
+				if (folder->isComparing())
+					return;
+		timer->stop();
+		close();
+	});
+	timer->start(50);
 }
 
 void MainWindow::describeSides(QWidget *page, const QStringList &descriptions)
@@ -1272,13 +1313,28 @@ void MainWindow::openFromCommandLine(const lm::CommandLine &cmd)
 		// selector stays one Cmd+O away
 		openBlankComparison();
 	m_openingCommandLine = nullptr;
+	// unattended, LibreMerge closes once it compared (CMergeApp::OnIdle)
+	if (cmd.nonInteractive)
+		closeWhenIdle();
 
-	// the comparison just opened: the sides' descriptions, then the pane
-	// and the line it opens on (MoveOnLoad) and its language
+	// the comparison just opened: the sides' descriptions, where it
+	// saves, then the pane and the line it opens on (MoveOnLoad) and its
+	// language
 	QWidget *page = m_tabs->currentWidget();
 	if (page == nullptr || (page == before && m_tabs->count() == count))
 		return;
 	describeSides(page, descriptions);
+	if (!cmd.outputPath.isEmpty())
+	{
+		if (auto *file = qobject_cast<FileCompareView *>(page))
+			file->setSaveAsPath(cmd.outputPath);
+		else if (auto *table = qobject_cast<TableCompareView *>(page))
+			table->setSaveAsPath(cmd.outputPath);
+		else if (auto *image = qobject_cast<ImageCompareView *>(page))
+			image->setSaveAsPath(cmd.outputPath);
+		else if (auto *hex = qobject_cast<HexCompareView *>(page))
+			hex->setSaveAsPath(cmd.outputPath);
+	}
 	if (auto *file = qobject_cast<FileCompareView *>(page))
 	{
 		if (!cmd.fileExt.isEmpty())
@@ -1399,6 +1455,23 @@ bool MainWindow::promptAndSaveIfNeeded(QWidget *page, bool closing)
 {
 	if (!hasUnsavedChanges(page))
 		return true;
+	// an unattended run has nobody to answer and must end on its own: it
+	// writes what was merged to the output path it was given, when one
+	// side only changed (CMergeDoc::PromptAndSaveIfNeeded)
+	if (lm::unattended())
+	{
+		if (auto *file = qobject_cast<FileCompareView *>(page))
+		{
+			const QList<int> sides = file->modifiedSideIndexes();
+			if (!file->saveAsPath().isEmpty() && sides.size() == 1
+				&& !file->paths().value(sides.first()).isEmpty())
+			{
+				QString error;
+				file->saveSideAt(sides.first(), &error);
+			}
+		}
+		return true;
+	}
 	auto *view = qobject_cast<FileCompareView *>(page);
 	auto *table = qobject_cast<TableCompareView *>(page);
 	auto *image = qobject_cast<ImageCompareView *>(page);
@@ -1679,6 +1752,8 @@ void MainWindow::openFolderComparison(const QStringList &dirs)
 		}
 	auto *view = new FolderCompareView(this);
 	connect(view, &FolderCompareView::filtersRequested, this, &MainWindow::showFilters);
+	connect(view, &FolderCompareView::compared, this,
+		[this](int differences) { noteCompareResult(differences); });
 	connect(view, &FolderCompareView::openFileComparisonRequested, this,
 		[this, view](const QString &l, const QString &r) {
 			openFileComparison(l, r);
@@ -1757,6 +1832,8 @@ void MainWindow::openArchiveComparison(const QStringList &sources)
 
 	auto *view = new FolderCompareView(this);
 	connect(view, &FolderCompareView::filtersRequested, this, &MainWindow::showFilters);
+	connect(view, &FolderCompareView::compared, this,
+		[this](int differences) { noteCompareResult(differences); });
 	// pane headers show the path inside the archive, WinMerge's display
 	// roots, instead of the extraction temp path; folder sides keep their
 	// real paths
@@ -2141,8 +2218,10 @@ void MainWindow::handleEscape()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-	// WinMerge's "ask when closing multiple windows", off by default
-	if (OptionsDialog::askBeforeClosingMultipleTabs() && m_tabs->count() > 1)
+	// WinMerge's "ask when closing multiple windows", off by default; an
+	// unattended run has nobody to answer, and closes
+	if (OptionsDialog::askBeforeClosingMultipleTabs() && m_tabs->count() > 1
+		&& !lm::unattended())
 	{
 		const auto choice = lm::question(this, tr("LibreMerge"),
 			tr("Close all %1 comparison tabs?").arg(m_tabs->count()));

@@ -8,6 +8,7 @@
 #include <QStringList>
 
 #include "FileFilters.h"
+#include "Settings.h"
 
 namespace lm
 {
@@ -20,7 +21,7 @@ inline QString defaultBinaryFilePatterns()
 
 inline QString binaryFilePatterns()
 {
-	return QSettings().value(QStringLiteral("BinaryCompare/FilePatterns"),
+	return setting(QStringLiteral("BinaryCompare/FilePatterns"),
 		defaultBinaryFilePatterns()).toString();
 }
 

@@ -50,7 +50,9 @@ public:
 	void updateSavedItem(const QStringList &paths, int significantDiffs);
 
 	/** Whether the background comparison is still running (for tests). */
-	bool isComparingForTest() const { return m_job != nullptr; }
+	bool isComparingForTest() const { return isComparing(); }
+	/** A comparison is running. */
+	bool isComparing() const { return m_job != nullptr; }
 	/** Activate a row by file name, like a double click (for tests). */
 	void activateRowForTest(const QString &name);
 	/** The category role of a row by file name, -1 if absent (for
@@ -158,6 +160,9 @@ signals:
 	/** 3-way activation: the three paths, empty for a side the item is
 	    not on (opened as an untitled pane). */
 	void openFileComparison3Requested(const QStringList &paths);
+	/** A comparison ended (CDirView::Redisplay's SetLastCompareResult):
+	    how many items differ, or -1 when it failed or was stopped. */
+	void compared(int differences);
 
 protected:
 	/** Esc stops a running comparison, like CDirView; otherwise it goes

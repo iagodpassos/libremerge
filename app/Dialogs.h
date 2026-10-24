@@ -3,6 +3,8 @@
 
 #include <QMessageBox>
 
+#include "MessageBoxes.h"
+
 namespace lm
 {
 
@@ -16,6 +18,11 @@ inline QMessageBox::StandardButton question(QWidget *parent,
 	QMessageBox::StandardButtons buttons =
 		QMessageBox::Yes | QMessageBox::No)
 {
+	if (unattended())
+	{
+		reportUnattended(text, true);
+		return QMessageBox::Cancel;
+	}
 	QMessageBox box(QMessageBox::Question, title, text, buttons, parent);
 	box.setWindowModality(Qt::WindowModal);
 	return static_cast<QMessageBox::StandardButton>(box.exec());
@@ -24,6 +31,11 @@ inline QMessageBox::StandardButton question(QWidget *parent,
 inline void warning(QWidget *parent, const QString &title,
 	const QString &text)
 {
+	if (unattended())
+	{
+		reportUnattended(text, false);
+		return;
+	}
 	QMessageBox box(QMessageBox::Warning, title, text, QMessageBox::Ok,
 		parent);
 	box.setWindowModality(Qt::WindowModal);

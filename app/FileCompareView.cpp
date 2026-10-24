@@ -48,6 +48,7 @@
 #include "SyntaxHighlighter.h"
 #include "FileOps.h"
 #include "MessageBoxes.h"
+#include "Settings.h"
 #include "OptionsDialog.h"
 #include "Theme.h"
 
@@ -3002,16 +3003,19 @@ FileCompareView::SaveResult FileCompareView::saveSide(int side, QString *error)
 		emit pathsChanged();
 	}
 
-	const QDateTime originalTime = lm::timeToPreserve(s.path);
+	// the command line's output path takes what is saved, and the pane
+	// goes on with it once written (DoSave's m_strSaveAsPath)
+	const QString target = m_saveAsPath.isEmpty() ? s.path : m_saveAsPath;
+	const QDateTime originalTime = lm::timeToPreserve(target);
 
 	// like WinMerge (OPT_BACKUP_FILECMP, on by default): keep the
 	// original as <name>.bak next to it before overwriting
-	if (QSettings().value(QStringLiteral("Backup/FileCompare"), true).toBool()
-		&& QFile::exists(s.path))
+	if (lm::setting(QStringLiteral("Backup/FileCompare"), true).toBool()
+		&& QFile::exists(target))
 	{
-		const QString backupPath = s.path + QStringLiteral(".bak");
+		const QString backupPath = target + QStringLiteral(".bak");
 		QFile::remove(backupPath);
-		if (!QFile::copy(s.path, backupPath))
+		if (!QFile::copy(target, backupPath))
 		{
 			if (error != nullptr)
 				*error = tr("could not create the backup file %1")
@@ -3021,10 +3025,10 @@ FileCompareView::SaveResult FileCompareView::saveSide(int side, QString *error)
 	}
 
 	UniStdioFile file;
-	if (!file.OpenCreate(s.path.toStdString()))
+	if (!file.OpenCreate(target.toStdString()))
 	{
 		if (error != nullptr)
-			*error = tr("cannot write %1").arg(s.path);
+			*error = tr("cannot write %1").arg(target);
 		return SaveResult::Failed;
 	}
 	file.SetUnicoding(static_cast<ucr::UNICODESET>(s.unicoding));
@@ -3043,7 +3047,13 @@ FileCompareView::SaveResult FileCompareView::saveSide(int side, QString *error)
 			file.WriteString(eols.at(i).toStdString());
 	}
 	file.Close();
-	lm::restoreFileTime(s.path, originalTime);
+	lm::restoreFileTime(target, originalTime);
+	if (target != s.path)
+	{
+		s.path = target;
+		updateHeader(side);
+		emit pathsChanged();
+	}
 	// what is on disk now is this pane's content: no change to report
 	s.stamp = lm::fileStamp(s.path);
 	m_syncing = true;

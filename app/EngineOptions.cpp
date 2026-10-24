@@ -4,6 +4,7 @@
 // like "Settings/IgnoreSpace" map naturally onto QSettings groups.
 #include "pch.h"
 #include "EngineOptions.h"
+#include "Settings.h"
 
 #include <algorithm>
 #include <mutex>
@@ -429,7 +430,8 @@ QStringList useOptions(const QList<std::pair<QString, QString>> &options)
 		const String longName = mgr->ExpandShortName(key);
 		if (!longName.empty())
 			mgr->Set(longName, value.toStdString());
-		else
+		// the options LibreMerge keeps itself, by WinMerge's names
+		else if (!useSetting(name, value))
 			unknown.append(name);
 	}
 	return unknown;

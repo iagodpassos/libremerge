@@ -91,6 +91,13 @@ bool askOverwriteChangedFile(QWidget *parent, const QString &path);
     now, or leave it for later? */
 bool askRefreshFolderCompares(QWidget *parent);
 
+/** An unattended run (the command line's -noninteractive): no message
+    box opens, each one's text goes to the terminal and a question is
+    answered Cancel (CMergeApp::ShowMessageBox, OutputConsole). */
+void setUnattended(bool on);
+bool unattended();
+void reportUnattended(const QString &text, bool question);
+
 /** Collect the messages instead of showing them (for tests; pass an
     empty function to show them again). */
 void setMessageSinkForTest(std::function<void(const QString &)> sink);

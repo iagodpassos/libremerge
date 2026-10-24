@@ -9,6 +9,7 @@
 #include "HexDialogs.h"
 #include "ItemCheckStyle.h"
 #include "MessageBoxes.h"
+#include "Settings.h"
 #include "TableFiles.h"
 #include "Theme.h"
 
@@ -119,56 +120,56 @@ QLabel *noteLabel(const QString &text, QWidget *page)
 
 bool OptionsDialog::scrollToFirstDiff()
 {
-	return QSettings().value(kScrollFirst, false).toBool();
+	return lm::setting(kScrollFirst, false).toBool();
 }
 
 bool OptionsDialog::scrollToFirstInlineDiff()
 {
-	return QSettings().value(kScrollFirstInline, false).toBool();
+	return lm::setting(kScrollFirstInline, false).toBool();
 }
 
 bool OptionsDialog::showSelectorAtStartup()
 {
-	return QSettings().value(kShowSelector, false).toBool();
+	return lm::setting(kShowSelector, false).toBool();
 }
 
 bool OptionsDialog::askBeforeClosingMultipleTabs()
 {
-	return QSettings().value(kAskClose, false).toBool();
+	return lm::setting(kAskClose, false).toBool();
 }
 
 OptionsDialog::CloseWithEsc OptionsDialog::closeWithEsc()
 {
-	const int mode = QSettings().value(kCloseWithEsc, EscTabOrMainWindow).toInt();
+	const int mode = lm::setting(kCloseWithEsc, EscTabOrMainWindow).toInt();
 	return mode >= EscDisabled && mode <= EscMainWindowIfOneTab
 		? static_cast<CloseWithEsc>(mode) : EscTabOrMainWindow;
 }
 
 bool OptionsDialog::verifyOpenPaths()
 {
-	return QSettings().value(kVerifyPaths, true).toBool();
+	return lm::setting(kVerifyPaths, true).toBool();
 }
 
 bool OptionsDialog::preserveFileTime()
 {
-	return QSettings().value(kPreserveFileTime, false).toBool();
+	return lm::setting(kPreserveFileTime, false).toBool();
 }
 
 bool OptionsDialog::closeSelectorOnCompare()
 {
-	return QSettings().value(kCloseSelector, false).toBool();
+	return lm::setting(kCloseSelector, false).toBool();
 }
 
 OptionsDialog::AutoCompleteSource OptionsDialog::autoCompleteSource()
 {
-	const int source = QSettings().value(kAutoComplete, AutoCompleteFileSystem).toInt();
+	const int source = lm::setting(kAutoComplete, AutoCompleteFileSystem).toInt();
 	return source >= AutoCompleteDisabled && source <= AutoCompleteRecentList
 		? static_cast<AutoCompleteSource>(source) : AutoCompleteFileSystem;
 }
 
 OptionsDialog::AutoReload OptionsDialog::autoReloadModifiedFiles()
 {
-	const int mode = QSettings().value(kAutoReload, AutoReloadOnWindowActivated).toInt();
+	const int mode = lm::setting(kAutoReload, AutoReloadOnWindowActivated).toInt();
 	return mode >= AutoReloadDisabled && mode <= AutoReloadImmediately
 		? static_cast<AutoReload>(mode) : AutoReloadOnWindowActivated;
 }
@@ -713,15 +714,15 @@ QWidget *OptionsDialog::buildBackupPage()
 void OptionsDialog::load()
 {
 	QSettings settings;
-	m_chkScrollFirst->setChecked(settings.value(kScrollFirst, false).toBool());
+	m_chkScrollFirst->setChecked(lm::setting(kScrollFirst, false).toBool());
 	m_chkScrollFirstInline->setChecked(
-		settings.value(kScrollFirstInline, false).toBool());
+		lm::setting(kScrollFirstInline, false).toBool());
 	m_cmbCloseWithEsc->setCurrentIndex(closeWithEsc());
 	m_chkVerifyPaths->setChecked(verifyOpenPaths());
-	m_chkAskClose->setChecked(settings.value(kAskClose, false).toBool());
+	m_chkAskClose->setChecked(lm::setting(kAskClose, false).toBool());
 	m_chkPreserveFileTime->setChecked(preserveFileTime());
 	m_chkShowSelector->setChecked(
-		settings.value(kShowSelector, false).toBool());
+		lm::setting(kShowSelector, false).toBool());
 	m_chkCloseSelector->setChecked(closeSelectorOnCompare());
 	m_cmbAutoComplete->setCurrentIndex(autoCompleteSource());
 	m_cmbAutoReload->setCurrentIndex(autoReloadModifiedFiles());
@@ -730,7 +731,7 @@ void OptionsDialog::load()
 	const int langIndex =
 		m_cmbLanguage->findData(settings.value(kLanguage).toString());
 	m_cmbLanguage->setCurrentIndex(qMax(0, langIndex));
-	m_chkBackup->setChecked(settings.value(kBackup, true).toBool());
+	m_chkBackup->setChecked(lm::setting(kBackup, true).toBool());
 
 	if (COptionsMgr *mgr = GetOptionsMgr())
 	{
@@ -852,6 +853,8 @@ void OptionsDialog::save()
 		}
 		lm::setRememberedAnswer(item->data(0, Qt::UserRole).toString(), answer);
 	}
+	// the page showed what the command line set, and saved it
+	lm::forgetCommandLineSettings();
 }
 
 void OptionsDialog::showTableSettings(const lm::TableSettings &table)

@@ -182,7 +182,19 @@ than from one line of text:
 - `-s`, `-s-`, `-sw`, `-g`, `-show-compare-as-menu` and
   `-set-usertasks-to-jumplist` belong to Windows (one instance, the
   Explorer's menu, the jump list) and are taken without effect;
-- Qt's `--help` and `--version`, and LibreMerge's `--new`, keep working.
+- Qt's `--help` and `--version`, and LibreMerge's `--new`, keep working;
+- `-noninteractive` runs on Qt's offscreen platform where it is there
+  (the AppImage has it), so that it works without a display; a dialog
+  shown alone (`-show-dialog`) is no unattended run, as upstream's usage
+  is none;
+- `-noprefs` and `-inifile` take every setting along, the recent
+  comparisons and the window's state too, where upstream's take the
+  options only; the INI file is Qt's;
+- `-cfg` names the options of the Options pages that LibreMerge keeps
+  under keys of its own by WinMerge's names as well
+  (`app/Settings.cpp`);
+- unattended, closing does not ask before closing several tabs: upstream
+  answers that question Cancel and so never closes.
 
 ## Deliberately excluded (and why)
 

@@ -34,6 +34,7 @@
 #include "Icons.h"
 #include "LineFilterMenu.h"
 #include "MessageBoxes.h"
+#include "Settings.h"
 #include "NewComparisonView.h"
 #include "OptionsDialog.h"
 #include "TableFiles.h"
@@ -2483,13 +2484,16 @@ bool TableCompareView::saveModified(QString *error)
 			&& !lm::askOverwriteChangedFile(this, s.path))
 			continue;
 
-		const QDateTime originalTime = lm::timeToPreserve(s.path);
-		if (QSettings().value(QStringLiteral("Backup/FileCompare"), true).toBool()
-			&& QFile::exists(s.path))
+		// the command line's output path takes what is saved, and the
+		// side goes on with it once written (DoSave's m_strSaveAsPath)
+		const QString target = m_saveAsPath.isEmpty() ? s.path : m_saveAsPath;
+		const QDateTime originalTime = lm::timeToPreserve(target);
+		if (lm::setting(QStringLiteral("Backup/FileCompare"), true).toBool()
+			&& QFile::exists(target))
 		{
-			const QString backupPath = s.path + QStringLiteral(".bak");
+			const QString backupPath = target + QStringLiteral(".bak");
 			QFile::remove(backupPath);
-			if (!QFile::copy(s.path, backupPath))
+			if (!QFile::copy(target, backupPath))
 			{
 				if (error != nullptr)
 					*error = tr("could not create the backup file %1")
@@ -2499,10 +2503,10 @@ bool TableCompareView::saveModified(QString *error)
 		}
 
 		UniStdioFile file;
-		if (!file.OpenCreate(s.path.toStdString()))
+		if (!file.OpenCreate(target.toStdString()))
 		{
 			if (error != nullptr)
-				*error = tr("cannot write %1").arg(s.path);
+				*error = tr("cannot write %1").arg(target);
 			return false;
 		}
 		file.SetUnicoding(static_cast<ucr::UNICODESET>(s.unicoding));
@@ -2518,7 +2522,13 @@ bool TableCompareView::saveModified(QString *error)
 				file.WriteString(rowEol(side, i).toStdString());
 		}
 		file.Close();
-		lm::restoreFileTime(s.path, originalTime);
+		lm::restoreFileTime(target, originalTime);
+		if (target != s.path)
+		{
+			s.path = target;
+			updateHeader(side);
+			emit pathsChanged();
+		}
 		// what is on disk now is this side's content: no change to report
 		s.stamp = lm::fileStamp(s.path);
 		setSideModified(side, false);

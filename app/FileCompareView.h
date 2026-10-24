@@ -216,6 +216,10 @@ public:
 	/** The extension the text is colored by, and its comments told by,
 	    in place of the files' own (the command line's -fileext). */
 	void setFileExtension(const QString &extension);
+	/** Where a side is saved in place of its file (the command line's
+	    -o); the side goes on with that file once saved. */
+	void setSaveAsPath(const QString &path) { m_saveAsPath = path; }
+	QString saveAsPath() const { return m_saveAsPath; }
 	/** WinMerge's OnFileReload, past its save prompt: every pane is read
 	    from disk again (an untitled one emptied), the undo history goes
 	    and the cursor returns to the line it was on. Nothing is touched
@@ -453,6 +457,7 @@ private:
 	QStringList m_realEols[3];       // and their line endings
 	bool m_ignoreEol = false;        // Yes to the question, for this comparison
 	QString m_fileExt;               // the language's extension, by the command line
+	QString m_saveAsPath;            // where a side is saved, by the command line
 	/** The path the highlighting goes by: the file's, or one with the
 	    command line's extension. */
 	QString highlightPath(const QString &path) const;

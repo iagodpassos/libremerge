@@ -13,6 +13,7 @@ qt_add_executable(LibreMerge
   ${LM_APP_ICON}
   main.cpp
   CommandLine.cpp
+  Settings.cpp
   MainWindow.cpp
   MessageBoxes.cpp
   NewComparisonView.cpp

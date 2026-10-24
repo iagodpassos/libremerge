@@ -63,6 +63,9 @@ public:
 	    focus, line...), and what it asks of the window from then on
 	    (-e, -x). */
 	void openFromCommandLine(const lm::CommandLine &cmd);
+	/** The last comparison's result (CMergeApp::m_nLastCompareResult): 0
+	    identical, more when different, -1 an error or none yet. */
+	int lastCompareResult() const { return m_lastCompareResult; }
 
 	/** Route paths dropped on the window or opened via Finder/Dock. */
 	void handleIncomingPaths(const QStringList &paths);
@@ -153,6 +156,10 @@ private:
 	/** Name the sides of a comparison just opened, the ones given only,
 	    in its panes and its tab. */
 	void describeSides(QWidget *page, const QStringList &descriptions);
+	void noteCompareResult(int result);
+	/** Close once no folder comparison runs (the command line's
+	    -noninteractive, CMergeApp::OnIdle). */
+	void closeWhenIdle();
 	/** Reopen a recent comparison (folders or files). */
 	void reopenComparison(const QStringList &paths);
 
@@ -170,4 +177,5 @@ private:
 	bool m_escShutdown = false;
 	lm::CommandLine::ExitNoDiff m_exitIfNoDiff = lm::CommandLine::ExitNoDiff::Disabled;
 	const lm::CommandLine *m_openingCommandLine = nullptr; // while it opens
+	int m_lastCompareResult = -1;
 };

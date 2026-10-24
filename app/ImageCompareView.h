@@ -54,6 +54,9 @@ public:
 	    title show it instead of the file name, as "Original File" in a
 	    self-compare. */
 	void setSideDescription(int side, const QString &description);
+	/** Where a pane is saved in place of its file (the command line's
+	    -o); the pane goes on with that file once saved. */
+	void setSaveAsPath(const QString &path) { m_saveAsPath = path; }
 	/** WinMerge's ChangeFile, which the path bar calls: save what was
 	    changed (after asking), then open the images again with another
 	    one in one pane. */
@@ -187,6 +190,7 @@ private:
 	QString m_paths[3];
 	lm::FileStamp m_stamps[3]; // the files as loaded or last saved here
 	int m_paneCount = 2;
+	QString m_saveAsPath; // where a pane is saved, by the command line
 	int m_activePane = 0;
 	double m_zoom = 1.0;
 

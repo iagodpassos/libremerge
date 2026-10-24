@@ -18,6 +18,7 @@
 #include "HexView.h"
 #include "Icons.h"
 #include "MessageBoxes.h"
+#include "Settings.h"
 #include "NewComparisonView.h"
 #include "Theme.h"
 
@@ -599,12 +600,14 @@ bool HexCompareView::savePane(int pane, QString *error)
 		m_paths[pane] = chosen;
 		emit pathsChanged();
 	}
-	const QString path = m_paths[pane];
-	if (lm::fileChangedOnDisk(path, m_stamps[pane]) == lm::FileChange::Changed
-		&& !lm::askOverwriteChangedFile(this, path))
+	if (lm::fileChangedOnDisk(m_paths[pane], m_stamps[pane]) == lm::FileChange::Changed
+		&& !lm::askOverwriteChangedFile(this, m_paths[pane]))
 		return true;
+	// the command line's output path takes what is saved, and the pane
+	// goes on with it once written (m_strSaveAsPath)
+	const QString path = m_saveAsPath.isEmpty() ? m_paths[pane] : m_saveAsPath;
 	const QDateTime originalTime = lm::timeToPreserve(path);
-	if (QSettings().value(QStringLiteral("Backup/FileCompare"), true).toBool()
+	if (lm::setting(QStringLiteral("Backup/FileCompare"), true).toBool()
 		&& QFile::exists(path))
 	{
 		const QString backupPath = path + QStringLiteral(".bak");
@@ -625,6 +628,11 @@ bool HexCompareView::savePane(int pane, QString *error)
 		return false;
 	}
 	lm::restoreFileTime(path, originalTime);
+	if (path != m_paths[pane])
+	{
+		m_paths[pane] = path;
+		emit pathsChanged();
+	}
 	m_stamps[pane] = lm::fileStamp(path);
 	view->setSavePoint();
 	updateHeader(pane);

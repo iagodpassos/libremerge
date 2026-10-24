@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "MessageBoxes.h"
 
+#include <cstdio>
 #include <QCheckBox>
 #include <QCoreApplication>
 #include <QFile>
@@ -341,6 +342,38 @@ bool askWarning(QWidget *parent, const QString &text)
 bool askReloadChangedFile(QWidget *parent, const QString &path)
 {
 	return askYesNo(parent, fileChangedRescanText().arg(path), kFileChangedRescan);
+}
+
+namespace
+{
+bool &unattendedFlag()
+{
+	static bool flag = false;
+	return flag;
+}
+} // namespace
+
+void setUnattended(bool on)
+{
+	unattendedFlag() = on;
+	if (on)
+	{
+		setMessageSinkForTest([](const QString &text) { reportUnattended(text, false); });
+		setQuestionSinkForTest([](const QString &text, bool *) {
+			reportUnattended(text, true);
+			return false;
+		});
+	}
+}
+
+bool unattended()
+{
+	return unattendedFlag();
+}
+
+void reportUnattended(const QString &text, bool question)
+{
+	fprintf(stderr, "%s%s\n", qPrintable(text), question ? ": Cancel" : "");
 }
 
 bool askSuggestIgnoreEol(QWidget *parent, bool *remembered)

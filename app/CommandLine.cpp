@@ -278,10 +278,25 @@ CommandLine CommandLine::parse(const QStringList &arguments)
 			hasColonValue = false;
 		else if (param == QStringLiteral("g") || param == QStringLiteral("set-usertasks-to-jumplist"))
 			value();
+		else if (param == QStringLiteral("o"))
+		{
+			const QString path = value();
+			cmd.outputPath = path.isEmpty() ? QString() : QFileInfo(path).absoluteFilePath();
+		}
+		else if (param == QStringLiteral("inifile"))
+		{
+			const QString path = value();
+			cmd.iniFile = path.isEmpty() ? QString() : QFileInfo(path).absoluteFilePath();
+		}
+		else if (param == QStringLiteral("noninteractive"))
+			cmd.nonInteractive = true;
+		else if (param == QStringLiteral("enableexitcode"))
+			cmd.enableExitCode = true;
+		else if (param == QStringLiteral("noprefs"))
+			cmd.noPrefs = true;
 		// upstream's, which LibreMerge does not act on yet
-		else if (param == QStringLiteral("o") || param == QStringLiteral("or")
-			|| param == QStringLiteral("unpacker") || param == QStringLiteral("prediffer")
-			|| param == QStringLiteral("cp") || param == QStringLiteral("inifile"))
+		else if (param == QStringLiteral("or") || param == QStringLiteral("unpacker")
+			|| param == QStringLiteral("prediffer") || param == QStringLiteral("cp"))
 		{
 			value();
 			unsupported(param);
@@ -291,9 +306,7 @@ CommandLine CommandLine::parse(const QStringList &arguments)
 			hasColonValue = false;
 			unsupported(QStringLiteral("r"));
 		}
-		else if (param == QStringLiteral("noninteractive") || param == QStringLiteral("noprefs")
-			|| param == QStringLiteral("clipboard-compare")
-			|| param == QStringLiteral("enableexitcode") || param == QStringLiteral("al")
+		else if (param == QStringLiteral("clipboard-compare") || param == QStringLiteral("al")
 			|| param == QStringLiteral("am") || param == QStringLiteral("ar"))
 			unsupported(param);
 		else
@@ -309,6 +322,10 @@ CommandLine CommandLine::parse(const QStringList &arguments)
 	}
 	if (cmd.windowType == WindowType::WebPage)
 		unsupported(QStringLiteral("t webpage"));
+	// upstream's usage is no unattended run, and neither is a dialog
+	// shown alone, which waits for its answer
+	if (cmd.showUsage || cmd.dialogType != DialogType::None)
+		cmd.nonInteractive = false;
 	return cmd;
 }
 
@@ -343,6 +360,13 @@ QString CommandLine::usage()
 		"  -ignoreeol[:0|1], -ignorecodepage[:0|1], -ignorecomments[:0|1]\n"
 		"                  the compare options, for this run\n"
 		"  -cfg Name=Value any option by its name, for this run\n"
+		"  -noprefs        neither read nor save the options\n"
+		"  -inifile file   keep the options in that file\n"
+		"  -o file         save a file there in place of where it came from\n"
+		"  -noninteractive no message boxes (their text goes to the terminal,\n"
+		"                  answered Cancel), and close once compared\n"
+		"  -enableexitcode exit with 0 when the files are identical, 1 when\n"
+		"                  they differ and 2 on an error\n"
 		"  -self-compare   compare the one file given with a copy of itself\n"
 		"  -new            open an empty comparison\n"
 		"  -minimize, -maximize\n"

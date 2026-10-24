@@ -590,8 +590,10 @@ void FolderCompareView::compareFinished()
 	m_progress->setVisible(false);
 	m_cancelButton->setVisible(false);
 	m_methodButton->setEnabled(true);
-	populate(m_watcher.result());
+	const lm::FolderCompareResult result = m_watcher.result();
+	populate(result);
 	m_job.reset();
+	emit compared(!result.ok || result.aborted ? -1 : result.different + result.unique);
 }
 
 void FolderCompareView::populate(const lm::FolderCompareResult &result)

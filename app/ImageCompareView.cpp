@@ -34,6 +34,7 @@
 #include "Icons.h"
 #include "ImagePane.h"
 #include "MessageBoxes.h"
+#include "Settings.h"
 #include "NewComparisonView.h"
 #include "Theme.h"
 
@@ -674,7 +675,10 @@ bool ImageCompareView::savePane(int pane, QString *error)
 	if (!m_buffer->IsModified(pane) || m_buffer->GetReadOnly(pane))
 		return true;
 
-	QString target = m_paths[pane];
+	// the command line's output path takes what is saved, and the pane
+	// goes on with it once written (m_strSaveAsPath)
+	QString target = m_paths[pane].isEmpty() || m_saveAsPath.isEmpty()
+		? m_paths[pane] : m_saveAsPath;
 	if (target.isEmpty() || !m_buffer->IsSaveSupported(pane))
 	{
 		// an untitled pane asks for a name; for a format Qt cannot
@@ -691,7 +695,7 @@ bool ImageCompareView::savePane(int pane, QString *error)
 	}
 
 	// optional .bak backup, same setting the text compare honors
-	if (QSettings().value(QStringLiteral("Backup/FileCompare"), true).toBool()
+	if (lm::setting(QStringLiteral("Backup/FileCompare"), true).toBool()
 		&& QFile::exists(target))
 	{
 		const QString bak = target + QStringLiteral(".bak");

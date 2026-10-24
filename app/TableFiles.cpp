@@ -7,6 +7,7 @@
 #include <QStringList>
 
 #include "FileFilters.h"
+#include "Settings.h"
 
 // engine
 #include "TableProps.h"
@@ -30,16 +31,15 @@ const QString kQuote = QStringLiteral("TableCompare/TableQuoteCharacter");
 TableSettings TableSettings::load()
 {
 	const TableSettings defaults;
-	QSettings settings;
 	TableSettings loaded;
-	loaded.csvFilePatterns = settings.value(kCsvFilePatterns, defaults.csvFilePatterns).toString();
-	loaded.csvDelimiter = settings.value(kCsvDelimiter, defaults.csvDelimiter).toString();
-	loaded.tsvFilePatterns = settings.value(kTsvFilePatterns, defaults.tsvFilePatterns).toString();
-	loaded.dsvFilePatterns = settings.value(kDsvFilePatterns, defaults.dsvFilePatterns).toString();
-	loaded.dsvDelimiter = settings.value(kDsvDelimiter, defaults.dsvDelimiter).toString();
+	loaded.csvFilePatterns = setting(kCsvFilePatterns, defaults.csvFilePatterns).toString();
+	loaded.csvDelimiter = setting(kCsvDelimiter, defaults.csvDelimiter).toString();
+	loaded.tsvFilePatterns = setting(kTsvFilePatterns, defaults.tsvFilePatterns).toString();
+	loaded.dsvFilePatterns = setting(kDsvFilePatterns, defaults.dsvFilePatterns).toString();
+	loaded.dsvDelimiter = setting(kDsvDelimiter, defaults.dsvDelimiter).toString();
 	loaded.allowNewlinesInQuotes =
-		settings.value(kAllowNewlines, defaults.allowNewlinesInQuotes).toBool();
-	loaded.quote = settings.value(kQuote, defaults.quote).toString();
+		setting(kAllowNewlines, defaults.allowNewlinesInQuotes).toBool();
+	loaded.quote = setting(kQuote, defaults.quote).toString();
 	return loaded;
 }
 

@@ -126,7 +126,13 @@ LibreMerge reads WinMerge's command line, with `-` in front of each switch (`/` 
 libremerge -e -u -wl -dl "Base" -dr "Mine" base.txt mine.txt
 ```
 
-These work today: the descriptions (`-dl`, `-dm`, `-dr`), read-only sides (`-wl`, `-wm`, `-wr`), the focus (`-fl`, `-fm`, `-fr`), `-e`, `-x` and `-xq`, `-u`, the window type (`-t`), the compare method (`-m`), the file filter (`-f`), the line and character to go to (`-l`, `-c`), `-fileext`, the table switches, the compare options (`-ignorews` and the like, and any option by name with `-cfg`), `-self-compare`, `-new`, `-minimize`, `-maximize` and `-show-dialog`. Not yet: `-noninteractive`, `-enableexitcode`, `-o`, `-or`, `-r`, `-noprefs`, `-inifile`, `-cp`, auto-merge (`-al`, `-am`, `-ar`) and plugins; LibreMerge says so on the terminal when it meets them. Windows' own switches for a single instance (`-s`, `-sw`, `-g`) are taken and have no effect: each run is a separate LibreMerge, which a caller waits for anyway.
+These work today: the descriptions (`-dl`, `-dm`, `-dr`), read-only sides (`-wl`, `-wm`, `-wr`), the focus (`-fl`, `-fm`, `-fr`), `-e`, `-x` and `-xq`, `-u`, the window type (`-t`), the compare method (`-m`), the file filter (`-f`), the line and character to go to (`-l`, `-c`), `-fileext`, the table switches, the compare options (`-ignorews` and the like, and any option of the Options by WinMerge's name with `-cfg`), the output file (`-o`), `-noprefs`, `-inifile`, `-self-compare`, `-new`, `-minimize`, `-maximize` and `-show-dialog`. For scripts, `-noninteractive` answers every message box with Cancel (its text goes to the terminal) and closes once the comparison is done, without a window where Qt's offscreen platform is there, and `-enableexitcode` makes the exit code 0 for identical files or folders, 1 for different ones and 2 on an error:
+
+```sh
+libremerge -noninteractive -enableexitcode -noprefs old/ new/ && echo same
+```
+
+Not yet: `-or`, `-r`, `-cp`, auto-merge (`-al`, `-am`, `-ar`) and plugins; LibreMerge says so on the terminal when it meets them. Windows' own switches for a single instance (`-s`, `-sw`, `-g`) are taken and have no effect: each run is a separate LibreMerge, which a caller waits for anyway.
 
 ## Known limitations
 

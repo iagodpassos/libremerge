@@ -51,6 +51,16 @@ struct CommandLine
 	bool selfCompare = false;
 	bool newCompare = false;
 	bool gotoFirstDiff = false; ///< --goto-first-diff, kept
+	/** No message boxes (each one answered Cancel, its text on the
+	    terminal) and closing once the comparison is done. */
+	bool nonInteractive = false;
+	/** The last comparison's result as the exit code: 0 identical, 1
+	    different, 2 an error or none. */
+	bool enableExitCode = false;
+	/** No saved options read, none saved (-noprefs). */
+	bool noPrefs = false;
+	QString outputPath; ///< where a file is saved (-o)
+	QString iniFile;    ///< the options' file (-inifile)
 	int lineIndex = -1; ///< from 0 (-l)
 	int charIndex = -1; ///< from 0 (-c)
 	std::optional<QChar> tableDelimiter;

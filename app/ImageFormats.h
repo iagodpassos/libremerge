@@ -5,6 +5,7 @@
 #include <QString>
 
 #include "FileFilters.h"
+#include "Settings.h"
 
 namespace lm
 {
@@ -22,7 +23,7 @@ inline QString defaultImageFilePatterns()
 
 inline QString imageFilePatterns()
 {
-	return QSettings().value(QStringLiteral("ImageCompare/FilePatterns"),
+	return setting(QStringLiteral("ImageCompare/FilePatterns"),
 		defaultImageFilePatterns()).toString();
 }
 
@@ -31,7 +32,7 @@ inline QString imageFilePatterns()
     image patterns take by their pixels. */
 inline bool imageCompareInFolderCompare()
 {
-	return QSettings().value(QStringLiteral("ImageCompare/EnableInFolderCompare"),
+	return setting(QStringLiteral("ImageCompare/EnableInFolderCompare"),
 		false).toBool();
 }
 

@@ -93,8 +93,9 @@ void setCompareMethodForTest(int method);
 /** Set it for this run only, unsaved (the command line's -m). */
 void useCompareMethod(int method);
 /** Set options by name for this run only, unsaved (the command line's
-    -ignorews... and -cfg, CMergeApp::ApplyCommandLineConfigOptions): a
-    name may be the end of one, when only one ends so. What names no
+    -ignorews... and -cfg, CMergeApp::ApplyCommandLineConfigOptions),
+    the engine's and those LibreMerge keeps itself (lm::useSetting): a
+    name may be a part of one, when only one holds it. What names no
     option comes back. */
 QStringList useOptions(const QList<std::pair<QString, QString>> &options);
 

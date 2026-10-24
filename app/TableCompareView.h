@@ -116,6 +116,9 @@ public:
 	    options' for every side, from the next compare on. */
 	void setTableOverrides(std::optional<QChar> delimiter, std::optional<QChar> quote,
 		std::optional<bool> allowNewlinesInQuotes);
+	/** Where a side is saved in place of its file (the command line's
+	    -o); the side goes on with that file once saved. */
+	void setSaveAsPath(const QString &path) { m_saveAsPath = path; }
 	/** Whether a side's file ends its rows in more than one way, and
 	    whether this comparison treats line endings as the same (for
 	    tests). */
@@ -321,6 +324,7 @@ private:
 	std::optional<QChar> m_delimiterOverride;
 	std::optional<QChar> m_quoteOverride;
 	std::optional<bool> m_newlinesOverride;
+	QString m_saveAsPath; // where a side is saved, by the command line
 
 	friend class TableSideModel;
 };
