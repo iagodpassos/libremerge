@@ -371,6 +371,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestEditorTabsOpt(QStringLiteral("selftest-editor-tabs"),
 		QStringLiteral("Exercise the tabs of Options > Editor: the tab size, the Tab and Shift+Tab keys and the column in the status bar (for testing)"));
 	parser.addOption(selftestEditorTabsOpt);
+	QCommandLineOption selftestEolOpt(QStringLiteral("selftest-eol"),
+		QStringLiteral("Exercise the line endings: files of mixed endings kept, real endings compared and the question about files that end their lines otherwise (for testing)"));
+	parser.addOption(selftestEolOpt);
 	QCommandLineOption selftestFolderSelectionOpt(QStringLiteral("selftest-folder-selection"),
 		QStringLiteral("Compare two or three selected items of a folder comparison with each other (for testing)"));
 	parser.addOption(selftestFolderSelectionOpt);
@@ -2432,9 +2435,11 @@ int main(int argc, char *argv[])
 			const bool saved = lm::messageHidden(QStringLiteral("FilesSame"));
 			shown.clear();
 			dialog.resetMessageBoxesForTest();
-			// WinMerge's order: the four answers kept since 0.9.x, then the
-			// question before Copy All (IDS_CONFIRM_COPY_ALL_DIFFS)
-			check(rows.size() == lm::hideableMessages().size() && rows.size() == 5
+			// WinMerge's order: the four answers kept since 0.9.x, the
+			// question about files whose lines end otherwise
+			// (IDS_SUGGEST_IGNOREEOL) and the one before Copy All
+			// (IDS_CONFIRM_COPY_ALL_DIFFS)
+			check(rows.size() == lm::hideableMessages().size() && rows.size() == 6
 				&& !rows.at(0).second && saved
 				&& !lm::messageHidden(QStringLiteral("FilesSame"))
 				&& !dialog.messageBoxesForTest().at(0).second,
@@ -11285,6 +11290,186 @@ int main(int argc, char *argv[])
 		}
 
 		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestEolOpt))
+	{
+		// the line endings as WinMerge keeps them with "Preserve original
+		// EOL" off: a file whose lines end in more than one way saved with
+		// each line's own, the lines copied into it taking theirs along
+		// (and back with an undo); the engine handed the real endings, so
+		// files that end their lines otherwise differ, and the question
+		// that offers to treat them as the same (IDS_SUGGEST_IGNOREEOL),
+		// for the comparison or, the answer kept, from then on; and a file
+		// that ends without a line break
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+		};
+		QStringList asked;
+		bool answer = false;
+		bool keep = false;
+		lm::setQuestionSinkForTest([&](const QString &text, bool *dontAskAgain) {
+			asked << text;
+			if (dontAskAgain != nullptr)
+				*dontAskAgain = keep;
+			return answer;
+		});
+		const QString question = QCoreApplication::translate("MessageBoxes",
+			"Files use different EOL.\n\nTreat all EOL as equivalent?\n\n"
+			"Set 'Ignore EOL differences (Windows/Unix/Mac)' in Compare section of Options.");
+		const QString left = dir.filePath(QStringLiteral("left.txt"));
+		const QString right = dir.filePath(QStringLiteral("right.txt"));
+		QString error;
+
+		// mixed endings on both sides: no question, and the lines that end
+		// otherwise are differences
+		write(left, "a\r\nb\nc\r\n");
+		write(right, "a\r\nx\r\nc\n");
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			check(asked.isEmpty() && view.mixedEolForTest(0) && view.mixedEolForTest(1)
+					&& view.encodingTextForTest(0).endsWith(FileCompareView::tr("Mixed")),
+				"mixed endings: no question, Mixed in the status bar");
+			check(view.diffCount() == 1 && view.diffLinesForTest() == QList<int>({ 1, 2 }),
+				"mixed endings: a line that ends otherwise differs");
+			view.typeAtForTest(0, 0, QStringLiteral("z"));
+			check(view.saveSideAt(0, &error) && read(left) == "za\r\nb\nc\r\n",
+				"mixed endings: saved with each line's own");
+			view.copyAllFrom(1, 0);
+			check(view.saveSideAt(0, &error) && read(left) == read(right),
+				"mixed endings: the lines copied in take theirs along");
+			view.undoActive();
+			check(view.saveSideAt(0, &error) && read(left) == "za\r\nb\nc\r\n",
+				"mixed endings: undone, the lines end as before");
+			// a line typed in ends as the one it was split from
+			DiffTextEdit *pane = view.paneForTest(0);
+			QTextCursor cursor(pane->document()->findBlockByNumber(1));
+			cursor.movePosition(QTextCursor::EndOfBlock);
+			pane->setTextCursor(cursor);
+			QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier, QStringLiteral("\r"));
+			QApplication::sendEvent(pane, &enter);
+			check(view.saveSideAt(0, &error) && read(left) == "za\r\nb\n\nc\r\n",
+				"mixed endings: a line typed in ends as the one it was split from");
+		}
+
+		// Windows endings against Unix ones: every line differs, unless
+		// the question is answered Yes
+		write(left, "a\r\nb\r\n");
+		write(right, "a\nb\n");
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			check(asked == QStringList({ question }) && !view.ignoresEolForTest()
+					&& view.diffCount() == 1 && view.diffLinesForTest() == QList<int>({ 0, 1 })
+					&& view.encodingTextForTest(0).endsWith(QStringLiteral("Win"))
+					&& view.encodingTextForTest(1).endsWith(QStringLiteral("Unix")),
+				"Win against Unix: asked, No leaves every line different");
+		}
+		asked.clear();
+		answer = true;
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			check(asked.size() == 1 && view.ignoresEolForTest() && view.diffCount() == 0
+					&& !lm::currentDiffOptions().bIgnoreEol,
+				"Win against Unix: Yes treats them as the same, in this comparison only");
+			view.refreshDiffOptions();
+			view.recompare();
+			check(asked.size() == 1 && !view.ignoresEolForTest() && view.diffCount() == 1,
+				"the options again: the Yes goes, and comparing again does not ask");
+			view.reload(&error);
+			check(asked.size() == 2 && view.ignoresEolForTest() && view.diffCount() == 0,
+				"File > Reload asks again");
+		}
+		asked.clear();
+		keep = true;
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			check(asked.size() == 1 && view.diffCount() == 0
+					&& lm::currentDiffOptions().bIgnoreEol,
+				"Yes kept: the option is set");
+		}
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			check(asked.size() == 1 && view.diffCount() == 0,
+				"Yes kept: no question from then on");
+		}
+		lm::setCompareFlagForTest(OPT_CMP_IGNORE_EOL, false);
+		lm::resetHiddenMessages();
+		asked.clear();
+		answer = false;
+		keep = false;
+
+		// a file that ends without a line break differs from one that ends
+		// with it, unless "Ignore missing trailing EOL" is on, and is saved
+		// without one
+		write(left, "a\nb");
+		write(right, "a\nb\n");
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			check(asked.isEmpty() && view.diffCount() == 1
+					&& view.diffLinesForTest() == QList<int>({ 1 }),
+				"no line break at the end: the last line differs");
+			view.typeAtForTest(0, 0, QStringLiteral("q"));
+			check(view.saveSideAt(0, &error) && read(left) == "qa\nb",
+				"no line break at the end: saved without one");
+		}
+		lm::setCompareFlagForTest(OPT_CMP_IGNORE_MISSING_TRAILING_EOL, true);
+		write(left, "a\nb");
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			check(view.diffCount() == 0, "Ignore missing trailing EOL: the same");
+		}
+		lm::setCompareFlagForTest(OPT_CMP_IGNORE_MISSING_TRAILING_EOL, false);
+
+		// an untitled pane is one line without a line break (InitNew)
+		write(right, "a\n");
+		{
+			FileCompareView view;
+			if (!view.compare({ QString(), right }, &error))
+				return 2;
+			// on its line, past the ghost line the right's line puts above it
+			view.typeAtForTest(0, view.paneForTest(0)->document()->blockCount() - 1,
+				QStringLiteral("a"));
+			view.recompare();
+			check(asked.isEmpty() && view.realLinesForTest(0) == QStringList({ QStringLiteral("a") })
+					&& view.diffCount() == 1 && view.diffLinesForTest() == QList<int>({ 0 }),
+				"untitled: its line has no line break");
+		}
+
+		lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
+		printf("eol: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

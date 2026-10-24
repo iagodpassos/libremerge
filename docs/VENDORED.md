@@ -116,10 +116,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 618 | 165 | 245 | 0 | 3 |
-| Spanish | 606 | 179 | 243 | 3 | 0 |
-| Catalan | 304 | 174 | 245 | 308 | 0 |
-| French | 622 | 182 | 227 | 0 | 0 |
+| German | 620 | 165 | 245 | 0 | 3 |
+| Spanish | 608 | 179 | 243 | 3 | 0 |
+| Catalan | 306 | 174 | 245 | 308 | 0 |
+| French | 624 | 182 | 227 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -159,6 +159,17 @@ says so in a comment:
   before the cursor counting columns as the cursor's column is counted.
   Upstream counts one per character there, so a wide character left the
   cursor off the tab stop.
+
+Where upstream falls back on Windows' line ending, LibreMerge falls back
+on the one of macOS and Linux:
+
+- A file without a line break and an untitled pane end their lines as
+  Unix does; upstream's take Windows' (`CRLFSTYLE::DOS`). This decides
+  too whether such a file is asked about as one whose lines end otherwise
+  (`IDS_SUGGEST_IGNOREEOL`).
+- In a file whose lines end in more than one way, a line typed in ends as
+  the line it was split from, or as most of the file's lines; upstream's
+  take Windows' ending (`GetDefaultEol` of `CRLFSTYLE::MIXED`).
 
 ## Deliberately excluded (and why)
 

@@ -384,6 +384,10 @@
         <translation>La destinació de la combinació és de només lectura.</translation>
     </message>
     <message>
+        <source>Mixed</source>
+        <translation>Barrejat</translation>
+    </message>
+    <message>
         <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
         <translation>Lin: %1  Col: %2/%3  Car: %4/%5</translation>
     </message>
@@ -3969,6 +3973,18 @@ Si no voleu tornar-los a analitzar ara, podeu seleccionar &apos;No&apos; i fer-h
     <message>
         <source>Replaced %1 string(s).</source>
         <translation>S&apos;ha(n) substituït %1 cadena(es).</translation>
+    </message>
+    <message>
+        <source>Files use different EOL.
+
+Treat all EOL as equivalent?
+
+Set &apos;Ignore EOL differences (Windows/Unix/Mac)&apos; in Compare section of Options.</source>
+        <translation>Els fitxers tenen tipus de salt de línia de diferents.
+
+Voleu tractar tots els salts de línia com a equivalents per a aquesta comparació?
+
+Nota: Si voleu tractar els salts de línia sempre com a equivalents, especifiqueu l&apos;opció &apos;Ignora les diferències de salt de línia (Windows/Unix/Mac)&apos; a la secció Comparació de la finestra d&apos;opcions (disponible des del menú Edita/Opcions).</translation>
     </message>
     <message>
         <source>Selected files are identical.</source>

@@ -1703,6 +1703,7 @@ void MainWindow::showOptions()
 			{
 				file->refreshSyntaxHighlighting();
 				file->refreshEditorOptions();
+				file->refreshDiffOptions();
 			}
 		applyDiffOptions();
 	}

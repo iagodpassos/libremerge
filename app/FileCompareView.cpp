@@ -131,14 +131,23 @@ QString encodingName(int unicoding, int codepage, bool bom)
 	return QStringLiteral("CP%1").arg(codepage);
 }
 
-QString eolName(const QString &eol)
+/** The status bar's line ending, as upstream's EOL pane names it
+    (CCrystalTextView::OnUpdateIndicatorCRLF). */
+QString eolName(const QString &eol, bool mixed = false)
 {
+	if (mixed)
+		return QCoreApplication::translate("FileCompareView", "Mixed");
 	if (eol == QStringLiteral("\r\n"))
-		return QStringLiteral("Windows");
+		return QStringLiteral("Win");
 	if (eol == QStringLiteral("\r"))
 		return QStringLiteral("Mac");
 	return QStringLiteral("Unix");
 }
+
+/** The block property a line of a file of mixed endings keeps its own
+    ending in, when it is not the file's. A block format goes with the
+    text through undo and redo. */
+const int kEolProperty = QTextFormat::UserProperty + 1;
 
 } // namespace
 
@@ -245,14 +254,16 @@ public:
 	{
 		if (!valid(pane, lineIndex))
 			return EOL_NONE;
-		// the file's line ending, which every line of a pane shares here;
-		// the last line has none when the file ends without one
+		// the line's ending, the file's unless its lines end in more than
+		// one way; the last line has none when the file ends without one
 		const Side &side = m_view->m_sides[pane];
 		if (!side.hadFinalEol && m_realIndex[pane][lineIndex] == m_realCount[pane] - 1)
 			return EOL_NONE;
-		if (side.eol == QStringLiteral("\r\n"))
+		const QString eol = m_view->lineEol(pane,
+			m_view->m_panes[pane]->document()->findBlockByNumber(lineIndex));
+		if (eol == QStringLiteral("\r\n"))
 			return EOL_CRLF;
-		return side.eol == QStringLiteral("\r") ? EOL_CR : EOL_LF;
+		return eol == QStringLiteral("\r") ? EOL_CR : EOL_LF;
 	}
 
 private:
@@ -654,6 +665,7 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 		m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
 			m_panes[i]->document(), paths.at(i));
 	}
+	suggestIgnoreEol();
 	if (!runDiff(error))
 		return false;
 	// like WinMerge, open with no difference selected
@@ -706,6 +718,8 @@ void FileCompareView::startUntitled(int side)
 		: (side == 1 && m_paneCount == 3) ? tr("Untitled Middle") : tr("Untitled Right");
 	s.unicoding = ucr::UTF8;
 	s.codepage = 65001;
+	// upstream's InitNew: one line, without a line ending
+	s.hadFinalEol = false;
 	m_syncing = true;
 	m_panes[side]->setPlainText(QString());
 	m_panes[side]->document()->setModified(false);
@@ -795,6 +809,7 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 	s.bom = file.HasBom();
 
 	QStringList lines;
+	QStringList eols;
 	int crlf = 0, lf = 0, cr = 0;
 	String line, eol;
 	bool lossy = false;
@@ -802,6 +817,7 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 	while (file.ReadString(line, eol, &lossy))
 	{
 		lines.append(QString::fromUtf8(line.data(), static_cast<int>(line.size())));
+		eols.append(QString::fromStdString(eol));
 		if (eol == "\r\n") ++crlf;
 		else if (eol == "\n") ++lf;
 		else if (eol == "\r") ++cr;
@@ -810,6 +826,7 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 	file.Close();
 
 	s.hadFinalEol = lines.isEmpty() ? false : lastHadEol;
+	s.mixedEol = (crlf > 0) + (lf > 0) + (cr > 0) > 1;
 	if (crlf >= lf && crlf >= cr && crlf > 0)
 		s.eol = QStringLiteral("\r\n");
 	else if (cr > lf)
@@ -818,31 +835,98 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 		s.eol = QStringLiteral("\n");
 
 	m_syncing = true;
+	QTextDocument *doc = m_panes[side]->document();
 	m_panes[side]->setPlainText(lines.join(QChar('\n')));
-	m_panes[side]->document()->setModified(false);
+	if (s.mixedEol)
+	{
+		// the lines that end otherwise than most keep their ending, as
+		// opening goes: outside the undo history
+		doc->setUndoRedoEnabled(false);
+		QTextCursor cursor(doc);
+		QTextBlock block = doc->begin();
+		for (int i = 0; i < eols.size() && block.isValid(); ++i, block = block.next())
+		{
+			if (eols.at(i).isEmpty() || eols.at(i) == s.eol)
+				continue;
+			QTextBlockFormat format = block.blockFormat();
+			format.setProperty(kEolProperty, eols.at(i));
+			cursor.setPosition(block.position());
+			cursor.setBlockFormat(format);
+		}
+		doc->setUndoRedoEnabled(true);
+	}
+	doc->setModified(false);
 	m_syncing = false;
 	s.modified = false;
 
 	updateHeader(side);
 	m_encLabels[side]->setText(QStringLiteral("%1  %2")
-		.arg(encodingName(s.unicoding, s.codepage, s.bom), eolName(s.eol)));
+		.arg(encodingName(s.unicoding, s.codepage, s.bom), eolName(s.eol, s.mixedEol)));
 	updatePaneStatus(side);
 	return true;
 }
 
+/** Upstream asks before it compares, with neither "Ignore carriage return
+    differences" nor "Preserve original EOL" on, when the files end their
+    lines in different ways (CRLFSTYLE, mixed endings being one of them):
+    every line would differ. Yes treats every line ending as the same in
+    this comparison, and from then on, the option set, when the answer is
+    kept. */
+void FileCompareView::suggestIgnoreEol()
+{
+	if (m_ignoreEol || lm::currentDiffOptions().bIgnoreEol)
+		return;
+	const auto style = [this](int side) {
+		return m_sides[side].mixedEol ? QStringLiteral("mixed") : m_sides[side].eol;
+	};
+	bool differ = false;
+	for (int side = 1; side < m_paneCount; ++side)
+		differ = differ || style(side) != style(0);
+	bool remembered = false;
+	if (!differ || !lm::askSuggestIgnoreEol(this, &remembered))
+		return;
+	m_ignoreEol = true;
+	if (remembered)
+		if (COptionsMgr *mgr = GetOptionsMgr())
+			mgr->SaveOption(OPT_CMP_IGNORE_EOL, true);
+}
+
+QString FileCompareView::lineEol(int side, const QTextBlock &block) const
+{
+	const Side &s = m_sides[side];
+	if (s.mixedEol)
+	{
+		const QVariant eol = block.blockFormat().property(kEolProperty);
+		if (eol.isValid())
+			return eol.toString();
+	}
+	return s.eol;
+}
+
+QString FileCompareView::encodingTextForTest(int side) const
+{
+	return m_encLabels[side]->text();
+}
+
 /** The side's real lines (skipping alignment ghosts); optionally also the
     per-view-line ghost flags. */
-QStringList FileCompareView::collectRealLines(int side, QList<bool> *ghostFlags) const
+QStringList FileCompareView::collectRealLines(int side, QList<bool> *ghostFlags,
+	QStringList *eols) const
 {
 	QStringList lines;
+	if (eols != nullptr)
+		eols->clear();
 	for (QTextBlock block = m_panes[side]->document()->begin();
 		block.isValid(); block = block.next())
 	{
 		const bool ghost = isGhostBlock(block);
 		if (ghostFlags != nullptr)
 			ghostFlags->append(ghost);
-		if (!ghost)
-			lines.append(block.text());
+		if (ghost)
+			continue;
+		lines.append(block.text());
+		if (eols != nullptr)
+			eols->append(lineEol(side, block));
 	}
 	return lines;
 }
@@ -856,21 +940,25 @@ bool FileCompareView::runDiff(QString *error)
 	paths.SetSize(m_paneCount);
 	for (int i = 0; i < m_paneCount; ++i)
 	{
-		m_realLines[i] = collectRealLines(i);
+		m_realLines[i] = collectRealLines(i, nullptr, &m_realEols[i]);
 		if (!temp[i].open())
 		{
 			if (error != nullptr)
 				*error = tr("cannot create temporary file");
 			return false;
 		}
-		// every line goes with its line ending, the last one too, as
-		// upstream's buffers save them: the engine takes a last line
-		// without one for a line that differs from the same line with
-		// others after it, and does not see an empty last line at all
-		// (a pane with nothing in it stays an empty file)
-		QByteArray bytes = m_realLines[i].join(QChar('\n')).toUtf8();
-		if (!bytes.isEmpty())
-			bytes.append('\n');
+		// every line goes with its line ending, as upstream's buffers save
+		// themselves for the engine (CDiffTextBuffer::SaveToFile): the
+		// file's, or each line's own in a file of mixed endings, and the
+		// last line's only when the file ends with one
+		const Side &s = m_sides[i];
+		QByteArray bytes;
+		for (int k = 0; k < m_realLines[i].size(); ++k)
+		{
+			bytes += m_realLines[i].at(k).toUtf8();
+			if (k + 1 < m_realLines[i].size() || s.hadFinalEol)
+				bytes += m_realEols[i].at(k).toUtf8();
+		}
 		temp[i].write(bytes);
 		temp[i].flush();
 		paths.SetPath(i, temp[i].fileName().toStdString(), false);
@@ -878,6 +966,8 @@ bool FileCompareView::runDiff(QString *error)
 
 	CDiffWrapper wrapper;
 	DIFFOPTIONS options = lm::currentDiffOptions();
+	if (m_ignoreEol)
+		options.bIgnoreEol = true;
 	DiffList diffList;
 	wrapper.SetCreateDiffList(&diffList);
 	wrapper.SetPaths(paths, false);
@@ -1289,7 +1379,9 @@ void FileCompareView::resetUndoHistory()
 void FileCompareView::computeWordSpans()
 {
 	m_wordSpans.clear();
-	const DIFFOPTIONS options = lm::currentDiffOptions();
+	DIFFOPTIONS options = lm::currentDiffOptions();
+	if (m_ignoreEol)
+		options.bIgnoreEol = true;
 
 	for (size_t b = 0; b < m_blocks.size(); ++b)
 	{
@@ -1313,7 +1405,13 @@ void FileCompareView::computeWordSpans()
 				const QByteArray utf8 = m_realLines[side].at(line).toUtf8();
 				lineBytes[side].append(utf8);
 				text.append(utf8.constData(), utf8.size());
-				text += '\n';
+				// with its line ending, as GetWordDiffArrayInRange joins
+				// the lines: none after the file's last line without one
+				if (line + 1 < m_realLines[side].size() || m_sides[side].hadFinalEol)
+				{
+					const QByteArray eol = m_realEols[side].value(line).toUtf8();
+					text.append(eol.constData(), eol.size());
+				}
 			}
 			if (!text.empty())
 				++nonEmptySides;
@@ -2132,6 +2230,7 @@ bool FileCompareView::reload(QString *error)
 
 	// a file that went away between the check and the load leaves the
 	// panes loaded so far: compare what is there either way
+	suggestIgnoreEol();
 	QString diffError;
 	const bool compared = runDiff(&diffError);
 	m_current = -1;
@@ -2230,6 +2329,24 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide,
 	cursor.setPosition(lastBlock.position() + lastBlock.length() - 1,
 		QTextCursor::KeepAnchor);
 	cursor.insertText(newLines.join(QChar('\n')));
+	// into a file of mixed endings the lines take their own along, as
+	// upstream's lines carry theirs; another file gives them its ending
+	if (m_sides[target].mixedEol)
+	{
+		QTextCursor line(tgtDoc);
+		for (int v = block.viewBegin; v <= block.viewEnd; ++v)
+		{
+			const QTextBlock tb = tgtDoc->findBlockByNumber(v);
+			const QString eol = lineEol(sourceSide, srcDoc->findBlockByNumber(v));
+			QTextBlockFormat format = tb.blockFormat();
+			if (eol == m_sides[target].eol)
+				format.clearProperty(kEolProperty);
+			else
+				format.setProperty(kEolProperty, eol);
+			line.setPosition(tb.position());
+			line.setBlockFormat(format);
+		}
+	}
 	cursor.endEditBlock();
 	for (int v = block.viewBegin; v <= block.viewEnd; ++v)
 		tgtDoc->findBlockByNumber(v).setUserData(
@@ -2863,14 +2980,15 @@ FileCompareView::SaveResult FileCompareView::saveSide(int side, QString *error)
 	file.SetBom(s.bom);
 	file.WriteBom();
 
-	// ghost alignment lines are visual only: never write them
-	const QStringList lines = collectRealLines(side);
-	const std::string eol = s.eol.toStdString();
+	// ghost alignment lines are visual only: never write them. Each line
+	// ends as the file does, or as its own in a file of mixed endings
+	QStringList eols;
+	const QStringList lines = collectRealLines(side, nullptr, &eols);
 	for (int i = 0; i < lines.size(); ++i)
 	{
 		file.WriteString(lines.at(i).toStdString());
 		if (i + 1 < lines.size() || s.hadFinalEol)
-			file.WriteString(eol);
+			file.WriteString(eols.at(i).toStdString());
 	}
 	file.Close();
 	lm::restoreFileTime(s.path, originalTime);

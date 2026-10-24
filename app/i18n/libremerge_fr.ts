@@ -197,6 +197,10 @@
 <context>
     <name>FileCompareView</name>
     <message>
+        <source>Mixed</source>
+        <translation>Combiné</translation>
+    </message>
+    <message>
         <source>First Difference</source>
         <translatorcomment>After WinMerge&apos;s &quot;&amp;First Difference\tAlt+Home&quot;.</translatorcomment>
         <translation>Première différence</translation>
@@ -3686,6 +3690,18 @@ Sélectionnez &quot;Non&quot; pour actualiser ultérieurement.</translation>
     <message>
         <source>Copy all differences to other file?</source>
         <translation>Copier toutes les différences dans un autre fichier ?</translation>
+    </message>
+    <message>
+        <source>Files use different EOL.
+
+Treat all EOL as equivalent?
+
+Set &apos;Ignore EOL differences (Windows/Unix/Mac)&apos; in Compare section of Options.</source>
+        <translation>Les fichiers utilisent des EOL différents.
+
+Voulez-vous traiter tous les EOL comme équivalents ?
+
+Définissez &quot;Ignorer les différences d&apos;EOL (Windows/Unix/Mac)&quot; dans Préférences &gt; Comparer &gt; Général.</translation>
     </message>
     <message>
         <source>Selected files are identical.</source>

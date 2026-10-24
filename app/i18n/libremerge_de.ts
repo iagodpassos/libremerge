@@ -367,6 +367,10 @@
         <translation>Das Ziel der Zusammenführung ist schreibgeschützt.</translation>
     </message>
     <message>
+        <source>Mixed</source>
+        <translation>Gemixt</translation>
+    </message>
+    <message>
         <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
         <translation>Zeile: %1  Spalte: %2/%3  Zeichen: %4/%5</translation>
     </message>
@@ -3685,6 +3689,18 @@ Wenn Sie jetzt nicht alle Vergleiche aktualisieren möchten, können Sie &apos;N
     <message>
         <source>Replaced %1 string(s).</source>
         <translation>%1 Vorkommen ersetzt.</translation>
+    </message>
+    <message>
+        <source>Files use different EOL.
+
+Treat all EOL as equivalent?
+
+Set &apos;Ignore EOL differences (Windows/Unix/Mac)&apos; in Compare section of Options.</source>
+        <translation>Die Dateien haben ein unterschiedliches Zeilenumbruchformat.
+
+Möchten Sie alle Zeilenumbrüche für diesen Vergleich als gleichwertig behandeln?
+
+Hinweis: Wenn Sie immer alle Zeilenumbruchformate als gleichwertig behandeln wollen, aktivieren Sie die Option &apos;Zeilenumbruchunterschiede (Windows/Unix/Mac) ignorieren&apos; unter Einstellungen/Vergleichen/Allgemein.</translation>
     </message>
     <message>
         <source>Selected files are identical.</source>

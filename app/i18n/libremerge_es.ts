@@ -369,6 +369,10 @@
         <translation>El destino de la combinación es de solo lectura.</translation>
     </message>
     <message>
+        <source>Mixed</source>
+        <translation>Mezclado</translation>
+    </message>
+    <message>
         <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
         <translation>Línea: %1  Columna: %2/%3  Carácter: %4/%5</translation>
     </message>
@@ -3693,6 +3697,18 @@ Si no desea actualizar todas las comparaciones ahora, puede seleccionar &apos;No
     <message>
         <source>Replaced %1 string(s).</source>
         <translation>Sustituida(s) %1 cadena(s).</translation>
+    </message>
+    <message>
+        <source>Files use different EOL.
+
+Treat all EOL as equivalent?
+
+Set &apos;Ignore EOL differences (Windows/Unix/Mac)&apos; in Compare section of Options.</source>
+        <translation>Estos archivos utilizan tipos diferentes de salto de línea.
+
+¿Desea tratar todos los tipos de salto de línea como equivalentes para esta comparación?
+
+Nota: si desea tratar siempre todos los tipos de saltos de línea como equivalentes, seleccione la opción &apos;Ignorar saltos de línea diferentes (Windows/Unix/Mac)&apos; en la pestaña Comparar del dialogo Opciones... (disponible en Editar/Opciones...).</translation>
     </message>
     <message>
         <source>Selected files are identical.</source>

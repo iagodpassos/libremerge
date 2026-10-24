@@ -331,6 +331,10 @@
         <translation>O destino da mesclagem é somente leitura.</translation>
     </message>
     <message>
+        <source>Mixed</source>
+        <translation>Misturado</translation>
+    </message>
+    <message>
         <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
         <translation>Lin: %1  Col: %2/%3  Car: %4/%5</translation>
     </message>
@@ -3380,6 +3384,18 @@ Selecione &apos;Não&apos; para atualizar mais tarde.</translation>
     <message>
         <source>Replaced %1 string(s).</source>
         <translation>Substituiu %1 string(s).</translation>
+    </message>
+    <message>
+        <source>Files use different EOL.
+
+Treat all EOL as equivalent?
+
+Set &apos;Ignore EOL differences (Windows/Unix/Mac)&apos; in Compare section of Options.</source>
+        <translation>Os arquivos usam caracteres EOL diferentes.
+
+Tratar todos os caracteres EOL como equivalentes?
+
+Defina &apos;Ignorar diferenças de caractere EOL (Windows/Unix/Mac)&apos; na seção Comparar das Opções.</translation>
     </message>
     <message>
         <source>Don&apos;t ask this question again.</source>

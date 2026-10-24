@@ -73,6 +73,11 @@ bool askWarning(QWidget *parent, const QString &text);
     compared file since it was loaded, reload it? "Don't ask this question
     again" keeps the answer, so Yes reloads silently from then on. */
 bool askReloadChangedFile(QWidget *parent, const QString &path);
+/** CMergeDoc::OpenDocs' question when the files' lines end otherwise
+    (IDS_SUGGEST_IGNOREEOL): treat every line ending as the same? With
+    "Don't ask this question again" the answer is kept, and remembered
+    says so. */
+bool askSuggestIgnoreEol(QWidget *parent, bool *remembered);
 /** WinMerge's question before Copy All (IDS_CONFIRM_COPY_ALL_DIFFS), No
     the default, with "Don't ask this question again". */
 bool askCopyAllDiffs(QWidget *parent);

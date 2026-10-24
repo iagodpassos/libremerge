@@ -19,6 +19,7 @@ class QLabel;
 class QLineEdit;
 class QMenu;
 class QPlainTextEdit;
+class QTextBlock;
 class QVBoxLayout;
 class DiffTextEdit;
 class DisplayFilterBar;
@@ -205,6 +206,9 @@ public:
 	    upstream only sets as the files load (DocumentsLoaded), so that
 	    the comparisons open kept the one they had. */
 	void refreshEditorOptions();
+	/** CMergeDoc::RefreshOptions: the comparison takes the options as
+	    they are, a Yes to the question about line endings going. */
+	void refreshDiffOptions() { m_ignoreEol = false; }
 	/** WinMerge's OnFileReload, past its save prompt: every pane is read
 	    from disk again (an untitled one emptied), the undo history goes
 	    and the cursor returns to the line it was on. Nothing is touched
@@ -282,6 +286,12 @@ public:
 	    its lines (for tests). */
 	QString positionTextForTest(int side) const;
 	QPlainTextEdit *diffPaneEditForTest(int side) const { return m_diffPaneEdits[side]; }
+	/** A pane's encoding and line ending in the status bar, whether its
+	    file's lines end in more than one way, and whether this comparison
+	    treats line endings as the same (for tests). */
+	QString encodingTextForTest(int side) const;
+	bool mixedEolForTest(int side) const { return m_sides[side].mixedEol; }
+	bool ignoresEolForTest() const { return m_ignoreEol; }
 
 signals:
 	/** A recompare asked for by the user is about to run: WinMerge's
@@ -329,6 +339,10 @@ private:
 		int codepage = 65001;
 		bool bom = false;
 		QString eol = QStringLiteral("\n");
+		/** The lines end in more than one way (upstream's
+		    CRLFSTYLE::MIXED): each keeps its own ending, those that end
+		    otherwise than eol carrying it on their block. */
+		bool mixedEol = false;
 		bool hadFinalEol = true;
 		bool modified = false;
 		lm::FileStamp stamp; // the file as loaded or last saved here
@@ -352,7 +366,14 @@ private:
 	bool runDiff(QString *error);
 	void rebuildAlignment();
 	void refreshSideMaps(int side);
-	QStringList collectRealLines(int side, QList<bool> *ghostFlags = nullptr) const;
+	QStringList collectRealLines(int side, QList<bool> *ghostFlags = nullptr,
+		QStringList *eols = nullptr) const;
+	/** The line ending a line is saved with: its own in a file of mixed
+	    endings, the file's otherwise. */
+	QString lineEol(int side, const QTextBlock &block) const;
+	/** CMergeDoc::OpenDocs' question about files whose lines end
+	    otherwise. */
+	void suggestIgnoreEol();
 	void computeWordSpans();
 	void applyHighlights();
 	void updateStatus();
@@ -419,6 +440,8 @@ private:
 	std::vector<Block> m_blocks;
 	std::vector<WordSpan> m_wordSpans;
 	QStringList m_realLines[3];      // side's real lines as of the last diff run
+	QStringList m_realEols[3];       // and their line endings
+	bool m_ignoreEol = false;        // Yes to the question, for this comparison
 	QSet<int> m_movedLines[3];       // real lines inside moved blocks
 	QHash<int, int> m_movedRight;    // the first file's moved lines -> the second's
 	std::vector<int> m_realToView[3]; // real line -> view line, ditto

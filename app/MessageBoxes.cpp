@@ -17,6 +17,7 @@ const QString kFilesSame = QStringLiteral("FilesSame");         // IDS_FILESSAME
 const QString kFileToItself = QStringLiteral("FileToItself");   // IDS_FILE_TO_ITSELF
 const QString kNumReplaced = QStringLiteral("NumReplaced");     // IDS_NUM_REPLACED
 const QString kFileChangedRescan = QStringLiteral("FileChangedRescan"); // IDS_FILECHANGED_RESCAN
+const QString kSuggestIgnoreEol = QStringLiteral("SuggestIgnoreEol"); // IDS_SUGGEST_IGNOREEOL
 const QString kConfirmCopyAllDiffs = QStringLiteral("ConfirmCopyAllDiffs"); // IDS_CONFIRM_COPY_ALL_DIFFS
 
 std::function<void(const QString &)> &sink()
@@ -49,6 +50,13 @@ QString numReplacedText()
 QString confirmCopyAllDiffsText()
 {
 	return QCoreApplication::translate("MessageBoxes", "Copy all differences to other file?");
+}
+
+QString suggestIgnoreEolText()
+{
+	return QCoreApplication::translate("MessageBoxes", "Files use different EOL.\n\n"
+		"Treat all EOL as equivalent?\n\n"
+		"Set 'Ignore EOL differences (Windows/Unix/Mac)' in Compare section of Options.");
 }
 
 QString fileChangedRescanText()
@@ -193,6 +201,7 @@ QList<HideableMessage> hideableMessages()
 		{ kFileToItself, fileToItselfText(), { AnswerOk } },
 		{ kNumReplaced, numReplacedText(), { AnswerOk } },
 		{ kFileChangedRescan, fileChangedRescanText(), { AnswerYes, AnswerNo } },
+		{ kSuggestIgnoreEol, suggestIgnoreEolText(), { AnswerYes, AnswerNo } },
 		{ kConfirmCopyAllDiffs, confirmCopyAllDiffsText(), { AnswerYes, AnswerNo } },
 	};
 }
@@ -325,6 +334,14 @@ bool askWarning(QWidget *parent, const QString &text)
 bool askReloadChangedFile(QWidget *parent, const QString &path)
 {
 	return askYesNo(parent, fileChangedRescanText().arg(path), kFileChangedRescan);
+}
+
+bool askSuggestIgnoreEol(QWidget *parent, bool *remembered)
+{
+	const bool yes = askYesNo(parent, suggestIgnoreEolText(), kSuggestIgnoreEol);
+	if (remembered != nullptr)
+		*remembered = rememberedAnswer(kSuggestIgnoreEol) != NoAnswer;
+	return yes;
 }
 
 bool askCopyAllDiffs(QWidget *parent)
