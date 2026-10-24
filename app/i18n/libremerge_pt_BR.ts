@@ -3420,6 +3420,14 @@ Mas diferem no nível binário.</translation>
         <translation>Copiar todas as diferenças para o outro arquivo?</translation>
     </message>
     <message>
+        <source>Create matching folder:
+%1
+on the other side and open?</source>
+        <translation>Criar pasta correspondente:
+%1
+no outro lado e abrir?</translation>
+    </message>
+    <message>
         <source>Selected files are identical (with current settings).
 But binary comparison failed.</source>
         <translation>Os arquivos selecionados são idênticos (com as configurações atuais).
@@ -3513,6 +3521,10 @@ Checando identidade binária...</translation>
     <message>
         <source>Type a path or drop a file or folder here</source>
         <translation>Digite um caminho ou arraste um arquivo ou pasta para cá</translation>
+    </message>
+    <message>
+        <source>&amp;Include subfolders</source>
+        <translation>&amp;Incluir subpastas</translation>
     </message>
     <message>
         <source>Select two (or three) folders/files to compare.</source>

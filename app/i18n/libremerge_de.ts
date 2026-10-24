@@ -3723,6 +3723,16 @@ Hinweis: Wenn Sie immer alle Zeilenumbruchformate als gleichwertig behandeln wol
         <translation>Wollen Sie wirklich alle Unterschiede in die andere Datei kopieren?</translation>
     </message>
     <message>
+        <source>Create matching folder:
+%1
+on the other side and open?</source>
+        <translation>Der Ordner existiert nur auf der anderen Seite und kann nicht geöffnet werden.
+
+Möchten Sie einen passenden Ordner:
+%1
+auf der anderen Seite erzeugen und die Ordner öffnen?</translation>
+    </message>
+    <message>
         <source>Don&apos;t ask this question again.</source>
         <translatorcomment>After WinMerge&apos;s &quot;Don&apos;t ask this &amp;question again.&quot;.</translatorcomment>
         <translation>Diese Frage nicht erneut stellen.</translation>
@@ -3837,6 +3847,10 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <source>Folder...</source>
         <translatorcomment>After WinMerge&apos;s &quot;Folder&quot;.</translatorcomment>
         <translation>Ordner...</translation>
+    </message>
+    <message>
+        <source>&amp;Include subfolders</source>
+        <translation>&amp;Unterordner einbeziehen</translation>
     </message>
     <message>
         <source>Select two (or three) folders/files to compare.</source>

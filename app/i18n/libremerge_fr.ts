@@ -3720,6 +3720,14 @@ Définissez &quot;Ignorer les différences d&apos;EOL (Windows/Unix/Mac)&quot; d
         <translation>Le même fichier est ouvert dans les deux volets.</translation>
     </message>
     <message>
+        <source>Create matching folder:
+%1
+on the other side and open?</source>
+        <translation>Créer un dossier correspondant :
+%1
+de l&apos;autre côté et l&apos;ouvrir ?</translation>
+    </message>
+    <message>
         <source>Don&apos;t ask this question again.</source>
         <translatorcomment>After WinMerge&apos;s &quot;Don&apos;t ask this &amp;question again.&quot;.</translatorcomment>
         <translation>Ne plus poser cette question.</translation>
@@ -3833,6 +3841,10 @@ Vérification de l&apos;identité binaire...</translation>
         <source>Folder...</source>
         <translatorcomment>After WinMerge&apos;s &quot;Folder&quot;.</translatorcomment>
         <translation>Dossier...</translation>
+    </message>
+    <message>
+        <source>&amp;Include subfolders</source>
+        <translation>&amp;Inclure les sous-dossiers</translation>
     </message>
     <message>
         <source>Select two (or three) folders/files to compare.</source>

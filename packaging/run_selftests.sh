@@ -64,6 +64,7 @@ run_one selftest-tree-sitter
 run_one selftest-editor-tabs
 run_one selftest-eol
 run_one selftest-command-line
+run_one selftest-subfolders
 run_one selftest-folder-selection
 run_one selftest-hex
 run_one selftest-hex-edit

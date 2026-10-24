@@ -259,6 +259,7 @@ void installEngineOptions()
 	options.InitOption(OPT_CMP_INDENT_HEURISTIC, true); // upstream default
 	options.InitOption(OPT_CMP_MOVED_BLOCKS, false);    // upstream default
 	options.InitOption(OPT_CMP_METHOD, static_cast<int>(CMP_CONTENT));
+	options.InitOption(OPT_CMP_INCLUDE_SUBDIRS, true);
 	// how a file's encoding is guessed, WinMerge's default outside the CJK
 	// locales: valid UTF-8 reads as UTF-8, HTML/XML/.rc files by their
 	// declared charset. Not an option here (it is not saved), but the
@@ -408,6 +409,21 @@ QString compareMethodName(int method)
 void setCompareMethodForTest(int method)
 {
 	useCompareMethod(method);
+}
+
+bool includeSubfolders()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr == nullptr || mgr->GetBool(OPT_CMP_INCLUDE_SUBDIRS);
+}
+
+void saveIncludeSubfolders(bool include)
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+	{
+		mgr->SaveOption(OPT_CMP_INCLUDE_SUBDIRS, include);
+		mgr->FlushOptions();
+	}
 }
 
 void useCompareMethod(int method)

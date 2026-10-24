@@ -116,10 +116,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 623 | 165 | 245 | 0 | 3 |
-| Spanish | 611 | 179 | 243 | 3 | 0 |
-| Catalan | 309 | 174 | 245 | 308 | 0 |
-| French | 627 | 182 | 227 | 0 | 0 |
+| German | 625 | 165 | 245 | 0 | 3 |
+| Spanish | 613 | 179 | 243 | 3 | 0 |
+| Catalan | 311 | 174 | 245 | 308 | 0 |
+| French | 629 | 182 | 227 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -195,6 +195,14 @@ than from one line of text:
   (`app/Settings.cpp`);
 - unattended, closing does not ask before closing several tabs: upstream
   answers that question Cancel and so never closes.
+
+A folder comparison without its subfolders ("Include subfolders" off,
+`-r-`) lists the top folders' items, a subfolder among them with no
+result; opening one compares it in the same window (in a window of its
+own with Ctrl held) and ".." goes back up, as `CDirView` does. Archives
+compare with their subfolders whatever the option: going up out of an
+archive's extracted folders, which upstream's temporary path contexts
+handle, is not offered.
 
 ## Deliberately excluded (and why)
 

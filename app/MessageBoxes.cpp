@@ -14,6 +14,7 @@ namespace
 {
 
 const QString kGroup = QStringLiteral("MessageBoxes/");
+const QString kCreatePairFolder = QStringLiteral("CreatePairFolder"); // IDS_CREATE_PAIR_FOLDER
 const QString kFilesSame = QStringLiteral("FilesSame");         // IDS_FILESSAME
 const QString kFileToItself = QStringLiteral("FileToItself");   // IDS_FILE_TO_ITSELF
 const QString kNumReplaced = QStringLiteral("NumReplaced");     // IDS_NUM_REPLACED
@@ -58,6 +59,12 @@ QString suggestIgnoreEolText()
 	return QCoreApplication::translate("MessageBoxes", "Files use different EOL.\n\n"
 		"Treat all EOL as equivalent?\n\n"
 		"Set 'Ignore EOL differences (Windows/Unix/Mac)' in Compare section of Options.");
+}
+
+QString createPairFolderText()
+{
+	return QCoreApplication::translate("MessageBoxes",
+		"Create matching folder:\n%1\non the other side and open?");
 }
 
 QString fileChangedRescanText()
@@ -198,6 +205,7 @@ QList<HideableMessage> hideableMessages()
 {
 	// WinMerge's order (PropMessageBoxes.cpp)
 	return {
+		{ kCreatePairFolder, createPairFolderText(), { AnswerYes, AnswerNo } },
 		{ kFilesSame, filesSameText(), { AnswerOk } },
 		{ kFileToItself, fileToItselfText(), { AnswerOk } },
 		{ kNumReplaced, numReplacedText(), { AnswerOk } },
@@ -374,6 +382,11 @@ bool unattended()
 void reportUnattended(const QString &text, bool question)
 {
 	fprintf(stderr, "%s%s\n", qPrintable(text), question ? ": Cancel" : "");
+}
+
+bool askCreatePairFolder(QWidget *parent, const QString &path)
+{
+	return askYesNo(parent, createPairFolderText().arg(path), kCreatePairFolder);
 }
 
 bool askSuggestIgnoreEol(QWidget *parent, bool *remembered)

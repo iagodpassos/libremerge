@@ -2,6 +2,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include <QElapsedTimer>
 #include <QHash>
 #include <QMainWindow>
@@ -38,8 +39,11 @@ public:
 	/** Empty, editable comparison (WinMerge's File > New). */
 	void openBlankComparison();
 	void openFolderComparison(const QString &leftDir, const QString &rightDir);
-	/** Two or three folders (WinMerge's 3-way folder compare). */
-	void openFolderComparison(const QStringList &dirs);
+	/** Two or three folders (WinMerge's 3-way folder compare), with
+	    their subfolders or not; by default as "Include subfolders" says
+	    (OpenFolderParams::m_bRecurse). */
+	void openFolderComparison(const QStringList &dirs,
+		std::optional<bool> recursive = std::nullopt);
 	/** Two or three sides, each a folder or an archive: archives are
 	    extracted to temp folders and the lot opens as a folder
 	    comparison (WinMerge's DecompressArchive flow). */

@@ -75,6 +75,11 @@ bool askWarning(QWidget *parent, const QString &text);
     compared file since it was loaded, reload it? "Don't ask this question
     again" keeps the answer, so Yes reloads silently from then on. */
 bool askReloadChangedFile(QWidget *parent, const QString &path);
+/** CreateFoldersPair's question when a folder of a comparison without
+    its subfolders is on one side only: create the matching one on the
+    other side and open the two? "Don't ask this question again" keeps the
+    answer. */
+bool askCreatePairFolder(QWidget *parent, const QString &path);
 /** CMergeDoc::OpenDocs' question when the files' lines end otherwise
     (IDS_SUGGEST_IGNOREEOL): treat every line ending as the same? With
     "Don't ask this question again" the answer is kept, and remembered

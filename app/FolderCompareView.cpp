@@ -26,6 +26,7 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSettings>
+#include <QStyle>
 #include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
@@ -61,6 +62,28 @@ enum ItemRole
 	RoleThreeWay,   ///< lm::FolderCompareItem::ThreeWayInfo as int
 	RoleItemIndex,  ///< the item's place in the result's list, where its
 	                ///  folder and the engine's own item are
+	RoleParentFolder, ///< the ".." row of a comparison without subfolders
+};
+
+/** A row of the list. The ".." row (CDirView's special item) heads it
+    whatever it is sorted by. */
+class FolderRow : public QTreeWidgetItem
+{
+public:
+	using QTreeWidgetItem::QTreeWidgetItem;
+
+	bool operator<(const QTreeWidgetItem &other) const override
+	{
+		const bool parent = data(0, RoleParentFolder).toBool();
+		if (parent != other.data(0, RoleParentFolder).toBool())
+		{
+			const QTreeWidget *tree = treeWidget();
+			const bool ascending = tree == nullptr
+				|| tree->header()->sortIndicatorOrder() == Qt::AscendingOrder;
+			return parent == ascending;
+		}
+		return QTreeWidgetItem::operator<(other);
+	}
 };
 
 
@@ -210,7 +233,9 @@ void FolderCompareView::setRowCategory(QTreeWidgetItem *row,
 		row->data(0, RoleFileType).toInt());
 	const QString text = categoryText(category, type, isDir)
 		+ threeWayText(threeWay);
-	row->setText(ColResult, isDir
+	// (nothing for a folder with no result, as a comparison without the
+	// subfolders leaves them)
+	row->setText(ColResult, isDir && !text.isEmpty()
 		? QObject::tr("Folder: %1").arg(text) : text);
 	row->setData(0, RoleCategory, static_cast<int>(category));
 	row->setData(0, RoleThreeWay, static_cast<int>(threeWay));
@@ -529,6 +554,7 @@ void FolderCompareView::start(const QStringList &dirs)
 	m_compareMethod = lm::currentCompareMethod();
 	m_methodButton->setText(lm::compareMethodName(m_compareMethod));
 	m_methodButton->setEnabled(false);
+	m_actTreeMode->setEnabled(m_recursive);
 
 	m_job = std::make_shared<lm::FolderCompareJob>(m_sides);
 	m_status->setText(tr("Scanning\xE2\x80\xA6"));
@@ -540,8 +566,9 @@ void FolderCompareView::start(const QStringList &dirs)
 
 	auto job = m_job;
 	const int method = m_compareMethod;
-	m_watcher.setFuture(QtConcurrent::run([dirs, job, filter, method]() {
-		return lm::compareFolders(dirs, true, job, filter, method);
+	const bool recursive = m_recursive;
+	m_watcher.setFuture(QtConcurrent::run([dirs, recursive, job, filter, method]() {
+		return lm::compareFolders(dirs, recursive, job, filter, method);
 	}));
 }
 
@@ -917,6 +944,8 @@ bool FolderCompareView::rowShowable(QTreeWidgetItem *row, bool treeMode,
 	bool insideShown) const
 {
 	using Item = lm::FolderCompareItem;
+	if (row->data(0, RoleParentFolder).toBool())
+		return true;
 	const QVariant categoryData = row->data(0, RoleCategory);
 	if (!categoryData.isValid())
 		return insideShown; // folder node synthesized for the tree
@@ -1160,7 +1189,8 @@ void FolderCompareView::updateSavedItem(const QStringList &paths,
 
 void FolderCompareView::rebuildRows()
 {
-	const bool treeMode = m_actTreeMode->isChecked();
+	// the tree is for a comparison with its subfolders
+	const bool treeMode = m_recursive && m_actTreeMode->isChecked();
 	m_tree->clear();
 	m_tree->setRootIsDecorated(treeMode);
 	m_tree->setColumnHidden(ColFolder, treeMode);
@@ -1193,17 +1223,28 @@ void FolderCompareView::rebuildRows()
 			{
 				QTreeWidgetItem *parent = folderNode(item.folder, folderNodes);
 				row = parent != nullptr
-					? new QTreeWidgetItem(parent) : new QTreeWidgetItem(m_tree);
+					? new FolderRow(parent) : new FolderRow(m_tree);
 			}
 			if (item.isDir)
 				folderNodes.insert(relPath, row);
 		}
 		else
 		{
-			row = new QTreeWidgetItem(m_tree);
+			row = new FolderRow(m_tree);
 		}
 		fillRow(row, item);
 		row->setData(0, RoleItemIndex, place);
+	}
+	// without the subfolders, ".." goes up to the parent folders, when
+	// they are there (AddSpecialItems, AddParentFolderItem)
+	if (!m_recursive && !parentFolders().isEmpty())
+	{
+		auto *up = new FolderRow(m_tree);
+		up->setText(ColName, QStringLiteral(".."));
+		up->setIcon(ColName, style()->standardIcon(QStyle::SP_FileDialogToParent));
+		up->setData(0, RoleParentFolder, true);
+		up->setData(0, RoleIsFile, false);
+		up->setData(0, RoleName, QStringLiteral(".."));
 	}
 	m_tree->setSortingEnabled(true);
 	m_tree->sortByColumn(treeMode ? ColName : ColFolder, Qt::AscendingOrder);
@@ -1230,7 +1271,7 @@ QTreeWidgetItem *FolderCompareView::folderNode(const QString &folder,
 	const QString name = slash < 0 ? folder : folder.mid(slash + 1);
 	QTreeWidgetItem *parent = folderNode(parentFolder, nodes);
 	auto *row = parent != nullptr
-		? new QTreeWidgetItem(parent) : new QTreeWidgetItem(m_tree);
+		? new FolderRow(parent) : new FolderRow(m_tree);
 	row->setText(ColName, name);
 	row->setText(ColFolder, parentFolder);
 	for (int i = 0; i < m_sides; ++i)
@@ -1495,6 +1536,11 @@ void FolderCompareView::itemActivated(QTreeWidgetItem *item, int column)
 	Q_UNUSED(column);
 	if (item == nullptr)
 		return;
+	if (item->data(0, RoleParentFolder).toBool())
+	{
+		openParentFolders();
+		return;
+	}
 	// CDirView::OnChar: Enter opens the selection, two or three items
 	// compared with each other (nothing when they do not go together)
 	const QList<QTreeWidgetItem *> rows = selectedResultRows();
@@ -1509,8 +1555,15 @@ void FolderCompareView::itemActivated(QTreeWidgetItem *item, int column)
 
 void FolderCompareView::openRow(QTreeWidgetItem *row)
 {
-	if (row == nullptr || !row->data(0, RoleIsFile).toBool())
+	if (row == nullptr)
 		return;
+	if (!row->data(0, RoleIsFile).toBool())
+	{
+		// a folder item of a comparison without its subfolders
+		if (!m_recursive && row->data(0, RoleCategory).isValid())
+			openFolderRow(row);
+		return;
+	}
 	// upstream's CDirView::Open: every side opens, one the item misses as
 	// an empty untitled pane (its path left empty)
 	QStringList paths;
@@ -1520,6 +1573,65 @@ void FolderCompareView::openRow(QTreeWidgetItem *row)
 		emit openFileComparison3Requested(paths);
 	else
 		emit openFileComparisonRequested(paths.at(0), paths.at(1));
+}
+
+QStringList FolderCompareView::roots() const
+{
+	QStringList dirs;
+	for (int i = 0; i < m_sides; ++i)
+		dirs.append(m_roots[i]);
+	return dirs;
+}
+
+QStringList FolderCompareView::parentFolders() const
+{
+	QStringList parents;
+	for (int i = 0; i < m_sides; ++i)
+	{
+		const QString root = QDir::cleanPath(m_roots[i]);
+		const QString parent = QFileInfo(root).path();
+		if (parent == root || !QFileInfo(parent).isDir())
+			return {};
+		parents.append(parent);
+	}
+	return parents;
+}
+
+void FolderCompareView::openParentFolders()
+{
+	const QStringList parents = parentFolders();
+	if (parents.isEmpty())
+		return;
+	if (QGuiApplication::keyboardModifiers() & Qt::ControlModifier)
+		emit openFolderComparisonRequested(parents);
+	else
+		compareInPlace(parents);
+}
+
+void FolderCompareView::openFolderRow(QTreeWidgetItem *row)
+{
+	QStringList dirs;
+	for (int i = 0; i < m_sides; ++i)
+	{
+		const QString path = intendedSidePath(row, i);
+		if (!QFileInfo(path).isDir() && lm::askCreatePairFolder(this, path))
+			QDir().mkpath(path);
+		if (!QFileInfo(path).isDir())
+			return;
+		dirs.append(path);
+	}
+	if (QGuiApplication::keyboardModifiers() & Qt::ControlModifier)
+		emit openFolderComparisonRequested(dirs);
+	else
+		compareInPlace(dirs);
+}
+
+void FolderCompareView::compareInPlace(const QStringList &dirs)
+{
+	if (m_job)
+		return; // still comparing
+	start(dirs);
+	emit rootsChanged();
 }
 
 QList<QTreeWidgetItem *> FolderCompareView::selectedResultRows() const
@@ -1537,11 +1649,12 @@ bool FolderCompareView::itemsComparable(SelectionType type) const
 	const QList<QTreeWidgetItem *> rows = selectedResultRows();
 	if (rows.isEmpty() || rows.size() > 3)
 		return false;
-	// the comparison is recursive: its folders do not compare as items,
-	// as upstream's menu leaves Compare out when one is selected
+	// a comparison with its subfolders compares no folder as an item, as
+	// upstream's menu leaves Compare out when one is selected; one without
+	// them opens a folder item by itself (AreItemsComparableIndivisually)
 	for (QTreeWidgetItem *row : rows)
 		if (!row->data(0, RoleIsFile).toBool())
-			return false;
+			return !m_recursive && rows.size() == 1 && type == SelectionNormal;
 	const auto exists = [this](QTreeWidgetItem *row, int side) {
 		return !sidePath(row, side).isEmpty();
 	};

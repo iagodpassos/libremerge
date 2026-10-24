@@ -92,6 +92,12 @@ QString compareMethodName(int method);
 void setCompareMethodForTest(int method);
 /** Set it for this run only, unsaved (the command line's -m). */
 void useCompareMethod(int method);
+
+/** WinMerge's OPT_CMP_INCLUDE_SUBDIRS ("Include subfolders" on the
+    selection screen, on by default): a folder comparison takes the
+    subfolders in. */
+bool includeSubfolders();
+void saveIncludeSubfolders(bool include);
 /** Set options by name for this run only, unsaved (the command line's
     -ignorews... and -cfg, CMergeApp::ApplyCommandLineConfigOptions),
     the engine's and those LibreMerge keeps itself (lm::useSetting): a

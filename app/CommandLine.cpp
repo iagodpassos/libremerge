@@ -301,11 +301,13 @@ CommandLine CommandLine::parse(const QStringList &arguments)
 			value();
 			unsupported(param);
 		}
-		else if (param == QStringLiteral("r") || param == QStringLiteral("r-"))
+		else if (param == QStringLiteral("r"))
 		{
+			cmd.recursive = hasColonValue ? colonValue.toInt() != 0 : true;
 			hasColonValue = false;
-			unsupported(QStringLiteral("r"));
 		}
+		else if (param == QStringLiteral("r-"))
+			cmd.recursive = false;
 		else if (param == QStringLiteral("clipboard-compare") || param == QStringLiteral("al")
 			|| param == QStringLiteral("am") || param == QStringLiteral("ar"))
 			unsupported(param);
@@ -347,6 +349,7 @@ QString CommandLine::usage()
 		"  -xq             close when the files are identical, quietly\n"
 		"  -t type         compare as automatic, text, table, binary, image\n"
 		"                  or folder\n"
+		"  -r, -r-         compare folders with their subfolders, or without\n"
 		"  -m method       compare folders by full, quick, binary, date,\n"
 		"                  sizedate, size or existence\n"
 		"  -f filter       the file filter (\"*.h;*.cpp\", a filter's name or\n"

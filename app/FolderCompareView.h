@@ -44,6 +44,14 @@ public:
 	void start(const QString &leftDir, const QString &rightDir);
 	/** Same, for two or three folders (3-way folder compare). */
 	void start(const QStringList &dirs);
+	/** Whether the comparison takes the subfolders in (WinMerge's
+	    "Include subfolders", CDiffContext::m_bRecursive), set before it
+	    starts. Without them, the subfolders are items of their own, which
+	    open in this window, and ".." goes up to the parent folders. */
+	void setRecursive(bool recursive) { m_recursive = recursive; }
+	bool isRecursive() const { return m_recursive; }
+	/** The folders compared. */
+	QStringList roots() const;
 
 	/** A file opened from this comparison was saved: refresh its row,
 	    WinMerge's CDirDoc::UpdateChangedItem. */
@@ -163,6 +171,12 @@ signals:
 	/** A comparison ended (CDirView::Redisplay's SetLastCompareResult):
 	    how many items differ, or -1 when it failed or was stopped. */
 	void compared(int differences);
+	/** Other folders are compared in this window now (a subfolder or the
+	    parent folders of a comparison without the subfolders). */
+	void rootsChanged();
+	/** A comparison of these folders asked for in a window of its own
+	    (Ctrl held as a folder item or ".." opens). */
+	void openFolderComparisonRequested(const QStringList &dirs);
 
 protected:
 	/** Esc stops a running comparison, like CDirView; otherwise it goes
@@ -206,6 +220,18 @@ private:
 	void compareSelection();
 	/** One item's sides compared (CDirView::Open of one item). */
 	void openRow(QTreeWidgetItem *row);
+	/** A folder item's sides compared, in this window or one of its own
+	    with Ctrl held; a side the folder is not on is offered to be
+	    created first (CreateFoldersPair). */
+	void openFolderRow(QTreeWidgetItem *row);
+	/** CheckAllowUpwardDirectory: the folders the compared ones are in,
+	    empty when one of them is not there. */
+	QStringList parentFolders() const;
+	/** CDirView::OpenParentDirectory: the parent folders, in this window
+	    or one of its own with Ctrl held. */
+	void openParentFolders();
+	/** Compare other folders in this window. */
+	void compareInPlace(const QStringList &dirs);
 	int colSize(int side) const { return 3 + side; }
 	int colDate(int side) const { return 3 + m_sides + side; }
 	int colCount() const { return 3 + 2 * m_sides; }
@@ -230,6 +256,7 @@ private:
 
 	QString m_roots[3];
 	int m_sides = 2;
+	bool m_recursive = true;
 	int m_rowsRemoved = 0; // rows dropped since the scan (delete ops)
 	bool m_show[ShowFilterCount] = {};
 	int m_hiddenRows = 0; // result items the View filters leave out

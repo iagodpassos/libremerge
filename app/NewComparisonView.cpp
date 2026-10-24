@@ -3,6 +3,7 @@
 #include "ArchiveCompare.h"
 #include "FileFilterCombo.h"
 #include "FileFilterMenu.h"
+#include "EngineOptions.h"
 #include "FileFilters.h"
 #include "OptionsDialog.h"
 #include "StarPrompt.h"
@@ -169,9 +170,8 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 
 	// WinMerge's "Folder: Filter" group: the file filter a folder
 	// comparison goes by, typed here, put together from the button's
-	// menu or picked in Tools > Filters. Its
-	// "Include subfolders" box is not here: folders compare with their
-	// subfolders
+	// menu or picked in Tools > Filters, and whether it takes the
+	// subfolders in
 	m_filterTitle = new QLabel(tr("Folder: Filter"), content);
 	QFont filterBold = m_filterTitle->font();
 	filterBold.setBold(true);
@@ -216,6 +216,11 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 	});
 	filterRow->addWidget(m_selectFilterButton);
 	layout->addLayout(filterRow);
+	// OPT_CMP_INCLUDE_SUBDIRS, saved as Compare runs (COpenView::OnOK)
+	m_includeSubfolders = new QCheckBox(tr("&Include subfolders"), content);
+	m_includeSubfolders->setObjectName(QStringLiteral("includeSubfolders"));
+	m_includeSubfolders->setChecked(lm::includeSubfolders());
+	layout->addWidget(m_includeSubfolders);
 
 	layout->addStretch(1);
 	// (where the request for a star goes, see below)
@@ -370,10 +375,14 @@ void NewComparisonView::verifyPaths()
 
 void NewComparisonView::showFilterGroup(bool visible, bool enabled)
 {
+	// "Include subfolders" with them (COpenView::UpdateButtonStates)
 	for (QWidget *widget : { static_cast<QWidget *>(m_filterTitle),
 			static_cast<QWidget *>(m_filterCombo),
-			static_cast<QWidget *>(m_selectFilterButton) })
+			static_cast<QWidget *>(m_selectFilterButton),
+			static_cast<QWidget *>(m_includeSubfolders) })
 	{
+		if (widget == nullptr)
+			continue;
 		widget->setVisible(visible);
 		widget->setEnabled(enabled);
 	}
@@ -607,6 +616,7 @@ void NewComparisonView::compare()
 		if (info.isFile())
 		{
 			applyFileFilter();
+			lm::saveIncludeSubfolders(m_includeSubfolders->isChecked());
 			emit compareRequested(paths, readOnly, false);
 		}
 		else if (!info.exists())
@@ -644,5 +654,6 @@ void NewComparisonView::compare()
 	}
 	rememberPaths(paths);
 	applyFileFilter();
+	lm::saveIncludeSubfolders(m_includeSubfolders->isChecked());
 	emit compareRequested(paths, readOnly, folders);
 }

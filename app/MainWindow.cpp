@@ -1288,12 +1288,12 @@ void MainWindow::openFromCommandLine(const lm::CommandLine &cmd)
 			openImageComparison(paths, readOnly);
 			break;
 		case Cmd::WindowType::Folder:
-			openFolderComparison(paths);
+			openFolderComparison(paths, cmd.recursive);
 			break;
 		default:
 			// folders and archives, in any mix, compare as folders
 			if (allFolderLike(paths))
-				openFolderComparison(paths);
+				openFolderComparison(paths, cmd.recursive);
 			else
 				openFileComparison(paths, readOnly);
 			break;
@@ -1741,7 +1741,7 @@ void MainWindow::openFolderComparison(const QString &leftDir, const QString &rig
 	openFolderComparison(QStringList{ leftDir, rightDir });
 }
 
-void MainWindow::openFolderComparison(const QStringList &dirs)
+void MainWindow::openFolderComparison(const QStringList &dirs, std::optional<bool> recursive)
 {
 	for (const QString &dir : dirs)
 		if (!QFileInfo(dir).isDir())
@@ -1751,6 +1751,7 @@ void MainWindow::openFolderComparison(const QStringList &dirs)
 			return;
 		}
 	auto *view = new FolderCompareView(this);
+	view->setRecursive(recursive.value_or(lm::includeSubfolders()));
 	connect(view, &FolderCompareView::filtersRequested, this, &MainWindow::showFilters);
 	connect(view, &FolderCompareView::compared, this,
 		[this](int differences) { noteCompareResult(differences); });
@@ -1764,18 +1765,36 @@ void MainWindow::openFolderComparison(const QStringList &dirs)
 			openFileComparison(paths);
 			wireFolderRowSync(view);
 		});
-	QStringList names, tips;
-	for (const QString &dir : dirs)
-	{
-		names.append(displayName(dir));
-		tips.append(dir);
-	}
-	const int index = m_tabs->addTab(view,
-		names.join(QString::fromUtf8(" \xE2\x86\x94 ")));
-	m_tabs->setTabToolTip(index, tips.join(QStringLiteral("\n")));
+	// a subfolder or the parent folders, in a window of their own; not
+	// among the recent ones (FFILEOPEN_NOMRU)
+	connect(view, &FolderCompareView::openFolderComparisonRequested, this,
+		[this, view](const QStringList &others) {
+			const lm::CommandLine noRecent = [] {
+				lm::CommandLine cmd;
+				cmd.leftFlags = lm::CommandLine::NoMru;
+				return cmd;
+			}();
+			m_openingCommandLine = &noRecent;
+			openFolderComparison(others, view->isRecursive());
+			m_openingCommandLine = nullptr;
+		});
+	const auto nameTab = [this, view]() {
+		QStringList names, tips;
+		for (const QString &dir : view->roots())
+		{
+			names.append(displayName(dir));
+			tips.append(dir);
+		}
+		const int index = m_tabs->indexOf(view);
+		m_tabs->setTabText(index, names.join(QString::fromUtf8(" \xE2\x86\x94 ")));
+		m_tabs->setTabToolTip(index, tips.join(QStringLiteral("\n")));
+	};
+	connect(view, &FolderCompareView::rootsChanged, this, nameTab);
+	const int index = m_tabs->addTab(view, QString());
 	m_tabs->setCurrentIndex(index);
 	rememberComparison(dirs);
 	view->start(dirs);
+	nameTab();
 }
 
 void MainWindow::openArchiveComparison(const QStringList &sources)

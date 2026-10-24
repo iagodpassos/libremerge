@@ -46,6 +46,9 @@ struct CommandLine
 	ExitNoDiff exitIfNoDiff = ExitNoDiff::Disabled;
 	/** WinMerge's compare methods, CMP_CONTENT to CMP_EXISTENCE (-m). */
 	std::optional<int> compareMethod;
+	/** Folders compared with their subfolders or not (-r, -r-, -r:0);
+	    "Include subfolders" when not given. */
+	std::optional<bool> recursive;
 	bool showUsage = false;
 	bool showVersion = false; ///< --version, Qt's switch kept
 	bool selfCompare = false;

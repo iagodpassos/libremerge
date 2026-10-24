@@ -86,6 +86,7 @@ private:
 	QLabel *m_filterTitle = nullptr;
 	FileFilterCombo *m_filterCombo = nullptr;
 	QToolButton *m_selectFilterButton = nullptr;
+	QCheckBox *m_includeSubfolders = nullptr;
 	FileFilterMenu *m_filterMenu = nullptr;
 	QLabel *m_hint;
 	QPushButton *m_compareButton = nullptr;

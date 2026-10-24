@@ -63,7 +63,11 @@ FolderCompareItem::Category classify(const DIFFITEM &di, int sides)
 		return FolderCompareItem::MissingRight;
 	if (di.diffcode.isResultSame())
 		return FolderCompareItem::Identical;
-	return FolderCompareItem::Different;
+	if (di.diffcode.isResultDiff())
+		return FolderCompareItem::Different;
+	// no result: a folder of a comparison without its subfolders, which
+	// compares no folder (ColStatusGet says nothing of it)
+	return FolderCompareItem::NotCompared;
 }
 
 /** Which pair stayed identical (the 3-way suffix of WinMerge's Result

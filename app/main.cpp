@@ -541,6 +541,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestCommandLineOpt(QStringLiteral("selftest-command-line"),
 		QStringLiteral("Read WinMerge's command line switches and open what they ask for (for testing)"));
 	parser.addOption(selftestCommandLineOpt);
+	QCommandLineOption selftestSubfoldersOpt(QStringLiteral("selftest-subfolders"),
+		QStringLiteral("Compare folders without their subfolders: folder items, \"..\", opening in place, the selection screen's box and -r (for testing)"));
+	parser.addOption(selftestSubfoldersOpt);
 	QCommandLineOption selftestFolderSelectionOpt(QStringLiteral("selftest-folder-selection"),
 		QStringLiteral("Compare two or three selected items of a folder comparison with each other (for testing)"));
 	parser.addOption(selftestFolderSelectionOpt);
@@ -2223,13 +2226,17 @@ int main(int argc, char *argv[])
 			const QList<lm::HideableMessage> listed = lm::hideableMessages();
 			while (row < listed.size() && listed.at(row).key != key)
 				++row;
+			int information = 0; // an information box's: the identical files'
+			while (information < listed.size()
+				&& listed.at(information).key != QStringLiteral("FilesSame"))
+				++information;
 			bool fine = rows.size() == listed.size() && row < rows.size() && rows.at(row).second
 				&& dialog.messageBoxAnswerForTest(row) == lm::answerText(lm::AnswerYes)
-				&& dialog.messageBoxAnswerForTest(0).isEmpty();
+				&& dialog.messageBoxAnswerForTest(information).isEmpty();
 			dialog.setMessageBoxAnswerForTest(row, 1);
-			dialog.setMessageBoxHiddenForTest(0, true);
-			fine = fine && dialog.messageBoxAnswerForTest(0) == lm::answerText(lm::AnswerOk);
-			dialog.setMessageBoxHiddenForTest(0, false);
+			dialog.setMessageBoxHiddenForTest(information, true);
+			fine = fine && dialog.messageBoxAnswerForTest(information) == lm::answerText(lm::AnswerOk);
+			dialog.setMessageBoxHiddenForTest(information, false);
 			dialog.saveForTest();
 			fine = fine && lm::rememberedAnswer(key) == lm::AnswerNo;
 			write(b, "one\ntwo\nthree\nfour\n");
@@ -2600,19 +2607,24 @@ int main(int argc, char *argv[])
 		{
 			OptionsDialog dialog;
 			const auto rows = dialog.messageBoxesForTest();
-			dialog.setMessageBoxHiddenForTest(0, true);
+			int same = 0; // the identical files' row
+			while (same < lm::hideableMessages().size()
+				&& lm::hideableMessages().at(same).key != QStringLiteral("FilesSame"))
+				++same;
+			dialog.setMessageBoxHiddenForTest(same, true);
 			dialog.saveForTest();
 			const bool saved = lm::messageHidden(QStringLiteral("FilesSame"));
 			shown.clear();
 			dialog.resetMessageBoxesForTest();
-			// WinMerge's order: the four answers kept since 0.9.x, the
-			// question about files whose lines end otherwise
-			// (IDS_SUGGEST_IGNOREEOL) and the one before Copy All
+			// WinMerge's order: the folder window's question about a folder
+			// on one side (IDS_CREATE_PAIR_FOLDER), the four answers kept
+			// since 0.9.x, the question about files whose lines end
+			// otherwise (IDS_SUGGEST_IGNOREEOL) and the one before Copy All
 			// (IDS_CONFIRM_COPY_ALL_DIFFS)
-			check(rows.size() == lm::hideableMessages().size() && rows.size() == 6
-				&& !rows.at(0).second && saved
+			check(rows.size() == lm::hideableMessages().size() && rows.size() == 7
+				&& same == 1 && !rows.at(same).second && saved
 				&& !lm::messageHidden(QStringLiteral("FilesSame"))
-				&& !dialog.messageBoxesForTest().at(0).second,
+				&& !dialog.messageBoxesForTest().at(same).second,
 				"Message Boxes page: hide, save and reset");
 		}
 		lm::setMessageSinkForTest([](const QString &) {});
@@ -11463,6 +11475,148 @@ int main(int argc, char *argv[])
 		return ok ? 0 : 1;
 	}
 
+	if (parser.isSet(selftestSubfoldersOpt))
+	{
+		// WinMerge's "Include subfolders" off (CDiffContext::m_bRecursive):
+		// the top folders' items only, the subfolders among them with no
+		// result, ".." up to the parent folders, a folder item opening in
+		// the same window (a missing side created first when the user says
+		// so), the selection screen's box and the command line's -r
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).path());
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 30; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto waitFor = [&settle](FolderCompareView &view)
+		{
+			for (int i = 0; i < 300 && view.isComparing(); ++i)
+				settle();
+			settle();
+		};
+		const QString left = dir.filePath(QStringLiteral("left"));
+		const QString right = dir.filePath(QStringLiteral("right"));
+		write(left + QStringLiteral("/a.txt"), "same\n");
+		write(right + QStringLiteral("/a.txt"), "same\n");
+		write(left + QStringLiteral("/sub/x.txt"), "1\n");
+		write(right + QStringLiteral("/sub/x.txt"), "2\n");
+		write(left + QStringLiteral("/onlyleft/y.txt"), "y\n");
+		using Item = lm::FolderCompareItem;
+		{
+			FolderCompareView view;
+			view.setRecursive(false);
+			int moved = 0;
+			QObject::connect(&view, &FolderCompareView::rootsChanged, [&moved]() { ++moved; });
+			view.start({ left, right });
+			waitFor(view);
+			check(view.rowCategoryForTest(QStringLiteral("a.txt")) == Item::Identical
+					&& view.rowCategoryForTest(QStringLiteral("sub")) == Item::NotCompared
+					&& view.rowResultForTest(QStringLiteral("sub")).isEmpty()
+					&& view.rowCategoryForTest(QStringLiteral("onlyleft")) == Item::LeftOnly
+					&& view.rowCategoryForTest(QStringLiteral("x.txt")) == -1,
+				"without subfolders: the top items, a folder on both sides with no result");
+			check(view.rowShownForTest(QStringLiteral("..")), "\"..\" heads the list");
+			view.activateRowForTest(QStringLiteral("sub"));
+			waitFor(view);
+			check(moved == 1 && view.roots() == QStringList({ left + QStringLiteral("/sub"),
+					right + QStringLiteral("/sub") })
+					&& view.rowCategoryForTest(QStringLiteral("x.txt")) == Item::Different,
+				"a folder item opens in the same window");
+			view.activateRowForTest(QStringLiteral(".."));
+			waitFor(view);
+			check(moved == 2 && view.roots() == QStringList({ left, right }),
+				"\"..\" goes back up to the parent folders");
+			QStringList asked;
+			lm::setQuestionSinkForTest([&asked](const QString &text, bool *) {
+				asked << text;
+				return true;
+			});
+			view.activateRowForTest(QStringLiteral("onlyleft"));
+			waitFor(view);
+			lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
+			check(asked.size() == 1 && asked.first().contains(right + QStringLiteral("/onlyleft"))
+					&& QFileInfo(right + QStringLiteral("/onlyleft")).isDir()
+					&& view.roots().value(1) == right + QStringLiteral("/onlyleft"),
+				"a folder on one side: the matching one created on the user's word, and opened");
+			QDir(right + QStringLiteral("/onlyleft")).removeRecursively();
+		}
+		{
+			FolderCompareView view;
+			view.start({ left, right });
+			waitFor(view);
+			check(view.isRecursive() && view.rowCategoryForTest(QStringLiteral("x.txt")) == Item::Different
+					&& !view.rowShownForTest(QStringLiteral("..")),
+				"with subfolders, as by default: no \"..\"");
+		}
+		// the selection screen's box saves the option as Compare runs, and
+		// the comparison goes by it
+		{
+			MainWindow window;
+			window.openSelector({ left, right });
+			auto *selector = window.findChild<NewComparisonView *>();
+			auto *box = selector != nullptr
+				? selector->findChild<QCheckBox *>(QStringLiteral("includeSubfolders")) : nullptr;
+			if (box == nullptr)
+				return 2;
+			const bool onAtFirst = box->isChecked();
+			box->setChecked(false);
+			QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+			QCoreApplication::sendEvent(selector->findChild<QLineEdit *>(), &enter);
+			settle();
+			auto *view = window.findChild<FolderCompareView *>();
+			check(onAtFirst && !lm::includeSubfolders() && view != nullptr && !view->isRecursive(),
+				"the selection screen's \"Include subfolders\": on by default, saved, followed");
+			lm::saveIncludeSubfolders(true);
+		}
+		// -r- on the command line, whatever the option
+		{
+			MainWindow window;
+			window.openFromCommandLine(lm::CommandLine::parse({ QStringLiteral("-r-"), left, right }));
+			auto *view = window.findChild<FolderCompareView *>();
+			check(view != nullptr && !view->isRecursive(), "-r-: without the subfolders");
+		}
+		// unattended, without the subfolders a subfolder's differences
+		// do not count
+		const auto run = [](const QStringList &arguments) {
+			QProcess process;
+			process.start(QCoreApplication::applicationFilePath(), arguments);
+			if (!process.waitForFinished(60000))
+			{
+				process.kill();
+				process.waitForFinished();
+				return -100;
+			}
+			return process.exitStatus() == QProcess::NormalExit ? process.exitCode() : -101;
+		};
+		QDir(left + QStringLiteral("/onlyleft")).removeRecursively();
+		const QStringList unattended = { QStringLiteral("-noninteractive"),
+			QStringLiteral("-enableexitcode"), QStringLiteral("-noprefs") };
+		check(run(unattended + QStringList{ QStringLiteral("-r-"), left, right }) == 0
+				&& run(unattended + QStringList{ QStringLiteral("-r"), left, right }) == 1,
+			"-r- and -r: the subfolder's difference counts only with the subfolders");
+		printf("subfolders: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
 	if (parser.isSet(selftestCommandLineOpt))
 	{
 		// WinMerge's command line (MergeCmdLineInfo, ParseArgsAndDoOpen):
@@ -11545,7 +11699,8 @@ int main(int argc, char *argv[])
 				QStringLiteral("-t"), QStringLiteral("web"), QStringLiteral("-l"), QStringLiteral("0"),
 				QStringLiteral("-xyz"), QStringLiteral("--new"), QStringLiteral("-new"), QStringLiteral("-?") });
 			check(cmd.paths.isEmpty()
-					&& cmd.unsupported == QStringList({ QStringLiteral("-r"), QStringLiteral("-t webpage") })
+					&& cmd.unsupported == QStringList({ QStringLiteral("-t webpage") })
+					&& cmd.recursive == false
 					&& cmd.errors == QStringList({ QStringLiteral("Invalid line number specified"),
 						QStringLiteral("Unknown option '-xyz'") })
 					&& cmd.newCompare && cmd.showUsage,

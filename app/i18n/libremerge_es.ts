@@ -3731,6 +3731,14 @@ Nota: si desea tratar siempre todos los tipos de saltos de línea como equivalen
         <translation>¿Copiar todas las diferencias al otro archivo?</translation>
     </message>
     <message>
+        <source>Create matching folder:
+%1
+on the other side and open?</source>
+        <translation>¿Quiere crear la carpeta que coincide con
+%1
+en el otro lado y abrirla?</translation>
+    </message>
+    <message>
         <source>Don&apos;t ask this question again.</source>
         <translatorcomment>After WinMerge&apos;s &quot;Don&apos;t ask this &amp;question again.&quot;.</translatorcomment>
         <translation>No preguntar de nuevo.</translation>
@@ -3844,6 +3852,10 @@ Comprobando la identidad binaria...</translation>
         <source>Folder...</source>
         <translatorcomment>After WinMerge&apos;s &quot;Folder&quot;.</translatorcomment>
         <translation>Carpeta...</translation>
+    </message>
+    <message>
+        <source>&amp;Include subfolders</source>
+        <translation>&amp;Incluir subcarpetas</translation>
     </message>
     <message>
         <source>Select two (or three) folders/files to compare.</source>

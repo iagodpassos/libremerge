@@ -4007,6 +4007,16 @@ Nota: Si voleu tractar els salts de línia sempre com a equivalents, especifique
         <translation>Esteu segur que voleu copiar totes les diferències a l&apos;altre fitxer?</translation>
     </message>
     <message>
+        <source>Create matching folder:
+%1
+on the other side and open?</source>
+        <translation>El directori existeix només en un costat i no es pot obrir.
+
+Voleu crear el directori corresponent del costat:
+%1
+i obrir ambdós directoris?</translation>
+    </message>
+    <message>
         <source>Don&apos;t ask this question again.</source>
         <translatorcomment>After WinMerge&apos;s &quot;Don&apos;t ask this &amp;question again.&quot;.</translatorcomment>
         <translation>No tornis a preguntar-ho.</translation>
@@ -4123,6 +4133,10 @@ S&apos;està comprovant la identitat binària...</translation>
         <source>Folder...</source>
         <translatorcomment>After WinMerge&apos;s &quot;Folder&quot;.</translatorcomment>
         <translation>Directori...</translation>
+    </message>
+    <message>
+        <source>&amp;Include subfolders</source>
+        <translation>&amp;Inclou-hi les subcarpetes</translation>
     </message>
     <message>
         <source>Select two (or three) folders/files to compare.</source>
