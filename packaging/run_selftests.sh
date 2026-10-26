@@ -97,6 +97,7 @@ LIBREMERGE_LANGUAGE=fr run_one selftest-app-menu
 run_one selftest-about
 run_one selftest-options
 run_one selftest-general-options
+run_one selftest-tab-close
 run_one selftest-identical
 run_one selftest-reload
 run_one selftest-compare-options

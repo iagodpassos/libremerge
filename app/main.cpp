@@ -650,6 +650,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestGeneralOptionsOpt(QStringLiteral("selftest-general-options"),
 		QStringLiteral("Exercise Close with Esc, Preserve file time, Close the selection on Compare and auto completion (for testing)"));
 	parser.addOption(selftestGeneralOptionsOpt);
+	QCommandLineOption selftestTabCloseOpt(QStringLiteral("selftest-tab-close"),
+		QStringLiteral("Close comparison tabs and verify which tab becomes current (for testing)"));
+	parser.addOption(selftestTabCloseOpt);
 	QCommandLineOption selftestIdenticalOpt(QStringLiteral("selftest-identical"),
 		QStringLiteral("Verify the identical files message, the self-compare and the Message Boxes page (for testing)"));
 	parser.addOption(selftestIdenticalOpt);
@@ -7630,6 +7633,70 @@ int main(int argc, char *argv[])
 		}
 
 		printf("general options: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestTabCloseOpt))
+	{
+		// closing the current tab goes back to the one current before it,
+		// as MDI's Z order does in WinMerge (issue #16)
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		QStringList files;
+		for (int i = 0; i < 6; ++i)
+		{
+			const QString path = dir.filePath(QStringLiteral("f%1.txt").arg(i));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				return 2;
+			f.write(QByteArray::number(i) + '\n');
+			files.append(path);
+		}
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		MainWindow window;
+		window.show();
+		auto *tabs = window.findChild<QTabWidget *>();
+		const auto closeTab = [tabs](int index)
+		{
+			emit tabs->tabCloseRequested(index);
+			QCoreApplication::processEvents();
+		};
+		// the comparisons A, B, C and D, opened in that order
+		QList<QWidget *> pages;
+		for (int i = 0; i < 4; ++i)
+		{
+			window.openFileComparison({ files[i], files[i + 1] });
+			pages.append(tabs->currentWidget());
+		}
+		QCoreApplication::processEvents();
+
+		// back to A, a comparison opened from there and closed: A again,
+		// not D, its neighbour
+		tabs->setCurrentWidget(pages[0]);
+		window.openFileComparison({ files[4], files[5] });
+		QCoreApplication::processEvents();
+		closeTab(tabs->currentIndex());
+		check(tabs->count() == 4 && tabs->currentWidget() == pages[0],
+			"Closing returns to the tab it was opened from");
+
+		// A, then C, then B, and C closed from its own tab: B stays, and
+		// closing it skips C and goes back to A, where a neighbour is D
+		tabs->setCurrentWidget(pages[2]);
+		tabs->setCurrentWidget(pages[1]);
+		closeTab(tabs->indexOf(pages[2]));
+		check(tabs->count() == 3 && tabs->currentWidget() == pages[1],
+			"Closing another tab keeps the current one");
+		closeTab(tabs->currentIndex());
+		check(tabs->count() == 2 && tabs->currentWidget() == pages[0],
+			"Closing skips a tab closed meanwhile");
+
+		printf("tab close: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

@@ -5,7 +5,9 @@
 #include <optional>
 #include <QElapsedTimer>
 #include <QHash>
+#include <QList>
 #include <QMainWindow>
+#include <QPointer>
 
 #include "CommandLine.h"
 #include "FileOps.h"
@@ -168,6 +170,8 @@ private:
 	void reopenComparison(const QStringList &paths);
 
 	QTabWidget *m_tabs;
+	// the tabs in MDI's Z order: the most recently current first
+	QList<QPointer<QWidget>> m_tabHistory;
 	QMenu *m_helpMenu = nullptr;
 	QFileSystemWatcher *m_fileWatcher;
 	QTimer *m_watchTimer;     // gathers a burst of change notifications

@@ -142,6 +142,14 @@ MainWindow::MainWindow(QWidget *parent)
 	m_tabs->setTabsClosable(true);
 	m_tabs->setDocumentMode(true);
 	connect(m_tabs, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
+	connect(m_tabs, &QTabWidget::currentChanged, this, [this](int index) {
+		QWidget *page = m_tabs->widget(index);
+		m_tabHistory.removeIf([page](const QPointer<QWidget> &tab) {
+			return tab.isNull() || tab == page;
+		});
+		if (page != nullptr)
+			m_tabHistory.prepend(page);
+	});
 	setCentralWidget(m_tabs);
 
 	// WinMerge's checks for files another application changed
@@ -2302,6 +2310,22 @@ void MainWindow::closeTab(int index)
 	QWidget *page = m_tabs->widget(index);
 	if (!promptAndSaveIfNeeded(page, true))
 		return;
+	// MDI activates the window under the closing one in Z order, the
+	// comparison that was current before it, where QTabWidget would pick
+	// a neighbouring tab (issue #16). Switching before the removal spares
+	// that neighbour a file check it is not shown for
+	if (index == m_tabs->currentIndex())
+	{
+		for (const QPointer<QWidget> &tab : std::as_const(m_tabHistory))
+		{
+			const int tabIndex = m_tabs->indexOf(tab);
+			if (tabIndex >= 0 && tabIndex != index)
+			{
+				m_tabs->setCurrentIndex(tabIndex);
+				break;
+			}
+		}
+	}
 	m_tabs->removeTab(index);
 	delete page;
 	updateFileWatches();
