@@ -30,6 +30,7 @@ class LineFilterHelper;
 class LocationPane;
 class PaneSearch;
 class SyntaxHighlighter;
+struct DIFFOPTIONS;
 
 /**
  * File comparison and merge view for 2 or 3 files: editable side-by-side
@@ -417,6 +418,8 @@ private:
 	    otherwise. */
 	void suggestIgnoreEol();
 	void computeWordSpans();
+	void computeWordSpans(int blockIndex, const int first[3], const int last[3],
+		const DIFFOPTIONS &options, int breakType, bool byteLevel);
 	void applyHighlights();
 	void updateStatus();
 	void updateDiffPane();

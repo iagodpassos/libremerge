@@ -2541,9 +2541,12 @@ void FileCompareView::resetUndoHistory()
 }
 
 /** Intra-line (word-level) diff spans, computed like upstream's
-    CMergeDoc::GetWordDiffArrayInRange: the whole diff block is joined per
-    side and diffed once, so the marks stay meaningful even when the sides
-    have different line counts. */
+    CMergeDoc::GetWordDiffArray: the whole diff block is joined per side
+    and diffed once, so the marks stay meaningful even when the sides have
+    different line counts; a block of more than 21 lines is diffed line by
+    line of the view instead (IsDiffPerLine), a ghost line as no text.
+    None for a block that has lines on one side only, as
+    CMergeEditView::GetAdditionalTextBlocks draws none there. */
 void FileCompareView::computeWordSpans()
 {
 	m_wordSpans.clear();
@@ -2562,107 +2565,141 @@ void FileCompareView::computeWordSpans()
 		const Block &block = m_blocks[b];
 		if (block.trivial || block.resolved)
 			continue;
-
-		QList<QByteArray> lineBytes[3];
-		String joined[3];
-		std::vector<int> lineStart[3];
-		bool tooBig = false;
-		int nonEmptySides = 0;
+		int sidesWithLines = 0;
+		int maxLen = 0;
 		for (int side = 0; side < m_paneCount; ++side)
 		{
-			String &text = joined[side];
-			for (int line = block.begin[side]; line <= block.end[side]; ++line)
-			{
-				if (line < 0 || line >= m_realLines[side].size())
-					continue;
-				lineStart[side].push_back(static_cast<int>(text.size()));
-				const QByteArray utf8 = m_realLines[side].at(line).toUtf8();
-				lineBytes[side].append(utf8);
-				text.append(utf8.constData(), utf8.size());
-				// with its line ending, as GetWordDiffArrayInRange joins
-				// the lines: none after the file's last line without one
-				if (line + 1 < m_realLines[side].size() || m_sides[side].hadFinalEol)
-				{
-					const QByteArray eol = m_realEols[side].value(line).toUtf8();
-					text.append(eol.constData(), eol.size());
-				}
-			}
-			if (!text.empty())
-				++nonEmptySides;
-			if (text.size() > kMaxWordDiffBlockBytes)
-				tooBig = true;
+			const int len = block.end[side] - block.begin[side] + 1;
+			if (len > 0)
+				++sidesWithLines;
+			maxLen = qMax(maxLen, len);
 		}
-		if (tooBig || nonEmptySides < 2)
+		if (sidesWithLines < 2)
 			continue;
-
-		// the line ends inside a block compare as the options say
-		// (GetWordDiffArrayInRange)
-		const strdiff::EolCompareMode eolMode = options.bIgnoreLineBreaks
-			? strdiff::EOL_AS_SPACE
-			: options.bIgnoreEol ? strdiff::EOL_IGNORE : strdiff::EOL_STRICT;
-		const std::vector<strdiff::wdiff> wdiffs = strdiff::ComputeWordDiffs(
-			m_paneCount, joined,
-			!options.bIgnoreCase, eolMode,
-			options.nIgnoreWhitespace, options.bIgnoreNumbers,
-			breakType, byteLevel);
-
-		for (const strdiff::wdiff &wd : wdiffs)
+		constexpr int LineLimit = 20;
+		if (block.viewEnd - block.viewBegin <= LineLimit)
 		{
-			int sidesWithText = 0;
-			for (int side = 0; side < m_paneCount; ++side)
-				if (wd.end[side] >= wd.begin[side])
-					++sidesWithText;
-			const bool oneSided = (sidesWithText == 1);
-
+			computeWordSpans(static_cast<int>(b), block.begin, block.end, options,
+				breakType, byteLevel);
+			continue;
+		}
+		for (int k = 0; k < maxLen; ++k)
+		{
+			int first[3] = {};
+			int last[3] = {};
 			for (int side = 0; side < m_paneCount; ++side)
 			{
-				if (wd.end[side] < wd.begin[side])
-				{
-					// nothing on this side: keep a zero-length span at
-					// the insertion point, so a thin marker shows where
-					// the other side's text would land (WinMerge draws
-					// its zero-width word diffs the same way, issue #6)
-					const int pos = wd.begin[side];
-					for (int li = 0;
-						li < static_cast<int>(lineStart[side].size()); ++li)
-					{
-						const int start = lineStart[side][li];
-						const int len = lineBytes[side].at(li).size();
-						if (pos < start || pos > start + len)
-							continue;
-						WordSpan span;
-						span.side = side;
-						span.line = block.begin[side] + li;
-						span.blockIndex = static_cast<int>(b);
-						span.oneSided = true;
-						span.start = QString::fromUtf8(
-							lineBytes[side].at(li).constData(),
-							qBound(0, pos - start, len)).size();
-						span.length = 0;
-						m_wordSpans.push_back(span);
-						break;
-					}
-					continue;
-				}
-				// split the byte range on the '\n' joins, one span per line
-				for (int li = 0; li < static_cast<int>(lineStart[side].size()); ++li)
+				first[side] = block.begin[side] + k;
+				last[side] = block.begin[side] + k <= block.end[side]
+					? first[side] : first[side] - 1;
+			}
+			computeWordSpans(static_cast<int>(b), first, last, options, breakType,
+				byteLevel);
+		}
+	}
+}
+
+/** The spans of the lines first..last of each side (none where last <
+    first), diffed at once (GetWordDiffArrayInRange). */
+void FileCompareView::computeWordSpans(int blockIndex, const int first[3], const int last[3],
+	const DIFFOPTIONS &options, int breakType, bool byteLevel)
+{
+	QList<QByteArray> lineBytes[3];
+	String joined[3];
+	std::vector<int> lineStart[3];
+	bool tooBig = false;
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		String &text = joined[side];
+		for (int line = first[side]; line <= last[side]; ++line)
+		{
+			if (line < 0 || line >= m_realLines[side].size())
+				continue;
+			lineStart[side].push_back(static_cast<int>(text.size()));
+			const QByteArray utf8 = m_realLines[side].at(line).toUtf8();
+			lineBytes[side].append(utf8);
+			text.append(utf8.constData(), utf8.size());
+			// with its line ending, as GetWordDiffArrayInRange joins
+			// the lines: none after the file's last line without one
+			if (line + 1 < m_realLines[side].size() || m_sides[side].hadFinalEol)
+			{
+				const QByteArray eol = m_realEols[side].value(line).toUtf8();
+				text.append(eol.constData(), eol.size());
+			}
+		}
+		if (text.size() > kMaxWordDiffBlockBytes)
+			tooBig = true;
+	}
+	if (tooBig)
+		return;
+
+	// the line ends inside a block compare as the options say
+	// (GetWordDiffArrayInRange)
+	const strdiff::EolCompareMode eolMode = options.bIgnoreLineBreaks
+		? strdiff::EOL_AS_SPACE
+		: options.bIgnoreEol ? strdiff::EOL_IGNORE : strdiff::EOL_STRICT;
+	const std::vector<strdiff::wdiff> wdiffs = strdiff::ComputeWordDiffs(
+		m_paneCount, joined,
+		!options.bIgnoreCase, eolMode,
+		options.nIgnoreWhitespace, options.bIgnoreNumbers,
+		breakType, byteLevel);
+
+	for (const strdiff::wdiff &wd : wdiffs)
+	{
+		int sidesWithText = 0;
+		for (int side = 0; side < m_paneCount; ++side)
+			if (wd.end[side] >= wd.begin[side])
+				++sidesWithText;
+		const bool oneSided = (sidesWithText == 1);
+
+		for (int side = 0; side < m_paneCount; ++side)
+		{
+			if (wd.end[side] < wd.begin[side])
+			{
+				// nothing on this side: keep a zero-length span at
+				// the insertion point, so a thin marker shows where
+				// the other side's text would land (WinMerge draws
+				// its zero-width word diffs the same way, issue #6)
+				const int pos = wd.begin[side];
+				for (int li = 0;
+					li < static_cast<int>(lineStart[side].size()); ++li)
 				{
 					const int start = lineStart[side][li];
 					const int len = lineBytes[side].at(li).size();
-					const int b0 = qMax(wd.begin[side], start) - start;
-					const int b1 = qMin(wd.end[side], start + len - 1) - start;
-					if (b1 < b0 || b0 >= len)
+					if (pos < start || pos > start + len)
 						continue;
 					WordSpan span;
 					span.side = side;
-					span.line = block.begin[side] + li;
-					span.blockIndex = static_cast<int>(b);
-					span.oneSided = oneSided;
-					byteRangeToU16(m_realLines[side].at(span.line), b0, b1,
-						&span.start, &span.length);
-					if (span.length > 0)
-						m_wordSpans.push_back(span);
+					span.line = first[side] + li;
+					span.blockIndex = blockIndex;
+					span.oneSided = true;
+					span.start = QString::fromUtf8(
+						lineBytes[side].at(li).constData(),
+						qBound(0, pos - start, len)).size();
+					span.length = 0;
+					m_wordSpans.push_back(span);
+					break;
 				}
+				continue;
+			}
+			// split the byte range on the '\n' joins, one span per line
+			for (int li = 0; li < static_cast<int>(lineStart[side].size()); ++li)
+			{
+				const int start = lineStart[side][li];
+				const int len = lineBytes[side].at(li).size();
+				const int b0 = qMax(wd.begin[side], start) - start;
+				const int b1 = qMin(wd.end[side], start + len - 1) - start;
+				if (b1 < b0 || b0 >= len)
+					continue;
+				WordSpan span;
+				span.side = side;
+				span.line = first[side] + li;
+				span.blockIndex = blockIndex;
+				span.oneSided = oneSided;
+				byteRangeToU16(m_realLines[side].at(span.line), b0, b1,
+					&span.start, &span.length);
+				if (span.length > 0)
+					m_wordSpans.push_back(span);
 			}
 		}
 	}

@@ -7896,6 +7896,45 @@ int main(int argc, char *argv[])
 			mgr->Set(OPT_BREAK_ON_WORDS, false);
 		}
 
+		// a block of more than 21 lines is diffed line by line of the view
+		// (IsDiffPerLine), a smaller one at once: with a line put in at
+		// its top, the lines meet their own counterparts only at once
+		{
+			const auto block = [&write](const char *name, int count, bool right) {
+				QByteArray bytes = "top\n";
+				if (right)
+					bytes += "zz\n";
+				for (int k = 0; k < count; ++k)
+					bytes += "line " + QByteArray::number(k) + (right ? " two\n" : " one\n");
+				return write(name, bytes + "bottom\n");
+			};
+			mgr->Set(OPT_BREAK_ON_WORDS, true);
+			MainWindow window;
+			window.openFileComparison({ block("big_l.txt", 22, false), block("big_r.txt", 22, true) });
+			wait(50);
+			auto *big = window.findChild<FileCompareView *>();
+			if (big == nullptr)
+				return 2;
+			const QStringList bigSpans = spans(big).split(QLatin1Char(' '));
+			MainWindow window2;
+			window2.openFileComparison({ block("small_l.txt", 18, false),
+				block("small_r.txt", 18, true) });
+			wait(50);
+			auto *small = window2.findChild<FileCompareView *>();
+			if (small == nullptr)
+				return 2;
+			const QStringList smallSpans = spans(small).split(QLatin1Char(' '));
+			printf("  23 lines: %s\n  19 lines: %s\n", qPrintable(bigSpans.join(QLatin1Char(' '))),
+				qPrintable(smallSpans.join(QLatin1Char(' '))));
+			check(bigSpans.contains(QStringLiteral("5+1")) && bigSpans.contains(QStringLiteral("7+3")),
+				"more than 21 lines: line by line");
+			// (the word "one" at 7, or at 8 from line 10 on)
+			check(!smallSpans.contains(QStringLiteral("5+1"))
+				&& smallSpans.count(QStringLiteral("7+3")) + smallSpans.count(QStringLiteral("8+3")) == 18,
+				"up to 21 lines: at once");
+			mgr->Set(OPT_BREAK_ON_WORDS, false);
+		}
+
 		// a table's differing cells are its line differences
 		{
 			MainWindow window;
