@@ -677,8 +677,9 @@ QWidget *OptionsDialog::buildEditorPage()
 }
 
 /** WinMerge's Editor > Compare/Merge page (PropEditorCompareMerge): the
-    rescan after edits, and how the differences inside the lines show.
-    The copy granularity and the merge result pane are not offered yet. */
+    rescan after edits, what a copy with text selected takes in, and how
+    the differences inside the lines show. Its box for the merge result
+    pane is left out: there is no such pane here. */
 QWidget *OptionsDialog::buildEditorCompareMergePage()
 {
 	auto *page = new QWidget(this);
@@ -687,6 +688,15 @@ QWidget *OptionsDialog::buildEditorCompareMergePage()
 	m_chkAutomaticRescan = new QCheckBox(tr("&Automatic rescan"), page);
 	m_chkAutomaticRescan->setObjectName(QStringLiteral("automaticRescan"));
 	box->addWidget(m_chkAutomaticRescan);
+
+	m_cmbCopyGranularity = new QComboBox(page);
+	m_cmbCopyGranularity->setObjectName(QStringLiteral("copyGranularity"));
+	m_cmbCopyGranularity->addItems({ tr("Diff hunk"), tr("Inline diff"), tr("Line"),
+		tr("Character") });
+	auto *granularityLabel = new QLabel(tr("Copy &granularity for selected differences:"), page);
+	granularityLabel->setBuddy(m_cmbCopyGranularity);
+	box->addWidget(granularityLabel);
+	box->addWidget(m_cmbCopyGranularity);
 
 	auto *coloring = new QGroupBox(tr("Line Difference Coloring"), page);
 	auto *coloringLayout = new QVBoxLayout(coloring);
@@ -931,6 +941,7 @@ void OptionsDialog::load()
 		(mgr->GetInt(OPT_TAB_TYPE) == 0 ? m_radInsertTabs : m_radInsertSpaces)
 			->setChecked(true);
 		m_chkAutomaticRescan->setChecked(mgr->GetBool(OPT_AUTOMATIC_RESCAN));
+		m_cmbCopyGranularity->setCurrentIndex(mgr->GetInt(OPT_COPY_GRANULARITY));
 		m_chkViewLineDiffs->setChecked(mgr->GetBool(OPT_WORDDIFF_HIGHLIGHT));
 		(mgr->GetBool(OPT_BREAK_ON_WORDS) ? m_radWordLevel : m_radCharLevel)
 			->setChecked(true);
@@ -1010,6 +1021,7 @@ void OptionsDialog::save()
 			std::clamp(m_editTabSize->text().toInt(), 1, kMaxTabSize));
 		mgr->SaveOption(OPT_TAB_TYPE, m_radInsertTabs->isChecked() ? 0 : 1);
 		mgr->SaveOption(OPT_AUTOMATIC_RESCAN, m_chkAutomaticRescan->isChecked());
+		mgr->SaveOption(OPT_COPY_GRANULARITY, m_cmbCopyGranularity->currentIndex());
 		mgr->SaveOption(OPT_WORDDIFF_HIGHLIGHT, m_chkViewLineDiffs->isChecked());
 		mgr->SaveOption(OPT_BREAK_ON_WORDS, m_radWordLevel->isChecked());
 		mgr->SaveOption(OPT_BREAK_TYPE, m_cmbBreakType->currentIndex());
@@ -1141,6 +1153,7 @@ void OptionsDialog::restoreDefaults(int page)
 		if (COptionsMgr *mgr = GetOptionsMgr())
 		{
 			m_chkAutomaticRescan->setChecked(mgr->GetDefault<bool>(OPT_AUTOMATIC_RESCAN));
+			m_cmbCopyGranularity->setCurrentIndex(mgr->GetDefault<int>(OPT_COPY_GRANULARITY));
 			m_chkViewLineDiffs->setChecked(mgr->GetDefault<bool>(OPT_WORDDIFF_HIGHLIGHT));
 			(mgr->GetDefault<bool>(OPT_BREAK_ON_WORDS) ? m_radWordLevel : m_radCharLevel)
 				->setChecked(true);

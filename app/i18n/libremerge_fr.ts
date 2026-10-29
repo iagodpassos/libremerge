@@ -4332,6 +4332,26 @@ Vérification de l&apos;identité binaire...</translation>
         <translation>&amp;Actualiser automatiquement</translation>
     </message>
     <message>
+        <source>Diff hunk</source>
+        <translation>Différence en bloc</translation>
+    </message>
+    <message>
+        <source>Inline diff</source>
+        <translation>Différence en ligne</translation>
+    </message>
+    <message>
+        <source>Line</source>
+        <translation>Ligne</translation>
+    </message>
+    <message>
+        <source>Character</source>
+        <translation>Caractère</translation>
+    </message>
+    <message>
+        <source>Copy &amp;granularity for selected differences:</source>
+        <translation>&amp;Granularité de copie pour les différences sélectionnées :</translation>
+    </message>
+    <message>
         <source>Line Difference Coloring</source>
         <translation>Coloration de la différence de ligne</translation>
     </message>
@@ -4349,11 +4369,11 @@ Vérification de l&apos;identité binaire...</translation>
     </message>
     <message>
         <source>Break at whitespace</source>
-        <translation>Coupure à l'espacement</translation>
+        <translation>Coupure à l&apos;espacement</translation>
     </message>
     <message>
         <source>Break at whitespace or punctuation</source>
-        <translation>Coupure à l'espacement ou à la ponctuation</translation>
+        <translation>Coupure à l&apos;espacement ou à la ponctuation</translation>
     </message>
     <message>
         <source>W&amp;ord break characters:</source>

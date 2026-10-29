@@ -3846,6 +3846,26 @@ Checando identidade binária...</translation>
         <translation>&amp;Reescaneamento automático</translation>
     </message>
     <message>
+        <source>Diff hunk</source>
+        <translation>Bloco da diferenciação</translation>
+    </message>
+    <message>
+        <source>Inline diff</source>
+        <translation>Diferenciação em linha</translation>
+    </message>
+    <message>
+        <source>Line</source>
+        <translation>Linha</translation>
+    </message>
+    <message>
+        <source>Character</source>
+        <translation>Caractere</translation>
+    </message>
+    <message>
+        <source>Copy &amp;granularity for selected differences:</source>
+        <translation>Copiar &amp;granularidade para diferenças selecionadas:</translation>
+    </message>
+    <message>
         <source>Line Difference Coloring</source>
         <translation>Coloração da Diferença de Linha</translation>
     </message>

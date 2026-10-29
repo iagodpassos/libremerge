@@ -4346,6 +4346,26 @@ Drücken Sie &apos;Zurücksetzen&apos;, um alle Meldungen wieder sichtbar zu sch
         <translation>&amp;Automatisch aktualisieren</translation>
     </message>
     <message>
+        <source>Diff hunk</source>
+        <translation>Diff-Hunk</translation>
+    </message>
+    <message>
+        <source>Inline diff</source>
+        <translation>Zeilenuntersciede</translation>
+    </message>
+    <message>
+        <source>Line</source>
+        <translation>Zeile</translation>
+    </message>
+    <message>
+        <source>Character</source>
+        <translation>Zeichen</translation>
+    </message>
+    <message>
+        <source>Copy &amp;granularity for selected differences:</source>
+        <translation>&amp;Kopiergranularität für ausgewählte Unterschiede:</translation>
+    </message>
+    <message>
         <source>Line Difference Coloring</source>
         <translation>Zeilenunterschied-Färbung</translation>
     </message>

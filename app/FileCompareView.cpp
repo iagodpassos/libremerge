@@ -149,6 +149,44 @@ QString eolName(const QString &eol, bool mixed = false)
     text through undo and redo. */
 const int kEolProperty = QTextFormat::UserProperty + 1;
 
+/** What a copy with text selected takes in (OPT_COPY_GRANULARITY, as
+    CMergeEditView numbers it). */
+enum CopyGranularity { DiffHunk, InlineDiff, Line, Character };
+
+/** A UTF-8 byte offset into a line, the engine's, as an offset into the
+    line's UTF-16 text: the start of the character it falls in, or its end
+    with roundUp. */
+int u16Offset(const QString &line, int byteOffset, bool roundUp)
+{
+	int bytePos = 0;
+	const int size = line.size();
+	for (int i = 0; i < size;)
+	{
+		const QChar ch = line.at(i);
+		int u16len = 1;
+		char32_t cp = ch.unicode();
+		if (ch.isHighSurrogate() && i + 1 < size && line.at(i + 1).isLowSurrogate())
+		{
+			cp = QChar::surrogateToUcs4(ch, line.at(i + 1));
+			u16len = 2;
+		}
+		const int u8len = cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+		if (byteOffset < bytePos + u8len)
+			return byteOffset > bytePos && roundUp ? i + u16len : i;
+		bytePos += u8len;
+		i += u16len;
+	}
+	return size;
+}
+
+/** ShowCannotCopyInvisibleLinesError. */
+void showCannotCopyInvisibleLinesError(QWidget *parent)
+{
+	lm::showError(parent, FileCompareView::tr("Merging/copying differences that contain "
+		"hidden lines is not currently supported.\n\nPlease clear the display filter or "
+		"adjust the filter settings to show all lines before merging."));
+}
+
 } // namespace
 
 /**
@@ -278,6 +316,1062 @@ private:
 	std::vector<int> m_realIndex[3];
 	int m_realCount[3] = {};
 };
+
+/**
+ * A copy with text selected (CMergeEditView::OnX2Y and
+ * MergeDocDiffCopy.cpp): the differences the selection takes in, as the
+ * copy granularity says, every difference it touches, the inline
+ * differences it takes in whole, or the lines or the very characters it
+ * selects. The target's text changes as upstream's buffer changes it
+ * (DeleteText, InsertText), each line touched replaced whole, in one
+ * undoable step, and the files are compared again (FlushAndRescan).
+ * Differences copied whole merge in place, as the current one does.
+ */
+class FileCompareView::SelectionCopy
+{
+public:
+	SelectionCopy(FileCompareView &view, int sourceSide, int targetSide);
+	void run();
+
+private:
+	/** WinMerge's CEPoint: a UTF-16 offset in a view line. */
+	struct Point
+	{
+		int x = 0;
+		int y = 0;
+		bool operator==(const Point &other) const { return x == other.x && y == other.y; }
+		bool operator!=(const Point &other) const { return !(*this == other); }
+		bool operator<(const Point &other) const
+		{
+			return y < other.y || (y == other.y && x < other.x);
+		}
+	};
+	/** WinMerge's WordDiff: where a difference inside the lines of a block
+	    starts, and ends (past it), in each pane. */
+	struct WordDiff
+	{
+		Point begin[3];
+		Point end[3];
+	};
+	/** A pane's view lines as upstream's text buffer holds them: the text,
+	    the line ending (none on a ghost line, nor after a last line
+	    without one) and the ghost flag. */
+	struct Lines
+	{
+		QStringList text;
+		QStringList eol;
+		QList<bool> ghost;
+		int count() const { return static_cast<int>(text.size()); }
+		int length(int y) const
+		{
+			return y >= 0 && y < count() ? static_cast<int>(text.at(y).size()) : 0;
+		}
+		int fullLength(int y) const
+		{
+			return y >= 0 && y < count()
+				? static_cast<int>(text.at(y).size() + eol.at(y).size()) : 0;
+		}
+		bool isGhost(int y) const { return y >= 0 && y < count() && ghost.at(y); }
+	};
+	/** Text to put in, a line or part of one, the line ending there when
+	    it ends. */
+	struct Piece
+	{
+		QString text;
+		QString eol;
+		bool ends = false;
+	};
+
+	Lines readLines(int side) const;
+	bool significant(int blockIndex) const;
+	int lineToDiff(int line) const;
+	int nextSignificantDiffFromLine(int line) const;
+	int prevSignificantDiffFromLine(int line) const;
+	void getSelectedDiffs(int &firstDiff, int &lastDiff) const;
+	void getFullySelectedDiffs(int &firstDiff, int &lastDiff, int &firstWordDiff,
+		int &lastWordDiff) const;
+	std::vector<WordDiff> wordDiffsInBlock(int blockIndex, bool ignoreDiffOptions) const;
+	std::vector<WordDiff> wordDiffsInRange(const int begin[3], const int end[3],
+		bool ignoreDiffOptions) const;
+	Point correspondingPoint(const WordDiff &wdiff, const Point &pt, int targetPane,
+		bool ptInDiff) const;
+	void characterRange(int blockIndex, const Point &start, const Point &end,
+		Point *srcStart, Point *srcEnd, Point *dstStart, Point *dstEnd) const;
+	static QList<Piece> textBetween(const Lines &lines, const Point &start, Point end);
+	static int distance(const Lines &lines, const Point &pt1, const Point &pt2);
+	static Point advance(const Lines &lines, Point pt, int distance);
+	static int findWordDiffIndex(const std::vector<WordDiff> &worddiffs, const Point &pt,
+		int pane, bool &inDiff);
+	static bool pointInWordDiff(const WordDiff &wdiff, const Point &pt, int pane);
+	void replaceText(const Point &start, Point end, const QList<Piece> &pieces);
+	void replaceLines(int first, int last, QStringList texts, QStringList eols);
+	void listCopy(int blockIndex);
+	void lineListCopy(int blockIndex, int firstLine, int lastLine);
+	bool inlineDiffListCopy(int blockIndex, int firstWordDiff, int lastWordDiff);
+	void characterListCopy(int blockIndex, const Point &start, const Point &end);
+	void copyMultipleList(int firstDiff, int lastDiff, int firstWordDiff = -1,
+		int lastWordDiff = -1);
+	void copyMultiplePartialList(int firstDiff, int lastDiff, bool character);
+	void mergeInPlace(int firstDiff, int lastDiff);
+	void finish();
+	void resetTargetCursor();
+
+	FileCompareView &m_view;
+	const std::vector<Block> &m_blocks;
+	const int m_src;
+	const int m_dst;
+	const int m_active;
+	Point m_start; // the selection, in the active pane
+	Point m_end;
+	Lines m_lines[3]; // the panes' lines, the target's kept as it is edited
+	QTextCursor m_cursor; // the target's edits, one undoable step
+	QList<bool> m_flagsBefore;
+	bool m_edited = false;
+	int m_topLine = INT_MAX; // the highest line edited
+};
+
+FileCompareView::SelectionCopy::SelectionCopy(FileCompareView &view, int sourceSide,
+	int targetSide)
+	: m_view(view)
+	, m_blocks(view.m_blocks)
+	, m_src(sourceSide)
+	, m_dst(targetSide)
+	, m_active(view.m_activePane)
+{
+	const QTextCursor cursor = view.m_panes[m_active]->textCursor();
+	const QTextDocument *doc = cursor.document();
+	const auto point = [doc](int position) {
+		const QTextBlock block = doc->findBlock(position);
+		return Point{ position - block.position(), block.blockNumber() };
+	};
+	m_start = point(cursor.selectionStart());
+	m_end = point(cursor.selectionEnd());
+	for (int side = 0; side < view.m_paneCount; ++side)
+		m_lines[side] = readLines(side);
+}
+
+/** OnX2Y's branch for a selection. Upstream also takes it for the inline
+    difference F4 selected (EqualCurrentWordDiff), and copies a column
+    selection by its own rule; neither is here. */
+void FileCompareView::SelectionCopy::run()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	const int granularity = mgr != nullptr ? mgr->GetInt(OPT_COPY_GRANULARITY) : Character;
+	int firstDiff = -1;
+	int lastDiff = -1;
+	if (granularity == InlineDiff)
+	{
+		int firstWordDiff = -1;
+		int lastWordDiff = -1;
+		getFullySelectedDiffs(firstDiff, lastDiff, firstWordDiff, lastWordDiff);
+		if (firstDiff != -1 && lastDiff != -1)
+			copyMultipleList(firstDiff, lastDiff, firstWordDiff, lastWordDiff);
+		return;
+	}
+	getSelectedDiffs(firstDiff, lastDiff);
+	if (firstDiff == -1 || lastDiff == -1)
+		return;
+	if (granularity == Line || granularity == Character)
+		copyMultiplePartialList(firstDiff, lastDiff, granularity == Character);
+	else
+		copyMultipleList(firstDiff, lastDiff);
+}
+
+FileCompareView::SelectionCopy::Lines FileCompareView::SelectionCopy::readLines(int side) const
+{
+	Lines lines;
+	const QTextDocument *doc = m_view.m_panes[side]->document();
+	QTextBlock lastReal = doc->lastBlock();
+	while (lastReal.isValid() && isGhostBlock(lastReal))
+		lastReal = lastReal.previous();
+	const bool finalEol = m_view.m_sides[side].hadFinalEol;
+	for (QTextBlock block = doc->begin(); block.isValid(); block = block.next())
+	{
+		const bool ghost = isGhostBlock(block);
+		lines.text.append(ghost ? QString() : block.text());
+		lines.eol.append(ghost || (block == lastReal && !finalEol)
+			? QString() : m_view.lineEol(side, block));
+		lines.ghost.append(ghost);
+	}
+	return lines;
+}
+
+/** A difference that counts (IsDiffSignificant); one merged in place is
+    no more. */
+bool FileCompareView::SelectionCopy::significant(int blockIndex) const
+{
+	const Block &block = m_blocks[blockIndex];
+	return !block.trivial && !block.resolved;
+}
+
+/** DiffList::LineToDiff: the difference a view line is in, an ignored one
+    too. */
+int FileCompareView::SelectionCopy::lineToDiff(int line) const
+{
+	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+		if (!m_blocks[b].resolved && line >= m_blocks[b].viewBegin
+			&& line <= m_blocks[b].viewEnd)
+			return b;
+	return -1;
+}
+
+int FileCompareView::SelectionCopy::nextSignificantDiffFromLine(int line) const
+{
+	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+		if (significant(b) && m_blocks[b].viewBegin >= line)
+			return b;
+	return -1;
+}
+
+int FileCompareView::SelectionCopy::prevSignificantDiffFromLine(int line) const
+{
+	for (int b = static_cast<int>(m_blocks.size()) - 1; b >= 0; --b)
+		if (significant(b) && m_blocks[b].viewEnd <= line)
+			return b;
+	return -1;
+}
+
+/** CMergeEditView::GetSelectedDiffs: the differences from the one the
+    selection starts in, or the next, to the one it ends in, or the one
+    before. */
+void FileCompareView::SelectionCopy::getSelectedDiffs(int &firstDiff, int &lastDiff) const
+{
+	firstDiff = -1;
+	lastDiff = -1;
+	if (m_view.m_diffCount == 0)
+		return;
+	const int firstLine = m_start.y;
+	const int lastLine = m_end.y;
+	firstDiff = lineToDiff(firstLine);
+	if (firstDiff == -1)
+	{
+		firstDiff = nextSignificantDiffFromLine(firstLine);
+		if (firstDiff == -1)
+			return;
+	}
+	lastDiff = lineToDiff(lastLine);
+	if (lastDiff == -1)
+		lastDiff = prevSignificantDiffFromLine(lastLine);
+	if (lastDiff < firstDiff)
+		firstDiff = -1;
+}
+
+/** CMergeEditView::GetFullySelectedDiffs: the differences, and the inline
+    differences of the first and the last, the selection takes in whole;
+    no inline difference (-1) when it takes in whole differences. */
+void FileCompareView::SelectionCopy::getFullySelectedDiffs(int &firstDiff, int &lastDiff,
+	int &firstWordDiff, int &lastWordDiff) const
+{
+	firstDiff = -1;
+	lastDiff = -1;
+	firstWordDiff = -1;
+	lastWordDiff = -1;
+	if (m_view.m_diffCount == 0)
+		return;
+	const Point &ptStart = m_start;
+	const Point &ptEnd = m_end;
+	const int firstLine = ptStart.y;
+	const int lastLine = ptEnd.y;
+
+	firstDiff = lineToDiff(firstLine);
+	const bool firstLineIsNotInDiff = firstDiff == -1;
+	if (firstDiff == -1)
+	{
+		firstDiff = nextSignificantDiffFromLine(firstLine);
+		if (firstDiff == -1)
+			return;
+		firstWordDiff = 0;
+	}
+	lastDiff = lineToDiff(lastLine);
+	const bool lastLineIsNotInDiff = lastDiff == -1;
+	if (lastDiff == -1)
+		lastDiff = prevSignificantDiffFromLine(lastLine);
+	if (lastDiff < firstDiff)
+	{
+		firstDiff = -1;
+		firstWordDiff = -1;
+		return;
+	}
+
+	if (ptStart == ptEnd)
+	{
+		firstDiff = -1;
+		lastDiff = -1;
+		firstWordDiff = -1;
+		lastWordDiff = -1;
+		return;
+	}
+	const Block *di = &m_blocks[firstDiff];
+	constexpr int LineLimit = 256;
+	if ((lastLineIsNotInDiff
+			&& (firstLineIsNotInDiff || (di->viewBegin == firstLine && ptStart.x == 0)))
+		|| di->viewEnd - di->viewBegin > LineLimit)
+	{
+		firstWordDiff = -1;
+		return;
+	}
+
+	if (firstWordDiff == -1)
+	{
+		const std::vector<WordDiff> worddiffs = wordDiffsInBlock(firstDiff, false);
+		for (size_t i = 0; i < worddiffs.size(); ++i)
+		{
+			const Point &begin = worddiffs[i].begin[m_active];
+			const Point &end = worddiffs[i].end[m_active];
+			const int worddiffLen = end.x - begin.x;
+			if (end.y > firstLine
+				|| (firstLine == end.y && end.x - (worddiffLen == 0 ? 0 : 1) >= ptStart.x))
+			{
+				firstWordDiff = static_cast<int>(i);
+				break;
+			}
+		}
+		if (firstLine >= di->viewBegin && firstWordDiff == -1)
+		{
+			++firstDiff;
+			firstWordDiff = 0;
+		}
+	}
+
+	di = &m_blocks[lastDiff];
+	const std::vector<WordDiff> worddiffs = wordDiffsInBlock(lastDiff, false);
+	for (int i = static_cast<int>(worddiffs.size()) - 1; i >= 0; --i)
+	{
+		const Point &begin = worddiffs[i].begin[m_active];
+		if (begin.y < lastLine || (lastLine == begin.y && begin.x + 1 <= ptEnd.x))
+		{
+			lastWordDiff = i;
+			break;
+		}
+	}
+	if (lastLine <= di->viewEnd && lastWordDiff == -1)
+		--lastDiff;
+
+	if ((firstDiff == lastDiff && lastWordDiff != -1 && lastWordDiff < firstWordDiff)
+		|| lastDiff < firstDiff
+		|| (firstDiff == lastDiff && firstWordDiff == -1 && lastWordDiff == -1))
+	{
+		firstDiff = -1;
+		lastDiff = -1;
+		firstWordDiff = -1;
+		lastWordDiff = -1;
+	}
+}
+
+/** CMergeDoc::GetWordDiffArrayInDiffBlock: a block's inline differences,
+    worked out over the whole block, or line by line in one of more than
+    21 lines (IsDiffPerLine). */
+std::vector<FileCompareView::SelectionCopy::WordDiff>
+FileCompareView::SelectionCopy::wordDiffsInBlock(int blockIndex, bool ignoreDiffOptions) const
+{
+	const Block &block = m_blocks[blockIndex];
+	constexpr int LineLimit = 20;
+	if (block.viewEnd - block.viewBegin <= LineLimit)
+	{
+		const int begin[3] = { block.viewBegin, block.viewBegin, block.viewBegin };
+		const int end[3] = { block.viewEnd, block.viewEnd, block.viewEnd };
+		return wordDiffsInRange(begin, end, ignoreDiffOptions);
+	}
+	std::vector<WordDiff> worddiffs;
+	for (int line = block.viewBegin; line <= block.viewEnd; ++line)
+	{
+		const int range[3] = { line, line, line };
+		const std::vector<WordDiff> perLine = wordDiffsInRange(range, range, ignoreDiffOptions);
+		worddiffs.insert(worddiffs.end(), perLine.begin(), perLine.end());
+	}
+	return worddiffs;
+}
+
+/** CMergeDoc::GetWordDiffArrayInRange: the view lines of each pane joined
+    with their endings and diffed at once; with ignoreDiffOptions, case
+    and white space are not left out as the compare options say. */
+std::vector<FileCompareView::SelectionCopy::WordDiff>
+FileCompareView::SelectionCopy::wordDiffsInRange(const int begin[3], const int end[3],
+	bool ignoreDiffOptions) const
+{
+	const int panes = m_view.m_paneCount;
+	String str[3];
+	std::vector<int> offsets[3]; // each line's first byte in str
+	for (int file = 0; file < panes; ++file)
+	{
+		const Lines &lines = m_lines[file];
+		if (end[file] >= lines.count())
+			return {};
+		offsets[file].push_back(0);
+		for (int line = begin[file]; line <= end[file]; ++line)
+		{
+			const QByteArray bytes = (lines.text.at(line) + lines.eol.at(line)).toUtf8();
+			str[file].append(bytes.constData(), bytes.size());
+			offsets[file].push_back(offsets[file].back() + static_cast<int>(bytes.size()));
+		}
+	}
+
+	DIFFOPTIONS options = lm::currentDiffOptions();
+	if (m_view.m_ignoreEol)
+		options.bIgnoreEol = true;
+	const bool casitive = ignoreDiffOptions ? false : !options.bIgnoreCase;
+	const strdiff::EolCompareMode eolMode = options.bIgnoreLineBreaks
+		? strdiff::EOL_AS_SPACE
+		: options.bIgnoreEol ? strdiff::EOL_IGNORE : strdiff::EOL_STRICT;
+	const int xwhite = ignoreDiffOptions ? 0 : options.nIgnoreWhitespace;
+	COptionsMgr *mgr = GetOptionsMgr();
+	const int breakType = mgr != nullptr ? mgr->GetInt(OPT_BREAK_TYPE) : 1;
+	const bool byteColoring = mgr == nullptr || !mgr->GetBool(OPT_BREAK_ON_WORDS);
+	const std::vector<strdiff::wdiff> wdiffs = strdiff::ComputeWordDiffs(panes, str,
+		casitive, eolMode, xwhite, options.bIgnoreNumbers, breakType, byteColoring);
+
+	// a byte offset of the joined lines as a place in a line: one in the
+	// line's ending is the next line's start, but past the last line
+	std::vector<WordDiff> worddiffs;
+	for (const strdiff::wdiff &wd : wdiffs)
+	{
+		WordDiff out;
+		for (int file = 0; file < panes; ++file)
+		{
+			const Lines &lines = m_lines[file];
+			const std::vector<int> &offset = offsets[file];
+			const int lineBegin = begin[file];
+			const int lineEnd = end[file];
+			const auto place = [&](int line, int byteOffset, bool roundUp) {
+				const QString &text = lines.text.at(line);
+				if (byteOffset > text.toUtf8().size())
+					return line < lines.count() - 1 ? Point{ 0, line + 1 }
+													: Point{ lines.length(line), line };
+				return Point{ u16Offset(text, byteOffset, roundUp), line };
+			};
+			int line = lineBegin;
+			for (; line < lineEnd; ++line)
+				if (wd.begin[file] == offset[line - lineBegin]
+					|| wd.begin[file] < offset[line - lineBegin + 1])
+					break;
+			out.begin[file] = place(line, wd.begin[file] - offset[line - lineBegin], false);
+			for (; line < lineEnd; ++line)
+				if (wd.end[file] + 1 == offset[line - lineBegin]
+					|| wd.end[file] + 1 < offset[line - lineBegin + 1])
+					break;
+			out.end[file] = place(line, wd.end[file] + 1 - offset[line - lineBegin], true);
+		}
+		worddiffs.push_back(out);
+	}
+	return worddiffs;
+}
+
+/** GetDistance: the characters from one place to a later one, the line
+    endings counted. */
+int FileCompareView::SelectionCopy::distance(const Lines &lines, const Point &pt1,
+	const Point &pt2)
+{
+	int result = 0;
+	for (int y = pt1.y; y <= pt2.y; ++y)
+	{
+		result += lines.fullLength(y);
+		if (y == pt1.y)
+			result -= pt1.x;
+		if (y == pt2.y)
+			result -= lines.fullLength(y) - pt2.x;
+	}
+	return qMax(0, result);
+}
+
+/** Advance: so many characters on from a place, stopping at a ghost line
+    and at the end of the last line. */
+FileCompareView::SelectionCopy::Point FileCompareView::SelectionCopy::advance(
+	const Lines &lines, Point pt, int distance)
+{
+	while (distance > 0)
+	{
+		if (lines.isGhost(pt.y))
+			break;
+		if (pt.x + distance > lines.length(pt.y))
+		{
+			distance -= lines.fullLength(pt.y) - pt.x;
+			pt.x = 0;
+			++pt.y;
+			if (pt.y >= lines.count())
+			{
+				pt.y = qMax(0, lines.count() - 1);
+				pt.x = lines.length(pt.y);
+				break;
+			}
+		}
+		else
+		{
+			pt.x += distance;
+			distance = 0;
+		}
+	}
+	return pt;
+}
+
+/** FindWordDiffIndex: the inline difference a place is in, or the last
+    before it; -1 for none. */
+int FileCompareView::SelectionCopy::findWordDiffIndex(const std::vector<WordDiff> &worddiffs,
+	const Point &pt, int pane, bool &inDiff)
+{
+	int wordDiffIndex = -1;
+	inDiff = false;
+	for (int i = 0; i < static_cast<int>(worddiffs.size()); ++i)
+	{
+		const Point &begin = worddiffs[i].begin[pane];
+		const Point &end = worddiffs[i].end[pane];
+		if (pt.y > begin.y || (pt.y == begin.y && pt.x >= begin.x))
+		{
+			if (pt.y < end.y || (pt.y == end.y && pt.x < end.x))
+			{
+				wordDiffIndex = i;
+				inDiff = true;
+				break;
+			}
+			if ((pt.y == end.y && pt.x >= end.x) || pt.y > end.y)
+				wordDiffIndex = i;
+		}
+	}
+	return wordDiffIndex;
+}
+
+bool FileCompareView::SelectionCopy::pointInWordDiff(const WordDiff &wdiff, const Point &pt,
+	int pane)
+{
+	const Point &begin = wdiff.begin[pane];
+	const Point &end = wdiff.end[pane];
+	return (pt.y > begin.y || (pt.y == begin.y && pt.x >= begin.x))
+		&& (pt.y < end.y || (pt.y == end.y && pt.x < end.x));
+}
+
+/** CalculateCorrespondingPoint: a place of the active pane in another,
+    by the inline difference it is in or comes after. */
+FileCompareView::SelectionCopy::Point FileCompareView::SelectionCopy::correspondingPoint(
+	const WordDiff &wdiff, const Point &pt, int targetPane, bool ptInDiff) const
+{
+	const Lines &bufActive = m_lines[m_active];
+	const Lines &bufTarget = m_lines[targetPane];
+	if (ptInDiff)
+	{
+		const int distanceFromBegin = distance(bufActive, wdiff.begin[m_active], pt);
+		const int targetWordDiffLength =
+			distance(bufTarget, wdiff.begin[targetPane], wdiff.end[targetPane]);
+		Point ptTarget = advance(bufTarget, wdiff.begin[targetPane],
+			qMin(distanceFromBegin, targetWordDiffLength));
+		if (!pointInWordDiff(wdiff, ptTarget, targetPane))
+			ptTarget = wdiff.end[targetPane];
+		return ptTarget;
+	}
+	const int distanceFromEnd = distance(bufActive, wdiff.end[m_active], pt);
+	return advance(bufTarget, wdiff.end[targetPane], distanceFromEnd);
+}
+
+/** CMergeDoc::GetCharacterRange: the selection's start and end in the
+    source and in the target, within the block. */
+void FileCompareView::SelectionCopy::characterRange(int blockIndex, const Point &ptStart,
+	const Point &ptEnd, Point *srcStart, Point *srcEnd, Point *dstStart, Point *dstEnd) const
+{
+	const Block &cd = m_blocks[blockIndex];
+	const int cd_dbegin = cd.viewBegin;
+	const int cd_dend = cd.viewEnd;
+	const std::vector<WordDiff> worddiffs = wordDiffsInBlock(blockIndex, true);
+	const Lines &active = m_lines[m_active];
+	// LF_DIFF: a real line of a difference
+	const auto inDiff = [this, &active](int line) {
+		if (active.isGhost(line))
+			return false;
+		for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+			if (significant(b) && line >= m_blocks[b].viewBegin && line <= m_blocks[b].viewEnd)
+				return true;
+		return false;
+	};
+
+	int firstWordDiff = -1;
+	bool firstWordDiffIn = false;
+	if (inDiff(ptStart.y))
+		firstWordDiff = findWordDiffIndex(worddiffs, ptStart, m_active, firstWordDiffIn);
+	int lastWordDiff = -1;
+	bool lastWordDiffIn = false;
+	if (inDiff(ptEnd.y))
+		lastWordDiff = findWordDiffIndex(worddiffs, ptEnd, m_active, lastWordDiffIn);
+
+	Point ptDstStart, ptDstEnd, ptSrcStart, ptSrcEnd;
+	if (firstWordDiff == -1)
+	{
+		if (ptStart.y < cd_dbegin)
+		{
+			ptSrcStart = { 0, cd_dbegin };
+			ptDstStart = ptSrcStart;
+		}
+		else
+		{
+			ptSrcStart = ptStart;
+			ptDstStart = ptStart;
+			if (m_src == m_active)
+				ptDstStart.x = qMin(ptDstStart.x, m_lines[m_dst].length(ptDstStart.y));
+			else
+				ptSrcStart.x = qMin(ptSrcStart.x, m_lines[m_src].length(ptSrcStart.y));
+		}
+	}
+	else
+	{
+		const WordDiff &wdiffFirst = worddiffs[firstWordDiff];
+		if (m_src == m_active)
+		{
+			ptDstStart = correspondingPoint(wdiffFirst, ptStart, m_dst, firstWordDiffIn);
+			ptSrcStart = ptStart;
+		}
+		else
+		{
+			ptSrcStart = correspondingPoint(wdiffFirst, ptStart, m_src, firstWordDiffIn);
+			ptDstStart = ptStart;
+		}
+	}
+	if (lastWordDiff == -1)
+	{
+		if (ptEnd.y > cd_dend)
+		{
+			ptDstEnd = { 0, cd_dend + 1 };
+			ptSrcEnd = { 0, cd_dend + 1 };
+		}
+		else
+		{
+			ptDstEnd = ptEnd;
+			ptSrcEnd = ptEnd;
+			if (m_src == m_active)
+				ptDstEnd.x = qMin(ptDstEnd.x, m_lines[m_dst].length(ptDstEnd.y));
+			else
+				ptSrcEnd.x = qMin(ptSrcEnd.x, m_lines[m_src].length(ptSrcEnd.y));
+		}
+	}
+	else
+	{
+		const WordDiff &wdiffLast = worddiffs[lastWordDiff];
+		if (m_src == m_active)
+		{
+			ptDstEnd = correspondingPoint(wdiffLast, ptEnd, m_dst, lastWordDiffIn);
+			ptSrcEnd = ptEnd;
+		}
+		else
+		{
+			ptSrcEnd = correspondingPoint(wdiffLast, ptEnd, m_src, lastWordDiffIn);
+			ptDstEnd = ptEnd;
+		}
+	}
+	if (ptDstStart.y > cd_dend)
+		ptDstStart = { 0, cd_dend + 1 };
+	if (ptSrcStart.y > cd_dend)
+		ptSrcStart = { 0, cd_dend + 1 };
+	if (ptDstEnd.y < ptDstStart.y)
+		ptDstEnd.y = ptDstStart.y;
+	if (ptSrcEnd.y < ptSrcStart.y)
+		ptSrcEnd.y = ptSrcStart.y;
+	if (ptDstEnd.y > cd_dend)
+		ptDstEnd = { 0, cd_dend + 1 };
+	if (ptSrcEnd.y > cd_dend)
+		ptSrcEnd = { 0, cd_dend + 1 };
+	*srcStart = ptSrcStart;
+	*srcEnd = ptSrcEnd;
+	*dstStart = ptDstStart;
+	*dstEnd = ptDstEnd;
+}
+
+/** GetTextWithoutEmptys: the text from one place to another, ghost lines
+    left out. */
+QList<FileCompareView::SelectionCopy::Piece> FileCompareView::SelectionCopy::textBetween(
+	const Lines &lines, const Point &start, Point end)
+{
+	QList<Piece> pieces;
+	if (end < start)
+		end = start;
+	for (int y = start.y; y <= end.y && y < lines.count(); ++y)
+	{
+		if (lines.ghost.at(y))
+			continue;
+		const int from = y == start.y ? start.x : 0;
+		if (y == end.y)
+			pieces.append({ lines.text.at(y).mid(from, qMax(0, end.x - from)), QString(), false });
+		else
+			pieces.append({ lines.text.at(y).mid(from), lines.eol.at(y),
+				!lines.eol.at(y).isEmpty() });
+	}
+	return pieces;
+}
+
+/** CGhostTextBuffer's DeleteText and InsertText on the target: the pieces
+    in place of its text from start to end. An end on a ghost line goes on
+    to the next real line (DeleteText2), and text put in on a ghost line
+    that does not end its line gets a line ending (InsertText). */
+void FileCompareView::SelectionCopy::replaceText(const Point &start, Point end,
+	const QList<Piece> &pieces)
+{
+	const Lines &dst = m_lines[m_dst];
+	const int count = dst.count();
+	if (end < start)
+		end = start;
+	while (end.y < count && dst.ghost.at(end.y))
+		end = { 0, end.y + 1 };
+	const bool startGhost = dst.isGhost(start.y);
+
+	QList<Piece> parts;
+	if (start.y < count && !startGhost)
+		parts.append({ dst.text.at(start.y).left(start.x), QString(), false });
+	parts += pieces;
+	bool hasText = false;
+	bool endsLine = false;
+	for (const Piece &piece : pieces)
+	{
+		if (!piece.text.isEmpty())
+		{
+			hasText = true;
+			endsLine = false;
+		}
+		if (piece.ends)
+		{
+			hasText = true;
+			endsLine = true;
+		}
+	}
+	if (startGhost && hasText && !endsLine && end.y < count)
+		parts.append({ QString(), m_view.m_sides[m_dst].eol, true });
+	if (end.y < count)
+		parts.append({ dst.text.at(end.y).mid(end.x), dst.eol.at(end.y), true });
+
+	// the lines they make, one without an ending (CGhostTextBuffer gives a
+	// real line that lacks one the file's)
+	QStringList texts;
+	QStringList eols;
+	QString line;
+	for (const Piece &part : parts)
+	{
+		line += part.text;
+		if (part.ends)
+		{
+			texts.append(line);
+			eols.append(part.eol);
+			line.clear();
+		}
+	}
+	if (!line.isEmpty())
+	{
+		texts.append(line);
+		eols.append(QString());
+	}
+
+	// from the start's line to the end's, which ends before the first
+	// line past the target's
+	const int first = qMin(start.y, count);
+	const int last = qMin(end.y, count - 1);
+	QStringList oldTexts;
+	QStringList oldEols;
+	for (int y = first; y <= last; ++y)
+		if (!dst.ghost.at(y))
+		{
+			oldTexts.append(dst.text.at(y));
+			oldEols.append(dst.eol.at(y));
+		}
+	if (texts == oldTexts && eols == oldEols)
+		return;
+	replaceLines(first, last, texts, eols);
+}
+
+/** The target's view lines first..last (none when last < first) replaced
+    by real lines, in its document as one undoable step with the copy's
+    other edits, and in the lines kept of it. */
+void FileCompareView::SelectionCopy::replaceLines(int first, int last, QStringList texts,
+	QStringList eols)
+{
+	QTextDocument *doc = m_view.m_panes[m_dst]->document();
+	if (!m_edited)
+	{
+		m_edited = true;
+		for (QTextBlock b = doc->begin(); b.isValid(); b = b.next())
+			m_flagsBefore.append(b.userData() != nullptr);
+		m_view.m_syncing = true;
+		m_cursor = QTextCursor(doc);
+		// (where undo puts the cursor back)
+		m_cursor.setPosition(
+			doc->findBlockByNumber(qMin(first, doc->blockCount() - 1)).position());
+		m_cursor.beginEditBlock();
+	}
+	m_topLine = qMin(m_topLine, first);
+	const int blocks = doc->blockCount();
+	const auto endOf = [](const QTextBlock &block) {
+		return block.position() + block.length() - 1;
+	};
+	const QString joined = texts.join(QChar('\n'));
+	if (last >= first)
+	{
+		if (!texts.isEmpty())
+		{
+			m_cursor.setPosition(doc->findBlockByNumber(first).position());
+			m_cursor.setPosition(endOf(doc->findBlockByNumber(last)), QTextCursor::KeepAnchor);
+			m_cursor.insertText(joined);
+		}
+		else if (last + 1 < blocks)
+		{
+			m_cursor.setPosition(doc->findBlockByNumber(first).position());
+			m_cursor.setPosition(doc->findBlockByNumber(last + 1).position(),
+				QTextCursor::KeepAnchor);
+			m_cursor.removeSelectedText();
+		}
+		else if (first > 0)
+		{
+			m_cursor.setPosition(endOf(doc->findBlockByNumber(first - 1)));
+			m_cursor.setPosition(endOf(doc->findBlockByNumber(last)), QTextCursor::KeepAnchor);
+			m_cursor.removeSelectedText();
+		}
+		else
+		{
+			// the whole file: an empty line stays, as a document has one
+			m_cursor.select(QTextCursor::Document);
+			m_cursor.removeSelectedText();
+			texts = QStringList{ QString() };
+			eols = QStringList{ QString() };
+		}
+	}
+	else if (texts.isEmpty())
+	{
+		return;
+	}
+	else if (first < blocks)
+	{
+		m_cursor.setPosition(doc->findBlockByNumber(first).position());
+		m_cursor.insertText(joined + QChar('\n'));
+	}
+	else
+	{
+		m_cursor.movePosition(QTextCursor::End);
+		m_cursor.insertText(QChar('\n') + joined);
+	}
+
+	Lines &dst = m_lines[m_dst];
+	for (int y = last; y >= first; --y)
+	{
+		dst.text.removeAt(y);
+		dst.eol.removeAt(y);
+		dst.ghost.removeAt(y);
+	}
+	for (int k = 0; k < texts.size(); ++k)
+	{
+		dst.text.insert(first + k, texts.at(k));
+		dst.eol.insert(first + k, eols.at(k));
+		dst.ghost.insert(first + k, false);
+	}
+	// the lines take their endings along, as applyBlockCopy has them
+	const QString &fileEol = m_view.m_sides[m_dst].eol;
+	for (int k = 0; k < texts.size(); ++k)
+	{
+		const QTextBlock block = doc->findBlockByNumber(first + k);
+		QTextBlockFormat format = block.blockFormat();
+		const QString &eol = eols.at(k);
+		if (eol.isEmpty() || eol == fileEol)
+			format.clearProperty(kEolProperty);
+		else
+			format.setProperty(kEolProperty, eol);
+		QTextCursor line(block);
+		line.setBlockFormat(format);
+	}
+	m_view.applyGhostFlags(m_dst, dst.ghost);
+}
+
+/** CMergeDoc::ListCopy: the block's lines of the source in place of the
+    target's. */
+void FileCompareView::SelectionCopy::listCopy(int blockIndex)
+{
+	if (m_blocks[blockIndex].resolved)
+		return;
+	const Point start{ 0, m_blocks[blockIndex].viewBegin };
+	const Point end{ 0, m_blocks[blockIndex].viewEnd + 1 };
+	replaceText(start, end, textBetween(m_lines[m_src], start, end));
+}
+
+/** CMergeDoc::LineListCopy: the source's lines in place of the target's,
+    on the block's view lines from firstLine to lastLine (its last for
+    -1). */
+void FileCompareView::SelectionCopy::lineListCopy(int blockIndex, int firstLine, int lastLine)
+{
+	const Block &cd = m_blocks[blockIndex];
+	if (cd.resolved)
+		return;
+	const int begin = qMax(firstLine, cd.viewBegin);
+	const int limit = lastLine < 0 || lastLine > cd.viewEnd ? cd.viewEnd : lastLine;
+	if (begin > limit)
+		return;
+	const Point start{ 0, begin };
+	const Point end{ 0, limit + 1 };
+	replaceText(start, end, textBetween(m_lines[m_src], start, end));
+}
+
+/** CMergeDoc::InlineDiffListCopy: the source's text of the block's inline
+    differences firstWordDiff to lastWordDiff (all for -1) in place of the
+    target's, the text between them kept. False when the block has none. */
+bool FileCompareView::SelectionCopy::inlineDiffListCopy(int blockIndex, int firstWordDiff,
+	int lastWordDiff)
+{
+	const Block &cd = m_blocks[blockIndex];
+	if (cd.resolved)
+		return true;
+	const std::vector<WordDiff> worddiffs = wordDiffsInBlock(blockIndex, false);
+	if (worddiffs.empty())
+		return false;
+	if (cd.end[m_src] < cd.begin[m_src])
+	{
+		listCopy(blockIndex);
+		return true;
+	}
+	const int size = static_cast<int>(worddiffs.size());
+	firstWordDiff = firstWordDiff == -1 ? 0 : qBound(0, firstWordDiff, size - 1);
+	lastWordDiff = lastWordDiff == -1 ? size - 1 : qBound(0, lastWordDiff, size - 1);
+
+	QList<Piece> pieces;
+	Point from = worddiffs[firstWordDiff].begin[m_dst];
+	for (int i = firstWordDiff; i <= lastWordDiff; ++i)
+	{
+		pieces += textBetween(m_lines[m_dst], from, worddiffs[i].begin[m_dst]);
+		pieces += textBetween(m_lines[m_src], worddiffs[i].begin[m_src], worddiffs[i].end[m_src]);
+		from = worddiffs[i].end[m_dst];
+	}
+	replaceText(worddiffs[firstWordDiff].begin[m_dst], worddiffs[lastWordDiff].end[m_dst], pieces);
+	return true;
+}
+
+/** CMergeDoc::CharacterListCopy: the source's text the selection takes in
+    within the block, in place of the target's. */
+void FileCompareView::SelectionCopy::characterListCopy(int blockIndex, const Point &start,
+	const Point &end)
+{
+	if (m_blocks[blockIndex].resolved)
+		return;
+	Point srcStart, srcEnd, dstStart, dstEnd;
+	characterRange(blockIndex, start, end, &srcStart, &srcEnd, &dstStart, &dstEnd);
+	replaceText(dstStart, dstEnd, textBetween(m_lines[m_src], srcStart, srcEnd));
+}
+
+/** CMergeDoc::CopyMultipleList: the differences firstDiff to lastDiff, the
+    first from its inline difference firstWordDiff and the last up to
+    lastWordDiff when they are given; bottom up, as upstream copies. */
+void FileCompareView::SelectionCopy::copyMultipleList(int firstDiff, int lastDiff,
+	int firstWordDiff, int lastWordDiff)
+{
+	lastDiff = qMin(static_cast<int>(m_blocks.size()) - 1, lastDiff);
+	firstDiff = qMax(0, firstDiff);
+	if (firstDiff > lastDiff)
+		return;
+	if (m_view.hasInvisibleLines(firstDiff, lastDiff))
+	{
+		showCannotCopyInvisibleLinesError(&m_view);
+		return;
+	}
+	if (firstWordDiff <= 0 && lastWordDiff == -1)
+	{
+		mergeInPlace(firstDiff, lastDiff);
+		return;
+	}
+	if (!inlineDiffListCopy(lastDiff, firstDiff == lastDiff ? firstWordDiff : 0, lastWordDiff))
+		return;
+	for (int i = lastDiff - 1; i >= firstDiff; --i)
+	{
+		if (!significant(i))
+			continue;
+		if (i > firstDiff || firstWordDiff <= 0)
+			listCopy(i);
+		else if (!inlineDiffListCopy(firstDiff, firstWordDiff, -1))
+			break;
+	}
+	finish();
+}
+
+/** CMergeDoc::CopyMultiplePartialList: the differences firstDiff to
+    lastDiff, the first from the selection's start and the last up to its
+    end, by lines or by characters. LibreMerge: upstream copies the first
+    whole when the selection starts on the file's first line
+    (firstLineDiff <= 0), which by characters copies what lies before the
+    selection's start on that line; here the first is copied from the
+    start, which comes to the whole difference whenever the selection
+    starts before it. */
+void FileCompareView::SelectionCopy::copyMultiplePartialList(int firstDiff, int lastDiff,
+	bool character)
+{
+	lastDiff = qMin(static_cast<int>(m_blocks.size()) - 1, lastDiff);
+	firstDiff = qMax(0, firstDiff);
+	if (firstDiff > lastDiff)
+		return;
+	const int firstLineDiff = m_start.y;
+	const int lastLineDiff = m_end.x == 0 ? m_end.y - 1 : m_end.y;
+	if (m_view.hasInvisibleLines(firstDiff, lastDiff))
+	{
+		showCannotCopyInvisibleLinesError(&m_view);
+		return;
+	}
+	if (!character)
+		lineListCopy(lastDiff, firstDiff == lastDiff ? firstLineDiff : 0, lastLineDiff);
+	else
+		characterListCopy(lastDiff, m_start, m_end);
+	for (int i = lastDiff - 1; i >= firstDiff; --i)
+	{
+		if (!significant(i))
+			continue;
+		if (i > firstDiff)
+			listCopy(i);
+		else if (!character)
+			lineListCopy(firstDiff, firstLineDiff, -1);
+		else
+			characterListCopy(firstDiff, m_start, Point{ 0, m_blocks[i].viewEnd + 1 });
+	}
+	finish();
+}
+
+/** Whole differences, the last even an ignored one as upstream has it,
+    merged in place as copyAllFrom merges them. */
+void FileCompareView::SelectionCopy::mergeInPlace(int firstDiff, int lastDiff)
+{
+	bool first = true;
+	for (int b = firstDiff; b <= lastDiff; ++b)
+	{
+		if (m_blocks[b].resolved || (b != lastDiff && m_blocks[b].trivial))
+			continue;
+		// one undoable step for them all
+		m_view.applyBlockCopy(b, m_src, m_dst, !first);
+		first = false;
+	}
+	if (first)
+		return;
+	m_view.refreshSideMaps(m_dst);
+	m_view.setSideModified(m_dst, true);
+	m_view.applyHiddenLines();
+	m_view.m_current = -1;
+	resetTargetCursor();
+	m_view.applyHighlights();
+	m_view.updateStatus();
+}
+
+/** The edits as one undoable step, which selects the difference again
+    when undone, and the files compared again (FlushAndRescan). */
+void FileCompareView::SelectionCopy::finish()
+{
+	if (!m_edited)
+		return;
+	m_cursor.endEditBlock();
+	m_view.m_syncing = false;
+	m_view.tagLastCommand(m_dst, false, m_flagsBefore, m_lines[m_dst].ghost);
+	for (int k = m_view.m_undoOrder.size() - 1; k >= 0; --k)
+		if (m_view.m_undoOrder[k].side == m_dst)
+		{
+			m_view.m_undoOrder[k].merge = true;
+			m_view.m_undoOrder[k].viewLine = m_topLine;
+			break;
+		}
+	m_view.setSideModified(m_dst, true);
+	m_view.recompare();
+	resetTargetCursor();
+}
+
+/** CopyMultipleList's last steps: the target's cursor at the start of its
+    line, nothing selected there. */
+void FileCompareView::SelectionCopy::resetTargetCursor()
+{
+	DiffTextEdit *pane = m_view.m_panes[m_dst];
+	QTextCursor cursor = pane->textCursor();
+	cursor.setPosition(cursor.block().position());
+	m_view.m_syncing = true;
+	pane->setTextCursor(cursor);
+	m_view.m_syncing = false;
+}
 
 FileCompareView::~FileCompareView() = default;
 
@@ -2028,6 +3122,18 @@ void FileCompareView::setCursorViewLineForTest(int side, int viewLine)
 		m_panes[side]->document()->findBlockByNumber(viewLine)));
 }
 
+void FileCompareView::selectForTest(int side, int fromLine, int fromChar, int toLine,
+	int toChar)
+{
+	m_activePane = side;
+	QTextDocument *doc = m_panes[side]->document();
+	QTextCursor cursor(doc);
+	cursor.setPosition(doc->findBlockByNumber(fromLine).position() + fromChar);
+	cursor.setPosition(doc->findBlockByNumber(toLine).position() + toChar,
+		QTextCursor::KeepAnchor);
+	m_panes[side]->setTextCursor(cursor);
+}
+
 void FileCompareView::selectAllAndCopyForTest(int side)
 {
 	m_panes[side]->selectAll();
@@ -2505,7 +3611,8 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide,
 		m_blocks[b2].end[target] += delta;
 	}
 	block.resolved = true;
-	--m_diffCount;
+	if (!block.trivial)
+		--m_diffCount;
 	m_wordSpans.erase(std::remove_if(m_wordSpans.begin(), m_wordSpans.end(),
 		[blockIndex](const WordSpan &s) { return s.blockIndex == blockIndex; }),
 		m_wordSpans.end());
@@ -2554,8 +3661,24 @@ void FileCompareView::copyCurrentDiff(int sourceSide, int targetSide, bool advan
 	if (sourceSide >= m_paneCount || targetSide >= m_paneCount
 		|| sourceSide == targetSide)
 		return;
-	// upstream's OnX2Y: with no current difference, the one the cursor is
-	// in, and none when it is in none
+	// upstream's OnX2Y: text selected in the pane the copy goes from or
+	// to copies what the selection takes in, as the copy granularity
+	// says; "and advance" goes on to the next difference (OnX2YNext)
+	if ((m_activePane == sourceSide || m_activePane == targetSide)
+		&& m_panes[m_activePane]->textCursor().hasSelection())
+	{
+		if (m_readOnly[targetSide])
+		{
+			m_status->setText(tr("The merge target is read-only."));
+			return;
+		}
+		SelectionCopy(*this, sourceSide, targetSide).run();
+		if (advance)
+			gotoNextDiff();
+		return;
+	}
+	// with no current difference, the one the cursor is in, and none when
+	// it is in none
 	if (m_current < 0)
 		m_current = activeDiffAtLine(m_panes[m_activePane]->textCursor().blockNumber());
 	if (m_current < 0 || m_current >= static_cast<int>(m_blocks.size()))
@@ -2617,11 +3740,9 @@ void FileCompareView::copyAllFrom(int sourceSide, int targetSide)
 	}
 	// CMergeDoc::CopyMultipleList: not with hidden lines among the
 	// differences to copy
-	if (hasInvisibleLines())
+	if (hasInvisibleLines(0, static_cast<int>(m_blocks.size()) - 1))
 	{
-		lm::showError(this, tr("Merging/copying differences that contain hidden lines is "
-			"not currently supported.\n\nPlease clear the display filter or adjust the "
-			"filter settings to show all lines before merging."));
+		showCannotCopyInvisibleLinesError(this);
 		return;
 	}
 
@@ -3210,15 +4331,17 @@ bool FileCompareView::blockFiltered(int blockIndex) const
 	return m_shownBefore[last] == m_shownBefore[first];
 }
 
-/** CMergeDoc::HasInvisibleLines over every difference there is to copy:
-    one of them has a hidden line. */
-bool FileCompareView::hasInvisibleLines() const
+/** CMergeDoc::HasInvisibleLines over the differences there are to copy,
+    firstDiff to lastDiff: one of them has a hidden line. */
+bool FileCompareView::hasInvisibleLines(int firstDiff, int lastDiff) const
 {
 	if (m_shownBefore.empty())
 		return false;
 	const int lines = static_cast<int>(m_shownBefore.size()) - 1;
-	for (const Block &block : m_blocks)
+	for (int b = qMax(0, firstDiff);
+		b <= lastDiff && b < static_cast<int>(m_blocks.size()); ++b)
 	{
+		const Block &block = m_blocks[b];
 		if (block.trivial || block.resolved)
 			continue;
 		const int first = qBound(0, block.viewBegin, lines);

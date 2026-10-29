@@ -4347,6 +4347,26 @@ Por favor, use valores entre 1 y %1.</translation>
         <translation>Volver a comparar &amp;automáticamente</translation>
     </message>
     <message>
+        <source>Diff hunk</source>
+        <translation>Fragmentos de diferencias</translation>
+    </message>
+    <message>
+        <source>Inline diff</source>
+        <translation>Diferencia en línea</translation>
+    </message>
+    <message>
+        <source>Line</source>
+        <translation>Línea</translation>
+    </message>
+    <message>
+        <source>Character</source>
+        <translation>Carácter</translation>
+    </message>
+    <message>
+        <source>Copy &amp;granularity for selected differences:</source>
+        <translation>Copiar &amp;granularidad para las diferencias seleccionadas:</translation>
+    </message>
+    <message>
         <source>Line Difference Coloring</source>
         <translation>Colorear según las diferencias de líneas</translation>
     </message>

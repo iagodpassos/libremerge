@@ -94,6 +94,9 @@ public:
 	    there (for tests). */
 	int cursorViewLineForTest(int side) const;
 	void setCursorViewLineForTest(int side, int viewLine);
+	/** Select a pane's text from a view line's character to another's,
+	    the pane becoming the active one (for tests). */
+	void selectForTest(int side, int fromLine, int fromChar, int toLine, int toChar);
 	/** Select everything in one pane and copy it (for tests). */
 	void selectAllAndCopyForTest(int side);
 	/** Type text at the start of a view line, as an undoable user edit
@@ -342,6 +345,7 @@ signals:
 
 private:
 	class LineProvider;
+	class SelectionCopy;
 
 	struct Block
 	{
@@ -457,7 +461,7 @@ private:
 	void hideLines();
 	void applyHiddenLines();
 	bool blockFiltered(int blockIndex) const;
-	bool hasInvisibleLines() const;
+	bool hasInvisibleLines(int firstDiff, int lastDiff) const;
 	void updateLocationViewport();
 	void ensureFilterBar();
 	void hideFilterBar();

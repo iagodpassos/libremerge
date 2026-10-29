@@ -4639,6 +4639,26 @@ Useu valors entre 1 i %1.</translation>
         <translation>Reexploració &amp;automàtica</translation>
     </message>
     <message>
+        <source>Diff hunk</source>
+        <translation>Tros de diferència</translation>
+    </message>
+    <message>
+        <source>Inline diff</source>
+        <translation>Diferència en línia</translation>
+    </message>
+    <message>
+        <source>Line</source>
+        <translation>Línia</translation>
+    </message>
+    <message>
+        <source>Character</source>
+        <translation>Caràcter</translation>
+    </message>
+    <message>
+        <source>Copy &amp;granularity for selected differences:</source>
+        <translation>Copia la &amp;granularitat per a les diferències seleccionades:</translation>
+    </message>
+    <message>
         <source>Line Difference Coloring</source>
         <translation>Acoloriment de diferència de línia</translation>
     </message>
@@ -4656,11 +4676,11 @@ Useu valors entre 1 i %1.</translation>
     </message>
     <message>
         <source>Break at whitespace</source>
-        <translation>Separa a l'espai</translation>
+        <translation>Separa a l&apos;espai</translation>
     </message>
     <message>
         <source>Break at whitespace or punctuation</source>
-        <translation>Separa a l'espai o puntuació</translation>
+        <translation>Separa a l&apos;espai o puntuació</translation>
     </message>
     <message>
         <source>W&amp;ord break characters:</source>

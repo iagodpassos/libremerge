@@ -656,6 +656,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestLineDiffsOpt(QStringLiteral("selftest-line-diffs"),
 		QStringLiteral("Exercise the Editor > Compare/Merge page: line difference coloring, word breaks, View Line Differences and the automatic rescan (for testing)"));
 	parser.addOption(selftestLineDiffsOpt);
+	QCommandLineOption selftestCopyGranularityOpt(QStringLiteral("selftest-copy-granularity"),
+		QStringLiteral("Copy with text selected by each copy granularity, and undo it (for testing)"));
+	parser.addOption(selftestCopyGranularityOpt);
 	QCommandLineOption selftestIdenticalOpt(QStringLiteral("selftest-identical"),
 		QStringLiteral("Verify the identical files message, the self-compare and the Message Boxes page (for testing)"));
 	parser.addOption(selftestIdenticalOpt);
@@ -7901,6 +7904,209 @@ int main(int argc, char *argv[])
 		}
 
 		printf("line diffs: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestCopyGranularityOpt))
+	{
+		// WinMerge's copy with text selected (CMergeEditView::OnX2Y), as the
+		// copy granularity of Editor > Compare/Merge says
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		const QString wordsLeft = write("words_l.txt",
+			"same\nalpha beta gamma\nsame2\none two three\nsame3\n");
+		const QString wordsRight = write("words_r.txt",
+			"same\nalpha BETA gamma\nsame2\none TWO three\nsame3\n");
+		const QString linesLeft = write("lines_l.txt", "top\na1\na2\na3\nbottom\n");
+		const QString linesRight = write("lines_r.txt", "top\nb1\nb2\nb3\nbottom\n");
+		const QString ghostRight = write("ghost_r.txt", "top\nb1\nbottom\n");
+		const QString inlineLeft = write("inline_l.txt", "head\nx aaa y bbb z\ntail\n");
+		const QString inlineRight = write("inline_r.txt", "head\nx AAA y BBB z\ntail\n");
+		const QString threeLeft = write("three_l.txt", "head\nabc one\ntail\n");
+		const QString threeMiddle = write("three_m.txt", "head\nxyz one\ntail\n");
+		const QString threeRight = write("three_r.txt", "head\nabc one\ntail\n");
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		const auto lines = [](FileCompareView &view, int side)
+		{
+			return view.realLinesForTest(side).join(QLatin1Char('|'));
+		};
+		const auto open = [](FileCompareView &view, const QStringList &paths)
+		{
+			QString error;
+			if (!view.compare(paths, &error))
+				std::exit(2);
+		};
+
+		// the page: by character of four, which Defaults gives back
+		{
+			OptionsDialog dialog;
+			QWidget *page = dialog.pageForTest(OptionsDialog::EditorCompareMergePage);
+			auto *granularity = page->findChild<QComboBox *>(QStringLiteral("copyGranularity"));
+			if (granularity == nullptr)
+				return 2;
+			check(granularity->count() == 4 && granularity->currentIndex() == 3,
+				"Character by default, of four");
+			granularity->setCurrentIndex(0);
+			dialog.selectCategoryForTest(10);
+			dialog.restoreDefaultsForTest();
+			check(granularity->currentIndex() == 3, "Defaults gives Character back");
+		}
+
+		// by character: the very characters, into the other pane or the
+		// active one, one undo step
+		{
+			mgr->Set(OPT_COPY_GRANULARITY, 3);
+			FileCompareView view;
+			open(view, { wordsLeft, wordsRight });
+			view.selectForTest(0, 1, 6, 1, 8);
+			view.copyToRight();
+			printf("  right: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == QStringLiteral("same|alpha beTA gamma|same2|one TWO three|same3")
+				&& view.diffCount() == 2, "by character: the characters selected");
+			view.undoActive();
+			check(lines(view, 1) == QStringLiteral("same|alpha BETA gamma|same2|one TWO three|same3"),
+				"undone in one step");
+			view.selectForTest(0, 1, 6, 1, 8);
+			view.copyToLeft();
+			printf("  left: %s\n", qPrintable(lines(view, 0)));
+			check(lines(view, 0) == QStringLiteral("same|alpha BEta gamma|same2|one two three|same3"),
+				"into the pane they are selected in");
+			view.undoActive();
+			view.selectForTest(0, 1, 6, 1, 8);
+			view.copyToRight(true);
+			// OnNextdiff from the cursor's line, the first of the difference
+			// part of which is left
+			check(view.currentDiffForTest() == 0, "and advance: the difference from the cursor on");
+		}
+
+		// by line and by character over the same lines
+		{
+			FileCompareView view;
+			open(view, { linesLeft, linesRight });
+			mgr->Set(OPT_COPY_GRANULARITY, 2);
+			view.selectForTest(0, 2, 1, 3, 1);
+			view.copyToRight();
+			printf("  by line: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == QStringLiteral("top|b1|a2|a3|bottom"),
+				"by line: the lines selected, whole");
+			view.undoActive();
+			mgr->Set(OPT_COPY_GRANULARITY, 3);
+			view.selectForTest(0, 2, 1, 3, 1);
+			view.copyToRight();
+			printf("  by character: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == QStringLiteral("top|b1|b2|a3|bottom"),
+				"by character: from the selection's start");
+			// selected in the target: Copy to Right from the right pane
+			view.undoActive();
+			view.selectForTest(1, 2, 1, 3, 1);
+			view.copyToRight();
+			printf("  selected in the target: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == QStringLiteral("top|b1|b2|a3|bottom"),
+				"by character, selected in the target");
+		}
+
+		// lines copied onto ghost lines, and undone
+		{
+			mgr->Set(OPT_COPY_GRANULARITY, 2);
+			FileCompareView view;
+			open(view, { linesLeft, ghostRight });
+			view.selectForTest(0, 2, 0, 3, 2);
+			view.copyToRight();
+			printf("  onto ghosts: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == QStringLiteral("top|b1|a2|a3|bottom"),
+				"by line onto ghost lines");
+			view.undoActive();
+			check(lines(view, 1) == QStringLiteral("top|b1|bottom"), "and undone");
+			// everything selected, by character: the differences whole
+			mgr->Set(OPT_COPY_GRANULARITY, 3);
+			view.selectForTest(0, 0, 0, 4, 6);
+			view.copyToRight();
+			printf("  all by character: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == lines(view, 0) && view.diffCount() == 0,
+				"all selected by character: the files alike");
+		}
+
+		// by diff hunk: every difference touched, whole
+		{
+			mgr->Set(OPT_COPY_GRANULARITY, 0);
+			FileCompareView view;
+			open(view, { wordsLeft, wordsRight });
+			view.selectForTest(0, 1, 7, 3, 2);
+			view.copyToRight();
+			check(lines(view, 1) == lines(view, 0) && view.diffCount() == 0,
+				"by diff hunk: every difference touched, whole");
+		}
+
+		// by inline diff: those the selection takes in, against by character
+		{
+			FileCompareView view;
+			open(view, { inlineLeft, inlineRight });
+			mgr->Set(OPT_COPY_GRANULARITY, 1);
+			view.selectForTest(0, 1, 1, 1, 6);
+			view.copyToRight();
+			printf("  one inline diff: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == QStringLiteral("head|x aaa y BBB z|tail"),
+				"by inline diff: the one taken in");
+			view.undoActive();
+			view.selectForTest(0, 1, 3, 1, 10);
+			view.copyToRight();
+			check(lines(view, 1) == QStringLiteral("head|x aaa y bbb z|tail")
+				&& view.diffCount() == 0, "by inline diff: both touched, whole");
+			view.undoActive();
+			mgr->Set(OPT_COPY_GRANULARITY, 3);
+			view.selectForTest(0, 1, 3, 1, 10);
+			view.copyToRight();
+			printf("  same by character: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == QStringLiteral("head|x Aaa y bbB z|tail"),
+				"by character: the characters of both");
+		}
+
+		// by inline diff over two differences: the first whole, the last's
+		// inline difference taken in
+		{
+			mgr->Set(OPT_COPY_GRANULARITY, 1);
+			FileCompareView view;
+			open(view, { wordsLeft, wordsRight });
+			view.selectForTest(0, 1, 7, 3, 5);
+			view.copyToRight();
+			printf("  over two: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == lines(view, 0) && view.diffCount() == 0,
+				"by inline diff over two differences");
+		}
+
+		// 3-way, from the middle pane
+		{
+			mgr->Set(OPT_COPY_GRANULARITY, 3);
+			FileCompareView view;
+			open(view, { threeLeft, threeMiddle, threeRight });
+			view.selectForTest(1, 1, 0, 1, 2);
+			view.copyToRight();
+			printf("  3-way right: %s\n", qPrintable(lines(view, 2)));
+			check(lines(view, 2) == QStringLiteral("head|xyc one|tail")
+				&& lines(view, 0) == QStringLiteral("head|abc one|tail"),
+				"3-way: from the middle pane to the right");
+		}
+
+		mgr->Set(OPT_COPY_GRANULARITY, mgr->GetDefault<int>(OPT_COPY_GRANULARITY));
+		printf("copy granularity: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

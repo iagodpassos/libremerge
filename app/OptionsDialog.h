@@ -193,6 +193,7 @@ private:
 	QRadioButton *m_radInsertSpaces = nullptr;
 	// Editor > Compare/Merge
 	QCheckBox *m_chkAutomaticRescan = nullptr;
+	QComboBox *m_cmbCopyGranularity = nullptr;
 	QCheckBox *m_chkViewLineDiffs = nullptr;
 	QRadioButton *m_radCharLevel = nullptr;
 	QRadioButton *m_radWordLevel = nullptr;

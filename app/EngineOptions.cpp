@@ -356,10 +356,12 @@ void installEngineOptions()
 	options.InitOption(OPT_ALLOW_MIXED_EOL, false);
 	options.InitOption(OPT_TAB_SIZE, 4, 0, 64);
 	options.InitOption(OPT_TAB_TYPE, 0, 0, 1); // 0 means tabs inserted
-	// its Compare/Merge page: the rescan after edits, and how differences
+	// its Compare/Merge page: the rescan after edits, what a copy with
+	// text selected takes in (3, by character), and how differences
 	// inside the lines show (character or word level, and what ends a
 	// word, which the word diffs take from strdiff::SetBreakChars)
 	options.InitOption(OPT_AUTOMATIC_RESCAN, false);
+	options.InitOption(OPT_COPY_GRANULARITY, 3);
 	options.InitOption(OPT_WORDDIFF_HIGHLIGHT, true);
 	options.InitOption(OPT_BREAK_ON_WORDS, false);
 	options.InitOption(OPT_BREAK_TYPE, 1, 0, 1);

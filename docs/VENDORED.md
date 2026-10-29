@@ -116,10 +116,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 639 | 169 | 250 | 0 | 3 |
-| Spanish | 627 | 183 | 248 | 3 | 0 |
-| Catalan | 325 | 178 | 250 | 308 | 0 |
-| French | 644 | 185 | 232 | 0 | 0 |
+| German | 644 | 169 | 250 | 0 | 3 |
+| Spanish | 632 | 183 | 248 | 3 | 0 |
+| Catalan | 330 | 178 | 250 | 308 | 0 |
+| French | 649 | 185 | 232 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -163,6 +163,11 @@ says so in a comment:
   before the cursor counting columns as the cursor's column is counted.
   Upstream counts one per character there, so a wide character left the
   cursor off the tab stop.
+- A copy by characters of a selection that spans several differences
+  copies the first of them from the selection's start. Upstream
+  (`CMergeDoc::CopyMultiplePartialList`) copies it whole when the
+  selection starts on the file's first line, the text before the
+  selection's start on that line included.
 
 Where upstream falls back on Windows' line ending, LibreMerge falls back
 on the one of macOS and Linux:
