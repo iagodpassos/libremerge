@@ -2175,6 +2175,8 @@ bool TableCompareView::copySelectedCells(int sourceSide, int targetSide)
 		rebuildModel();
 		m_current = -1;
 		updateStatus();
+		// FlushAndRescan tells when the files are now identical
+		emit rescanned();
 		return true;
 	}
 
@@ -2213,6 +2215,7 @@ bool TableCompareView::copySelectedCells(int sourceSide, int targetSide)
 		rebuildModel();
 		m_current = -1;
 		updateStatus();
+		emit rescanned();
 	}
 	return true;
 }
@@ -2284,6 +2287,8 @@ void TableCompareView::copyCurrentDiff(int sourceSide, int targetSide)
 	QString error;
 	runDiff(&error);
 	rebuildModel();
+	// ListCopy's FlushAndRescan tells when the files are now identical
+	emit rescanned();
 	// land on the next difference below the merged spot
 	m_current = -1;
 	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
@@ -2342,6 +2347,9 @@ void TableCompareView::copyAllFrom(int sourceSide, int targetSide)
 	rebuildModel();
 	m_current = -1;
 	updateStatus();
+	// CopyMultipleList's FlushAndRescan tells when the files are now
+	// identical
+	emit rescanned();
 }
 
 void TableCompareView::refreshByUser()

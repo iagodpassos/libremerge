@@ -1338,6 +1338,8 @@ void FileCompareView::SelectionCopy::mergeInPlace(int firstDiff, int lastDiff)
 	resetTargetCursor();
 	m_view.applyHighlights();
 	m_view.updateStatus();
+	// FlushAndRescan tells when the files are now identical
+	emit m_view.rescanned();
 }
 
 /** The edits as one undoable step, which selects the difference again
@@ -1359,6 +1361,8 @@ void FileCompareView::SelectionCopy::finish()
 	m_view.setSideModified(m_dst, true);
 	m_view.recompare();
 	resetTargetCursor();
+	// which tells when the files are now identical
+	emit m_view.rescanned();
 }
 
 /** CopyMultipleList's last steps: the target's cursor at the start of its
@@ -3698,6 +3702,8 @@ void FileCompareView::copyCurrentDiff(int sourceSide, int targetSide, bool advan
 	setSideModified(target, true);
 	// the lines the copy wrote anew are hidden where they were
 	applyHiddenLines();
+	// ListCopy's FlushAndRescan tells when the files are now identical
+	emit rescanned();
 
 	if (advance)
 	{
@@ -3763,6 +3769,9 @@ void FileCompareView::copyAllFrom(int sourceSide, int targetSide)
 	m_current = -1;
 	applyHighlights();
 	updateStatus();
+	// CopyMultipleList's FlushAndRescan tells when the files are now
+	// identical
+	emit rescanned();
 }
 
 void FileCompareView::gotoFirstDiff()

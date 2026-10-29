@@ -1125,7 +1125,8 @@ void MainWindow::attachFileView(FileCompareView *view)
 
 /** WinMerge's identical files message: on opening (OpenDocs), on
     Recompare (OnRefresh) and, for text and tables, on saving (OnFileSave
-    rescans). Deferred: the triggers come from inside the page. */
+    rescans) and on copying differences (FlushAndRescan). Deferred: the
+    triggers come from inside the page. */
 void MainWindow::watchIdentical(QWidget *page)
 {
 	QPointer<QWidget> guard(page);

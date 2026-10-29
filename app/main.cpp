@@ -2499,6 +2499,7 @@ int main(int argc, char *argv[])
 		const QString binaryDiffer = message("Selected files are identical (with current settings).\n"
 			"But differ at the binary level.");
 		const QString sameFile = message("Same file is opened in both panes.");
+		const QString filesSame = message("Selected files are identical.");
 		const QString a = dir.filePath(QStringLiteral("a.txt"));
 		const QString b = dir.filePath(QStringLiteral("b.txt"));
 		const QString spaced = dir.filePath(QStringLiteral("spaced.txt"));
@@ -2553,19 +2554,69 @@ int main(int argc, char *argv[])
 			check(shown == QStringList{ binaryMatch }, "Recompare reports again");
 		}
 		{
-			// saving that leaves nothing different reports it too
+			// a copy that leaves nothing different reports it, as its
+			// FlushAndRescan does, and saving then reports it too
 			write(other, "one two!\n");
 			MainWindow window;
 			window.openFileComparison({ a, other });
 			settle();
 			auto *view = window.findChild<FileCompareView *>();
+			shown.clear();
 			view->copyCurrentDiff(0, 1, false);
+			settle();
+			check(shown == QStringList{ filesSame }, "a copy to identical reports it");
 			shown.clear();
 			QString error;
 			view->saveModified(&error);
 			settle();
 			check(shown == QStringList{ binaryMatch }, "saving to identical reports it");
 			write(other, "something else\n");
+		}
+		{
+			// a copy that leaves a difference says nothing; a copy of
+			// what a selection takes in, and Copy All, report as well
+			const QString left = dir.filePath(QStringLiteral("two_l.txt"));
+			const QString right = dir.filePath(QStringLiteral("two_r.txt"));
+			write(left, "x1\nsame\nx2\n");
+			write(right, "y1\nsame\ny2\n");
+			MainWindow window;
+			window.openFileComparison({ left, right });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			shown.clear();
+			view->copyCurrentDiff(0, 1, false);
+			settle();
+			check(shown.isEmpty(), "a copy that leaves a difference: no message");
+			view->selectForTest(0, 0, 0, 2, 2);
+			view->copyToRight();
+			settle();
+			check(shown == QStringList{ filesSame } && view->diffCount() == 0,
+				"a copy of a selection to identical reports it");
+			view->undoActive();
+			view->undoActive();
+			shown.clear();
+			view->copyAllFrom(0, 1);
+			settle();
+			check(shown == QStringList{ filesSame }, "Copy All to identical reports it");
+		}
+		{
+			// a table's copy as well
+			const QString left = dir.filePath(QStringLiteral("l.csv"));
+			const QString right = dir.filePath(QStringLiteral("r.csv"));
+			write(left, "k,v\n1,a\n");
+			write(right, "k,v\n1,b\n");
+			MainWindow window;
+			window.openFileComparison({ left, right });
+			settle();
+			auto *table = window.findChild<TableCompareView *>();
+			shown.clear();
+			if (table != nullptr)
+			{
+				table->copyAllFrom(0, 1);
+				settle();
+			}
+			check(table != nullptr && shown == QStringList{ filesSame },
+				"a table's copy to identical reports it");
 		}
 		{
 			const QString leftPng = dir.filePath(QStringLiteral("l.png"));
