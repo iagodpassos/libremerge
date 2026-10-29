@@ -71,8 +71,6 @@
 namespace
 {
 
-// upstream breaks words at punctuation too (OPT_BREAK_TYPE default 1)
-constexpr int kBreakType = 1;
 // skip intra-line marks for pathologically large blocks
 constexpr int kMaxWordDiffBlockBytes = 256 * 1024;
 
@@ -292,6 +290,16 @@ FileCompareView::FileCompareView(QWidget *parent)
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(0);
 
+	// the automatic rescan's wait after typing (RESCAN_TIMEOUT), then
+	// RescanIfNeeded: not again when a rescan ran within that second
+	m_rescanTimer = new QTimer(this);
+	m_rescanTimer->setSingleShot(true);
+	m_rescanTimer->setInterval(1000);
+	connect(m_rescanTimer, &QTimer::timeout, this, [this]() {
+		if (m_diffStale && (!m_lastRescan.isValid() || m_lastRescan.elapsed() >= 1000))
+			rescan();
+	});
+
 	auto *toolbar = new QToolBar(this);
 	toolbar->setIconSize(QSize(16, 16));
 	toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
@@ -478,6 +486,21 @@ FileCompareView::FileCompareView(QWidget *parent)
 						i, position, removed, added,
 						qPrintable(probe.selectedText()));
 				});
+		// WinMerge's OnEditOperation: an edit of the user's, every one and
+		// not only the first after a save, leaves the differences out of
+		// date (SetEditedAfterRescan). The comparison's own edits are made
+		// while syncing; a change of formats alone (the highlighting's)
+		// moves neither the text's length nor the undo stack
+		m_undoSteps[i] = m_panes[i]->document()->availableUndoSteps();
+		connect(m_panes[i]->document(), &QTextDocument::contentsChange,
+			this, [this, i](int, int removed, int added) {
+				const int steps = m_panes[i]->document()->availableUndoSteps();
+				const bool undoMoved = steps != m_undoSteps[i];
+				m_undoSteps[i] = steps;
+				if (m_syncing || (removed == added && !undoMoved))
+					return;
+				userEdited(m_panes[i]->inTextDrop());
+			});
 		// QTextDocument's own modified tracking ignores syntax-highlight
 		// format changes, unlike contentsChange
 		connect(m_panes[i]->document(), &QTextDocument::modificationChanged,
@@ -1100,6 +1123,7 @@ bool FileCompareView::runDiff(QString *error)
 		m_blocks.push_back(block);
 	}
 	m_diffStale = false;
+	m_lastRescan.start();
 	rebuildAlignment();
 	computeWordSpans();
 	// upstream's Rescan hides the lines right after the buffers are primed
@@ -1428,6 +1452,12 @@ void FileCompareView::computeWordSpans()
 	DIFFOPTIONS options = lm::currentDiffOptions();
 	if (m_ignoreEol)
 		options.bIgnoreEol = true;
+	// the Compare/Merge page: a word ends at whitespace, or at the break
+	// characters too (GetBreakType), and the colors go by character
+	// unless by word (GetByteColoringOption)
+	COptionsMgr *mgr = GetOptionsMgr();
+	const int breakType = mgr != nullptr ? mgr->GetInt(OPT_BREAK_TYPE) : 1;
+	const bool byteLevel = mgr == nullptr || !mgr->GetBool(OPT_BREAK_ON_WORDS);
 
 	for (size_t b = 0; b < m_blocks.size(); ++b)
 	{
@@ -1476,7 +1506,7 @@ void FileCompareView::computeWordSpans()
 			m_paneCount, joined,
 			!options.bIgnoreCase, eolMode,
 			options.nIgnoreWhitespace, options.bIgnoreNumbers,
-			kBreakType, false /*byte_level*/);
+			breakType, byteLevel);
 
 		for (const strdiff::wdiff &wd : wdiffs)
 		{
@@ -1590,17 +1620,21 @@ void FileCompareView::applyHighlights()
 		}
 
 		// word-level spans on top of the line backgrounds; zero-length
-		// spans become thin insertion markers, painted by the pane
+		// spans become thin insertion markers, painted by the pane. None
+		// with "View line differences" off (GetAdditionalTextBlocks)
 		QList<DiffTextEdit::InsertionMarker> markers;
+		const bool lineDiffs = lm::viewLineDifferences();
+		m_drawnWordSpans[side] = 0;
 		for (const WordSpan &span : m_wordSpans)
 		{
-			if (span.side != side
+			if (!lineDiffs || span.side != side
 				|| span.line >= static_cast<int>(m_realToView[side].size()))
 				continue;
 			const QTextBlock textBlock = doc->findBlockByNumber(
 				m_realToView[side][span.line]);
 			if (!textBlock.isValid())
 				continue;
+			++m_drawnWordSpans[side];
 			const bool current = (span.blockIndex == m_current);
 			if (span.length == 0)
 			{
@@ -1797,7 +1831,8 @@ void FileCompareView::updateDiffPane()
 		}
 		for (const WordSpan &span : m_wordSpans)
 		{
-			if (span.side != side || span.blockIndex != m_current)
+			if (!lm::viewLineDifferences() || span.side != side
+				|| span.blockIndex != m_current)
 				continue;
 			const QTextBlock textBlock = doc->findBlockByNumber(
 				span.line - block.begin[side]);
@@ -2239,6 +2274,42 @@ void FileCompareView::refreshByUser()
 	emit aboutToRescan();
 	recompare();
 	emit rescanned();
+}
+
+void FileCompareView::rescan()
+{
+	recompare();
+	emit rescanned();
+}
+
+void FileCompareView::refreshLineDifferences()
+{
+	applyHighlights();
+}
+
+void FileCompareView::userEdited(bool immediate)
+{
+	if (!m_diffStale)
+	{
+		m_diffStale = true;
+		updateStatus();
+	}
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr || !mgr->GetBool(OPT_AUTOMATIC_RESCAN))
+		return;
+	// typing, pasting, deleting and the like wait for a second without
+	// edits (IDT_RESCAN); a drag and drop rescans at once, here from a
+	// clean stack, the drop being still under way
+	if (immediate)
+	{
+		m_rescanTimer->stop();
+		QTimer::singleShot(0, this, [this]() {
+			if (m_diffStale)
+				rescan();
+		});
+	}
+	else
+		m_rescanTimer->start();
 }
 
 bool FileCompareView::encodingsDiffer() const

@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <memory>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QKeySequence>
 #include <QSet>
@@ -19,6 +20,7 @@ class QLabel;
 class QLineEdit;
 class QMenu;
 class QPlainTextEdit;
+class QTimer;
 class QTextBlock;
 class QVBoxLayout;
 class DiffTextEdit;
@@ -115,6 +117,21 @@ public:
 				++count;
 		return count;
 	}
+	/** The differences inside the lines on one side, as (offset in the
+	    line, length) pairs (for tests). */
+	QList<QPair<int, int>> wordSpansForTest(int side) const
+	{
+		QList<QPair<int, int>> spans;
+		for (const WordSpan &span : m_wordSpans)
+			if (span.side == side)
+				spans.append({ span.start, span.length });
+		return spans;
+	}
+	/** The differences inside the lines drawn on one side, none with
+	    "View line differences" off (for tests). */
+	int drawnWordSpansForTest(int side) const { return m_drawnWordSpans[side]; }
+	/** Edited since the differences were last worked out (for tests). */
+	bool diffStaleForTest() const { return m_diffStale; }
 	/** Word-level highlights on one side (for tests). */
 	int wordSpanCountForTest(int side) const
 	{
@@ -198,6 +215,13 @@ public:
 	    followed by rescanned(): WinMerge's OnRefresh, which reports
 	    identical files. */
 	void refreshByUser();
+	/** CMergeDoc::FlushAndRescan: the differences worked out again from
+	    the text as it is, followed by rescanned() for the identical files
+	    message. Unlike Recompare, no check for files changed elsewhere. */
+	void rescan();
+	/** The differences inside the lines shown or not, as "View line
+	    differences" now says (WinMerge's views read it as they paint). */
+	void refreshLineDifferences();
 	/** The highlighting as the options have it now (WinMerge's
 	    CMergeEditView::RefreshOptions sets each view's text type again). */
 	void refreshSyntaxHighlighting();
@@ -418,6 +442,8 @@ private:
 	void refreshAfterUndoRedo(const int countsBefore[3]);
 	SaveResult saveSide(int side, QString *error);
 	void setSideModified(int side, bool modified);
+	/** CMergeEditView::OnEditOperation: an edit of the user's. */
+	void userEdited(bool immediate);
 	void paneScrolled(int pane);
 	void gotoLine(int line, bool realLine, int pane, bool moveAnchor);
 	void centerShownLine(int shownLine);
@@ -498,6 +524,13 @@ private:
 	int m_activePane = 0;
 	bool m_syncing = false;
 	bool m_diffStale = false;
+	// the automatic rescan (OPT_AUTOMATIC_RESCAN): the wait after typing
+	// (IDT_RESCAN) and when the differences were last worked out
+	// (m_LastRescan)
+	QTimer *m_rescanTimer = nullptr;
+	QElapsedTimer m_lastRescan;
+	int m_undoSteps[3] = {};
+	int m_drawnWordSpans[3] = {};
 	bool m_recordingAlignment = false;
 	QAction *m_actSave = nullptr;
 	QAction *m_actCopyFromLeft = nullptr;

@@ -83,6 +83,7 @@ public:
 		ImagePage,   ///< Compare > Image
 		MessageBoxesPage,
 		EditorPage,  ///< Editor > General
+		EditorCompareMergePage, ///< Editor > Compare/Merge
 		BackupPage,
 		CodepagePage,
 	};
@@ -127,6 +128,8 @@ private:
 	void resetMessageBoxes();
 	void syncMessageAnswer(int row);
 	QWidget *buildEditorPage();
+	QWidget *buildEditorCompareMergePage();
+	void updateLineDiffControls();
 	QWidget *buildBackupPage();
 	QWidget *buildCodepagePage();
 	void showCustomCodepage(int codepage);
@@ -188,6 +191,13 @@ private:
 	QLineEdit *m_editTabSize = nullptr;
 	QRadioButton *m_radInsertTabs = nullptr;
 	QRadioButton *m_radInsertSpaces = nullptr;
+	// Editor > Compare/Merge
+	QCheckBox *m_chkAutomaticRescan = nullptr;
+	QCheckBox *m_chkViewLineDiffs = nullptr;
+	QRadioButton *m_radCharLevel = nullptr;
+	QRadioButton *m_radWordLevel = nullptr;
+	QComboBox *m_cmbBreakType = nullptr;
+	QLineEdit *m_editBreakChars = nullptr;
 	// Message Boxes
 	QTreeWidget *m_messageList;
 	// the Answer drop-down of each question, by row (null for the

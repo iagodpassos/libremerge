@@ -649,7 +649,9 @@ void DiffTextEdit::dropEvent(QDropEvent *event)
 	if (m_hasHiddenLines && (event->source() == this || event->source() == viewport())
 		&& selectionSpansHiddenLine())
 		event->setDropAction(Qt::CopyAction);
+	m_inTextDrop = true;
 	QPlainTextEdit::dropEvent(event);
+	m_inTextDrop = false;
 }
 
 bool DiffTextEdit::event(QEvent *event)

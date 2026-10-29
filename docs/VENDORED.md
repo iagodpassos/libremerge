@@ -116,10 +116,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 630 | 168 | 250 | 0 | 3 |
-| Spanish | 618 | 182 | 248 | 3 | 0 |
-| Catalan | 316 | 177 | 250 | 308 | 0 |
-| French | 634 | 185 | 232 | 0 | 0 |
+| German | 639 | 169 | 250 | 0 | 3 |
+| Spanish | 627 | 183 | 248 | 3 | 0 |
+| Catalan | 325 | 178 | 250 | 308 | 0 |
+| French | 644 | 185 | 232 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says

@@ -356,6 +356,15 @@ void installEngineOptions()
 	options.InitOption(OPT_ALLOW_MIXED_EOL, false);
 	options.InitOption(OPT_TAB_SIZE, 4, 0, 64);
 	options.InitOption(OPT_TAB_TYPE, 0, 0, 1); // 0 means tabs inserted
+	// its Compare/Merge page: the rescan after edits, and how differences
+	// inside the lines show (character or word level, and what ends a
+	// word, which the word diffs take from strdiff::SetBreakChars)
+	options.InitOption(OPT_AUTOMATIC_RESCAN, false);
+	options.InitOption(OPT_WORDDIFF_HIGHLIGHT, true);
+	options.InitOption(OPT_BREAK_ON_WORDS, false);
+	options.InitOption(OPT_BREAK_TYPE, 1, 0, 1);
+	options.InitOption(OPT_BREAK_SEPARATORS, _T(".,:;?[](){}<=>`'!\"#$%&^~\\|@+-*/"));
+	updateBreakChars();
 	TreeSitterRegistry::Instance().Initialize(treeSitterGrammarsDir().toStdString());
 	initSyntaxParserFactories();
 }
@@ -395,6 +404,18 @@ void setSyntaxHighlightForTest(bool on, int mode)
 		mgr->Set(OPT_SYNTAX_HIGHLIGHT_MODE, mode);
 	}
 	initSyntaxParserFactories();
+}
+
+void updateBreakChars()
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+		strdiff::SetBreakChars(mgr->GetString(OPT_BREAK_SEPARATORS).c_str());
+}
+
+bool viewLineDifferences()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr == nullptr || mgr->GetBool(OPT_WORDDIFF_HIGHLIGHT);
 }
 
 int tabSize()

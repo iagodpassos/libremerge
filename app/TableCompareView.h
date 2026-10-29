@@ -103,6 +103,12 @@ public:
 	    followed by rescanned(): WinMerge's OnRefresh, which reports
 	    identical files. */
 	void refreshByUser();
+	/** CMergeDoc::FlushAndRescan: compared again, followed by
+	    rescanned(), without the check for files changed elsewhere. */
+	void rescan();
+	/** The cells' differences shown or not, as "View line differences"
+	    now says. */
+	void refreshLineDifferences();
 	/** WinMerge's OnFileReload, past its save prompt: both files are
 	    read from disk again, the undo history goes and the current row
 	    is selected again. Nothing is touched when a file cannot be

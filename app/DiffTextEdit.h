@@ -44,6 +44,9 @@ public:
 	explicit DiffTextEdit(QWidget *parent = nullptr);
 
 	void setGutterLineColors(const QHash<int, QColor> &colors);
+	/** A drag and drop of text is landing in the pane (WinMerge's
+	    CE_ACTION_DRAGDROP, an edit the automatic rescan follows at once). */
+	bool inTextDrop() const { return m_inTextDrop; }
 
 	/** The pane's highlights (the differences, line and word), under
 	    which the markers' stretches are drawn: upstream draws the markers
@@ -203,6 +206,7 @@ private:
 	int m_tabSize = 4;
 	bool m_insertTabs = true;
 	bool m_hasHiddenLines = false;
+	bool m_inTextDrop = false;
 	bool m_movingCursor = false;
 	int m_lastCursorPosition = 0;
 	std::function<void(QMenu *)> m_contextMenuHook;

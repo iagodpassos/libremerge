@@ -3338,6 +3338,11 @@ El archivo puede ser de solo lectura.</translation>
         <translation>Tamaño &amp;real</translation>
     </message>
     <message>
+        <source>Vie&amp;w Line Differences</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Vie&amp;w Line Differences&quot;.</translatorcomment>
+        <translation>&amp;Mostrar diferencias de línea</translation>
+    </message>
+    <message>
         <source>Next &amp;Pane</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Panel &amp;siguiente</translation>
@@ -4077,6 +4082,10 @@ Por favor, use valores entre 1 y %1.</translation>
         <translation>Edición</translation>
     </message>
     <message>
+        <source>Compare/Merge</source>
+        <translation>Comparar/Combinar</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Copias de seguridad</translation>
     </message>
@@ -4332,6 +4341,38 @@ Por favor, use valores entre 1 y %1.</translation>
     <message>
         <source>Insert &amp;spaces</source>
         <translation>Insertar e&amp;spacios</translation>
+    </message>
+    <message>
+        <source>&amp;Automatic rescan</source>
+        <translation>Volver a comparar &amp;automáticamente</translation>
+    </message>
+    <message>
+        <source>Line Difference Coloring</source>
+        <translation>Colorear según las diferencias de líneas</translation>
+    </message>
+    <message>
+        <source>View line differences</source>
+        <translation>Ver diferencias entre líneas</translation>
+    </message>
+    <message>
+        <source>&amp;Character-level</source>
+        <translation>A nivel de &amp;carácter</translation>
+    </message>
+    <message>
+        <source>&amp;Word-level:</source>
+        <translation>A nivel de pa&amp;labra:</translation>
+    </message>
+    <message>
+        <source>Break at whitespace</source>
+        <translation>Detener en espacio en blanco</translation>
+    </message>
+    <message>
+        <source>Break at whitespace or punctuation</source>
+        <translation>Detener en espacio en blanco o puntuación</translation>
+    </message>
+    <message>
+        <source>W&amp;ord break characters:</source>
+        <translation>Caracteres de separaci&amp;ón de palabras:</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

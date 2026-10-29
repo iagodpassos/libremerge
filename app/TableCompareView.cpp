@@ -500,7 +500,10 @@ public:
 					return C.trivial;
 				const bool current =
 					static_cast<int>(b) == m_view->m_current;
-				if (m_view->m_cellDiffs[m_side].contains(
+				// the cells' own differences are the differences inside
+				// the lines, shown as "View line differences" says
+				if (lm::viewLineDifferences()
+					&& m_view->m_cellDiffs[m_side].contains(
 						cellKey(real, index.column())))
 					return current ? C.selWordDiffDeleted : C.wordDiffDeleted;
 				return current ? C.selDiff : C.diff;
@@ -2348,6 +2351,18 @@ void TableCompareView::refreshByUser()
 	emit aboutToRescan();
 	recompare();
 	emit rescanned();
+}
+
+void TableCompareView::rescan()
+{
+	recompare();
+	emit rescanned();
+}
+
+void TableCompareView::refreshLineDifferences()
+{
+	for (int side = 0; side < m_paneCount; ++side)
+		m_tables[side]->viewport()->update();
 }
 
 bool TableCompareView::encodingsDiffer() const

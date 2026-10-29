@@ -3606,6 +3606,11 @@ Potser el fitxer és només de lectura?</translation>
         <translation>Mida &amp;real</translation>
     </message>
     <message>
+        <source>Vie&amp;w Line Differences</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Vie&amp;w Line Differences&quot;.</translatorcomment>
+        <translation>&amp;Mostra les diferències de la línia</translation>
+    </message>
+    <message>
         <source>Next &amp;Pane</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Subfinestra &amp;següent</translation>
@@ -4361,6 +4366,10 @@ Useu valors entre 1 i %1.</translation>
         <translation>Editor</translation>
     </message>
     <message>
+        <source>Compare/Merge</source>
+        <translation>Compara/fusiona</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Fitxers de còpia de seguretat</translation>
     </message>
@@ -4624,6 +4633,38 @@ Useu valors entre 1 i %1.</translation>
     <message>
         <source>Insert &amp;spaces</source>
         <translation>In&amp;sereix espais</translation>
+    </message>
+    <message>
+        <source>&amp;Automatic rescan</source>
+        <translation>Reexploració &amp;automàtica</translation>
+    </message>
+    <message>
+        <source>Line Difference Coloring</source>
+        <translation>Acoloriment de diferència de línia</translation>
+    </message>
+    <message>
+        <source>View line differences</source>
+        <translation>&amp;Veure les diferències de la línia</translation>
+    </message>
+    <message>
+        <source>&amp;Character-level</source>
+        <translation>Nivell de &amp;caràcter</translation>
+    </message>
+    <message>
+        <source>&amp;Word-level:</source>
+        <translation>Nivell de &amp;paraula:</translation>
+    </message>
+    <message>
+        <source>Break at whitespace</source>
+        <translation>Separa a l'espai</translation>
+    </message>
+    <message>
+        <source>Break at whitespace or punctuation</source>
+        <translation>Separa a l'espai o puntuació</translation>
+    </message>
+    <message>
+        <source>W&amp;ord break characters:</source>
+        <translation>Caràcters de separació de paraules:</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

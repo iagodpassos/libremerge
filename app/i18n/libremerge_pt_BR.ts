@@ -3024,6 +3024,10 @@ O arquivo pode ser somente leitura.</translation>
         <translation>Tamanho Ori&amp;ginal</translation>
     </message>
     <message>
+        <source>Vie&amp;w Line Differences</source>
+        <translation>&amp;Ver Diferenças de Linha</translation>
+    </message>
+    <message>
         <source>Next &amp;Pane</source>
         <translation>Próximo &amp;Painel</translation>
     </message>
@@ -3630,6 +3634,10 @@ Checando identidade binária...</translation>
         <translation>Editor</translation>
     </message>
     <message>
+        <source>Compare/Merge</source>
+        <translation>Comparar/Unir</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Arquivos de Backup</translation>
     </message>
@@ -3832,6 +3840,38 @@ Checando identidade binária...</translation>
     <message>
         <source>Insert &amp;spaces</source>
         <translation>Inserir &amp;espaços</translation>
+    </message>
+    <message>
+        <source>&amp;Automatic rescan</source>
+        <translation>&amp;Reescaneamento automático</translation>
+    </message>
+    <message>
+        <source>Line Difference Coloring</source>
+        <translation>Coloração da Diferença de Linha</translation>
+    </message>
+    <message>
+        <source>View line differences</source>
+        <translation>Visualizar as diferenças de linha</translation>
+    </message>
+    <message>
+        <source>&amp;Character-level</source>
+        <translation>Nível de &amp;caractere</translation>
+    </message>
+    <message>
+        <source>&amp;Word-level:</source>
+        <translation>Nível de &amp;palavra:</translation>
+    </message>
+    <message>
+        <source>Break at whitespace</source>
+        <translation>Quebrar no espaço em branco</translation>
+    </message>
+    <message>
+        <source>Break at whitespace or punctuation</source>
+        <translation>Quebrar no espaço em branco ou pontuação</translation>
+    </message>
+    <message>
+        <source>W&amp;ord break characters:</source>
+        <translation>C&amp;aracteres de quebra de palavra:</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

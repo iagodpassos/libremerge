@@ -527,6 +527,38 @@ MainWindow::MainWindow(QWidget *parent)
 			else if (auto *hex = hexView()) hex->zoomReset();
 		});
 	viewMenu->addSeparator();
+	// WinMerge's View Line Differences (CMergeEditView::OnViewLineDiffs),
+	// of the text and table windows: the option turned over, the open
+	// comparisons showing it as they repaint, the one in front compared
+	// again (RefreshOptions, FlushAndRescan(true))
+	QAction *lineDiffsAction = viewMenu->addAction(tr("Vie&w Line Differences"));
+	lineDiffsAction->setObjectName(QStringLiteral("viewLineDiffsAction"));
+	lineDiffsAction->setCheckable(true);
+	const auto syncLineDiffsAction = [fileView, tableView, lineDiffsAction]() {
+		lineDiffsAction->setEnabled(fileView() != nullptr || tableView() != nullptr);
+		lineDiffsAction->setChecked(lm::viewLineDifferences());
+	};
+	connect(lineDiffsAction, &QAction::triggered, this,
+		[this, fileView, tableView, syncLineDiffsAction]() {
+			if (COptionsMgr *mgr = GetOptionsMgr())
+				mgr->SaveOption(OPT_WORDDIFF_HIGHLIGHT, !lm::viewLineDifferences());
+			for (int i = 0; i < m_tabs->count(); ++i)
+			{
+				if (auto *file = qobject_cast<FileCompareView *>(m_tabs->widget(i)))
+					file->refreshLineDifferences();
+				else if (auto *table = qobject_cast<TableCompareView *>(m_tabs->widget(i)))
+					table->refreshLineDifferences();
+			}
+			if (auto *file = fileView())
+				file->rescan();
+			else if (auto *table = tableView())
+				table->rescan();
+			syncLineDiffsAction();
+		});
+	connect(viewMenu, &QMenu::aboutToShow, this, syncLineDiffsAction);
+	connect(m_tabs, &QTabWidget::currentChanged, this, syncLineDiffsAction);
+	syncLineDiffsAction();
+	viewMenu->addSeparator();
 	addMenuAction(viewMenu, tr("Next &Pane"), QKeySequence(Qt::Key_F6),
 		[fileView, tableView, imageView, hexView]() {
 			if (auto *view = fileView()) view->focusNextPane();
@@ -1917,9 +1949,11 @@ void MainWindow::showOptions()
 	if (accepted)
 	{
 		// CMainFrame::OnOptions: the parsers in the highlight mode's order,
-		// the default codepage, then every merge document's options again
+		// the default codepage, the word break characters, then every
+		// merge document's options again
 		lm::initSyntaxParserFactories();
 		lm::updateCodepageModule();
+		lm::updateBreakChars();
 		for (int i = 0; i < m_tabs->count(); ++i)
 			if (auto *file = qobject_cast<FileCompareView *>(m_tabs->widget(i)))
 			{

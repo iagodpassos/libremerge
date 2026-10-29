@@ -653,6 +653,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestTabCloseOpt(QStringLiteral("selftest-tab-close"),
 		QStringLiteral("Close comparison tabs and verify which tab becomes current (for testing)"));
 	parser.addOption(selftestTabCloseOpt);
+	QCommandLineOption selftestLineDiffsOpt(QStringLiteral("selftest-line-diffs"),
+		QStringLiteral("Exercise the Editor > Compare/Merge page: line difference coloring, word breaks, View Line Differences and the automatic rescan (for testing)"));
+	parser.addOption(selftestLineDiffsOpt);
 	QCommandLineOption selftestIdenticalOpt(QStringLiteral("selftest-identical"),
 		QStringLiteral("Verify the identical files message, the self-compare and the Message Boxes page (for testing)"));
 	parser.addOption(selftestIdenticalOpt);
@@ -1592,12 +1595,13 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
 			OptionsDialog::BinaryPage, OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
-			-1, OptionsDialog::EditorPage, OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
-		bool ok = tree.size() == 12;
+			-1, OptionsDialog::EditorPage, OptionsDialog::EditorCompareMergePage,
+			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
+		bool ok = tree.size() == 13;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1607,16 +1611,17 @@ int main(int argc, char *argv[])
 			OptionsDialog::ComparePage, OptionsDialog::ComparePage,
 			OptionsDialog::FolderPage, OptionsDialog::TablePage, OptionsDialog::BinaryPage,
 			OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
-			OptionsDialog::EditorPage, OptionsDialog::EditorPage, OptionsDialog::BackupPage,
+			OptionsDialog::EditorPage, OptionsDialog::EditorPage,
+			OptionsDialog::EditorCompareMergePage, OptionsDialog::BackupPage,
 			OptionsDialog::CodepagePage };
-		for (int i = 0; ok && i < 12; ++i)
+		for (int i = 0; ok && i < 13; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
 			printf("item %d: page %d, title \"%s\"\n", i,
 				dialog.currentPageForTest(), qPrintable(dialog.windowTitle()));
 			ok = dialog.currentPageForTest() == expectedPage[i]
-				&& nested == ((i >= 1 && i <= 6) || i == 8 || i == 9);
+				&& nested == ((i >= 1 && i <= 6) || (i >= 8 && i <= 10));
 		}
 
 		const auto boxes = [&dialog](OptionsDialog::Page page) {
@@ -1641,7 +1646,7 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(10); // Backup Files
+		dialog.selectCategoryForTest(11); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 
@@ -7697,6 +7702,205 @@ int main(int argc, char *argv[])
 			"Closing skips a tab closed meanwhile");
 
 		printf("tab close: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestLineDiffsOpt))
+	{
+		// WinMerge's Editor > Compare/Merge page (PropEditorCompareMerge)
+		// and what its options do, on this run's own settings
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		const QString wordsLeft = write("words_l.txt", "alpha beta gamma\n");
+		const QString wordsRight = write("words_r.txt", "alpha betx gamma\n");
+		const QString punctLeft = write("punct_l.txt", "one a.b two\n");
+		const QString punctRight = write("punct_r.txt", "one a.x two\n");
+		const QString csvLeft = write("left.csv", "k,v\n1,a\n");
+		const QString csvRight = write("right.csv", "k,v\n1,b\n");
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto wait = [](int ms)
+		{
+			QElapsedTimer timer;
+			timer.start();
+			while (timer.elapsed() < ms)
+			{
+				QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+				QThread::msleep(10);
+			}
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		const auto spans = [](FileCompareView *view)
+		{
+			QStringList out;
+			for (const auto &span : view->wordSpansForTest(0))
+				out.append(QStringLiteral("%1+%2").arg(span.first).arg(span.second));
+			return out.join(QLatin1Char(' '));
+		};
+
+		// the page: its defaults, the level and the break type only with
+		// the line differences shown, and Defaults
+		{
+			OptionsDialog dialog;
+			QWidget *page = dialog.pageForTest(OptionsDialog::EditorCompareMergePage);
+			auto *rescan = page->findChild<QCheckBox *>(QStringLiteral("automaticRescan"));
+			auto *lineDiffs = page->findChild<QCheckBox *>(QStringLiteral("viewLineDiffs"));
+			auto *charLevel = page->findChild<QRadioButton *>(QStringLiteral("charLevel"));
+			auto *wordLevel = page->findChild<QRadioButton *>(QStringLiteral("wordLevel"));
+			auto *breakType = page->findChild<QComboBox *>(QStringLiteral("breakType"));
+			auto *breakChars = page->findChild<QLineEdit *>(QStringLiteral("breakChars"));
+			if (!rescan || !lineDiffs || !charLevel || !wordLevel || !breakType || !breakChars)
+				return 2;
+			check(!rescan->isChecked() && lineDiffs->isChecked() && charLevel->isChecked()
+				&& breakType->currentIndex() == 1 && breakType->count() == 2
+				&& breakChars->text() == QStringLiteral(".,:;?[](){}<=>`'!\"#$%&^~\\|@+-*/"),
+				"page defaults as WinMerge's");
+			lineDiffs->setChecked(false);
+			check(!charLevel->isEnabled() && !wordLevel->isEnabled() && !breakType->isEnabled()
+				&& breakChars->isEnabled(), "level and break type follow the check box");
+			wordLevel->setChecked(true);
+			dialog.selectCategoryForTest(10);
+			dialog.restoreDefaultsForTest();
+			check(dialog.currentPageForTest() == OptionsDialog::EditorCompareMergePage
+				&& lineDiffs->isChecked() && charLevel->isChecked() && charLevel->isEnabled(),
+				"Defaults restores the page");
+		}
+
+		// character level by default, word level on request
+		{
+			MainWindow window;
+			window.show();
+			auto *action = window.findChild<QAction *>(QStringLiteral("viewLineDiffsAction"));
+			check(action != nullptr && !action->isEnabled(),
+				"View Line Differences waits for a text comparison");
+			window.openFileComparison({ wordsLeft, wordsRight });
+			wait(50);
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr || action == nullptr)
+				return 2;
+			printf("  character level: %s\n", qPrintable(spans(view)));
+			check(spans(view) == QStringLiteral("9+1"), "character level marks the character");
+			mgr->Set(OPT_BREAK_ON_WORDS, true);
+			view->rescan();
+			printf("  word level: %s\n", qPrintable(spans(view)));
+			check(spans(view) == QStringLiteral("6+4"), "word level marks the word");
+			mgr->Set(OPT_BREAK_ON_WORDS, false);
+
+			// View Line Differences: worked out still, not drawn
+			check(action->isEnabled() && action->isChecked()
+				&& view->drawnWordSpansForTest(0) > 0, "line differences drawn");
+			action->trigger();
+			check(!lm::viewLineDifferences() && !action->isChecked()
+				&& view->drawnWordSpansForTest(0) == 0 && view->wordSpanCountForTest(0) > 0,
+				"View Line Differences turns them off");
+			action->trigger();
+			check(lm::viewLineDifferences() && view->drawnWordSpansForTest(0) > 0,
+				"and on again");
+		}
+
+		// the break type and the break characters, at word level
+		{
+			mgr->Set(OPT_BREAK_ON_WORDS, true);
+			MainWindow window;
+			window.openFileComparison({ punctLeft, punctRight });
+			wait(50);
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			const QString punctuation = spans(view);
+			mgr->Set(OPT_BREAK_TYPE, 0);
+			view->rescan();
+			const QString whitespace = spans(view);
+			mgr->Set(OPT_BREAK_TYPE, 1);
+			mgr->Set(OPT_BREAK_SEPARATORS, String(","));
+			lm::updateBreakChars();
+			view->rescan();
+			const QString comma = spans(view);
+			printf("  punctuation: %s, whitespace: %s, comma only: %s\n",
+				qPrintable(punctuation), qPrintable(whitespace), qPrintable(comma));
+			check(punctuation == QStringLiteral("6+1"), "a break character ends a word");
+			check(whitespace == QStringLiteral("4+3"), "whitespace only keeps a.b whole");
+			check(comma == QStringLiteral("4+3"), "the break characters are the page's");
+			mgr->Set(OPT_BREAK_SEPARATORS, mgr->GetDefault<String>(OPT_BREAK_SEPARATORS));
+			lm::updateBreakChars();
+			mgr->Set(OPT_BREAK_ON_WORDS, false);
+		}
+
+		// a table's differing cells are its line differences
+		{
+			MainWindow window;
+			window.openFileComparison({ csvLeft, csvRight });
+			wait(50);
+			auto *table = window.findChild<TableCompareView *>();
+			if (table == nullptr)
+				return 2;
+			const auto cellColor = [table]() {
+				// the first line is the header: the data's 1,a is row 0
+				return table->tableForTest(0)->model()->index(0, 1)
+					.data(Qt::BackgroundRole).value<QColor>();
+			};
+			const lm::DiffColors &C = lm::diffColors();
+			const QColor shown = cellColor();
+			mgr->Set(OPT_WORDDIFF_HIGHLIGHT, false);
+			const QColor hidden = cellColor();
+			mgr->Set(OPT_WORDDIFF_HIGHLIGHT, true);
+			check((shown == C.wordDiffDeleted || shown == C.selWordDiffDeleted)
+				&& hidden != C.wordDiffDeleted && hidden != C.selWordDiffDeleted,
+				"a table's cells follow View line differences");
+		}
+
+		// every edit leaves the differences out of date, not only the
+		// first; the automatic rescan works them out a second later
+		{
+			MainWindow window;
+			window.openFileComparison({ wordsLeft, wordsRight });
+			wait(50);
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			int rescans = 0;
+			QObject::connect(view, &FileCompareView::rescanned, [&rescans]() { ++rescans; });
+			view->typeAtForTest(0, 0, QStringLiteral("x"));
+			const bool first = view->diffStaleForTest();
+			view->recompare();
+			const bool cleared = !view->diffStaleForTest();
+			view->typeAtForTest(0, 0, QStringLiteral("y"));
+			check(first && cleared && view->diffStaleForTest(),
+				"an edit after a recompare is out of date again");
+			wait(1300);
+			check(view->diffStaleForTest() && rescans == 0,
+				"no automatic rescan when it is off");
+
+			mgr->Set(OPT_AUTOMATIC_RESCAN, true);
+			view->typeAtForTest(0, 0, QStringLiteral("z"));
+			wait(400);
+			const bool waiting = view->diffStaleForTest();
+			view->typeAtForTest(0, 0, QStringLiteral("w"));
+			wait(700);
+			const bool stillWaiting = view->diffStaleForTest();
+			wait(800);
+			check(waiting && stillWaiting && !view->diffStaleForTest() && rescans == 1,
+				"automatic rescan a second after the last edit");
+			mgr->Set(OPT_AUTOMATIC_RESCAN, false);
+		}
+
+		printf("line diffs: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

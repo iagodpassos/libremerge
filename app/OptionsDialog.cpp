@@ -214,6 +214,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	addCategory(nullptr, tr("Message Boxes"), MessageBoxesPage);
 	QTreeWidgetItem *editor = addCategory(nullptr, tr("Editor"), -1);
 	addCategory(editor, tr("General"), EditorPage);
+	addCategory(editor, tr("Compare/Merge"), EditorCompareMergePage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	addCategory(nullptr, tr("Codepage"), CodepagePage);
 	m_categories->expandAll();
@@ -229,6 +230,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildImagePage());
 	m_pages->addWidget(buildMessageBoxesPage());
 	m_pages->addWidget(buildEditorPage());
+	m_pages->addWidget(buildEditorCompareMergePage());
 	m_pages->addWidget(buildBackupPage());
 	m_pages->addWidget(buildCodepagePage());
 	pageArea->addWidget(m_pages, 1);
@@ -674,6 +676,66 @@ QWidget *OptionsDialog::buildEditorPage()
 	return page;
 }
 
+/** WinMerge's Editor > Compare/Merge page (PropEditorCompareMerge): the
+    rescan after edits, and how the differences inside the lines show.
+    The copy granularity and the merge result pane are not offered yet. */
+QWidget *OptionsDialog::buildEditorCompareMergePage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+
+	m_chkAutomaticRescan = new QCheckBox(tr("&Automatic rescan"), page);
+	m_chkAutomaticRescan->setObjectName(QStringLiteral("automaticRescan"));
+	box->addWidget(m_chkAutomaticRescan);
+
+	auto *coloring = new QGroupBox(tr("Line Difference Coloring"), page);
+	auto *coloringLayout = new QVBoxLayout(coloring);
+	// the dialog's steps in: the levels under the check box, the break
+	// type under the word level
+	const auto indented = [coloringLayout](QWidget *control, int indent) {
+		auto *row = new QHBoxLayout;
+		row->addSpacing(indent);
+		row->addWidget(control, 1);
+		coloringLayout->addLayout(row);
+	};
+	m_chkViewLineDiffs = new QCheckBox(tr("View line differences"), coloring);
+	m_chkViewLineDiffs->setObjectName(QStringLiteral("viewLineDiffs"));
+	coloringLayout->addWidget(m_chkViewLineDiffs);
+	m_radCharLevel = new QRadioButton(tr("&Character-level"), coloring);
+	m_radCharLevel->setObjectName(QStringLiteral("charLevel"));
+	indented(m_radCharLevel, 16);
+	m_radWordLevel = new QRadioButton(tr("&Word-level:"), coloring);
+	m_radWordLevel->setObjectName(QStringLiteral("wordLevel"));
+	indented(m_radWordLevel, 16);
+	m_cmbBreakType = new QComboBox(coloring);
+	m_cmbBreakType->setObjectName(QStringLiteral("breakType"));
+	m_cmbBreakType->addItems({ tr("Break at whitespace"),
+		tr("Break at whitespace or punctuation") });
+	indented(m_cmbBreakType, 32);
+	m_editBreakChars = new QLineEdit(coloring);
+	m_editBreakChars->setObjectName(QStringLiteral("breakChars"));
+	auto *breakCharsLabel = new QLabel(tr("W&ord break characters:"), coloring);
+	breakCharsLabel->setBuddy(m_editBreakChars);
+	indented(breakCharsLabel, 16);
+	indented(m_editBreakChars, 16);
+	connect(m_chkViewLineDiffs, &QCheckBox::toggled, this,
+		&OptionsDialog::updateLineDiffControls);
+	box->addWidget(coloring);
+
+	box->addStretch(1);
+	return page;
+}
+
+/** UpdateLineDiffControls: the level and the break type are only chosen
+    with the line differences shown. */
+void OptionsDialog::updateLineDiffControls()
+{
+	const bool on = m_chkViewLineDiffs->isChecked();
+	m_radCharLevel->setEnabled(on);
+	m_radWordLevel->setEnabled(on);
+	m_cmbBreakType->setEnabled(on);
+}
+
 /** PropEditor::OnEnKillfocusTabEdit: a tab size out of range is told as
     the field is left for another control, by key, click or accelerator
     (the page saves it within range all the same). Not when the window
@@ -868,6 +930,14 @@ void OptionsDialog::load()
 		m_editTabSize->setText(QString::number(mgr->GetInt(OPT_TAB_SIZE)));
 		(mgr->GetInt(OPT_TAB_TYPE) == 0 ? m_radInsertTabs : m_radInsertSpaces)
 			->setChecked(true);
+		m_chkAutomaticRescan->setChecked(mgr->GetBool(OPT_AUTOMATIC_RESCAN));
+		m_chkViewLineDiffs->setChecked(mgr->GetBool(OPT_WORDDIFF_HIGHLIGHT));
+		(mgr->GetBool(OPT_BREAK_ON_WORDS) ? m_radWordLevel : m_radCharLevel)
+			->setChecked(true);
+		m_cmbBreakType->setCurrentIndex(mgr->GetInt(OPT_BREAK_TYPE));
+		m_editBreakChars->setText(
+			QString::fromStdString(mgr->GetString(OPT_BREAK_SEPARATORS)));
+		updateLineDiffControls();
 		const int mode = mgr->GetInt(OPT_CP_DEFAULT_MODE);
 		m_radCodepage[mode >= 0 && mode < 3 ? mode : 0]->setChecked(true);
 		m_cmbCustomCodepage->setEnabled(m_radCodepage[2]->isChecked());
@@ -939,6 +1009,11 @@ void OptionsDialog::save()
 		mgr->SaveOption(OPT_TAB_SIZE,
 			std::clamp(m_editTabSize->text().toInt(), 1, kMaxTabSize));
 		mgr->SaveOption(OPT_TAB_TYPE, m_radInsertTabs->isChecked() ? 0 : 1);
+		mgr->SaveOption(OPT_AUTOMATIC_RESCAN, m_chkAutomaticRescan->isChecked());
+		mgr->SaveOption(OPT_WORDDIFF_HIGHLIGHT, m_chkViewLineDiffs->isChecked());
+		mgr->SaveOption(OPT_BREAK_ON_WORDS, m_radWordLevel->isChecked());
+		mgr->SaveOption(OPT_BREAK_TYPE, m_cmbBreakType->currentIndex());
+		mgr->SaveOption(OPT_BREAK_SEPARATORS, m_editBreakChars->text().toStdString());
 		int mode = 0;
 		for (int i = 0; i < 3; ++i)
 			if (m_radCodepage[i]->isChecked())
@@ -1061,6 +1136,19 @@ void OptionsDialog::restoreDefaults(int page)
 		m_chkMixedEol->setChecked(false);
 		m_editTabSize->setText(QStringLiteral("4"));
 		m_radInsertTabs->setChecked(true);
+		break;
+	case EditorCompareMergePage:
+		if (COptionsMgr *mgr = GetOptionsMgr())
+		{
+			m_chkAutomaticRescan->setChecked(mgr->GetDefault<bool>(OPT_AUTOMATIC_RESCAN));
+			m_chkViewLineDiffs->setChecked(mgr->GetDefault<bool>(OPT_WORDDIFF_HIGHLIGHT));
+			(mgr->GetDefault<bool>(OPT_BREAK_ON_WORDS) ? m_radWordLevel : m_radCharLevel)
+				->setChecked(true);
+			m_cmbBreakType->setCurrentIndex(mgr->GetDefault<int>(OPT_BREAK_TYPE));
+			m_editBreakChars->setText(QString::fromStdString(
+				mgr->GetDefault<String>(OPT_BREAK_SEPARATORS)));
+			updateLineDiffControls();
+		}
 		break;
 	case BackupPage:
 		m_chkBackup->setChecked(true);

@@ -3343,6 +3343,10 @@ Le fichier est peut-être en lecture seule.</translation>
         <translation>&amp;Taille réelle</translation>
     </message>
     <message>
+        <source>Vie&amp;w Line Differences</source>
+        <translation>&amp;Afficher les différences de ligne</translation>
+    </message>
+    <message>
         <source>Next &amp;Pane</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Volet &amp;suivant</translation>
@@ -4063,6 +4067,10 @@ Vérification de l&apos;identité binaire...</translation>
         <translation>Éditeur</translation>
     </message>
     <message>
+        <source>Compare/Merge</source>
+        <translation>Comparer/Fusionner</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Fichiers de sauvegarde</translation>
     </message>
@@ -4318,6 +4326,38 @@ Vérification de l&apos;identité binaire...</translation>
     <message>
         <source>Insert &amp;spaces</source>
         <translation>Insérer des e&amp;spaces</translation>
+    </message>
+    <message>
+        <source>&amp;Automatic rescan</source>
+        <translation>&amp;Actualiser automatiquement</translation>
+    </message>
+    <message>
+        <source>Line Difference Coloring</source>
+        <translation>Coloration de la différence de ligne</translation>
+    </message>
+    <message>
+        <source>View line differences</source>
+        <translation>Afficher les différences de ligne</translation>
+    </message>
+    <message>
+        <source>&amp;Character-level</source>
+        <translation>Précision au &amp;caractère</translation>
+    </message>
+    <message>
+        <source>&amp;Word-level:</source>
+        <translation>Précision au &amp;mot :</translation>
+    </message>
+    <message>
+        <source>Break at whitespace</source>
+        <translation>Coupure à l'espacement</translation>
+    </message>
+    <message>
+        <source>Break at whitespace or punctuation</source>
+        <translation>Coupure à l'espacement ou à la ponctuation</translation>
+    </message>
+    <message>
+        <source>W&amp;ord break characters:</source>
+        <translation>Caractères de coupure de m&amp;ot :</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

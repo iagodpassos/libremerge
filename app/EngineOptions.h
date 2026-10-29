@@ -30,6 +30,14 @@ void initSyntaxParserFactories();
     filled again (for tests). */
 void setSyntaxHighlightForTest(bool on, int mode);
 
+/** The word break characters of the Compare/Merge page
+    (OPT_BREAK_SEPARATORS) handed to the word diffs, as at startup and
+    after the Options dialog (strdiff::SetBreakChars). */
+void updateBreakChars();
+/** WinMerge's "View line differences" (OPT_WORDDIFF_HIGHLIGHT): the
+    differences inside the lines show. They are worked out either way. */
+bool viewLineDifferences();
+
 /** The columns a tab takes in the editor (WinMerge's OPT_TAB_SIZE), 1 to
     64, and whether the Tab key inserts a tab rather than spaces
     (OPT_TAB_TYPE 0). */

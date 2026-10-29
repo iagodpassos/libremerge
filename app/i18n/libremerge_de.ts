@@ -3320,6 +3320,11 @@ Patches sind nicht betroffen.</translation>
         <translation>&amp;Originalgröße</translation>
     </message>
     <message>
+        <source>Vie&amp;w Line Differences</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Vie&amp;w Line Differences&quot;.</translatorcomment>
+        <translation>Z&amp;eilenunterschiede anzeigen</translation>
+    </message>
+    <message>
         <source>Next &amp;Pane</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Nächster &amp;Ausschnitt</translation>
@@ -4073,6 +4078,10 @@ Bitte benutzen Sie Werte von 1 - %1.</translation>
         <translation>Editor</translation>
     </message>
     <message>
+        <source>Compare/Merge</source>
+        <translation>Vergleichen/Zusammenführen</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Sicherungsdateien</translation>
     </message>
@@ -4331,6 +4340,38 @@ Drücken Sie &apos;Zurücksetzen&apos;, um alle Meldungen wieder sichtbar zu sch
     <message>
         <source>Insert &amp;spaces</source>
         <translation>&amp;Leerzeichen einfügen</translation>
+    </message>
+    <message>
+        <source>&amp;Automatic rescan</source>
+        <translation>&amp;Automatisch aktualisieren</translation>
+    </message>
+    <message>
+        <source>Line Difference Coloring</source>
+        <translation>Zeilenunterschied-Färbung</translation>
+    </message>
+    <message>
+        <source>View line differences</source>
+        <translation>Ze&amp;ilenunterschied anzeigen</translation>
+    </message>
+    <message>
+        <source>&amp;Character-level</source>
+        <translation>&amp;Zeichen-Ebene</translation>
+    </message>
+    <message>
+        <source>&amp;Word-level:</source>
+        <translation>&amp;Wort-Ebene:</translation>
+    </message>
+    <message>
+        <source>Break at whitespace</source>
+        <translation>An Leerzeichen unterbrechen</translation>
+    </message>
+    <message>
+        <source>Break at whitespace or punctuation</source>
+        <translation>An Leerzeichen oder Interpunktion unterbrechen</translation>
+    </message>
+    <message>
+        <source>W&amp;ord break characters:</source>
+        <translation>W&amp;ortumbruchzeichen:</translation>
     </message>
     <message>
         <source>Create backup files for:</source>
