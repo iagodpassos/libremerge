@@ -536,7 +536,8 @@ Veuillez effacer le filtre d&apos;affichage ou modifier les paramètres de filtr
     </message>
     <message>
         <source>Add to &amp;Line Filters</source>
-        <translation>Ajouter aux &amp;filtres de ligne</translation>
+        <translatorcomment>After WinMerge&apos;s &quot;Add to &amp;Line Filters&quot;.</translatorcomment>
+        <translation>Ajouter aux filtres de &amp;ligne</translation>
     </message>
     <message>
         <source>Add to Substitution &amp;Filters</source>
@@ -4794,6 +4795,20 @@ de 2	à 2
 <context>
     <name>TableCompareView</name>
     <message>
+        <source>C&amp;opy to Right</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right\tAlt+Right&quot;.</translatorcomment>
+        <translation>Copier vers la Dr&amp;oite</translation>
+    </message>
+    <message>
+        <source>Copy fro&amp;m Right</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy fro&amp;m Right\tAlt+Shift+Left&quot;.</translatorcomment>
+        <translation>Copier depuis la &amp;Droite</translation>
+    </message>
+    <message>
+        <source>No differences found to select</source>
+        <translation>Aucune différence trouvée à sélectionner</translation>
+    </message>
+    <message>
         <source>Untitled Right</source>
         <translation>Sans titre à Droite</translation>
     </message>
@@ -4987,6 +5002,121 @@ Please clear the display filter or adjust the filter settings to show all lines 
         <translation>La fusion/copie de différences incluant des lignes masquées n&apos;est pas prise en charge pour le moment.
 
 Veuillez effacer le filtre d&apos;affichage ou modifier les paramètres de filtrage pour afficher toutes les lignes avant d&apos;effectuer la fusion.</translation>
+    </message>
+    <message>
+        <source>No differences found to add as substitution filter</source>
+        <translation>Aucune différence trouvée à ajouter comme filtre de substitution</translation>
+    </message>
+    <message>
+        <source>The pair is already in the Substitution Filters list</source>
+        <translation>La paire est déjà présente dans la liste des filtres de substitution</translation>
+    </message>
+    <message>
+        <source>Add this change to Substitution Filters?</source>
+        <translation>Ajouter cette modification aux filtres de substitution ?</translation>
+    </message>
+    <message>
+        <source>&amp;Windows (CRLF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Windows (CRLF)</translation>
+    </message>
+    <message>
+        <source>&amp;Unix (LF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Unix (LF)</translation>
+    </message>
+    <message>
+        <source>&amp;Mac (CR)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Mac (CR)</translation>
+    </message>
+    <message>
+        <source>Copy to Middle</source>
+        <translation>Copier vers le Milieu</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Middle</source>
+        <translation>Copier les lignes sélectionnées vers le Milieu</translation>
+    </message>
+    <message>
+        <source>Copy from Middle</source>
+        <translation>Copier depuis le Milieu</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Middle</source>
+        <translation>Copier les lignes sélectionnées depuis le Milieu</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Right</source>
+        <translation>Copier les lignes sélectionnées vers la Droite</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Right</source>
+        <translation>Copier les lignes sélectionnées depuis la Droite</translation>
+    </message>
+    <message>
+        <source>Cop&amp;y to Left</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Cop&amp;y to Left\tAlt+Left&quot;.</translatorcomment>
+        <translation>Copier vers la Ga&amp;uche</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Left</source>
+        <translation>Copier les lignes sélectionnées vers la Gauche</translation>
+    </message>
+    <message>
+        <source>Copy &amp;from Left</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;from Left\tAlt+Shift+Right&quot;.</translatorcomment>
+        <translation>Copier depuis la &amp;Gauche</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Left</source>
+        <translation>Copier les lignes sélectionnées depuis la Gauche</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Left) to Clipboard</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy Selected Diff (Left) to Clipboard\tCtrl+&amp;1&quot;.</translatorcomment>
+        <translation>Copier la différence sélectionnée (Gauche) dans le presse-papiers</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Middle) to Clipboard</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy Selected Diff (Middle) to Clipboard\tCtrl+&amp;2&quot;.</translatorcomment>
+        <translation>Copier la différence sélectionnée (Milieu) dans le presse-papiers</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Right) to Clipboard</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy Selected Diff (Right) to Clipboard\tCtrl+&amp;2&quot;.</translatorcomment>
+        <translation>Copier la différence sélectionnée (Droite) dans le presse-papiers</translation>
+    </message>
+    <message>
+        <source>Select Line &amp;Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Select Line &amp;Difference\tF4&quot;.</translatorcomment>
+        <translation>&amp;Sélectionner la différence suivante</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Filters</source>
+        <translation>Ajouter aux &amp;filtres</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Display Filter</source>
+        <translation>Ajouter au filtre &amp;d&apos;affichage</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Line Filters</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Add to &amp;Line Filters&quot;.</translatorcomment>
+        <translation>Ajouter aux filtres de &amp;ligne</translation>
+    </message>
+    <message>
+        <source>Add to Substitution &amp;Filters</source>
+        <translation>Ajouter aux &amp;filtres de substitution</translation>
+    </message>
+    <message>
+        <source>&amp;Undo</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Undo&quot;.</translatorcomment>
+        <translation>&amp;Annuler</translation>
+    </message>
+    <message>
+        <source>&amp;Redo</source>
+        <translation>&amp;Rétablir</translation>
     </message>
     <message>
         <source>Save As</source>

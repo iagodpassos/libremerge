@@ -5303,6 +5303,122 @@ Please clear the display filter or adjust the filter settings to show all lines 
 Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar totes les línies abans de combinar.</translation>
     </message>
     <message>
+        <source>No differences found to add as substitution filter</source>
+        <translation>No s&apos;han trobat diferències per afegir com a filtre de substitució</translation>
+    </message>
+    <message>
+        <source>The pair is already in the Substitution Filters list</source>
+        <translation>La parella ja està present a la llista de filtres de substitució</translation>
+    </message>
+    <message>
+        <source>Add this change to Substitution Filters?</source>
+        <translation>Voleu afegir aquest canvi als filtres de substitució?</translation>
+    </message>
+    <message>
+        <source>&amp;Windows (CRLF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Windows (CRLF)</translation>
+    </message>
+    <message>
+        <source>&amp;Unix (LF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Unix (LF)</translation>
+    </message>
+    <message>
+        <source>&amp;Mac (CR)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Mac (CR)</translation>
+    </message>
+    <message>
+        <source>Copy to Middle</source>
+        <translation>Copia cap al mig</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Middle</source>
+        <translation>Copia les línies seleccionades al mig</translation>
+    </message>
+    <message>
+        <source>Copy from Middle</source>
+        <translation>Copia del mig</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Middle</source>
+        <translation>Copia les línies seleccionades del mig</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Right</source>
+        <translation>Copia les línies seleccionades a la dreta</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Right</source>
+        <translation>Copia les línies seleccionades de la dreta</translation>
+    </message>
+    <message>
+        <source>Cop&amp;y to Left</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Cop&amp;y to Left\tAlt+Left&quot;.</translatorcomment>
+        <translation>Copia a l&apos;&amp;esquerra</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Left</source>
+        <translation>Copia les línies seleccionades a l&apos;esquerra</translation>
+    </message>
+    <message>
+        <source>Copy &amp;from Left</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;from Left\tAlt+Shift+Right&quot;.</translatorcomment>
+        <translation>Copia des de l&apos;es&amp;querra</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Left</source>
+        <translation>Copia les línies seleccionades de l&apos;esquerra</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Left) to Clipboard</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Copia la diferència seleccionada (esquerra) al porta-retalls</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Middle) to Clipboard</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Copia la diferència seleccionada (mig) al porta-retalls</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Right) to Clipboard</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Copia la diferència seleccionada (dreta) al porta-retalls</translation>
+    </message>
+    <message>
+        <source>Select Line &amp;Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Select Line &amp;Difference\tF4&quot;.</translatorcomment>
+        <translation>Selecciona la diferència de la &amp;línia</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Filters</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Afegeix als &amp;filtres</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Display Filter</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Afegeix al filtre de &amp;visualització</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Line Filters</source>
+        <translation>Afegeix als filtres de línia</translation>
+    </message>
+    <message>
+        <source>Add to Substitution &amp;Filters</source>
+        <translation>Afegeix aquest canvi als F&amp;iltres de substitució</translation>
+    </message>
+    <message>
+        <source>&amp;Undo</source>
+        <translation>&amp;Desfés</translation>
+    </message>
+    <message>
+        <source>&amp;Redo</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Redo&quot;.</translatorcomment>
+        <translation>&amp;Refés</translation>
+    </message>
+    <message>
         <source>Save As</source>
         <translation>Anomena i desa</translation>
     </message>
@@ -5320,6 +5436,20 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <source>cannot write %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>no es pot escriure %1</translation>
+    </message>
+    <message>
+        <source>C&amp;opy to Right</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right\tAlt+Right&quot;.</translatorcomment>
+        <translation>C&amp;opia a la dreta</translation>
+    </message>
+    <message>
+        <source>Copy fro&amp;m Right</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy fro&amp;m Right\tAlt+Shift+Left&quot;.</translatorcomment>
+        <translation>Copia des de la dret&amp;a</translation>
+    </message>
+    <message>
+        <source>No differences found to select</source>
+        <translation>No s&apos;han trobat diferències per seleccionar</translation>
     </message>
     <message>
         <source>Untitled Right</source>

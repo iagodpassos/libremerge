@@ -302,10 +302,13 @@ MainWindow::MainWindow(QWidget *parent)
 		convertEolMenu->clear();
 		if (auto *view = qobject_cast<FileCompareView *>(m_tabs->currentWidget()))
 			view->buildConvertEolMenu(convertEolMenu);
+		else if (auto *table = qobject_cast<TableCompareView *>(m_tabs->currentWidget()))
+			table->buildConvertEolMenu(convertEolMenu);
 	});
 	connect(fileMenu, &QMenu::aboutToShow, this, [this, convertEolMenu]() {
 		convertEolMenu->menuAction()->setEnabled(
-			qobject_cast<FileCompareView *>(m_tabs->currentWidget()) != nullptr);
+			qobject_cast<FileCompareView *>(m_tabs->currentWidget()) != nullptr
+			|| qobject_cast<TableCompareView *>(m_tabs->currentWidget()) != nullptr);
 	});
 	fileMenu->addSeparator();
 	QAction *quitAction = addMenuAction(fileMenu, tr("&Quit"), QKeySequence::Quit,
@@ -339,37 +342,41 @@ MainWindow::MainWindow(QWidget *parent)
 	// WinMerge's Edit > Select Line Difference (F4); Shift+F4, the previous
 	// one, has no menu item (ID_SELECTLINEDIFF, ID_SELECTPREVLINEDIFF)
 	QAction *lineDiffAction = addMenuAction(editMenu, tr("Select Line &Difference"),
-		QKeySequence(Qt::Key_F4), [fileView]() {
+		QKeySequence(Qt::Key_F4), [fileView, tableView]() {
 			if (auto *view = fileView())
 				view->selectLineDiff(false);
+			else if (auto *table = tableView())
+				table->selectLineDiff(false);
 		});
 	lineDiffAction->setObjectName(QStringLiteral("editSelectLineDiff"));
 	editMenu->addSeparator();
 	// the keys of the pane menu's commands that no menu here has: from the
 	// neighbors into the active pane, and a difference to the clipboard
-	const auto addFileKey = [this, fileView](const char *name, const QKeySequence &key,
-		std::function<void(FileCompareView *)> run) {
+	const auto addKey = [this, fileView, tableView](const char *name, const QKeySequence &key,
+		auto run) {
 		auto *action = new QAction(this);
 		action->setObjectName(QLatin1String(name));
 		action->setShortcut(key);
-		connect(action, &QAction::triggered, this, [fileView, run]() {
+		connect(action, &QAction::triggered, this, [fileView, tableView, run]() {
 			if (auto *view = fileView())
 				run(view);
+			else if (auto *table = tableView())
+				run(table);
 		});
 		addAction(action);
 	};
-	addFileKey("editSelectPrevLineDiff", QKeySequence(Qt::SHIFT | Qt::Key_F4),
-		[](FileCompareView *view) { view->selectLineDiff(true); });
-	addFileKey("mergeCopyFromLeft", QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Right),
-		[](FileCompareView *view) { view->copyFromLeft(); });
-	addFileKey("mergeCopyFromRight", QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Left),
-		[](FileCompareView *view) { view->copyFromRight(); });
-	addFileKey("editDiffToClipboard1", QKeySequence(Qt::CTRL | Qt::Key_1),
-		[](FileCompareView *view) { view->copySelectedDiffToClipboard(0); });
-	addFileKey("editDiffToClipboard2", QKeySequence(Qt::CTRL | Qt::Key_2),
-		[](FileCompareView *view) { view->copySelectedDiffToClipboard(1); });
-	addFileKey("editDiffToClipboard3", QKeySequence(Qt::CTRL | Qt::Key_3),
-		[](FileCompareView *view) {
+	addKey("editSelectPrevLineDiff", QKeySequence(Qt::SHIFT | Qt::Key_F4),
+		[](auto *view) { view->selectLineDiff(true); });
+	addKey("mergeCopyFromLeft", QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Right),
+		[](auto *view) { view->copyFromLeft(); });
+	addKey("mergeCopyFromRight", QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Left),
+		[](auto *view) { view->copyFromRight(); });
+	addKey("editDiffToClipboard1", QKeySequence(Qt::CTRL | Qt::Key_1),
+		[](auto *view) { view->copySelectedDiffToClipboard(0); });
+	addKey("editDiffToClipboard2", QKeySequence(Qt::CTRL | Qt::Key_2),
+		[](auto *view) { view->copySelectedDiffToClipboard(1); });
+	addKey("editDiffToClipboard3", QKeySequence(Qt::CTRL | Qt::Key_3),
+		[](auto *view) {
 			if (view->paneCount() == 3)
 				view->copySelectedDiffToClipboard(2);
 		});
@@ -400,13 +407,14 @@ MainWindow::MainWindow(QWidget *parent)
 	// greyed out over a read-only pane (OnUpdateEditReplace) while the menu
 	// shows; its shortcut does nothing there either
 	connect(editMenu, &QMenu::aboutToShow, this,
-		[fileView, hexView, replaceAction, lineDiffAction]() {
+		[fileView, tableView, hexView, replaceAction, lineDiffAction]() {
 			const FileCompareView *view = fileView();
 			const HexCompareView *hex = hexView();
 			replaceAction->setEnabled(view != nullptr ? view->activePaneEditable()
 				: hex == nullptr || hex->activePaneEditable());
 			// OnUpdateSelectLineDiff
-			lineDiffAction->setEnabled(view != nullptr && view->lineDiffSelectable());
+			lineDiffAction->setEnabled(view != nullptr ? view->lineDiffSelectable()
+				: tableView() != nullptr);
 		});
 	connect(editMenu, &QMenu::aboutToHide, this, [replaceAction, lineDiffAction]() {
 		replaceAction->setEnabled(true);

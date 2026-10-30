@@ -444,7 +444,7 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     </message>
     <message>
         <source>Cop&amp;y to Left</source>
-        <translation>Cop&amp;iar para a Esquerda</translation>
+        <translation>Copiar para a &amp;Esquerda</translation>
     </message>
     <message>
         <source>Copy Selected Lines to Left</source>
@@ -452,7 +452,7 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     </message>
     <message>
         <source>Copy &amp;from Left</source>
-        <translation>Copiar &amp;da Esquerda</translation>
+        <translation>Copiar da Es&amp;querda</translation>
     </message>
     <message>
         <source>Copy Selected Lines from Left</source>
@@ -472,7 +472,7 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     </message>
     <message>
         <source>Select Line &amp;Difference</source>
-        <translation>Selecionar a &amp;Diferença da Linha</translation>
+        <translation>&amp;Selecionar a Diferença da Linha</translation>
     </message>
     <message>
         <source>Add to &amp;Filters</source>
@@ -4554,6 +4554,110 @@ Please clear the display filter or adjust the filter settings to show all lines 
 Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas antes de mesclar.</translation>
     </message>
     <message>
+        <source>No differences found to add as substitution filter</source>
+        <translation>Nenhuma diferença encontrada para adicionar como filtro de substituição</translation>
+    </message>
+    <message>
+        <source>The pair is already in the Substitution Filters list</source>
+        <translation>O par já está na lista de Filtros de Substituição</translation>
+    </message>
+    <message>
+        <source>Add this change to Substitution Filters?</source>
+        <translation>Adicionar esta alteração aos Filtros de Substituição?</translation>
+    </message>
+    <message>
+        <source>&amp;Windows (CRLF)</source>
+        <translation>&amp;Windows (CRLF)</translation>
+    </message>
+    <message>
+        <source>&amp;Unix (LF)</source>
+        <translation>&amp;Unix (LF)</translation>
+    </message>
+    <message>
+        <source>&amp;Mac (CR)</source>
+        <translation>&amp;Mac (CR)</translation>
+    </message>
+    <message>
+        <source>Copy to Middle</source>
+        <translation>Copiar para o Meio</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Middle</source>
+        <translation>Copiar Linhas Selecionadas para o Meio</translation>
+    </message>
+    <message>
+        <source>Copy from Middle</source>
+        <translation>Copiar do Meio</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Middle</source>
+        <translation>Copiar Linhas Selecionadas do Meio</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Right</source>
+        <translation>Copiar Linhas Selecionadas para a Direita</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Right</source>
+        <translation>Copiar Linhas Selecionadas da Direita</translation>
+    </message>
+    <message>
+        <source>Cop&amp;y to Left</source>
+        <translation>Copiar para a &amp;Esquerda</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Left</source>
+        <translation>Copiar Linhas Selecionadas para a Esquerda</translation>
+    </message>
+    <message>
+        <source>Copy &amp;from Left</source>
+        <translation>Copiar da Es&amp;querda</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Left</source>
+        <translation>Copiar Linhas Selecionadas da Esquerda</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Left) to Clipboard</source>
+        <translation>Copiar Diferença(s) Selecionada(s) (da Esquerda) para a Área de Transferência</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Middle) to Clipboard</source>
+        <translation>Copiar Diferença(s) Selecionada(s) (do Meio) para a Área de Transferência</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Right) to Clipboard</source>
+        <translation>Copiar Diferença(s) Selecionada(s) (da Direita) para a Área de Transferência</translation>
+    </message>
+    <message>
+        <source>Select Line &amp;Difference</source>
+        <translation>&amp;Selecionar a Diferença da Linha</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Filters</source>
+        <translation>Adicionar aos &amp;Filtros</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Display Filter</source>
+        <translation>Adicionar ao Filtro &amp;de Exibição</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Line Filters</source>
+        <translation>Adicionar aos Filtros de &amp;Linha</translation>
+    </message>
+    <message>
+        <source>Add to Substitution &amp;Filters</source>
+        <translation>Adicionar aos &amp;Filtros de Substituição</translation>
+    </message>
+    <message>
+        <source>&amp;Undo</source>
+        <translation>&amp;Desfazer</translation>
+    </message>
+    <message>
+        <source>&amp;Redo</source>
+        <translation>&amp;Refazer</translation>
+    </message>
+    <message>
         <source>Save As</source>
         <translation>Salvar Como</translation>
     </message>
@@ -4568,6 +4672,18 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     <message>
         <source>cannot write %1</source>
         <translation>não foi possível gravar %1</translation>
+    </message>
+    <message>
+        <source>C&amp;opy to Right</source>
+        <translation>C&amp;opiar para a Direita</translation>
+    </message>
+    <message>
+        <source>Copy fro&amp;m Right</source>
+        <translation>Copiar d&amp;a Direita</translation>
+    </message>
+    <message>
+        <source>No differences found to select</source>
+        <translation>Nenhuma diferença encontrada para selecionar</translation>
     </message>
     <message>
         <source>Untitled Right</source>

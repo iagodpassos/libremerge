@@ -662,6 +662,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestPaneMenuOpt(QStringLiteral("selftest-pane-menu"),
 		QStringLiteral("Exercise the file comparison's pane menu: its copies, Select Line Difference and the filters (for testing)"));
 	parser.addOption(selftestPaneMenuOpt);
+	QCommandLineOption selftestTableMenuOpt(QStringLiteral("selftest-table-menu"),
+		QStringLiteral("Exercise the table comparison's cell menu: its copies, Select Line Difference, the filters and Convert Line Endings (for testing)"));
+	parser.addOption(selftestTableMenuOpt);
 	QCommandLineOption selftestViewEolOpt(QStringLiteral("selftest-view-eol"),
 		QStringLiteral("Exercise View Whitespace, View EOL and Convert Line Endings (for testing)"));
 	parser.addOption(selftestViewEolOpt);
@@ -967,6 +970,39 @@ int main(int argc, char *argv[])
 			});
 			search->editMark();
 			TextMarkerDialog::setPresenterForTest({});
+			// the context menus of a pane and of a table's cell, on the sides
+			// they differ on
+			const auto reportMenu = [&](const QString &where, QMenu &menu) {
+				report(where, menu.actions(), true);
+				for (QAction *action : menu.actions())
+					if (action->menu() != nullptr)
+						report(where + QStringLiteral(" > ") + action->text(),
+							action->menu()->actions(), true);
+			};
+			for (int side = 0; side < 2; ++side)
+			{
+				QMenu menu;
+				view.buildPaneMenu(side, &menu);
+				reportMenu(QStringLiteral("pane menu %1").arg(side), menu);
+			}
+			TableCompareView table;
+			if (!table.compare(QStringList{ file, file }, &error))
+				return 2;
+			for (int side = 0; side < 2; ++side)
+			{
+				QMenu menu;
+				table.buildCellMenu(side, &menu);
+				reportMenu(QStringLiteral("cell menu %1").arg(side), menu);
+			}
+			TableCompareView table3;
+			if (!table3.compare(QStringList{ file, file, file }, &error))
+				return 2;
+			for (int side = 0; side < 3; ++side)
+			{
+				QMenu menu;
+				table3.buildCellMenu(side, &menu);
+				reportMenu(QStringLiteral("3-way cell menu %1").arg(side), menu);
+			}
 		}
 		printf("menus: %d, letters shared: %d (and %d noted in the filter popups)\n",
 			menus, shared, noted);
@@ -8053,6 +8089,617 @@ int main(int argc, char *argv[])
 		}
 
 		printf("line diffs: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestTableMenuOpt))
+	{
+		// WinMerge's pane menu as far as it goes in a table, a cell standing
+		// for its difference inside a line: the items and what they do, on
+		// this run's own settings
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		// (a grid's rows 0 to 2 are the first difference's, 3 agrees, 4 the
+		// second difference's)
+		const QString left = write("left.csv",
+			"id,name,note\n1,apple,red\n2,pear,green\n3,plum,blue\nkeep,keep,keep\n5,kiwi,brown\n");
+		const QString right = write("right.csv",
+			"id,name,note\n1,APPLE,red\n2,PEAR,GREEN\n3,plum,BLUE\nkeep,keep,keep\n5,KIWI,brown\n");
+		const QString threeLeft = write("three_l.csv", "id,n\nabc,1\ntail,2\n");
+		const QString threeMiddle = write("three_m.csv", "id,n\nxyz,1\ntail,2\n");
+		const QString threeRight = write("three_r.csv", "id,n\nabc,3\ntail,2\n");
+		const QStringList both{ left, right };
+		const QStringList three{ threeLeft, threeMiddle, threeRight };
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		QStringList shown;
+		lm::setMessageSinkForTest([&shown](const QString &text) { shown.append(text); });
+		QString asked;
+		bool answer = false;
+		lm::setQuestionSinkForTest([&asked, &answer](const QString &text, bool *) {
+			asked = text;
+			return answer;
+		});
+		const auto open = [](TableCompareView &view, const QStringList &paths)
+		{
+			QString error;
+			if (!view.compare(paths, &error))
+				std::exit(2);
+			view.resize(1000, 500);
+			view.show();
+		};
+		const auto rows = [](TableCompareView &view, int side)
+		{
+			return view.rawLinesForTest(side).mid(1).join(QLatin1Char('|'));
+		};
+		const auto item = [](QMenu &menu, const char *name) {
+			return menu.findChild<QAction *>(QLatin1String(name));
+		};
+		// the names of the items above the Select Line Difference one
+		const auto itemNames = [](QMenu &menu)
+		{
+			QStringList names;
+			for (QAction *action : menu.actions())
+			{
+				if (action->objectName() == QStringLiteral("cellSelectLineDiff"))
+					break;
+				names.append(action->isSeparator() ? QStringLiteral("-") : action->objectName());
+			}
+			return names.join(QLatin1Char(' '));
+		};
+		const auto trigger = [&item](TableCompareView &view, int side, const char *name) {
+			QMenu menu;
+			view.buildCellMenu(side, &menu);
+			item(menu, name)->trigger();
+		};
+		const auto enabled = [&item](TableCompareView &view, int side, const char *name) {
+			QMenu menu;
+			view.buildCellMenu(side, &menu);
+			return item(menu, name)->isEnabled();
+		};
+		const auto at = [](TableCompareView &view, int side) {
+			const QModelIndex index = view.tableForTest(side)->currentIndex();
+			return QStringLiteral("%1:%2").arg(index.row()).arg(index.column());
+		};
+		const QString untouchedRight = QStringLiteral("1,APPLE,red|2,PEAR,GREEN|3,plum,BLUE|keep,keep,keep|5,KIWI,brown");
+
+		// which items each grid offers, and their names
+		{
+			TableCompareView view;
+			open(view, both);
+			QMenu leftMenu;
+			view.buildCellMenu(0, &leftMenu);
+			QMenu rightMenu;
+			view.buildCellMenu(1, &rightMenu);
+			printf("  2-way left: %s\n", qPrintable(itemNames(leftMenu)));
+			check(itemNames(leftMenu) == QStringLiteral("cellCopy_0_1 cellCopy_1_0 - cellCopyLines_0_1 "
+					"cellCopyLines_1_0 - cellDiffToClipboard_0 cellDiffToClipboard_1 -"),
+				"2-way, left grid: to and from the right");
+			check(itemNames(rightMenu) == QStringLiteral("cellCopy_1_0 cellCopy_0_1 - cellCopyLines_1_0 "
+					"cellCopyLines_0_1 - cellDiffToClipboard_0 cellDiffToClipboard_1 -"),
+				"2-way, right grid: to and from the left");
+			QAction *toRight = item(leftMenu, "cellCopy_0_1");
+			QAction *fromRight = item(leftMenu, "cellCopy_1_0");
+			check(toRight->text() == TableCompareView::tr("C&opy to Right")
+				&& toRight->shortcut() == QKeySequence(Qt::ALT | Qt::Key_Right)
+				&& fromRight->text() == TableCompareView::tr("Copy fro&m Right")
+				&& fromRight->shortcut() == QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Left)
+				&& item(leftMenu, "cellSelectLineDiff")->shortcut() == QKeySequence(Qt::Key_F4)
+				&& item(leftMenu, "cellDiffToClipboard_1")->shortcut() == QKeySequence(Qt::CTRL | Qt::Key_2),
+				"their names and keys");
+		}
+		{
+			TableCompareView view;
+			open(view, three);
+			QMenu leftMenu;
+			view.buildCellMenu(0, &leftMenu);
+			QMenu middleMenu;
+			view.buildCellMenu(1, &middleMenu);
+			QMenu rightMenu;
+			view.buildCellMenu(2, &rightMenu);
+			const auto copies = [&itemNames](QMenu &menu) {
+				return itemNames(menu).section(QLatin1Char('-'), 0, 0).trimmed();
+			};
+			check(copies(leftMenu) == QStringLiteral("cellCopy_0_1 cellCopy_0_2 cellCopy_1_0 cellCopy_2_0")
+				&& copies(middleMenu) == QStringLiteral("cellCopy_1_0 cellCopy_1_2 cellCopy_0_1 cellCopy_2_1")
+				&& copies(rightMenu) == QStringLiteral("cellCopy_2_1 cellCopy_2_0 cellCopy_1_2 cellCopy_0_2"),
+				"3-way: each grid its own");
+			check(item(middleMenu, "cellCopy_1_0")->shortcut() == QKeySequence(Qt::ALT | Qt::Key_Left)
+				&& item(leftMenu, "cellCopy_0_1")->shortcut().isEmpty()
+				&& item(leftMenu, "cellDiffToClipboard_2")->shortcut() == QKeySequence(Qt::CTRL | Qt::Key_3),
+				"3-way: the keys of the middle one, and Ctrl+3");
+			check(item(leftMenu, "addToDisplayFilter")->isEnabled()
+				&& !item(leftMenu, "addToLineFilters")->isEnabled()
+				&& !item(leftMenu, "addToSubstitutionFilters")->isEnabled(),
+				"3-way: the display filter only");
+		}
+
+		// a right click, in and out of the selection
+		{
+			TableCompareView view;
+			open(view, both);
+			QStringList offered;
+			DiffTextEdit::setContextMenuPresenterForTest([&offered](QMenu *popup) {
+				offered.clear();
+				for (QAction *action : popup->actions())
+					offered.append(action->objectName());
+			});
+			const auto rightClick = [&view](int side, int row, int column) {
+				QTableView *table = view.tableForTest(side);
+				const QPoint point = table->visualRect(table->model()->index(row, column)).center();
+				QContextMenuEvent event(QContextMenuEvent::Mouse, point,
+					table->viewport()->mapToGlobal(point), Qt::NoModifier);
+				QCoreApplication::sendEvent(table->viewport(), &event);
+			};
+			view.selectCellsForTest(0, 0, 0, 1, 1);
+			rightClick(1, 2, 1);
+			check(at(view, 1) == QStringLiteral("2:1") && offered.contains(QStringLiteral("cellCopy_1_0")),
+				"on a cell: the current one, and the menu of its grid");
+			check(view.tableForTest(1)->selectionModel()->selectedIndexes().size() == 1,
+				"out of the selection: only that cell selected");
+			view.selectCellsForTest(0, 0, 0, 1, 1);
+			rightClick(0, 1, 1);
+			check(view.tableForTest(0)->selectionModel()->selectedIndexes().size() == 4
+				&& offered.contains(QStringLiteral("cellCopy_0_1")), "in the selection: it stays");
+			view.gotoFirstDiff();
+			rightClick(0, 1, 0);
+			check(view.currentDiffForTest() == 0, "in the current difference: it stays current");
+			rightClick(0, 3, 0);
+			check(view.currentDiffForTest() == -1, "out of it: none current");
+			DiffTextEdit::setContextMenuPresenterForTest({});
+		}
+
+		// what is enabled where
+		{
+			TableCompareView view;
+			open(view, both);
+			view.selectCellsForTest(0, 3, 0, 3, 0);
+			check(!enabled(view, 0, "cellCopy_0_1") && !enabled(view, 0, "cellCopyLines_0_1")
+				&& !enabled(view, 0, "cellDiffToClipboard_0"), "a cell of no difference: no copy");
+			view.selectCellsForTest(0, 3, 0, 3, 2);
+			check(!enabled(view, 0, "cellCopy_0_1") && !enabled(view, 0, "cellCopyLines_0_1"),
+				"a selection of no difference: no copy");
+			view.selectCellsForTest(0, 3, 0, 4, 2);
+			check(enabled(view, 0, "cellCopy_0_1") && enabled(view, 0, "cellCopyLines_0_1"),
+				"a selection that reaches one: they copy");
+			view.selectCellsForTest(0, 1, 0, 1, 0);
+			check(enabled(view, 0, "cellCopy_0_1") && enabled(view, 0, "cellDiffToClipboard_1"),
+				"a cell of a difference: they copy");
+			view.gotoFirstDiff();
+			view.selectCellsForTest(0, 3, 0, 3, 0);
+			check(enabled(view, 0, "cellCopy_0_1"), "the current difference, wherever the cursor is");
+			check(!enabled(view, 0, "cellUndo") && !enabled(view, 0, "cellRedo"), "nothing to undo yet");
+		}
+
+		// the copies: the difference, or its selected rows, or a side's
+		{
+			TableCompareView view;
+			open(view, both);
+			view.selectCellsForTest(0, 1, 0, 1, 0);
+			trigger(view, 0, "cellCopy_0_1");
+			check(rows(view, 1) == QStringLiteral("1,apple,red|2,pear,green|3,plum,blue|keep,keep,keep|5,KIWI,brown")
+				&& view.isModified(), "Copy to Right: the whole difference");
+			check(enabled(view, 0, "cellUndo") && !enabled(view, 0, "cellRedo"), "and it can be undone");
+			trigger(view, 0, "cellUndo");
+			check(rows(view, 1) == untouchedRight && enabled(view, 0, "cellRedo"), "Undo from the menu");
+			trigger(view, 0, "cellRedo");
+			check(rows(view, 1).startsWith(QStringLiteral("1,apple,red|2,pear,green")), "Redo from the menu");
+		}
+		{
+			TableCompareView view;
+			open(view, both);
+			view.selectCellsForTest(0, 1, 0, 1, 0);
+			trigger(view, 0, "cellCopy_1_0");
+			check(rows(view, 0) == QStringLiteral("1,APPLE,red|2,PEAR,GREEN|3,plum,BLUE|keep,keep,keep|5,kiwi,brown")
+				&& rows(view, 1) == untouchedRight, "Copy from Right: into its own grid");
+		}
+		{
+			TableCompareView view;
+			open(view, both);
+			view.selectCellsForTest(1, 1, 0, 1, 0);
+			view.copyFromLeft();
+			check(rows(view, 1).startsWith(QStringLiteral("1,apple,red|2,pear,green|3,plum,blue")),
+				"Alt+Shift+Right: from the left, into the right grid");
+			view.undo();
+			view.selectCellsForTest(0, 1, 0, 1, 0);
+			view.copyFromRight();
+			check(rows(view, 0).startsWith(QStringLiteral("1,APPLE,red|2,PEAR,GREEN|3,plum,BLUE")),
+				"Alt+Shift+Left: from the right, into the left grid");
+		}
+		{
+			TableCompareView view;
+			open(view, both);
+			int rescans = 0;
+			QObject::connect(&view, &TableCompareView::rescanned, [&rescans]() { ++rescans; });
+			view.selectCellsForTest(0, 1, 2, 1, 2);
+			trigger(view, 0, "cellCopyLines_0_1");
+			check(rows(view, 1) == QStringLiteral("1,APPLE,red|2,pear,green|3,plum,BLUE|keep,keep,keep|5,KIWI,brown")
+				&& rescans == 1, "Copy Selected Lines: the cursor's row of its difference");
+			view.undo();
+			check(rows(view, 1) == untouchedRight, "and undone at once");
+			view.selectCellsForTest(0, 0, 1, 1, 1);
+			trigger(view, 0, "cellCopyLines_0_1");
+			check(rows(view, 1) == QStringLiteral("1,apple,red|2,pear,green|3,plum,BLUE|keep,keep,keep|5,KIWI,brown"),
+				"Copy Selected Lines: the selection's rows");
+			view.undo();
+			view.selectCellsForTest(0, 1, 0, 4, 0);
+			trigger(view, 0, "cellCopyLines_0_1");
+			check(rows(view, 1) == QStringLiteral("1,APPLE,red|2,pear,green|3,plum,blue|keep,keep,keep|5,kiwi,brown"),
+				"Copy Selected Lines: over two differences");
+			view.undo();
+			check(rows(view, 1) == untouchedRight, "and undone at once, as one step");
+			view.selectCellsForTest(1, 0, 0, 0, 2);
+			trigger(view, 1, "cellCopyLines_1_0");
+			check(rows(view, 0) == QStringLiteral("1,APPLE,red|2,pear,green|3,plum,blue|keep,keep,keep|5,kiwi,brown"),
+				"Copy Selected Lines to Left, from the right grid");
+		}
+		{
+			// a row one side lacks
+			TableCompareView view;
+			open(view, { write("ghost_l.csv", "id,n\na,1\nb,2\nc,3\nd,4\n"), write("ghost_r.csv", "id,n\na,1\nd,4\n") });
+			view.selectCellsForTest(0, 2, 0, 2, 0);
+			trigger(view, 0, "cellCopyLines_0_1");
+			check(rows(view, 1) == QStringLiteral("a,1|c,3|d,4"), "a row the target lacks goes in");
+			view.undo();
+			view.selectCellsForTest(1, 2, 0, 2, 0);
+			trigger(view, 1, "cellCopyLines_1_0");
+			check(rows(view, 0) == QStringLiteral("a,1|b,2|d,4"), "a row the source lacks goes out");
+		}
+		{
+			// hidden rows
+			TableCompareView view;
+			open(view, both);
+			view.selectCellsForTest(0, 0, 1, 0, 1);
+			trigger(view, 0, "addToDisplayFilter");
+			printf("  display filter: %s, %d row(s)\n", qPrintable(view.displayFilter()),
+				static_cast<int>(view.shownRowsForTest(0).size()));
+			check(view.displayFilter() == QStringLiteral("le:Line contains \"apple\"")
+				&& view.displayFilterBarForTest() != nullptr && view.shownRowsForTest(0).size() == 1,
+				"Add to Display Filter: the cell's text");
+			shown.clear();
+			view.selectCellsForTest(0, 0, 0, 0, 1);
+			trigger(view, 0, "cellCopyLines_0_1");
+			check(rows(view, 1) == untouchedRight && shown.size() == 1, "a selection with hidden rows: refused");
+		}
+
+		// the clipboard
+		{
+			TableCompareView view;
+			open(view, both);
+			QClipboard *clipboard = QGuiApplication::clipboard();
+			clipboard->setText(QStringLiteral("sentinel"));
+			view.selectCellsForTest(0, 3, 0, 3, 0);
+			view.copySelectedDiffToClipboard(0);
+			check(clipboard->text() == QStringLiteral("sentinel"), "Ctrl+1 out of a difference: nothing");
+			view.selectCellsForTest(0, 1, 0, 1, 0);
+			trigger(view, 0, "cellDiffToClipboard_0");
+			check(clipboard->text() == QStringLiteral("1,apple,red\n2,pear,green\n3,plum,blue\n"),
+				"Ctrl+1: the left side's rows");
+			trigger(view, 0, "cellDiffToClipboard_1");
+			check(clipboard->text() == QStringLiteral("1,APPLE,red\n2,PEAR,GREEN\n3,plum,BLUE\n"),
+				"Ctrl+2: the right side's rows");
+			TableCompareView last;
+			open(last, { write("final_l.csv", "id,n\nx,1"), write("final_r.csv", "id,n\ny,1\n") });
+			last.selectCellsForTest(0, 0, 0, 0, 0);
+			last.copySelectedDiffToClipboard(0);
+			check(clipboard->text() == QStringLiteral("x,1"), "a last row without an ending stays so");
+			TableCompareView middle;
+			open(middle, three);
+			middle.selectCellsForTest(0, 0, 0, 0, 0);
+			middle.copySelectedDiffToClipboard(1);
+			check(clipboard->text() == QStringLiteral("xyz,1\n"), "3-way: the middle's");
+		}
+
+		// Select Line Difference
+		{
+			TableCompareView view;
+			open(view, both);
+			view.selectCellsForTest(0, 0, 0, 0, 0);
+			QStringList visited;
+			for (int i = 0; i < 6; ++i)
+			{
+				view.selectLineDiff(false);
+				visited.append(at(view, 0));
+			}
+			printf("  F4: %s\n", qPrintable(visited.join(QLatin1Char(' '))));
+			check(visited.join(QLatin1Char(' ')) == QStringLiteral("0:1 1:1 1:2 2:2 4:1 0:1"),
+				"F4: cell by cell, block by block, round the file");
+			check(at(view, 1) == at(view, 0)
+				&& view.tableForTest(1)->selectionModel()->selectedIndexes().size() == 1,
+				"current in the other grid too");
+			visited.clear();
+			for (int i = 0; i < 6; ++i)
+			{
+				view.selectLineDiff(true);
+				visited.append(at(view, 0));
+			}
+			printf("  Shift+F4: %s\n", qPrintable(visited.join(QLatin1Char(' '))));
+			check(visited.join(QLatin1Char(' ')) == QStringLiteral("4:1 2:2 1:2 1:1 0:1 4:1"),
+				"Shift+F4: the same way back");
+			view.selectCellsForTest(0, 3, 1, 3, 1);
+			view.selectLineDiff(false);
+			check(at(view, 0) == QStringLiteral("4:1"), "from a row of no difference: the next one");
+			view.selectCellsForTest(0, 3, 1, 3, 1);
+			view.selectLineDiff(true);
+			check(at(view, 0) == QStringLiteral("2:2"), "and back: the previous one");
+			view.selectCellsForTest(0, 1, 2, 1, 2);
+			view.selectLineDiff(false);
+			check(at(view, 0) == QStringLiteral("1:2"), "from the cell itself: that one");
+		}
+		{
+			// a copy then takes the cell
+			TableCompareView view;
+			open(view, both);
+			view.selectCellsForTest(0, 1, 0, 1, 0);
+			view.selectLineDiff(false);
+			view.selectLineDiff(false);
+			check(at(view, 0) == QStringLiteral("1:2"), "(on the note of the pear)");
+			trigger(view, 0, "cellCopy_0_1");
+			check(rows(view, 1) == QStringLiteral("1,APPLE,red|2,PEAR,green|3,plum,BLUE|keep,keep,keep|5,KIWI,brown"),
+				"Copy to Right after F4: that cell");
+			view.undo();
+			view.selectCellsForTest(0, 1, 0, 1, 0);
+			view.selectLineDiff(false);
+			trigger(view, 0, "cellCopyLines_0_1");
+			check(rows(view, 1) == QStringLiteral("1,APPLE,red|2,pear,green|3,plum,BLUE|keep,keep,keep|5,KIWI,brown"),
+				"Copy Selected Lines after F4: its row");
+		}
+		{
+			// a row some side lacks is a stop of its own, and goes whole
+			TableCompareView view;
+			open(view, { write("stops_l.csv", "id,n\na,1\nb,2\nc,3\nd,4\n"), write("stops_r.csv", "id,n\na,1\nd,4\n") });
+			view.selectCellsForTest(0, 0, 0, 0, 0);
+			view.selectLineDiff(false);
+			const QString first = at(view, 0);
+			view.selectLineDiff(false);
+			printf("  stops: %s %s\n", qPrintable(first), qPrintable(at(view, 0)));
+			check(first == QStringLiteral("1:0") && at(view, 0) == QStringLiteral("2:0"), "one stop for each such row");
+			trigger(view, 0, "cellCopy_0_1");
+			check(rows(view, 1) == QStringLiteral("a,1|b,2|c,3|d,4"), "and a copy takes the difference");
+		}
+		{
+			TableCompareView view;
+			open(view, { left, left });
+			shown.clear();
+			view.selectLineDiff(false);
+			check(shown.size() == 1 && shown.at(0) == TableCompareView::tr("No differences found to select"),
+				"F4 with no difference at all: tells so");
+		}
+
+		// the filters
+		{
+			TableCompareView view;
+			open(view, both);
+			int rescans = 0;
+			QObject::connect(&view, &TableCompareView::rescanned, [&rescans]() { ++rescans; });
+			view.selectCellsForTest(1, 1, 1, 1, 1);
+			trigger(view, 1, "addToLineFilters");
+			{
+				LineFiltersList filters;
+				lm::copyLineFilters(&filters);
+				printf("  line filter: %s\n", filters.GetCount() > 0 ? filters.GetAt(0).filterStr.c_str() : "(none)");
+				check(filters.GetCount() == 1 && filters.GetAt(0).enabled && lm::lineFiltersEnabled()
+					&& filters.GetAt(0).filterStr == "PEAR" && rescans == 1,
+					"Add to Line Filters: the cell's text, on, compared again");
+			}
+			lm::saveLineFilters(false, LineFiltersList());
+			view.selectCellsForTest(0, 0, 1, 1, 2);
+			trigger(view, 0, "addToLineFilters");
+			{
+				LineFiltersList filters;
+				lm::copyLineFilters(&filters);
+				printf("  line filter: %s\n", filters.GetCount() > 0 ? filters.GetAt(0).filterStr.c_str() : "(none)");
+				const QString filter = filters.GetCount() > 0
+					? QString::fromStdString(filters.GetAt(0).filterStr) : QString();
+				check(filters.GetCount() == 1 && filter.startsWith(QStringLiteral("apple"))
+					&& filter.endsWith(QStringLiteral("green")) && filter.contains(QStringLiteral("pear")),
+					"of several cells: row by row");
+			}
+			lm::saveLineFilters(false, LineFiltersList());
+		}
+		{
+			TableCompareView view;
+			open(view, both);
+			int rescans = 0;
+			QObject::connect(&view, &TableCompareView::rescanned, [&rescans]() { ++rescans; });
+			view.selectCellsForTest(0, 0, 0, 0, 0);
+			answer = false;
+			trigger(view, 0, "addToSubstitutionFilters");
+			SubstitutionFiltersList pairs;
+			lm::copySubstitutionFilters(&pairs);
+			check(asked.contains(QStringLiteral("\"apple\" <-> \"APPLE\"")) && pairs.GetCount() == 0
+				&& at(view, 0) == QStringLiteral("0:1") && rescans == 0,
+				"Add to Substitution Filters: asks about the next cell; no");
+			view.selectCellsForTest(0, 0, 0, 0, 0);
+			answer = true;
+			trigger(view, 0, "addToSubstitutionFilters");
+			answer = false;
+			lm::copySubstitutionFilters(&pairs);
+			check(pairs.GetCount() == 1 && pairs.GetAt(0).pattern == "apple" && pairs.GetAt(0).replacement == "APPLE"
+				&& pairs.GetEnabled() && rescans == 1 && !view.diffRowsForTest().contains(1),
+				"yes: added, on, compared again, and that row agrees");
+			// the same pair, with the filters off
+			SubstitutionFiltersList off;
+			lm::copySubstitutionFilters(&off);
+			off.SetEnabled(false);
+			lm::saveSubstitutionFilters(off);
+			TableCompareView again;
+			open(again, both);
+			again.selectCellsForTest(0, 0, 0, 0, 0);
+			shown.clear();
+			asked.clear();
+			trigger(again, 0, "addToSubstitutionFilters");
+			check(shown.size() == 1 && shown.at(0).contains(QStringLiteral("\"apple\" <-> \"APPLE\""))
+				&& asked.isEmpty(), "a pair already there: tells so, and does not ask");
+			SubstitutionFiltersList none;
+			none.SetEnabled(false);
+			lm::saveSubstitutionFilters(none);
+		}
+
+		// Convert Line Endings to
+		{
+			const QString crlf = write("crlf.csv", "id,n\r\na,1\r\n");
+			TableCompareView view;
+			open(view, { crlf, write("lf.csv", "id,n\na,1\n") });
+			int rescans = 0;
+			QObject::connect(&view, &TableCompareView::rescanned, [&rescans]() { ++rescans; });
+			const auto convert = [&item](TableCompareView &on, int side, const char *name) {
+				QMenu menu;
+				on.buildConvertEolMenu(&menu, side);
+				item(menu, name)->trigger();
+			};
+			{
+				QMenu menu;
+				view.buildConvertEolMenu(&menu, 0);
+				check(menu.actions().size() == 3 && item(menu, "eolToWindows")->isChecked()
+					&& !item(menu, "eolToUnix")->isChecked() && !item(menu, "eolToMac")->isChecked(),
+					"the three, this one's marked");
+			}
+			convert(view, 0, "eolToUnix");
+			check(view.isModified() && rescans == 1, "converted: modified, compared again");
+			QString error;
+			check(view.saveModified(&error) && read(crlf) == "id,n\na,1\n", "and saved so");
+			rescans = 0;
+			convert(view, 0, "eolToUnix");
+			check(!view.isModified() && rescans == 0, "to the one it has: no change, no comparison");
+		}
+		{
+			// no step of the history: an undo leaves the endings as they are now
+			const QString target = write("undo_r.csv", "id,n\nb,1\n");
+			TableCompareView view;
+			open(view, { write("undo_l.csv", "id,n\na,1\n"), target });
+			view.selectCellsForTest(0, 0, 0, 0, 0);
+			view.copyLines(0, 1);
+			QMenu menu;
+			view.buildConvertEolMenu(&menu, 1);
+			item(menu, "eolToWindows")->trigger();
+			view.undo();
+			QString error;
+			check(rows(view, 1) == QStringLiteral("b,1") && view.isModified()
+				&& view.saveModified(&error) && read(target) == "id,n\r\nb,1\r\n",
+				"undo undoes the copy, not the conversion");
+		}
+		{
+			const QString mixed = write("mixed.csv", "id,n\r\na,1\nb,2\nc,3\r\n");
+			TableCompareView view;
+			open(view, { mixed, write("mixed_r.csv", "id,n\na,1\nb,2\nc,3\n") });
+			{
+				QMenu menu;
+				view.buildConvertEolMenu(&menu, 0);
+				check(view.mixedEolForTest(0) && !item(menu, "eolToWindows")->isChecked()
+					&& !item(menu, "eolToUnix")->isChecked() && !item(menu, "eolToMac")->isChecked(),
+					"mixed endings: none of the three marked");
+				item(menu, "eolToWindows")->trigger();
+			}
+			QString error;
+			check(!view.mixedEolForTest(0) && view.saveModified(&error)
+				&& read(mixed) == "id,n\r\na,1\r\nb,2\r\nc,3\r\n", "mixed endings: all the same now");
+		}
+		{
+			const QString noFinal = write("nofinal.csv", "id,n\na,1");
+			TableCompareView view;
+			open(view, { noFinal, write("nofinal_r.csv", "id,n\nx,1\n") });
+			QMenu menu;
+			view.buildConvertEolMenu(&menu, 0);
+			item(menu, "eolToWindows")->trigger();
+			QString error;
+			check(view.saveModified(&error) && read(noFinal) == "id,n\r\na,1", "a last row without an ending stays so");
+		}
+
+		// 3-way copies between explicit sides
+		{
+			TableCompareView view;
+			open(view, three);
+			view.selectCellsForTest(0, 0, 0, 0, 0);
+			trigger(view, 0, "cellCopyLines_2_0");
+			check(rows(view, 0) == QStringLiteral("abc,3|tail,2") && rows(view, 1) == QStringLiteral("xyz,1|tail,2"),
+				"3-way: Copy Selected Lines from Right, past the middle");
+		}
+
+		// the main window's keys and menus reach a table
+		{
+			MainWindow window;
+			window.resize(1000, 600);
+			window.show();
+			window.openTableComparison(write("win_l.csv", "id,n\na,1\nb,2\nc,3\n"), write("win_r.csv", "id,n\nA,1\nb,2\nC,3\n"));
+			settle();
+			auto *view = window.findChild<TableCompareView *>();
+			if (view == nullptr)
+				return 2;
+			const auto triggerKey = [&window](const char *name) {
+				window.findChild<QAction *>(QLatin1String(name))->trigger();
+			};
+			const auto menuOf = [](QAction *action) {
+				QMenu *owner = nullptr;
+				for (QObject *object : action->associatedObjects())
+					if (auto *menu = qobject_cast<QMenu *>(object))
+						owner = menu;
+				return owner;
+			};
+			auto *lineDiff = window.findChild<QAction *>(QStringLiteral("editSelectLineDiff"));
+			auto *convert = window.findChild<QAction *>(QStringLiteral("fileConvertEol"));
+			if (lineDiff == nullptr || convert == nullptr || menuOf(lineDiff) == nullptr
+				|| menuOf(convert) == nullptr)
+				return 2;
+			emit menuOf(lineDiff)->aboutToShow();
+			check(lineDiff->isEnabled(), "Edit > Select Line Difference: enabled");
+			view->selectCellsForTest(0, 0, 0, 0, 0);
+			triggerKey("editSelectLineDiff");
+			const QString forward = at(*view, 0);
+			triggerKey("editSelectLineDiff");
+			const QString next = at(*view, 0);
+			triggerKey("editSelectPrevLineDiff");
+			check(forward == QStringLiteral("0:0") && next == QStringLiteral("2:0") && at(*view, 0) == forward,
+				"F4 and Shift+F4");
+			triggerKey("editDiffToClipboard2");
+			check(QGuiApplication::clipboard()->text() == QStringLiteral("A,1\n"), "Ctrl+2: the right side's rows");
+			view->selectCellsForTest(1, 0, 1, 0, 1);
+			triggerKey("mergeCopyFromLeft");
+			check(rows(*view, 1) == QStringLiteral("a,1|b,2|C,3"), "Alt+Shift+Right: from the left, into the right grid");
+			view->undo();
+			view->selectCellsForTest(0, 0, 1, 0, 1);
+			triggerKey("mergeCopyFromRight");
+			check(rows(*view, 0) == QStringLiteral("A,1|b,2|c,3"), "Alt+Shift+Left: from the right, into the left grid");
+			emit menuOf(convert)->aboutToShow();
+			QMenu *submenu = convert->menu();
+			if (submenu == nullptr)
+				return 2;
+			emit submenu->aboutToShow();
+			check(convert->isEnabled() && submenu->actions().size() == 3
+				&& item(*submenu, "eolToUnix")->isChecked(), "File > Convert Line Endings to");
+			settle();
+		}
+
+		lm::setMessageSinkForTest({});
+		lm::setQuestionSinkForTest({});
+		printf("table menu: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

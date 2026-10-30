@@ -85,6 +85,39 @@ public:
 	    MenuIDtoXY), so the middle one of three pushes into either side. */
 	void copyToRight();
 	void copyToLeft();
+	/** Into the active grid from its neighbor (ID_COPY_FROM_LEFT and
+	    ID_COPY_FROM_RIGHT). */
+	void copyFromLeft();
+	void copyFromRight();
+	/** Upstream's Copy Selected Lines (OnCopyLinesX2Y): the rows of the
+	    differences from the selection's first to its last, or the current
+	    cell's row, between explicit sides. */
+	void copyLines(int sourceSide, int targetSide);
+	/** Copy Selected Diff to Clipboard (SelDiffCopy): one side's rows of
+	    the current difference, or the one at the current cell. */
+	void copySelectedDiffToClipboard(int side);
+	/** Select Line Difference (Showlinediff), as this view marks the
+	    differences inside the lines: the next or the previous cell that
+	    differs, current in every grid; a copy then takes that cell. */
+	void selectLineDiff(bool reversed);
+	/** Add to Display Filter (OnAddToDisplayFilters): the current cell's
+	    text. */
+	void addCellToDisplayFilter(int side);
+	/** Add to Line Filters (OnAddToLineFilters): the selected cells' text. */
+	void addSelectionToLineFilters(int side);
+	/** Add to Substitution Filters (AddToSubstitutionFilters): the next
+	    cell that differs, as a pair, after asking. */
+	void addLineDiffToSubstitutionFilters(int side);
+	/** Convert Line Endings to (OnConvertEolTo): every row of a side ends
+	    so from now on, and the files are compared again when one changed.
+	    As upstream's, no step of the undo history. */
+	void convertLineEndings(int side, const QString &eol);
+	/** The three items of that menu for a side, the active one if none is
+	    given (OnUpdateConvertEolTo). */
+	void buildConvertEolMenu(QMenu *menu, int side = -1);
+	/** A cell's context menu (upstream's IDR_POPUP_MERGEVIEW, as far as it
+	    goes in a table). */
+	void buildCellMenu(int side, QMenu *menu);
 	/** Upstream's typing in its table: a cell of a grid's row takes a new
 	    value, only that cell of the line written anew (a row a side does
 	    not have becomes one of its file), into the undo history, and the
@@ -169,6 +202,11 @@ public:
 	DisplayFilterBar *displayFilterBarForTest() const { return m_filterBar; }
 	QTableView *tableForTest(int side) const { return m_tables[side]; }
 	int currentDiffForTest() const { return m_current; }
+	/** Select cells of a grid's rows, the first one current and the grid
+	    the active one (for tests). */
+	void selectCellsForTest(int side, int fromRow, int fromColumn, int toRow, int toColumn);
+	/** The side's rows, the header's among them (for tests). */
+	QStringList rawLinesForTest(int side) const { return m_sides[side].rawLines; }
 	/** The lines of the rows on show, the header's row left out, an empty
 	    one for a row the side does not have (for tests). */
 	QStringList shownRowsForTest(int side) const;
@@ -248,7 +286,28 @@ private:
 	void rebuildModel();
 	void hideLines();
 	bool blockFiltered(int blockIndex) const;
-	bool hasInvisibleLines() const;
+	bool hasInvisibleLines(int firstDiff, int lastDiff) const;
+	/** The rows of the side's selection, as view rows; false for none. */
+	bool selectedViewRows(int side, int *first, int *last) const;
+	/** More than a cell selected, or the one Select Line Difference selected
+	    (IsSelection, EqualCurrentWordDiff). */
+	bool hasCellSelection(int side) const;
+	/** GetSelectedDiffs: the differences from the selection's first row to
+	    its last; false for none. */
+	bool selectedDiffs(int side, int *firstDiff, int *lastDiff) const;
+	/** DiffList::LineToDiff: the difference a row is in, an ignored one too. */
+	int lineToDiff(int viewRow) const;
+	/** The cell Select Line Difference selected is the side's current one. */
+	bool atCurrentCell(int side) const;
+	/** A block's cells that differ, by row and column; a row some side
+	    lacks counts as one at its first column. */
+	QList<QPair<int, int>> diffCells(int blockIndex) const;
+	/** Computelinediff: the cell to select from the side's current one. */
+	bool computeLineDiff(int side, bool reversed);
+	void selectCurrentCell();
+	/** A side's rows view rows first..last take the source's. */
+	void replaceRows(int blockIndex, int first, int last, int sourceSide, int targetSide);
+	QString cellText(int side, int viewRow, int column) const;
 	bool endsShownStretch(int viewRow) const;
 	int modelRowOf(int viewRow) const;
 	void ensureFilterBar();
@@ -325,6 +384,16 @@ private:
 	int m_saveSerial[3] = { 0, 0, 0 };
 	int m_diffCount = 0;
 	int m_current = -1;
+	// CMergeDoc::m_CurWordDiff: the cell Select Line Difference selected,
+	// until the next comparison
+	struct CurrentCell
+	{
+		int side = -1;
+		int viewRow = -1;
+		int column = -1;
+		int index = -1; // among the block's cells that differ
+	};
+	CurrentCell m_curCell;
 	bool m_syncing = false;
 	bool m_ignoreEol = false; // Yes to the question, for this comparison
 	std::optional<QChar> m_delimiterOverride;

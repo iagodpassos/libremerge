@@ -4995,6 +4995,119 @@ Please clear the display filter or adjust the filter settings to show all lines 
 Bitte deaktivieren Sie den Anzeigefilter oder passen Sie die Filtereinstellungen so an, dass alle Zeilen angezeigt werden, bevor Sie die Unterschiede zusammenführen.</translation>
     </message>
     <message>
+        <source>No differences found to add as substitution filter</source>
+        <translation>Keine Unterschiede zum Hinzufügen als Ersetzungsfilter gefunden</translation>
+    </message>
+    <message>
+        <source>The pair is already in the Substitution Filters list</source>
+        <translation>Das Paar ist bereits in der Ersetzungsfilterliste vorhanden</translation>
+    </message>
+    <message>
+        <source>Add this change to Substitution Filters?</source>
+        <translation>Diese Änderung zu den Ersetzungsfiltern hinzufügen?</translation>
+    </message>
+    <message>
+        <source>&amp;Windows (CRLF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Windows (CRLF)</translation>
+    </message>
+    <message>
+        <source>&amp;Unix (LF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Unix (LF)</translation>
+    </message>
+    <message>
+        <source>&amp;Mac (CR)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Mac (CR)</translation>
+    </message>
+    <message>
+        <source>Copy to Middle</source>
+        <translation>Zur Mitte kopieren</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Middle</source>
+        <translation>Ausgewählte Zeile(n) zur Mitte kopieren</translation>
+    </message>
+    <message>
+        <source>Copy from Middle</source>
+        <translation>Von der Mitte kopieren</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Middle</source>
+        <translation>Ausgewählte Zeile(n) von der Mitte kopieren</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Right</source>
+        <translation>Ausgewählte Zeile(n) nach rechts kopieren</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Right</source>
+        <translation>Ausgewählte Zeile(n) von rechts kopieren</translation>
+    </message>
+    <message>
+        <source>Cop&amp;y to Left</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Cop&amp;y to Left\tAlt+Left&quot;.</translatorcomment>
+        <translation>N&amp;ach links kopieren</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Left</source>
+        <translation>Ausgewählte Zeile(n) nach links kopieren</translation>
+    </message>
+    <message>
+        <source>Copy &amp;from Left</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;from Left\tAlt+Shift+Right&quot;.</translatorcomment>
+        <translation>&amp;Von links kopieren</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Left</source>
+        <translation>Ausgewählte Zeile(n) von links kopieren</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Left) to Clipboard</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy Selected Diff (Left) to Clipboard\tCtrl+&amp;1&quot;.</translatorcomment>
+        <translation>Ausgewählten Unterschied (Links) in die Zwischenablage kopieren</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Middle) to Clipboard</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy Selected Diff (Middle) to Clipboard\tCtrl+&amp;2&quot;.</translatorcomment>
+        <translation>Ausgewählten Unterschied (Mitte) in die Zwischenablage kopieren</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Right) to Clipboard</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy Selected Diff (Right) to Clipboard\tCtrl+&amp;2&quot;.</translatorcomment>
+        <translation>Ausgewählten Unterschied (Rechts) in die Zwischenablage kopieren</translation>
+    </message>
+    <message>
+        <source>Select Line &amp;Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Select Line &amp;Difference\tF4&quot;.</translatorcomment>
+        <translation>Zeilen&amp;unterschied markieren</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Filters</source>
+        <translation>Zu den &amp;Filtern hinzufügen</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Display Filter</source>
+        <translation>Zum &amp;Anzeigefilter hinzufügen</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Line Filters</source>
+        <translation>&amp;Zu den Zeilenfiltern hinzufügen</translation>
+    </message>
+    <message>
+        <source>Add to Substitution &amp;Filters</source>
+        <translation>Diese Änderung zu den Ersetzungsfiltern hinzuf&amp;ügen</translation>
+    </message>
+    <message>
+        <source>&amp;Undo</source>
+        <translation>&amp;Rückgängig</translation>
+    </message>
+    <message>
+        <source>&amp;Redo</source>
+        <translation>&amp;Wiederherstellen</translation>
+    </message>
+    <message>
         <source>Save As</source>
         <translation>Speichern unter</translation>
     </message>
@@ -5012,6 +5125,20 @@ Bitte deaktivieren Sie den Anzeigefilter oder passen Sie die Filtereinstellungen
         <source>cannot write %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>%1 kann nicht geschrieben werden</translation>
+    </message>
+    <message>
+        <source>C&amp;opy to Right</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right\tAlt+Right&quot;.</translatorcomment>
+        <translation>&amp;Nach rechts kopieren</translation>
+    </message>
+    <message>
+        <source>Copy fro&amp;m Right</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy fro&amp;m Right\tAlt+Shift+Left&quot;.</translatorcomment>
+        <translation>V&amp;on rechts kopieren</translation>
+    </message>
+    <message>
+        <source>No differences found to select</source>
+        <translation>Keine Unterschiede zur Auswahl gefunden</translation>
     </message>
     <message>
         <source>Untitled Right</source>

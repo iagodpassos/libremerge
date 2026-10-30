@@ -3,6 +3,10 @@
 
 #include "TableCompareView.h"
 
+#include <climits>
+
+#include <QClipboard>
+
 #include <set>
 
 #include <QAbstractTableModel>
@@ -43,15 +47,19 @@
 // engine
 #include "DiffWrapper.h"
 #include "DiffList.h"
+#include "DiffTextEdit.h"
 #include "EngineOptions.h"
 #include "FileTransform.h"
 #include "FilterEngine/FilterExpression.h"
 #include "FilterEngine/ILineDataProvider.h"
 #include "LineFilterHelper.h"
+#include "LineFiltersList.h"
 #include "Logger.h"
 #include "OptionsDef.h"
 #include "OptionsMgr.h"
 #include "PathContext.h"
+#include "SubstitutionFiltersList.h"
+#include "UnicodeString.h"
 #include "UniFile.h"
 #include "codepage_detect.h"
 #include "unicoder.h"
@@ -747,6 +755,25 @@ TableCompareView::TableCompareView(QWidget *parent)
 			this, [this](const QModelIndex &index) {
 				deselectDiffIfCursorNotInCurrentDiff(index.row());
 			});
+		// a right click on a cell (OnRButtonDown, OnRButtonUp, OnContextMenu):
+		// out of the selection, the current cell goes there and nothing else
+		// stays selected
+		m_tables[i]->setContextMenuPolicy(Qt::CustomContextMenu);
+		connect(m_tables[i], &QWidget::customContextMenuRequested, this,
+			[this, i](const QPoint &pos) {
+				QTableView *table = m_tables[i];
+				const QModelIndex index = table->indexAt(pos);
+				setActiveSide(i);
+				if (index.isValid())
+				{
+					if (!table->selectionModel()->isSelected(index))
+						table->setCurrentIndex(index);
+					deselectDiffIfCursorNotInCurrentDiff(index.row());
+				}
+				QMenu menu(this);
+				buildCellMenu(i, &menu);
+				DiffTextEdit::presentMenu(&menu, table->viewport()->mapToGlobal(pos));
+			});
 		// upstream's menu of a right click on the headers
 		QHeaderView *header = m_tables[i]->horizontalHeader();
 		header->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -1058,6 +1085,7 @@ bool TableCompareView::runDiff(QString *error)
 	}
 
 	m_blocks.clear();
+	m_curCell = CurrentCell();
 	m_diffCount = 0;
 	for (int i = 0; i < diffList.GetSize(); ++i)
 	{
@@ -1222,10 +1250,12 @@ bool TableCompareView::blockFiltered(int blockIndex) const
 
 /** CMergeDoc::HasInvisibleLines over every difference there is to copy:
     one of them has a hidden row. */
-bool TableCompareView::hasInvisibleLines() const
+bool TableCompareView::hasInvisibleLines(int firstDiff, int lastDiff) const
 {
-	for (const Block &block : m_blocks)
+	for (int b = qMax(0, firstDiff);
+		b <= lastDiff && b < static_cast<int>(m_blocks.size()); ++b)
 	{
+		const Block &block = m_blocks[b];
 		if (block.trivial)
 			continue;
 		for (int row = block.viewBegin; row <= block.viewEnd; ++row)
@@ -2120,7 +2150,7 @@ bool TableCompareView::copySelectedCells(int sourceSide, int targetSide)
 	// is the cursor, as a click puts it there, and the difference goes whole
 	const QItemSelectionModel *selection = m_tables[activeSide()]->selectionModel();
 	const QModelIndexList selected = selection->selectedIndexes();
-	if (selected.size() < 2)
+	if (!hasCellSelection(activeSide()))
 		return false;
 	const Side &from = m_sides[sourceSide];
 	Side &to = m_sides[targetSide];
@@ -2235,6 +2265,702 @@ void TableCompareView::copyToLeft()
 	copyCurrentDiff(target + 1, target);
 }
 
+void TableCompareView::copyFromLeft()
+{
+	// (MenuIDtoXY: none from the first grid)
+	const int active = activeSide();
+	if (active > 0)
+		copyCurrentDiff(active - 1, active);
+}
+
+void TableCompareView::copyFromRight()
+{
+	const int active = activeSide();
+	if (active < m_paneCount - 1)
+		copyCurrentDiff(active + 1, active);
+}
+
+bool TableCompareView::selectedViewRows(int side, int *first, int *last) const
+{
+	const QModelIndexList selected = m_tables[side]->selectionModel()->selectedIndexes();
+	if (selected.isEmpty())
+		return false;
+	*first = INT_MAX;
+	*last = -1;
+	for (const QModelIndex &index : selected)
+	{
+		const int viewRow = m_modelRows.value(index.row(), -1);
+		*first = qMin(*first, viewRow);
+		*last = qMax(*last, viewRow);
+	}
+	return *last >= 0;
+}
+
+bool TableCompareView::hasCellSelection(int side) const
+{
+	const qsizetype selected = m_tables[side]->selectionModel()->selectedIndexes().size();
+	return selected > 1 || (selected == 1 && atCurrentCell(side));
+}
+
+bool TableCompareView::selectedDiffs(int side, int *firstDiff, int *lastDiff) const
+{
+	int firstRow = -1;
+	int lastRow = -1;
+	if (!selectedViewRows(side, &firstRow, &lastRow))
+		return false;
+	*firstDiff = lineToDiff(firstRow);
+	if (*firstDiff == -1)
+		*firstDiff = nextActiveFromRow(firstRow, +1);
+	*lastDiff = lineToDiff(lastRow);
+	if (*lastDiff == -1)
+		*lastDiff = nextActiveFromRow(lastRow, -1);
+	return *firstDiff != -1 && *lastDiff >= *firstDiff;
+}
+
+int TableCompareView::lineToDiff(int viewRow) const
+{
+	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+		if (viewRow >= m_blocks[b].viewBegin && viewRow <= m_blocks[b].viewEnd)
+			return b;
+	return -1;
+}
+
+void TableCompareView::replaceRows(int blockIndex, int first, int last, int sourceSide,
+	int targetSide)
+{
+	const Block &block = m_blocks[blockIndex];
+	QStringList rows;
+	QStringList eols;
+	for (int viewRow = first; viewRow <= last; ++viewRow)
+	{
+		const int real = m_viewToReal[sourceSide].value(viewRow, -1);
+		if (real >= 0)
+		{
+			rows.append(m_sides[sourceSide].rawLines.at(real));
+			eols.append(rowEol(sourceSide, real));
+		}
+	}
+	int at = -1;
+	int count = 0;
+	for (int viewRow = first; viewRow <= last; ++viewRow)
+	{
+		const int real = m_viewToReal[targetSide].value(viewRow, -1);
+		if (real >= 0)
+		{
+			if (at < 0)
+				at = real;
+			++count;
+		}
+	}
+	// none there: past the side's rows of the block before those view rows
+	if (at < 0)
+		at = block.begin[targetSide]
+			+ qBound(0, first - block.viewBegin, qMax(0, block.end[targetSide] - block.begin[targetSide] + 1));
+	QStringList &lines = m_sides[targetSide].rawLines;
+	QStringList &ownEols = m_sides[targetSide].rowEols;
+	for (int k = 0; k < count; ++k)
+	{
+		lines.removeAt(at);
+		ownEols.removeAt(at);
+	}
+	for (int k = 0; k < rows.size(); ++k)
+	{
+		lines.insert(at + k, rows.at(k));
+		ownEols.insert(at + k, eols.at(k));
+	}
+}
+
+/** OnX2Y with selectedLineOnly: by the selection's rows when more than a
+    cell is selected, GetSelectedDiffs's differences bottom up
+    (CopyMultiplePartialList), or the current cell's row of the current
+    difference (LineListCopy). */
+void TableCompareView::copyLines(int sourceSide, int targetSide)
+{
+	if (sourceSide < 0 || sourceSide >= m_paneCount || targetSide < 0
+		|| targetSide >= m_paneCount || sourceSide == targetSide)
+		return;
+	const int active = activeSide();
+	int firstRow = -1;
+	int lastRow = -1;
+	int firstDiff = -1;
+	int lastDiff = -1;
+	if (hasCellSelection(active))
+	{
+		if (!selectedDiffs(active, &firstDiff, &lastDiff))
+			return;
+		selectedViewRows(active, &firstRow, &lastRow);
+		if (hasInvisibleLines(firstDiff, lastDiff))
+		{
+			lm::showError(this, tr("Merging/copying differences that contain hidden lines is "
+				"not currently supported.\n\nPlease clear the display filter or adjust the "
+				"filter settings to show all lines before merging."));
+			return;
+		}
+	}
+	else
+	{
+		const QModelIndex index = m_tables[active]->currentIndex();
+		if (!index.isValid())
+			return;
+		firstRow = lastRow = m_modelRows.value(index.row(), -1);
+		firstDiff = m_current >= 0 ? m_current : diffAtRow(firstRow);
+		lastDiff = firstDiff;
+		if (firstDiff < 0 || m_blocks[firstDiff].trivial)
+			return;
+	}
+	// (the first and the last by the rows the selection takes of them, as
+	// LineListCopy; another row than the current difference's takes none)
+	const auto rowsOf = [&](const Block &block) {
+		return QPair<int, int>(qMax(firstRow, block.viewBegin), qMin(lastRow, block.viewEnd));
+	};
+	bool any = false;
+	for (int b = firstDiff; b <= lastDiff; ++b)
+		any = any || rowsOf(m_blocks[b]).first <= rowsOf(m_blocks[b]).second;
+	if (!any)
+		return;
+	pushUndo(captureEntry(targetSide, qMax(firstRow, m_blocks[firstDiff].viewBegin)));
+	for (int b = lastDiff; b >= firstDiff; --b)
+	{
+		const Block &block = m_blocks[b];
+		if (block.trivial && b != lastDiff)
+			continue;
+		const auto [first, last] = rowsOf(block);
+		if (first <= last)
+			replaceRows(b, first, last, sourceSide, targetSide);
+	}
+	Side &to = m_sides[targetSide];
+	to.cells.clear();
+	for (const QString &line : to.rawLines)
+		to.cells.push_back(splitRow(line, to.props));
+	setSideModified(targetSide, true);
+	QString error;
+	runDiff(&error);
+	rebuildModel();
+	m_current = -1;
+	updateStatus();
+	// FlushAndRescan tells when the files are now identical
+	emit rescanned();
+}
+
+void TableCompareView::copySelectedDiffToClipboard(int side)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	const QModelIndex index = m_tables[activeSide()]->currentIndex();
+	const int diff = m_current >= 0 ? m_current
+		: index.isValid() ? diffAtRow(m_modelRows.value(index.row(), -1)) : -1;
+	if (diff < 0 || diff >= static_cast<int>(m_blocks.size()))
+		return;
+	const Block &block = m_blocks[diff];
+	const Side &s = m_sides[side];
+	QString text;
+	for (int row = qMax(0, block.begin[side]);
+		row <= block.end[side] && row < s.rawLines.size(); ++row)
+	{
+		text += s.rawLines.at(row);
+		if (row + 1 < s.rawLines.size() || s.hadFinalEol)
+			text += rowEol(side, row);
+	}
+	if (!text.isEmpty())
+		QGuiApplication::clipboard()->setText(text);
+}
+
+bool TableCompareView::atCurrentCell(int side) const
+{
+	if (m_curCell.side != side)
+		return false;
+	const QModelIndex index = m_tables[side]->currentIndex();
+	if (!index.isValid() || index.column() != m_curCell.column
+		|| m_modelRows.value(index.row(), -1) != m_curCell.viewRow)
+		return false;
+	// a row some side lacks goes with the whole difference
+	for (int s = 0; s < m_paneCount; ++s)
+		if (m_viewToReal[s].value(m_curCell.viewRow, -1) < 0)
+			return false;
+	return true;
+}
+
+QList<QPair<int, int>> TableCompareView::diffCells(int blockIndex) const
+{
+	const Block &block = m_blocks[blockIndex];
+	QList<QPair<int, int>> cells;
+	for (int viewRow = block.viewBegin; viewRow <= block.viewEnd; ++viewRow)
+	{
+		// only what a grid shows: not the header's row, nor a hidden one
+		if (!std::binary_search(m_modelRows.cbegin(), m_modelRows.cend(), viewRow))
+			continue;
+		int columns = 0;
+		bool lacking = false;
+		for (int side = 0; side < m_paneCount; ++side)
+		{
+			const int real = m_viewToReal[side].value(viewRow, -1);
+			if (real < 0)
+				lacking = true;
+			else if (real < static_cast<int>(m_sides[side].cells.size()))
+				columns = qMax(columns, static_cast<int>(m_sides[side].cells[real].size()));
+		}
+		bool found = false;
+		for (int column = 0; column < columns; ++column)
+			for (int side = 0; side < m_paneCount; ++side)
+			{
+				const int real = m_viewToReal[side].value(viewRow, -1);
+				if (real >= 0 && m_cellDiffs[side].contains(cellKey(real, column)))
+				{
+					cells.append({ viewRow, column });
+					found = true;
+					break;
+				}
+			}
+		if (!found && lacking && !block.trivial)
+			cells.append({ viewRow, 0 });
+	}
+	return cells;
+}
+
+/** CMergeDoc::Computelinediff, a cell being a difference inside the lines
+    here: the one at the current cell on its row or after it, or from the
+    one selected the next; past a block's last, the next block's first (the
+    other way, the previous' last), round the file; a block without any,
+    its first row. */
+bool TableCompareView::computeLineDiff(int side, bool reversed)
+{
+	const int blockCount = static_cast<int>(m_blocks.size());
+	if (blockCount == 0)
+		return false;
+	const QModelIndex index = m_tables[side]->currentIndex();
+	int y = m_modelRows.value(index.isValid() ? index.row() : 0, 0);
+	const int x = index.isValid() ? index.column() : 0;
+	int nCell = 0;
+	QList<QPair<int, int>> cells;
+	int nDiff = lineToDiff(y);
+	if (nDiff != -1)
+		cells = diffCells(nDiff);
+	if (!cells.isEmpty())
+	{
+		const int size = static_cast<int>(cells.size());
+		bool goToNext = true;
+		if (m_curCell.side == side && m_curCell.viewRow == y && m_curCell.column == x)
+		{
+			nCell = m_curCell.index;
+		}
+		else
+		{
+			nCell = reversed ? size - 1 : 0;
+			for (; nCell >= 0 && nCell < size; nCell += reversed ? -1 : 1)
+			{
+				if (cells[nCell].first != y)
+					continue;
+				if (reversed ? x >= cells[nCell].second : x <= cells[nCell].second)
+				{
+					goToNext = false;
+					break;
+				}
+			}
+		}
+		if (goToNext)
+		{
+			if (!reversed)
+			{
+				if (nCell < size)
+					++nCell;
+				if (nCell == size)
+				{
+					y = m_blocks[nDiff].viewEnd;
+					cells.clear();
+				}
+			}
+			else if (nCell <= 0)
+			{
+				y = m_blocks[nDiff].viewBegin;
+				cells.clear();
+			}
+			else
+			{
+				--nCell;
+			}
+		}
+	}
+	if (cells.isEmpty())
+	{
+		nDiff = lineToDiff(y);
+		if (nDiff != -1)
+		{
+			nDiff = (nDiff + (reversed ? blockCount - 1 : 1)) % blockCount;
+		}
+		else if (!reversed)
+		{
+			nDiff = 0;
+			for (int b = 0; b < blockCount; ++b)
+				if (m_blocks[b].viewBegin >= y)
+				{
+					nDiff = b;
+					break;
+				}
+		}
+		else
+		{
+			nDiff = blockCount - 1;
+			for (int b = blockCount - 1; b >= 0; --b)
+				if (m_blocks[b].viewEnd <= y)
+				{
+					nDiff = b;
+					break;
+				}
+		}
+		cells = diffCells(nDiff);
+		nCell = reversed ? static_cast<int>(cells.size()) - 1 : 0;
+	}
+	m_curCell.side = side;
+	if (cells.isEmpty())
+	{
+		m_curCell.viewRow = m_blocks[nDiff].viewBegin;
+		m_curCell.column = 0;
+		m_curCell.index = -1;
+	}
+	else
+	{
+		m_curCell.viewRow = cells[nCell].first;
+		m_curCell.column = cells[nCell].second;
+		m_curCell.index = nCell;
+	}
+	return true;
+}
+
+/** HighlightDiffRect in every grid, the one it started from setting the
+    scroll of the others. */
+void TableCompareView::selectCurrentCell()
+{
+	const int modelRow = modelRowOf(m_curCell.viewRow);
+	if (modelRow < 0)
+		return;
+	const int active = m_curCell.side;
+	m_syncing = true;
+	for (int side = 0; side < m_paneCount; ++side)
+		if (side != active)
+			m_tables[side]->setCurrentIndex(m_models[side]->index(modelRow, m_curCell.column));
+	m_tables[active]->setCurrentIndex(m_models[active]->index(modelRow, m_curCell.column));
+	const int top = m_tables[active]->verticalScrollBar()->value();
+	const int left = m_tables[active]->horizontalScrollBar()->value();
+	for (int side = 0; side < m_paneCount; ++side)
+	{
+		m_tables[side]->verticalScrollBar()->setValue(top);
+		m_tables[side]->horizontalScrollBar()->setValue(left);
+	}
+	m_syncing = false;
+}
+
+void TableCompareView::selectLineDiff(bool reversed)
+{
+	if (!computeLineDiff(activeSide(), reversed))
+	{
+		lm::showInformation(this, tr("No differences found to select"));
+		return;
+	}
+	selectCurrentCell();
+}
+
+QString TableCompareView::cellText(int side, int viewRow, int column) const
+{
+	const int real = m_viewToReal[side].value(viewRow, -1);
+	return real >= 0 && real < static_cast<int>(m_sides[side].cells.size())
+		? m_sides[side].cells[real].value(column) : QString();
+}
+
+void TableCompareView::addCellToDisplayFilter(int side)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	const QModelIndex index = m_tables[side]->currentIndex();
+	if (!index.isValid())
+		return;
+	const QString text = cellText(side, m_modelRows.value(index.row(), -1), index.column());
+	if (text.isEmpty())
+		return;
+	m_displayFilter->AddToExpression(
+		_T("Line contains ") + LineFilterHelper::Quote(text.toStdString()), _T("AND"));
+	ensureFilterBar();
+	m_filterBar->setFilterText(displayFilter());
+	applyDisplayFilter();
+}
+
+/** LibreMerge: line filters are switched on, as the substitution filters
+    are below; upstream adds the filter with them off, the default, and
+    nothing changes on screen. */
+void TableCompareView::addSelectionToLineFilters(int side)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	QModelIndexList selected = m_tables[side]->selectionModel()->selectedIndexes();
+	if (selected.isEmpty())
+		return;
+	std::sort(selected.begin(), selected.end());
+	// row by row, as the text between them has it: the delimiter between a
+	// row's cells, its line ending after it (GetTextWithoutEmptys: no ghost
+	// row)
+	QString text;
+	int previous = -1;
+	for (const QModelIndex &index : selected)
+	{
+		const int viewRow = m_modelRows.value(index.row(), -1);
+		const int real = m_viewToReal[side].value(viewRow, -1);
+		if (real < 0)
+			continue;
+		if (previous >= 0)
+			text += real == previous ? QString(m_sides[side].props.delimiter)
+				: rowEol(side, previous);
+		text += cellText(side, viewRow, index.column());
+		previous = real;
+	}
+	if (text.isEmpty())
+		return;
+	LineFiltersList filters;
+	lm::copyLineFilters(&filters);
+	filters.AddFilter(strutils::to_regex(text.toStdString()), true);
+	lm::saveLineFilters(true, filters);
+	rescan();
+}
+
+void TableCompareView::addLineDiffToSubstitutionFilters(int side)
+{
+	// (upstream: "Not clear what to do for a 3-way merge")
+	if (side < 0 || m_paneCount != 2 || side >= m_paneCount)
+		return;
+	if (!computeLineDiff(side, false))
+	{
+		lm::showInformation(this, tr("No differences found to add as substitution filter"));
+		return;
+	}
+	selectCurrentCell();
+	const QString left = cellText(0, m_curCell.viewRow, m_curCell.column);
+	const QString right = cellText(1, m_curCell.viewRow, m_curCell.column);
+	if (left.isEmpty())
+		return;
+	const QString pair = QStringLiteral("\"%1\" <-> \"%2\"").arg(left, right);
+	const String pattern = left.toStdString();
+	const String replacement = right.toStdString();
+	SubstitutionFiltersList filters;
+	lm::copySubstitutionFilters(&filters);
+	for (size_t f = 0; f < filters.GetCount(); ++f)
+		if (filters.GetAt(f).pattern == pattern && filters.GetAt(f).replacement == replacement)
+		{
+			lm::showInformation(this, tr("The pair is already in the Substitution Filters list")
+				+ QStringLiteral("\n\n") + pair);
+			return;
+		}
+	if (!lm::askQuestion(this, tr("Add this change to Substitution Filters?")
+			+ QStringLiteral("\n\n") + pair))
+		return;
+	filters.Add(pattern, replacement, false, true, false, true);
+	filters.SetEnabled(true);
+	lm::saveSubstitutionFilters(filters);
+	rescan();
+}
+
+void TableCompareView::convertLineEndings(int side, const QString &eol)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	// CCrystalTextBuffer::applyEOLMode: a change only where a row that has
+	// an ending has another
+	Side &s = m_sides[side];
+	bool changed = false;
+	const int rows = static_cast<int>(s.rawLines.size());
+	for (int row = 0; row < rows && !changed; ++row)
+		changed = (row + 1 < rows || s.hadFinalEol) && rowEol(side, row) != eol;
+	s.eol = eol;
+	s.mixedEol = false;
+	s.rowEols.fill(eol);
+	// no step of the history: what an undo brings back ends so as well, and
+	// the side stays modified
+	const auto converted = [side, &eol, changed](QList<UndoEntry> &stack) {
+		for (UndoEntry &entry : stack)
+			if (entry.side == side)
+			{
+				entry.eols.fill(eol);
+				entry.modified = entry.modified || changed;
+			}
+	};
+	converted(m_undoStack);
+	converted(m_redoStack);
+	if (!changed)
+		return;
+	setSideModified(side, true);
+	rescan();
+}
+
+void TableCompareView::buildConvertEolMenu(QMenu *menu, int side)
+{
+	if (side < 0 || side >= m_paneCount)
+		side = activeSide();
+	const Side &s = m_sides[side];
+	const bool perLine = s.mixedEol || lm::allowMixedEol();
+	const auto add = [&](const QString &text, const char *name, const QString &eol) {
+		QAction *action = menu->addAction(text);
+		action->setObjectName(QLatin1String(name));
+		// OnUpdateConvertEolTo: the file's one marked, unless rows keep
+		// their own
+		action->setCheckable(true);
+		action->setChecked(!perLine && eol == s.eol);
+		connect(action, &QAction::triggered, this,
+			[this, side, eol]() { convertLineEndings(side, eol); });
+	};
+	add(tr("&Windows (CRLF)"), "eolToWindows", QStringLiteral("\r\n"));
+	add(tr("&Unix (LF)"), "eolToUnix", QStringLiteral("\n"));
+	add(tr("&Mac (CR)"), "eolToMac", QStringLiteral("\r"));
+}
+
+void TableCompareView::buildCellMenu(int side, QMenu *menu)
+{
+	setActiveSide(side);
+	const auto addItem = [menu](const QString &text, const QString &name, bool enabled,
+		const QKeySequence &shortcut = QKeySequence()) {
+		QAction *action = menu->addAction(text);
+		action->setObjectName(name);
+		action->setEnabled(enabled);
+		if (!shortcut.isEmpty())
+		{
+			action->setShortcut(shortcut);
+			action->setShortcutVisibleInContextMenu(true);
+		}
+		return action;
+	};
+
+	struct CopyItem
+	{
+		QString text;
+		QString lines;
+		int source;
+		int target;
+		QKeySequence shortcut;
+	};
+	const int last = m_paneCount - 1;
+	const bool threeWay = m_paneCount == 3;
+	const QKeySequence altLeft(Qt::ALT | Qt::Key_Left);
+	const QKeySequence altRight(Qt::ALT | Qt::Key_Right);
+	const QKeySequence altShiftLeft(Qt::ALT | Qt::SHIFT | Qt::Key_Left);
+	const QKeySequence altShiftRight(Qt::ALT | Qt::SHIFT | Qt::Key_Right);
+	const auto toMiddle = [&](int source) {
+		return CopyItem{ tr("Copy to Middle"), tr("Copy Selected Lines to Middle"), source, 1, {} };
+	};
+	const auto fromMiddle = [&](int target) {
+		return CopyItem{ tr("Copy from Middle"), tr("Copy Selected Lines from Middle"), 1, target, {} };
+	};
+	const auto toRight = [&](int source, const QKeySequence &key) {
+		return CopyItem{ tr("C&opy to Right"), tr("Copy Selected Lines to Right"), source, last, key };
+	};
+	const auto fromRight = [&](int target, const QKeySequence &key) {
+		return CopyItem{ tr("Copy fro&m Right"), tr("Copy Selected Lines from Right"), last, target, key };
+	};
+	const auto toLeft = [&](int source, const QKeySequence &key) {
+		return CopyItem{ tr("Cop&y to Left"), tr("Copy Selected Lines to Left"), source, 0, key };
+	};
+	const auto fromLeft = [&](int target, const QKeySequence &key) {
+		return CopyItem{ tr("Copy &from Left"), tr("Copy Selected Lines from Left"), 0, target, key };
+	};
+	QList<CopyItem> copies;
+	if (!threeWay)
+		copies = side == 0 ? QList<CopyItem>{ toRight(0, altRight), fromRight(0, altShiftLeft) }
+			: QList<CopyItem>{ toLeft(last, altLeft), fromLeft(last, altShiftRight) };
+	else if (side == 0)
+		copies = { toMiddle(0), toRight(0, {}), fromMiddle(0), fromRight(0, {}) };
+	else if (side == 1)
+		copies = { toLeft(1, altLeft), toRight(1, altRight), fromLeft(1, altShiftRight),
+			fromRight(1, altShiftLeft) };
+	else
+		copies = { toMiddle(last), toLeft(last, {}), fromMiddle(last), fromLeft(last, {}) };
+
+	// OnUpdateX2Y: by the selection's rows, or the current cell's difference
+	const QModelIndex current = m_tables[side]->currentIndex();
+	const int currentRow = current.isValid() ? m_modelRows.value(current.row(), -1) : -1;
+	const bool inDiff = m_current >= 0 || diffAtRow(currentRow) >= 0;
+	bool copyable = inDiff;
+	if (hasCellSelection(side))
+	{
+		int firstDiff = -1;
+		int lastDiff = -1;
+		copyable = selectedDiffs(side, &firstDiff, &lastDiff);
+	}
+	const auto itemName = [](const char *what, int source, int target) {
+		return QStringLiteral("%1_%2_%3").arg(QLatin1String(what)).arg(source).arg(target);
+	};
+	for (const CopyItem &item : copies)
+	{
+		QAction *action = addItem(item.text, itemName("cellCopy", item.source, item.target),
+			copyable, item.shortcut);
+		const int source = item.source;
+		const int target = item.target;
+		connect(action, &QAction::triggered, this,
+			[this, source, target]() { copyCurrentDiff(source, target); });
+	}
+	menu->addSeparator();
+	for (const CopyItem &item : copies)
+	{
+		QAction *action = addItem(item.lines, itemName("cellCopyLines", item.source, item.target),
+			copyable);
+		const int source = item.source;
+		const int target = item.target;
+		connect(action, &QAction::triggered, this,
+			[this, source, target]() { copyLines(source, target); });
+	}
+	menu->addSeparator();
+
+	const auto addToClipboard = [&](const QString &text, int pane, Qt::Key key) {
+		QAction *action = addItem(text, QStringLiteral("cellDiffToClipboard_%1").arg(pane),
+			inDiff, QKeySequence(Qt::CTRL | key));
+		connect(action, &QAction::triggered, this,
+			[this, pane]() { copySelectedDiffToClipboard(pane); });
+	};
+	addToClipboard(tr("Copy Selected Diff (Left) to Clipboard"), 0, Qt::Key_1);
+	if (threeWay)
+	{
+		addToClipboard(tr("Copy Selected Diff (Middle) to Clipboard"), 1, Qt::Key_2);
+		addToClipboard(tr("Copy Selected Diff (Right) to Clipboard"), 2, Qt::Key_3);
+	}
+	else
+	{
+		addToClipboard(tr("Copy Selected Diff (Right) to Clipboard"), 1, Qt::Key_2);
+	}
+	menu->addSeparator();
+
+	QAction *lineDiff = addItem(tr("Select Line &Difference"),
+		QStringLiteral("cellSelectLineDiff"), true, QKeySequence(Qt::Key_F4));
+	connect(lineDiff, &QAction::triggered, this, [this]() { selectLineDiff(false); });
+
+	QMenu *filters = menu->addMenu(tr("Add to &Filters"));
+	QAction *display = filters->addAction(tr("Add to &Display Filter"));
+	display->setObjectName(QStringLiteral("addToDisplayFilter"));
+	connect(display, &QAction::triggered, this,
+		[this, side]() { addCellToDisplayFilter(side); });
+	QAction *lineFilter = filters->addAction(tr("Add to &Line Filters"));
+	lineFilter->setObjectName(QStringLiteral("addToLineFilters"));
+	lineFilter->setEnabled(current.isValid() && !threeWay);
+	connect(lineFilter, &QAction::triggered, this,
+		[this, side]() { addSelectionToLineFilters(side); });
+	QAction *substitution = filters->addAction(tr("Add to Substitution &Filters"));
+	substitution->setObjectName(QStringLiteral("addToSubstitutionFilters"));
+	substitution->setEnabled(!threeWay);
+	connect(substitution, &QAction::triggered, this,
+		[this, side]() { addLineDiffToSubstitutionFilters(side); });
+	menu->addSeparator();
+
+	QAction *undoItem = addItem(tr("&Undo"), QStringLiteral("cellUndo"), !m_undoStack.isEmpty());
+	connect(undoItem, &QAction::triggered, this, &TableCompareView::undo);
+	QAction *redoItem = addItem(tr("&Redo"), QStringLiteral("cellRedo"), !m_redoStack.isEmpty());
+	connect(redoItem, &QAction::triggered, this, &TableCompareView::redo);
+}
+
+void TableCompareView::selectCellsForTest(int side, int fromRow, int fromColumn, int toRow,
+	int toColumn)
+{
+	setActiveSide(side);
+	QItemSelectionModel *selection = m_tables[side]->selectionModel();
+	selection->clearSelection();
+	selection->setCurrentIndex(m_models[side]->index(fromRow, fromColumn),
+		QItemSelectionModel::NoUpdate);
+	selection->select(QItemSelection(m_models[side]->index(fromRow, fromColumn),
+		m_models[side]->index(toRow, toColumn)), QItemSelectionModel::Select);
+}
+
 void TableCompareView::copyCurrentDiff(int sourceSide, int targetSide)
 {
 	const int target = targetSide >= 0 ? targetSide : 1 - sourceSide;
@@ -2328,7 +3054,7 @@ void TableCompareView::copyAllFrom(int sourceSide, int targetSide)
 		return;
 	// CMergeDoc::CopyMultipleList: not with hidden lines among the
 	// differences to copy
-	if (hasInvisibleLines())
+	if (hasInvisibleLines(0, static_cast<int>(m_blocks.size()) - 1))
 	{
 		lm::showError(this, tr("Merging/copying differences that contain hidden lines is "
 			"not currently supported.\n\nPlease clear the display filter or adjust the "
