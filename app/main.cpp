@@ -365,7 +365,7 @@ int main(int argc, char *argv[])
 	QApplication app(argc, argv);
 	QGuiApplication::setDesktopFileName(QStringLiteral("libremerge"));
 	QApplication::setApplicationName(QStringLiteral("LibreMerge"));
-	QApplication::setApplicationVersion(QStringLiteral("1.1.0"));
+	QApplication::setApplicationVersion(QStringLiteral("1.2.0"));
 	QApplication::setOrganizationName(QStringLiteral("LibreMerge"));
 	// selftests run on settings of their own, emptied first: they neither
 	// depend on the user's options nor change them
