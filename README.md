@@ -120,7 +120,7 @@ WinMerge's switches work in these commands too: for the merge tool, `-e -u -wl -
 
 ## Command line
 
-LibreMerge reads WinMerge's command line, with `-` in front of each switch (`/` starts a path on macOS and Linux); `libremerge -?` lists the switches. For example:
+LibreMerge reads WinMerge's command line, with `-` in front of each switch (`/` starts a path on macOS and Linux); `libremerge --help` lists the switches. For example:
 
 ```sh
 libremerge -e -u -wl -dl "Base" -dr "Mine" base.txt mine.txt
