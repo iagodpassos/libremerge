@@ -13552,6 +13552,45 @@ int main(int argc, char *argv[])
 					&& view.positionTextForTest(0) == status(1, 1, 2, 1, 2, QString()),
 				"Preserve original EOL off: the lines copied in end as the file does");
 		}
+		// a ghost line gives the lines it is between (OnUpdateCaret), a
+		// selection its lines and characters, and the encoding is named as
+		// the engine's table has it (CMergeStatusBar)
+		write(left, "a\nb\nc\n");
+		write(right, "a\nc\n");
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			toLine(view, 1, 1);
+			printf("  on a ghost line: %s\n", qPrintable(view.positionTextForTest(1)));
+			check(view.positionTextForTest(1) == FileCompareView::tr("Line: %1").arg(QStringLiteral("1-2")),
+				"status bar, on a ghost line: the lines it is between");
+			view.selectForTest(0, 0, 0, 1, 1);
+			printf("  a selection: %s\n", qPrintable(view.positionTextForTest(0)));
+			check(view.positionTextForTest(0) == status(2, 2, 2, 2, 2, QString())
+					+ FileCompareView::tr("  Sel: %1 | %2").arg(2).arg(3),
+				"status bar, a selection: its lines and characters");
+			view.selectForTest(0, 0, 0, 1, 0);
+			check(view.positionTextForTest(0) == status(2, 1, 2, 1, 2, QString())
+					+ FileCompareView::tr("  Sel: %1 | %2").arg(1).arg(2),
+				"status bar, up to the next line's start: that line not counted");
+			toLine(view, 0, 0);
+			check(view.positionTextForTest(0) == status(1, 1, 2, 1, 2, QString()),
+				"status bar, no selection: no count");
+		}
+		write(left, QByteArray::fromHex("efbbbf610a"));
+		write(right, QByteArray::fromHex("fffe61000a00"));
+		{
+			FileCompareView view;
+			if (!view.compare(left, right, &error))
+				return 2;
+			printf("  encodings: %s | %s\n", qPrintable(view.encodingTextForTest(0)),
+				qPrintable(view.encodingTextForTest(1)));
+			check(view.encodingTextForTest(0).startsWith(QStringLiteral("UTF-8 BOM"))
+					&& view.encodingTextForTest(1).startsWith(QStringLiteral("ISO-10646-UCS-2 BOM")),
+				"status bar: the encodings as the engine's table names them");
+		}
+		write(right, "a\nx\n");
 		asked.clear();
 		lm::setAllowMixedEolForTest(true);
 		write(left, "a\r\nb\r\n");

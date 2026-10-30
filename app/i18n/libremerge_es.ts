@@ -359,12 +359,20 @@
         <translation>  • cambios sin guardar</translation>
     </message>
     <message>
+        <source>Line: %1</source>
+        <translation>Línea: %1</translation>
+    </message>
+    <message>
         <source>None</source>
         <translation>Ninguno</translation>
     </message>
     <message>
         <source>Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6</source>
         <translation>Línea: %1  Columna: %2/%3  Carácter: %4/%5  EOL: %6</translation>
+    </message>
+    <message>
+        <source>  Sel: %1 | %2</source>
+        <translation>  Selec: %1 | %2</translation>
     </message>
     <message>
         <source>No differences found to select</source>

@@ -462,6 +462,7 @@ private:
 	void updateStatus();
 	void updateDiffPane();
 	void updatePaneStatus(int side);
+	QString selectionStatus(int side) const;
 	void applyTheme();
 	void applyZoom(qreal pointSize);
 	void applyDiffPaneTabStops();

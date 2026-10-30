@@ -323,12 +323,20 @@
         <translation>  • alterações não salvas</translation>
     </message>
     <message>
+        <source>Line: %1</source>
+        <translation>Linha: %1</translation>
+    </message>
+    <message>
         <source>None</source>
         <translation>Nenhum</translation>
     </message>
     <message>
         <source>Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6</source>
         <translation>Lin: %1  Col: %2/%3  Car: %4/%5  EOL: %6</translation>
+    </message>
+    <message>
+        <source>  Sel: %1 | %2</source>
+        <translation>  Sel: %1 | %2</translation>
     </message>
     <message>
         <source>No differences found to select</source>

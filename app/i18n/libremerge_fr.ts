@@ -362,6 +362,10 @@
         <translation>  • changements non enregistrés</translation>
     </message>
     <message>
+        <source>Line: %1</source>
+        <translation>Ligne: %1</translation>
+    </message>
+    <message>
         <source>None</source>
         <translation>Aucun</translation>
     </message>
@@ -372,6 +376,10 @@
     <message>
         <source>Ln: %1  Col: %2/%3  Ch: %4/%5</source>
         <translation>Ln : %1  Col : %2/%3  Ch : %4/%5</translation>
+    </message>
+    <message>
+        <source>  Sel: %1 | %2</source>
+        <translation>  Sél : %1 | %2</translation>
     </message>
     <message>
         <source>The merge target is read-only.</source>

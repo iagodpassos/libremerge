@@ -357,12 +357,20 @@
         <translation>  • ungespeicherte Änderungen</translation>
     </message>
     <message>
+        <source>Line: %1</source>
+        <translation>Zeile: %1</translation>
+    </message>
+    <message>
         <source>None</source>
         <translation>Keines</translation>
     </message>
     <message>
         <source>Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6</source>
         <translation>Zeile: %1  Spalte: %2/%3  Zeichen: %4/%5  EOL: %6</translation>
+    </message>
+    <message>
+        <source>  Sel: %1 | %2</source>
+        <translation>  Auswahl: %1 | %2</translation>
     </message>
     <message>
         <source>No differences found to select</source>

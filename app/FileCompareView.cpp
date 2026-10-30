@@ -65,6 +65,7 @@
 #include "OptionsMgr.h"
 #include "PathContext.h"
 #include "UniFile.h"
+#include "charsets.h"
 #include "codepage_detect.h"
 #include "unicoder.h"
 #include "stringdiffs.h"
@@ -114,24 +115,22 @@ void byteRangeToU16(const QString &line, int beginByte, int endByte,
 	*lengthU16 = qMax(0, end - start);
 }
 
+/** The status bar's encoding (CMergeStatusBar::MergeStatus::SetLineInfo):
+    the code page's name in the engine's charset table, and BOM. A Unicode
+    file's code page is its form's (FileTextEncoding::SetUnicoding). */
 QString encodingName(int unicoding, int codepage, bool bom)
 {
-	switch (unicoding)
-	{
-	case ucr::UCS2LE: return QStringLiteral("UTF-16LE");
-	case ucr::UCS2BE: return QStringLiteral("UTF-16BE");
-	case ucr::UTF8:
-		return bom ? QStringLiteral("UTF-8 BOM") : QStringLiteral("UTF-8");
-	default:
-		break;
-	}
-	if (codepage == 65001)
-		return QStringLiteral("UTF-8");
-	if (codepage >= 1250 && codepage <= 1258)
-		return QStringLiteral("Windows-%1").arg(codepage);
-	if (codepage == 20127)
-		return QStringLiteral("US-ASCII");
-	return QStringLiteral("CP%1").arg(codepage);
+	if (unicoding == ucr::UCS2LE)
+		codepage = ucr::CP_UCS2LE;
+	else if (unicoding == ucr::UCS2BE)
+		codepage = ucr::CP_UCS2BE;
+	else if (unicoding == ucr::UTF8)
+		codepage = ucr::CP_UTF_8;
+	const char *name = GetEncodingNameFromCodePage(codepage);
+	QString text = name != nullptr ? QString::fromLatin1(name) : QString();
+	if (bom)
+		text += QStringLiteral(" BOM");
+	return text;
 }
 
 /** The status bar's line ending, as upstream's EOL pane names it
@@ -3364,8 +3363,17 @@ void FileCompareView::updatePaneStatus(int side)
 		for (int v = viewLine; realLine < 0 && v >= 0; --v)
 			realLine = m_lineNumbers[side].at(v);
 		if (realLine < 0)
-			realLine = 1;
+			realLine = 0;
 	}
+	const QString selection = selectionStatus(side);
+	// a ghost line, OnUpdateCaret: the lines it is between, "Line: 12-13"
+	if (isGhostBlock(cursor.block()))
+	{
+		m_posLabels[side]->setText(tr("Line: %1")
+			.arg(QStringLiteral("%1-%2").arg(realLine).arg(realLine + 1)) + selection);
+		return;
+	}
+	realLine = qMax(1, realLine);
 	// like WinMerge, the column on screen (a tab taking it to the next tab
 	// stop) and the character, each up to the line's end + 1
 	const QTextBlock block = cursor.block();
@@ -3386,11 +3394,47 @@ void FileCompareView::updatePaneStatus(int side)
 			: eol == QStringLiteral("\n") ? QStringLiteral("LF")
 			: eol == QStringLiteral("\r") ? QStringLiteral("CR") : tr("None");
 		m_posLabels[side]->setText(tr("Ln: %1  Col: %2/%3  Ch: %4/%5  EOL: %6")
-			.arg(realLine).arg(col).arg(maxCol).arg(ch).arg(maxCh).arg(name));
+			.arg(realLine).arg(col).arg(maxCol).arg(ch).arg(maxCh).arg(name) + selection);
 		return;
 	}
 	m_posLabels[side]->setText(tr("Ln: %1  Col: %2/%3  Ch: %4/%5")
-		.arg(realLine).arg(col).arg(maxCol).arg(ch).arg(maxCh));
+		.arg(realLine).arg(col).arg(maxCol).arg(ch).arg(maxCh) + selection);
+}
+
+/** CMergeStatusBar's "Sel:", with CGhostTextView's
+    GetSelectedLineAndCharacterCount: the selected lines and characters,
+    ghost and hidden lines left out, a line's ending counting as one. */
+QString FileCompareView::selectionStatus(int side) const
+{
+	const QTextCursor cursor = m_panes[side]->textCursor();
+	if (!cursor.hasSelection())
+		return QString();
+	const QTextDocument *doc = m_panes[side]->document();
+	const auto [startX, startY] = viewPointOf(doc, cursor.selectionStart());
+	const auto [endX, endY] = viewPointOf(doc, cursor.selectionEnd());
+	QTextBlock lastReal = doc->lastBlock();
+	while (lastReal.isValid() && isGhostBlock(lastReal))
+		lastReal = lastReal.previous();
+	int lines = 0;
+	int chars = 0;
+	int line = startY;
+	for (QTextBlock block = doc->findBlockByNumber(startY); block.isValid() && line <= endY;
+		block = block.next(), ++line)
+	{
+		if (isGhostBlock(block) || !block.isVisible())
+			continue;
+		int length = block.length() - 1;
+		if (block != lastReal || m_sides[side].hadFinalEol)
+			++length;
+		chars += line == endY ? endX : length;
+		if (line == startY)
+			chars -= startX;
+		if (line < endY || endX > 0)
+			++lines;
+	}
+	if (lines == 0)
+		return QString();
+	return tr("  Sel: %1 | %2").arg(lines).arg(chars);
 }
 
 void FileCompareView::setSideCaption(int side, const QString &caption)
