@@ -310,6 +310,21 @@
         <translation>%1 semble être un fichier binaire : ouvrez de nouveau les fichiers pour les comparer dans une comparaison binaire.</translation>
     </message>
     <message>
+        <source>&amp;Windows (CRLF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Windows (CRLF)</translation>
+    </message>
+    <message>
+        <source>&amp;Unix (LF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Unix (LF)</translation>
+    </message>
+    <message>
+        <source>&amp;Mac (CR)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Mac (CR)</translation>
+    </message>
+    <message>
         <source>cannot create temporary file</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>impossible de créer le fichier temporaire</translation>
@@ -3337,6 +3352,11 @@ Le fichier est peut-être en lecture seule.</translation>
         <translation>&amp;Fermer l&apos;onglet</translation>
     </message>
     <message>
+        <source>&amp;Convert Line Endings to</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Convert Line Endings to&quot;.</translatorcomment>
+        <translation>Con&amp;vertir les fins de ligne en</translation>
+    </message>
+    <message>
         <source>&amp;Quit</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>&amp;Quitter</translation>
@@ -3450,6 +3470,15 @@ Le fichier est peut-être en lecture seule.</translation>
         <source>&amp;Actual Size</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>&amp;Taille réelle</translation>
+    </message>
+    <message>
+        <source>&amp;View Whitespace</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;View Whitespace&quot;.</translatorcomment>
+        <translation>Afficher les es&amp;paces</translation>
+    </message>
+    <message>
+        <source>View E&amp;OL</source>
+        <translation>Afficher les caractères de fin de ligne (E&amp;OL)</translation>
     </message>
     <message>
         <source>Vie&amp;w Line Differences</source>

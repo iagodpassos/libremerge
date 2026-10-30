@@ -305,6 +305,21 @@
         <translation>%1 scheint eine Binärdatei zu sein: Öffnen Sie die Dateien erneut, um sie in einem Binärvergleich zu vergleichen.</translation>
     </message>
     <message>
+        <source>&amp;Windows (CRLF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Windows (CRLF)</translation>
+    </message>
+    <message>
+        <source>&amp;Unix (LF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Unix (LF)</translation>
+    </message>
+    <message>
+        <source>&amp;Mac (CR)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Mac (CR)</translation>
+    </message>
+    <message>
         <source>cannot create temporary file</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Temporäre Datei kann nicht erstellt werden</translation>
@@ -3318,6 +3333,10 @@ Patches sind nicht betroffen.</translation>
         <translation>Tab s&amp;chließen</translation>
     </message>
     <message>
+        <source>&amp;Convert Line Endings to</source>
+        <translation>&amp;Zeilenenden konvertieren nach</translation>
+    </message>
+    <message>
         <source>&amp;Quit</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>&amp;Beenden</translation>
@@ -3427,6 +3446,16 @@ Patches sind nicht betroffen.</translation>
         <source>&amp;Actual Size</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>&amp;Originalgröße</translation>
+    </message>
+    <message>
+        <source>&amp;View Whitespace</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;View Whitespace&quot;.</translatorcomment>
+        <translation>Leerzei&amp;chen anzeigen</translation>
+    </message>
+    <message>
+        <source>View E&amp;OL</source>
+        <translatorcomment>After WinMerge&apos;s &quot;View E&amp;OL&quot;.</translatorcomment>
+        <translation>Zeilenende anzeigen</translation>
     </message>
     <message>
         <source>Vie&amp;w Line Differences</source>

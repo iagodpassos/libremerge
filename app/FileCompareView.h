@@ -22,6 +22,7 @@ class QMenu;
 class QPlainTextEdit;
 class QTimer;
 class QTextBlock;
+class QTextBlockFormat;
 class QTextCursor;
 class QVBoxLayout;
 class DiffTextEdit;
@@ -257,6 +258,17 @@ public:
 	    upstream only sets as the files load (DocumentsLoaded), so that
 	    the comparisons open kept the one they had. */
 	void refreshEditorOptions();
+	/** View Whitespace and View EOL as the options have them now
+	    (CMergeEditView::RefreshOptions). */
+	void refreshViewOptions();
+	/** Convert Line Endings to (OnConvertEolTo): every line of a pane ends
+	    so from now on, and the files are compared again when one changed.
+	    As upstream's, no step of the undo history. */
+	void convertLineEndings(int side, const QString &eol);
+	/** The three items of that menu for a pane, the active one if none is
+	    given (OnUpdateConvertEolTo); the File menu has them, and a click
+	    on the pane's ending in the status bar. */
+	void buildConvertEolMenu(QMenu *menu, int side = -1);
 	/** CMergeDoc::RefreshOptions: the comparison takes the options as
 	    they are, a Yes to the question about line endings going. */
 	void refreshDiffOptions() { m_ignoreEol = false; }
@@ -352,6 +364,10 @@ public:
 	    file's lines end in more than one way, and whether this comparison
 	    treats line endings as the same (for tests). */
 	QString encodingTextForTest(int side) const;
+	/** The glyph of a view line's ending, and the status bar's ending as
+	    a click takes it (for tests). */
+	QString eolGlyphForTest(int side, int viewLine) const;
+	QLabel *eolLabelForTest(int side) const { return m_eolLabels[side]; }
 	bool mixedEolForTest(int side) const { return m_sides[side].mixedEol; }
 	bool ignoresEolForTest() const { return m_ignoreEol; }
 
@@ -409,6 +425,9 @@ private:
 		    otherwise than eol carrying it on their block. */
 		bool mixedEol = false;
 		bool hadFinalEol = true;
+		/** Convert Line Endings's count: the endings lines keep from
+		    before the last one go for nothing. */
+		int eolConversions = 0;
 		bool modified = false;
 		lm::FileStamp stamp; // the file as loaded or last saved here
 	};
@@ -452,6 +471,11 @@ private:
 	/** The line ending a line is compared and saved with: its own where
 	    lines keep theirs, the file's otherwise. */
 	QString lineEol(int side, const QTextBlock &block) const;
+	/** A line's own ending kept on its block's format, cleared when it
+	    is the file's. */
+	void setBlockEol(QTextBlockFormat &format, int side, const QString &eol) const;
+	QString eolGlyph(int side, const QTextBlock &block) const;
+	void updateEncodingLabels(int side);
 	/** CMergeDoc::OpenDocs' question about files whose lines end
 	    otherwise. */
 	void suggestIgnoreEol();
@@ -521,6 +545,7 @@ private:
 	std::function<bool()> m_savePrompt;
 	QLabel *m_posLabels[3];
 	QLabel *m_encLabels[3];
+	QLabel *m_eolLabels[3];
 	std::unique_ptr<SyntaxHighlighter> m_highlighters[3];
 	LocationPane *m_locationPane;
 	Side m_sides[3];

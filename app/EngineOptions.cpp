@@ -361,6 +361,9 @@ void installEngineOptions()
 	// inside the lines show (character or word level, and what ends a
 	// word, which the word diffs take from strdiff::SetBreakChars)
 	options.InitOption(OPT_AUTOMATIC_RESCAN, false);
+	// what the View menu's View Whitespace and View EOL leave
+	options.InitOption(OPT_VIEW_WHITESPACE, false);
+	options.InitOption(OPT_VIEW_EOL, false);
 	options.InitOption(OPT_COPY_GRANULARITY, 3);
 	options.InitOption(OPT_WORDDIFF_HIGHLIGHT, true);
 	options.InitOption(OPT_BREAK_ON_WORDS, false);

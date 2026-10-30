@@ -662,6 +662,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestPaneMenuOpt(QStringLiteral("selftest-pane-menu"),
 		QStringLiteral("Exercise the file comparison's pane menu: its copies, Select Line Difference and the filters (for testing)"));
 	parser.addOption(selftestPaneMenuOpt);
+	QCommandLineOption selftestViewEolOpt(QStringLiteral("selftest-view-eol"),
+		QStringLiteral("Exercise View Whitespace, View EOL and Convert Line Endings (for testing)"));
+	parser.addOption(selftestViewEolOpt);
 	QCommandLineOption selftestIdenticalOpt(QStringLiteral("selftest-identical"),
 		QStringLiteral("Verify the identical files message, the self-compare and the Message Boxes page (for testing)"));
 	parser.addOption(selftestIdenticalOpt);
@@ -8050,6 +8053,241 @@ int main(int argc, char *argv[])
 		}
 
 		printf("line diffs: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestViewEolOpt))
+	{
+		// WinMerge's View Whitespace and View EOL (SetViewTabs, SetViewEols)
+		// and Convert Line Endings (OnConvertEolTo), on this run's settings
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		const auto read = [](const QString &path)
+		{
+			QFile f(path);
+			return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+		};
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		// "the files' lines end otherwise": no
+		lm::setQuestionSinkForTest([](const QString &, bool *) { return false; });
+		lm::setMessageSinkForTest([](const QString &) {});
+		const QString cell = QString(QChar(0xA4));
+		const QString cr = QString(QChar(0xA7));
+		const QString lf = QString(QChar(0xB6));
+		const auto open = [](FileCompareView &view, const QStringList &paths)
+		{
+			QString error;
+			if (!view.compare(paths, &error))
+				std::exit(2);
+		};
+		const auto item = [](QMenu &menu, const char *name) {
+			return menu.findChild<QAction *>(QLatin1String(name));
+		};
+		const auto convert = [&item](FileCompareView &view, int side, const char *name) {
+			QMenu menu;
+			view.buildConvertEolMenu(&menu, side);
+			item(menu, name)->trigger();
+		};
+		const auto save = [](FileCompareView &view, int side) {
+			QString error;
+			return view.saveSideAt(side, &error);
+		};
+
+		check(!mgr->GetBool(OPT_VIEW_WHITESPACE) && !mgr->GetBool(OPT_VIEW_EOL), "both off by default");
+
+		// the glyphs of the endings
+		{
+			FileCompareView view;
+			open(view, { write("pure.txt", "a\r\nb\r\n"), write("short.txt", "a\r\n") });
+			check(view.eolGlyphForTest(0, 0) == cell && view.eolGlyphForTest(1, 1).isEmpty(),
+				"one glyph for every ending, none on a ghost line");
+		}
+		{
+			FileCompareView view;
+			open(view, { write("mixed.txt", "a\r\nb\nc\rd\n"), write("other.txt", "x\n") });
+			check(view.eolGlyphForTest(0, 0) == cell && view.eolGlyphForTest(0, 1) == lf
+				&& view.eolGlyphForTest(0, 2) == cr, "lines that keep their own: one for each kind");
+		}
+		{
+			FileCompareView view;
+			open(view, { write("final.txt", "a\nb"), write("other2.txt", "x\ny\nz\n") });
+			check(view.eolGlyphForTest(0, 0) == cell && view.eolGlyphForTest(0, 1).isEmpty(),
+				"none after a last line without one");
+		}
+		lm::setAllowMixedEolForTest(true);
+		{
+			FileCompareView view;
+			open(view, { write("plain.txt", "a\nb\n"), write("other3.txt", "a\nb\n") });
+			check(view.eolGlyphForTest(0, 0) == lf, "Preserve original EOL on: by kind too");
+		}
+		lm::setAllowMixedEolForTest(false);
+
+		// what the View menu's items do to what shows
+		{
+			MainWindow window;
+			window.resize(1000, 600);
+			window.show();
+			window.openFileComparison({ write("show_l.txt", "a b\nc\td\nsame\nint  x = 1;\n\tindent  more\n"), write("show_r.txt", "a b\nc\tX\nsame\nint  x = 1;\n\tindent  more\n") });
+			QCoreApplication::processEvents();
+			auto *view = window.findChild<FileCompareView *>();
+			auto *whitespace = window.findChild<QAction *>(QStringLiteral("viewWhitespaceAction"));
+			auto *eol = window.findChild<QAction *>(QStringLiteral("viewEolAction"));
+			if (view == nullptr || whitespace == nullptr || eol == nullptr)
+				return 2;
+			const auto shot = [view]() { return view->paneForTest(0)->viewport()->grab().toImage(); };
+			const QImage plain = shot();
+			whitespace->trigger();
+			const QImage dots = shot();
+			check(mgr->GetBool(OPT_VIEW_WHITESPACE) && dots != plain, "View Whitespace shows on the pane");
+			whitespace->trigger();
+			eol->trigger();
+			const QImage ends = shot();
+			check(mgr->GetBool(OPT_VIEW_EOL) && !mgr->GetBool(OPT_VIEW_WHITESPACE)
+				&& ends != plain && ends != dots, "View EOL shows on the pane, apart from it");
+			eol->trigger();
+			check(!mgr->GetBool(OPT_VIEW_EOL) && shot() == plain, "and both go again");
+			// a comparison opened later takes them
+			mgr->Set(OPT_VIEW_WHITESPACE, true);
+			FileCompareView later;
+			later.resize(800, 300);
+			later.show();
+			open(later, { write("later_l.txt", "a b\n"), write("later_r.txt", "a b\n") });
+			QCoreApplication::processEvents();
+			const QImage withDots = later.paneForTest(0)->viewport()->grab().toImage();
+			mgr->Set(OPT_VIEW_WHITESPACE, false);
+			later.refreshViewOptions();
+			check(withDots != later.paneForTest(0)->viewport()->grab().toImage(),
+				"a comparison opened later takes the option");
+			// the File menu's submenu, for the active pane
+			auto *submenuAction = window.findChild<QAction *>(QStringLiteral("fileConvertEol"));
+			QMenu *submenu = submenuAction != nullptr ? submenuAction->menu() : nullptr;
+			if (submenu == nullptr)
+				return 2;
+			emit submenu->aboutToShow();
+			check(submenu->actions().size() == 3 && item(*submenu, "eolToUnix")->isChecked()
+				&& !item(*submenu, "eolToWindows")->isChecked(), "File > Convert Line Endings to: the three, this one's marked");
+		}
+
+		// a pane's lines all end so, and the files compared again
+		{
+			const QString left = write("crlf.txt", "a b\r\nc\r\n");
+			const QString right = write("lf.txt", "a b\nc\n");
+			FileCompareView view;
+			open(view, { left, right });
+			int rescans = 0;
+			QObject::connect(&view, &FileCompareView::rescanned, [&rescans]() { ++rescans; });
+			check(view.diffCount() > 0 && view.encodingTextForTest(0).endsWith(QStringLiteral("Win")),
+				"(line endings that differ)");
+			convert(view, 0, "eolToUnix");
+			check(view.encodingTextForTest(0).endsWith(QStringLiteral("Unix")) && view.diffCount() == 0
+				&& view.isModified() && rescans == 1, "converted: named so, modified, compared again");
+			check(save(view, 0) && read(left) == "a b\nc\n", "and saved so");
+			// to the one it has: nothing changes
+			rescans = 0;
+			convert(view, 0, "eolToUnix");
+			check(!view.isModified() && rescans == 0, "to the one it has: no change, no comparison");
+		}
+		// no step of the history: an undo leaves the endings as they are now
+		{
+			const QString left = write("undo_l.txt", "a\r\nb\r\n");
+			FileCompareView view;
+			open(view, { left, write("undo_r.txt", "a\nb\n") });
+			view.typeAtForTest(0, 0, QStringLiteral("x"));
+			convert(view, 0, "eolToUnix");
+			view.undoActive();
+			check(view.realLinesForTest(0).value(0) == QStringLiteral("a")
+				&& view.encodingTextForTest(0).endsWith(QStringLiteral("Unix")), "undo undoes the edit, not the conversion");
+			check(view.isModified() && save(view, 0) && read(left) == "a\nb\n",
+				"and still saves converted");
+		}
+		// a file of mixed endings, whose lines keep theirs on their blocks
+		{
+			const QString left = write("mixed_l.txt", "a\r\nb\nc\rd\n");
+			FileCompareView view;
+			open(view, { left, write("mixed_r.txt", "a\nb\nc\nd\n") });
+			{
+				QMenu menu;
+				view.buildConvertEolMenu(&menu, 0);
+				check(view.mixedEolForTest(0) && !item(menu, "eolToWindows")->isChecked()
+					&& !item(menu, "eolToUnix")->isChecked() && !item(menu, "eolToMac")->isChecked(),
+					"mixed endings: none of the three marked");
+			}
+			view.typeAtForTest(0, 0, QStringLiteral("x"));
+			convert(view, 0, "eolToWindows");
+			check(!view.mixedEolForTest(0) && view.encodingTextForTest(0).endsWith(QStringLiteral("Win"))
+				&& view.eolGlyphForTest(0, 1) == cell, "mixed endings: all the same now");
+			view.undoActive();
+			check(save(view, 0) && read(left) == "a\r\nb\r\nc\r\nd\r\n",
+				"mixed endings: saved converted, after undoing an edit too");
+		}
+		// lines that keep their own: what is copied in afterwards keeps its
+		lm::setAllowMixedEolForTest(true);
+		{
+			const QString left = write("keep_l.txt", "a\nb\n");
+			FileCompareView view;
+			open(view, { left, write("keep_r.txt", "a\nX\n") });
+			convert(view, 0, "eolToWindows");
+			view.setCursorViewLineForTest(0, 1);
+			view.copyCurrentDiff(1, 0, false);
+			// (both lines differ by their endings now: the block is the file)
+			check(view.encodingTextForTest(0).endsWith(QStringLiteral("Win"))
+					&& save(view, 0) && read(left) == "a\nX\n",
+				"Preserve original EOL on: lines copied in after keep their own");
+		}
+		lm::setAllowMixedEolForTest(false);
+		// a last line without one stays so
+		{
+			const QString left = write("nofinal_l.txt", "a\nb");
+			FileCompareView view;
+			open(view, { left, write("nofinal_r.txt", "x\ny\n") });
+			convert(view, 0, "eolToWindows");
+			check(save(view, 0) && read(left) == "a\r\nb", "a last line without an ending stays so");
+		}
+		// a read-only pane, and a click on the status bar's ending
+		{
+			FileCompareView view;
+			view.setReadOnlySides({ true, false });
+			open(view, { write("ro_l.txt", "a\n"), write("ro_r.txt", "b\r\n") });
+			QMenu menu;
+			view.buildConvertEolMenu(&menu, 0);
+			check(item(menu, "eolToUnix")->isEnabled() && !item(menu, "eolToWindows")->isEnabled(),
+				"a read-only pane: its own only");
+			view.show();
+			QStringList offered;
+			DiffTextEdit::setContextMenuPresenterForTest([&offered](QMenu *popup) {
+				for (QAction *action : popup->actions())
+					offered.append(action->objectName());
+			});
+			QLabel *label = view.eolLabelForTest(1);
+			QMouseEvent press(QEvent::MouseButtonPress, QPointF(2, 2), label->mapToGlobal(QPointF(2, 2)),
+				Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+			QCoreApplication::sendEvent(label, &press);
+			DiffTextEdit::setContextMenuPresenterForTest({});
+			check(offered == QStringList({ QStringLiteral("eolToWindows"), QStringLiteral("eolToUnix"),
+					QStringLiteral("eolToMac") }), "a click on the status bar's ending: the same menu");
+		}
+
+		lm::setQuestionSinkForTest({});
+		lm::setMessageSinkForTest({});
+		printf("view eol: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

@@ -280,6 +280,18 @@
         <translation>%1 parece ser um arquivo binário: abra os arquivos de novo para compará-los numa comparação binária.</translation>
     </message>
     <message>
+        <source>&amp;Windows (CRLF)</source>
+        <translation>&amp;Windows (CRLF)</translation>
+    </message>
+    <message>
+        <source>&amp;Unix (LF)</source>
+        <translation>&amp;Unix (LF)</translation>
+    </message>
+    <message>
+        <source>&amp;Mac (CR)</source>
+        <translation>&amp;Mac (CR)</translation>
+    </message>
+    <message>
         <source>cannot create temporary file</source>
         <translation>não foi possível criar o arquivo temporário</translation>
     </message>
@@ -3028,6 +3040,10 @@ O arquivo pode ser somente leitura.</translation>
         <translation>&amp;Fechar Aba</translation>
     </message>
     <message>
+        <source>&amp;Convert Line Endings to</source>
+        <translation>C&amp;onverter Finais de Linha para</translation>
+    </message>
+    <message>
         <source>&amp;Quit</source>
         <translation>Sai&amp;r</translation>
     </message>
@@ -3122,6 +3138,14 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>&amp;Actual Size</source>
         <translation>Tamanho Ori&amp;ginal</translation>
+    </message>
+    <message>
+        <source>&amp;View Whitespace</source>
+        <translation>Ver Espaços em &amp;Branco</translation>
+    </message>
+    <message>
+        <source>View E&amp;OL</source>
+        <translation>Ver EO&amp;L</translation>
     </message>
     <message>
         <source>Vie&amp;w Line Differences</source>

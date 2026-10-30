@@ -23,6 +23,7 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include "Dialogs.h"
 #include <QScrollBar>
 #include <QWheelEvent>
@@ -150,6 +151,9 @@ QString eolName(const QString &eol, bool mixed = false)
     ending in, when it is not the file's. A block format goes with the
     text through undo and redo. */
 const int kEolProperty = QTextFormat::UserProperty + 1;
+/** The Convert Line Endings it was set after: the format comes back with
+    undo, the conversion does not. */
+const int kEolConversionProperty = QTextFormat::UserProperty + 2;
 
 /** What a copy with text selected takes in (OPT_COPY_GRANULARITY, as
     CMergeEditView numbers it). */
@@ -187,6 +191,29 @@ std::pair<int, int> viewPointOf(const QTextDocument *doc, int position)
 	const QTextBlock block = doc->findBlock(position);
 	return { position - block.position(), block.blockNumber() };
 }
+
+/** The status bar's ending, a click on it opening its menu
+    (CMergeEditView::OnStatusBarClick). */
+class ClickableLabel : public QLabel
+{
+public:
+	explicit ClickableLabel(QWidget *parent, std::function<void(const QPoint &)> onClick)
+		: QLabel(parent)
+		, m_onClick(std::move(onClick))
+	{
+	}
+
+protected:
+	void mousePressEvent(QMouseEvent *event) override
+	{
+		if (event->button() == Qt::LeftButton)
+			m_onClick(event->globalPosition().toPoint());
+		QLabel::mousePressEvent(event);
+	}
+
+private:
+	std::function<void(const QPoint &)> m_onClick;
+};
 
 /** ShowCannotCopyInvisibleLinesError. */
 void showCannotCopyInvisibleLinesError(QWidget *parent)
@@ -1263,16 +1290,11 @@ void FileCompareView::SelectionCopy::replaceLines(int first, int last, QStringLi
 		dst.ghost.insert(first + k, false);
 	}
 	// the lines take their endings along, as applyBlockCopy has them
-	const QString &fileEol = m_view.m_sides[m_dst].eol;
 	for (int k = 0; k < texts.size(); ++k)
 	{
 		const QTextBlock block = doc->findBlockByNumber(first + k);
 		QTextBlockFormat format = block.blockFormat();
-		const QString &eol = eols.at(k);
-		if (eol.isEmpty() || eol == fileEol)
-			format.clearProperty(kEolProperty);
-		else
-			format.setProperty(kEolProperty, eol);
+		m_view.setBlockEol(format, m_dst, eols.at(k));
 		QTextCursor line(block);
 		line.setBlockFormat(format);
 	}
@@ -1855,8 +1877,15 @@ FileCompareView::FileCompareView(QWidget *parent)
 		m_posLabels[i]->setContentsMargins(6, 1, 6, 1);
 		m_encLabels[i] = new QLabel(this);
 		m_encLabels[i]->setContentsMargins(6, 1, 6, 1);
+		m_eolLabels[i] = new ClickableLabel(this, [this, i](const QPoint &globalPos) {
+			QMenu menu(this);
+			buildConvertEolMenu(&menu, i);
+			DiffTextEdit::presentMenu(&menu, globalPos);
+		});
+		m_eolLabels[i]->setContentsMargins(0, 1, 6, 1);
 		statusRow->addWidget(m_posLabels[i], 1);
 		statusRow->addWidget(m_encLabels[i]);
+		statusRow->addWidget(m_eolLabels[i]);
 		column->addLayout(statusRow);
 
 		panes->addLayout(column, 1);
@@ -2012,6 +2041,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 	applyTheme();
 	connect(lm::Theme::instance(), &lm::Theme::changed,
 		this, [this]() { applyTheme(); });
+	refreshViewOptions();
 
 	const qreal savedSize = QSettings()
 		.value(QStringLiteral("FileCompare/FontPointSize")).toReal();
@@ -2091,6 +2121,7 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 		m_panes[i]->setVisible(visible);
 		m_posLabels[i]->setVisible(visible);
 		m_encLabels[i]->setVisible(visible);
+		m_eolLabels[i]->setVisible(visible);
 		m_diffPaneEdits[i]->setVisible(visible);
 	}
 	// in 3-way the copy commands are relative to the active pane
@@ -2136,6 +2167,7 @@ void FileCompareView::startBlank()
 		m_panes[i]->setVisible(visible);
 		m_posLabels[i]->setVisible(visible);
 		m_encLabels[i]->setVisible(visible);
+		m_eolLabels[i]->setVisible(visible);
 		m_diffPaneEdits[i]->setVisible(visible);
 	}
 
@@ -2173,8 +2205,7 @@ void FileCompareView::startUntitled(int side)
 	m_syncing = false;
 	m_highlighters[side].reset();
 	updateHeader(side);
-	m_encLabels[side]->setText(QStringLiteral("%1  %2")
-		.arg(encodingName(s.unicoding, s.codepage, s.bom), eolName(s.eol)));
+	updateEncodingLabels(side);
 	updatePaneStatus(side);
 }
 
@@ -2257,6 +2288,7 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 	Side &s = m_sides[side];
 	s.path = path;
 	s.stamp = stamp;
+	s.eolConversions = 0;
 	s.unicoding = file.GetUnicoding();
 	s.codepage = file.GetCodepage();
 	s.bom = file.HasBom();
@@ -2313,8 +2345,7 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 	s.modified = false;
 
 	updateHeader(side);
-	m_encLabels[side]->setText(QStringLiteral("%1  %2")
-		.arg(encodingName(s.unicoding, s.codepage, s.bom), eolName(s.eol, s.mixedEol)));
+	updateEncodingLabels(side);
 	updatePaneStatus(side);
 	return true;
 }
@@ -2354,11 +2385,135 @@ QString FileCompareView::lineEol(int side, const QTextBlock &block) const
 	const Side &s = m_sides[side];
 	if (perLineEol(side))
 	{
-		const QVariant eol = block.blockFormat().property(kEolProperty);
-		if (eol.isValid())
+		const QTextBlockFormat format = block.blockFormat();
+		const QVariant eol = format.property(kEolProperty);
+		if (eol.isValid() && format.intProperty(kEolConversionProperty) == s.eolConversions)
 			return eol.toString();
 	}
 	return s.eol;
+}
+
+void FileCompareView::setBlockEol(QTextBlockFormat &format, int side, const QString &eol) const
+{
+	const Side &s = m_sides[side];
+	if (eol.isEmpty() || eol == s.eol)
+	{
+		format.clearProperty(kEolProperty);
+		format.clearProperty(kEolConversionProperty);
+		return;
+	}
+	format.setProperty(kEolProperty, eol);
+	format.setProperty(kEolConversionProperty, s.eolConversions);
+}
+
+/** CCrystalTextView's glyphs for a line's ending: one for all, or, where
+    lines keep their own, one for each kind (SetViewEols' bDistinguishEols);
+    none on a ghost line, nor after a last line without one. */
+QString FileCompareView::eolGlyph(int side, const QTextBlock &block) const
+{
+	if (isGhostBlock(block))
+		return QString();
+	if (!m_sides[side].hadFinalEol)
+	{
+		QTextBlock next = block.next();
+		while (next.isValid() && isGhostBlock(next))
+			next = next.next();
+		if (!next.isValid())
+			return QString();
+	}
+	if (perLineEol(side))
+	{
+		const QString eol = lineEol(side, block);
+		if (eol == QStringLiteral("\r"))
+			return QString(QChar(0xA7));
+		if (eol == QStringLiteral("\n"))
+			return QString(QChar(0xB6));
+	}
+	return QString(QChar(0xA4));
+}
+
+QString FileCompareView::eolGlyphForTest(int side, int viewLine) const
+{
+	return eolGlyph(side, m_panes[side]->document()->findBlockByNumber(viewLine));
+}
+
+void FileCompareView::refreshViewOptions()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	const bool whitespace = mgr != nullptr && mgr->GetBool(OPT_VIEW_WHITESPACE);
+	const bool eols = mgr != nullptr && mgr->GetBool(OPT_VIEW_EOL);
+	for (int side = 0; side < 3; ++side)
+	{
+		m_panes[side]->setViewWhitespace(whitespace);
+		if (eols)
+			m_panes[side]->setEolGlyphs(
+				[this, side](const QTextBlock &block) { return eolGlyph(side, block); });
+		else
+			m_panes[side]->setEolGlyphs({});
+		// the diff pane shows them too, in Qt's own glyphs
+		QTextOption option = m_diffPaneEdits[side]->document()->defaultTextOption();
+		QTextOption::Flags flags = option.flags();
+		flags.setFlag(QTextOption::ShowTabsAndSpaces, whitespace);
+		flags.setFlag(QTextOption::ShowLineAndParagraphSeparators, eols);
+		option.setFlags(flags);
+		m_diffPaneEdits[side]->document()->setDefaultTextOption(option);
+	}
+}
+
+void FileCompareView::updateEncodingLabels(int side)
+{
+	const Side &s = m_sides[side];
+	m_encLabels[side]->setText(encodingName(s.unicoding, s.codepage, s.bom));
+	m_eolLabels[side]->setText(eolName(s.eol, s.mixedEol));
+}
+
+void FileCompareView::convertLineEndings(int side, const QString &eol)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	// CCrystalTextBuffer::applyEOLMode: a change only where a line that has
+	// an ending has another
+	QTextDocument *doc = m_panes[side]->document();
+	bool changed = false;
+	for (QTextBlock block = doc->begin(); block.isValid() && !changed; block = block.next())
+		changed = !eolGlyph(side, block).isEmpty() && lineEol(side, block) != eol;
+	Side &s = m_sides[side];
+	s.eol = eol;
+	s.mixedEol = false;
+	++s.eolConversions;
+	updateEncodingLabels(side);
+	if (!changed)
+		return;
+	// modified for good: an undo back to the last save does not undo this.
+	// (Only a change to true forgets that state, hence the round trip)
+	m_syncing = true;
+	doc->setModified(false);
+	doc->setModified(true);
+	m_syncing = false;
+	setSideModified(side, true);
+	rescan();
+}
+
+void FileCompareView::buildConvertEolMenu(QMenu *menu, int side)
+{
+	if (side < 0 || side >= m_paneCount)
+		side = m_activePane;
+	const Side &s = m_sides[side];
+	const auto add = [&](const QString &text, const char *name, const QString &eol) {
+		QAction *action = menu->addAction(text);
+		action->setObjectName(QLatin1String(name));
+		// OnUpdateConvertEolTo: the file's one marked, unless lines keep
+		// their own; another not for a pane that cannot be edited
+		const bool current = !perLineEol(side) && eol == s.eol;
+		action->setCheckable(true);
+		action->setChecked(current);
+		action->setEnabled(current || !m_readOnly[side]);
+		connect(action, &QAction::triggered, this,
+			[this, side, eol]() { convertLineEndings(side, eol); });
+	};
+	add(tr("&Windows (CRLF)"), "eolToWindows", QStringLiteral("\r\n"));
+	add(tr("&Unix (LF)"), "eolToUnix", QStringLiteral("\n"));
+	add(tr("&Mac (CR)"), "eolToMac", QStringLiteral("\r"));
 }
 
 QString FileCompareView::highlightPath(const QString &path) const
@@ -2396,7 +2551,7 @@ void FileCompareView::moveOnLoad(int pane, int line, int character)
 
 QString FileCompareView::encodingTextForTest(int side) const
 {
-	return m_encLabels[side]->text();
+	return m_encLabels[side]->text() + QStringLiteral("  ") + m_eolLabels[side]->text();
 }
 
 /** The side's real lines (skipping alignment ghosts); optionally also the
@@ -3505,6 +3660,7 @@ void FileCompareView::applyTheme()
 		m_diffPaneEdits[i]->setPalette(pal);
 		m_posLabels[i]->setStyleSheet(statusStyle);
 		m_encLabels[i]->setStyleSheet(statusStyle);
+		m_eolLabels[i]->setStyleSheet(statusStyle);
 		// syntax palettes are theme-specific: rebuild and rehighlight
 		if (m_highlighters[i] != nullptr)
 			m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
@@ -4000,10 +4156,7 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide,
 		const QTextBlock tb = tgtDoc->findBlockByNumber(v);
 		const QString eol = lineEol(sourceSide, srcDoc->findBlockByNumber(v));
 		QTextBlockFormat format = tb.blockFormat();
-		if (eol == m_sides[target].eol)
-			format.clearProperty(kEolProperty);
-		else
-			format.setProperty(kEolProperty, eol);
+		setBlockEol(format, target, eol);
 		line.setPosition(tb.position());
 		line.setBlockFormat(format);
 	}

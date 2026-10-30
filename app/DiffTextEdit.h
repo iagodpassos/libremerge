@@ -109,6 +109,16 @@ public:
 	    tests: a menu on screen lasts only while the application is the
 	    one in front). */
 	static void setContextMenuPresenterForTest(std::function<void(QMenu *menu)> presenter);
+	/** Open a menu the way the pane's is opened. */
+	static void presentMenu(QMenu *menu, const QPoint &globalPos);
+
+	/** WinMerge's View Whitespace (CCrystalTextView::SetViewTabs): a
+	    tab's and a space's glyph over them, as the text is painted. */
+	void setViewWhitespace(bool on);
+	/** View EOL (SetViewEols): the glyph a line's ending shows as, from
+	    this function, none where it gives an empty text; without a
+	    function, none at all. */
+	void setEolGlyphs(std::function<QString(const QTextBlock &block)> glyphOf);
 
 	/** Hide the view lines whose entry is true and show the others; an
 	    empty list shows every line. */
@@ -155,6 +165,7 @@ protected:
 	bool event(QEvent *event) override;
 	void changeEvent(QEvent *event) override;
 	void paintEvent(QPaintEvent *event) override;
+	void paintWhitespace(QPaintEvent *event);
 	void mouseDoubleClickEvent(QMouseEvent *event) override;
 	void mouseReleaseEvent(QMouseEvent *event) override;
 	void resizeEvent(QResizeEvent *event) override;
@@ -210,6 +221,8 @@ private:
 	bool m_movingCursor = false;
 	int m_lastCursorPosition = 0;
 	std::function<void(QMenu *)> m_contextMenuHook;
+	bool m_viewWhitespace = false;
+	std::function<QString(const QTextBlock &)> m_eolGlyphOf;
 	QHash<int, QColor> m_lineColors;
 	QList<int> m_lineNumbers;
 	QList<InsertionMarker> m_markers;

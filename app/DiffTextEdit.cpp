@@ -605,6 +605,26 @@ void DiffTextEdit::setContextMenuPresenterForTest(std::function<void(QMenu *menu
 	contextMenuPresenter() = std::move(presenter);
 }
 
+void DiffTextEdit::presentMenu(QMenu *menu, const QPoint &globalPos)
+{
+	if (contextMenuPresenter())
+		contextMenuPresenter()(menu);
+	else
+		menu->exec(globalPos);
+}
+
+void DiffTextEdit::setViewWhitespace(bool on)
+{
+	m_viewWhitespace = on;
+	viewport()->update();
+}
+
+void DiffTextEdit::setEolGlyphs(std::function<QString(const QTextBlock &block)> glyphOf)
+{
+	m_eolGlyphOf = std::move(glyphOf);
+	viewport()->update();
+}
+
 void DiffTextEdit::contextMenuEvent(QContextMenuEvent *event)
 {
 	// CCrystalTextView::OnRButtonDown: outside the selection, the cursor
@@ -640,10 +660,7 @@ void DiffTextEdit::contextMenuEvent(QContextMenuEvent *event)
 	}
 	if (m_contextMenuHook)
 		m_contextMenuHook(menu);
-	if (contextMenuPresenter())
-		contextMenuPresenter()(menu);
-	else
-		menu->exec(event->globalPos());
+	presentMenu(menu, event->globalPos());
 	delete menu;
 }
 
@@ -919,9 +936,64 @@ void DiffTextEdit::setInsertionMarkers(const QList<InsertionMarker> &markers)
 
 /** Extra selections cannot paint a zero-length range, so the insertion
     markers are drawn by hand on top of the text. */
+/** CCrystalTextView's viewable whitespace: U+BB for a tab, U+B7 for a
+    space, each where the character is, and a line's ending past its text;
+    in COLORINDEX_INTERMEDIATECOLOR, a third of the way from the background
+    to the text, which the text's color a third opaque comes to over any
+    background. */
+void DiffTextEdit::paintWhitespace(QPaintEvent *event)
+{
+	QColor color = palette().color(QPalette::Text);
+	color.setAlphaF(0.333f);
+	QPainter painter(viewport());
+	painter.setFont(font());
+	painter.setPen(color);
+	const QRect area = event->rect();
+	for (QTextBlock block = firstVisibleBlock(); block.isValid(); block = block.next())
+	{
+		const QRectF geometry = blockBoundingGeometry(block).translated(contentOffset());
+		if (geometry.top() > area.bottom())
+			break;
+		QTextLayout *layout = block.layout();
+		if (!block.isVisible() || geometry.bottom() < area.top() || layout == nullptr
+			|| layout->lineCount() == 0)
+			continue;
+		const QString text = block.text();
+		if (m_viewWhitespace)
+			for (int l = 0; l < layout->lineCount(); ++l)
+			{
+				const QTextLine line = layout->lineAt(l);
+				const qreal baseline = geometry.y() + line.y() + line.ascent();
+				// (only what is in the area: a long line costs nothing more)
+				const int end = line.textStart() + line.textLength();
+				const int from = qMax(line.textStart(), line.xToCursor(area.left() - geometry.x()));
+				const int to = qMin(end, line.xToCursor(area.right() - geometry.x()) + 1);
+				for (int pos = from; pos < to; ++pos)
+				{
+					const QChar c = text.at(pos);
+					if (c == QLatin1Char(' ') || c == QLatin1Char('\t'))
+						painter.drawText(QPointF(geometry.x() + line.cursorToX(pos), baseline),
+							c == QLatin1Char(' ') ? QString(QChar(0xB7)) : QString(QChar(0xBB)));
+				}
+			}
+		if (m_eolGlyphOf)
+		{
+			const QString glyph = m_eolGlyphOf(block);
+			if (!glyph.isEmpty())
+			{
+				const QTextLine line = layout->lineAt(layout->lineCount() - 1);
+				painter.drawText(QPointF(geometry.x() + line.cursorToX(block.length() - 1),
+					geometry.y() + line.y() + line.ascent()), glyph);
+			}
+		}
+	}
+}
+
 void DiffTextEdit::paintEvent(QPaintEvent *event)
 {
 	QPlainTextEdit::paintEvent(event);
+	if (m_viewWhitespace || m_eolGlyphOf)
+		paintWhitespace(event);
 	if (m_hasHiddenLines)
 	{
 		// CCrystalTextView draws a boundary under each shown line that

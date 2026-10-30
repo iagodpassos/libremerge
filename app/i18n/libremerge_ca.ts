@@ -322,6 +322,21 @@
         <translation>%1 sembla un fitxer binari: torneu a obrir els fitxers per comparar-los en una comparació binària.</translation>
     </message>
     <message>
+        <source>&amp;Windows (CRLF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Windows (CRLF)</translation>
+    </message>
+    <message>
+        <source>&amp;Unix (LF)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Unix (LF)</translation>
+    </message>
+    <message>
+        <source>&amp;Mac (CR)</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>&amp;Mac (CR)</translation>
+    </message>
+    <message>
         <source>cannot create temporary file</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>no es pot crear el fitxer temporal</translation>
@@ -3606,6 +3621,11 @@ Potser el fitxer és només de lectura?</translation>
         <translation>Tanca la &amp;pestanya</translation>
     </message>
     <message>
+        <source>&amp;Convert Line Endings to</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Convert Line Endings to&quot;.</translatorcomment>
+        <translation>Con&amp;verteix retorns de línia a</translation>
+    </message>
+    <message>
         <source>&amp;Quit</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>&amp;Surt</translation>
@@ -3713,6 +3733,15 @@ Potser el fitxer és només de lectura?</translation>
         <source>&amp;Actual Size</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Mida &amp;real</translation>
+    </message>
+    <message>
+        <source>&amp;View Whitespace</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;View Whitespace&quot;.</translatorcomment>
+        <translation>Mostra els esp&amp;ais</translation>
+    </message>
+    <message>
+        <source>View E&amp;OL</source>
+        <translation>Mostra els salts de línia</translation>
     </message>
     <message>
         <source>Vie&amp;w Line Differences</source>

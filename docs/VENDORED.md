@@ -116,10 +116,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 660 | 178 | 250 | 0 | 3 |
-| Spanish | 648 | 192 | 248 | 3 | 0 |
-| Catalan | 346 | 184 | 250 | 311 | 0 |
-| French | 665 | 194 | 232 | 0 | 0 |
+| German | 661 | 180 | 253 | 0 | 3 |
+| Spanish | 649 | 194 | 251 | 3 | 0 |
+| Catalan | 347 | 186 | 253 | 311 | 0 |
+| French | 666 | 196 | 235 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -137,7 +137,8 @@ Cursorposition:" and the font size "Schriftgröße in Punkten:".
 The French catalog keeps WinMerge's French typography in LibreMerge's own
 texts too: a space before a colon or a question mark, and the panes
 named Gauche, Milieu and Droite. WinMerge's French gives no accelerator
-to the six Compare 3-way items of the View menu, to "Go to Line", to the
+to the six Compare 3-way items of the View menu, to the File menu's
+Convert Line Endings, to "Go to Line", to the
 search's "Don't wrap end of file" and to the Table page's delimiter, and
 gives the two Copy All items of the Merge menu the same letter, so these
 take one here.

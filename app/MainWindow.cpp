@@ -295,6 +295,19 @@ MainWindow::MainWindow(QWidget *parent)
 	addMenuAction(fileMenu, tr("&Close Tab"), QKeySequence::Close,
 		[this]() { closeTab(m_tabs->currentIndex()); });
 	fileMenu->addSeparator();
+	// WinMerge's File > Convert Line Endings to, for the active pane
+	QMenu *convertEolMenu = fileMenu->addMenu(tr("&Convert Line Endings to"));
+	convertEolMenu->menuAction()->setObjectName(QStringLiteral("fileConvertEol"));
+	connect(convertEolMenu, &QMenu::aboutToShow, this, [this, convertEolMenu]() {
+		convertEolMenu->clear();
+		if (auto *view = qobject_cast<FileCompareView *>(m_tabs->currentWidget()))
+			view->buildConvertEolMenu(convertEolMenu);
+	});
+	connect(fileMenu, &QMenu::aboutToShow, this, [this, convertEolMenu]() {
+		convertEolMenu->menuAction()->setEnabled(
+			qobject_cast<FileCompareView *>(m_tabs->currentWidget()) != nullptr);
+	});
+	fileMenu->addSeparator();
 	QAction *quitAction = addMenuAction(fileMenu, tr("&Quit"), QKeySequence::Quit,
 		[]() { QApplication::quit(); });
 	quitAction->setMenuRole(QAction::QuitRole);
@@ -569,6 +582,29 @@ MainWindow::MainWindow(QWidget *parent)
 			else if (auto *hex = hexView()) hex->zoomReset();
 		});
 	viewMenu->addSeparator();
+	// WinMerge's View Whitespace and View EOL (OnViewWhitespace, OnViewEOL)
+	// of the text window: the option turned over, the open comparisons
+	// showing it (RefreshOptions)
+	const auto addViewOption = [this, viewMenu, fileView](const QString &text, const char *name,
+		const String &option) {
+		QAction *action = viewMenu->addAction(text);
+		action->setObjectName(QLatin1String(name));
+		action->setCheckable(true);
+		connect(action, &QAction::triggered, this, [this, option]() {
+			if (COptionsMgr *mgr = GetOptionsMgr())
+				mgr->SaveOption(option, !mgr->GetBool(option));
+			for (int i = 0; i < m_tabs->count(); ++i)
+				if (auto *file = qobject_cast<FileCompareView *>(m_tabs->widget(i)))
+					file->refreshViewOptions();
+		});
+		connect(viewMenu, &QMenu::aboutToShow, this, [action, fileView, option]() {
+			COptionsMgr *mgr = GetOptionsMgr();
+			action->setEnabled(fileView() != nullptr);
+			action->setChecked(mgr != nullptr && mgr->GetBool(option));
+		});
+	};
+	addViewOption(tr("&View Whitespace"), "viewWhitespaceAction", OPT_VIEW_WHITESPACE);
+	addViewOption(tr("View E&OL"), "viewEolAction", OPT_VIEW_EOL);
 	// WinMerge's View Line Differences (CMergeEditView::OnViewLineDiffs),
 	// of the text and table windows: the option turned over, the open
 	// comparisons showing it as they repaint, the one in front compared
