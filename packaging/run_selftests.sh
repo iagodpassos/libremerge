@@ -100,6 +100,7 @@ run_one selftest-general-options
 run_one selftest-tab-close
 run_one selftest-line-diffs
 run_one selftest-copy-granularity
+run_one selftest-pane-menu
 run_one selftest-identical
 run_one selftest-reload
 run_one selftest-compare-options

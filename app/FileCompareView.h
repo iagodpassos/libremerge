@@ -22,6 +22,7 @@ class QMenu;
 class QPlainTextEdit;
 class QTimer;
 class QTextBlock;
+class QTextCursor;
 class QVBoxLayout;
 class DiffTextEdit;
 class DisplayFilterBar;
@@ -175,6 +176,28 @@ public:
 	    middle pane can push into either side. */
 	void copyToRight(bool advance = false);
 	void copyToLeft(bool advance = false);
+	/** Into the active pane from its neighbor (ID_COPY_FROM_LEFT and
+	    ID_COPY_FROM_RIGHT, Alt+Shift+Right and Alt+Shift+Left). */
+	void copyFromLeft();
+	void copyFromRight();
+	/** Upstream's Copy Selected Lines (OnCopyLinesX2Y): the differences'
+	    lines the selection takes in, or the cursor's line of the current
+	    difference, between explicit panes. */
+	void copyLines(int sourceSide, int targetSide);
+	/** Copy Selected Diff to Clipboard (SelDiffCopy, Ctrl+1, 2 and 3): one
+	    side's text of the current difference, or the one at the cursor. */
+	void copySelectedDiffToClipboard(int side);
+	/** Select Line Difference (Showlinediff, F4 and Shift+F4): the next or
+	    the previous difference inside the lines, selected in every pane. */
+	void selectLineDiff(bool reversed);
+	/** Whether the differences are up to date, which Select Line Difference
+	    needs (OnUpdateSelectLineDiff). */
+	bool lineDiffSelectable() const { return !m_diffStale; }
+	/** Add to Line Filters (OnAddToLineFilters): a pane's selection. */
+	void addSelectionToLineFilters(int side);
+	/** Add to Substitution Filters (AddToSubstitutionFilters): the next
+	    difference inside the lines, as a pair, after asking. */
+	void addLineDiffToSubstitutionFilters(int side);
 	void copyAllToRight();
 	void copyAllToLeft();
 	void gotoNextDiff();
@@ -346,7 +369,9 @@ signals:
 
 private:
 	class LineProvider;
+	class PaneLines;
 	class SelectionCopy;
+	class LineDiffSelection;
 
 	struct Block
 	{
@@ -386,6 +411,19 @@ private:
 		bool hadFinalEol = true;
 		bool modified = false;
 		lm::FileStamp stamp; // the file as loaded or last saved here
+	};
+
+	/** CMergeDoc::m_CurWordDiff: the difference inside the lines Select
+	    Line Difference last selected, until the next comparison. */
+	struct CurrentWordDiff
+	{
+		int pane = -1;
+		int startChar = -1;
+		int startLine = -1;
+		int endChar = -1;
+		int endLine = -1;
+		int diff = -1;
+		int wordDiff = -1;
 	};
 
 	enum class SaveResult
@@ -465,6 +503,8 @@ private:
 	void applyHiddenLines();
 	bool blockFiltered(int blockIndex) const;
 	bool hasInvisibleLines(int firstDiff, int lastDiff) const;
+	bool equalCurrentWordDiff(int pane, const QTextCursor &cursor) const;
+	void rescanIfMerged();
 	void updateLocationViewport();
 	void ensureFilterBar();
 	void hideFilterBar();
@@ -528,6 +568,7 @@ private:
 	QVBoxLayout *m_layout = nullptr;
 	int m_diffCount = 0;
 	int m_current = -1; // index into m_blocks; -1 = none
+	CurrentWordDiff m_curWordDiff;
 	int m_activePane = 0;
 	bool m_syncing = false;
 	bool m_diffStale = false;

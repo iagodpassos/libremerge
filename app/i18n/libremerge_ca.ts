@@ -382,6 +382,22 @@
         <translation>Lïn: %1  Col: %2/%3  Car: %4/%5  EOL: %6</translation>
     </message>
     <message>
+        <source>No differences found to select</source>
+        <translation>No s&apos;han trobat diferències per seleccionar</translation>
+    </message>
+    <message>
+        <source>No differences found to add as substitution filter</source>
+        <translation>No s&apos;han trobat diferències per afegir com a filtre de substitució</translation>
+    </message>
+    <message>
+        <source>The pair is already in the Substitution Filters list</source>
+        <translation>La parella ja està present a la llista de filtres de substitució</translation>
+    </message>
+    <message>
+        <source>Add this change to Substitution Filters?</source>
+        <translation>Voleu afegir aquest canvi als filtres de substitució?</translation>
+    </message>
+    <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
@@ -433,6 +449,78 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <translation>no es pot escriure %1</translation>
     </message>
     <message>
+        <source>Copy to Middle</source>
+        <translation>Copia cap al mig</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Middle</source>
+        <translation>Copia les línies seleccionades al mig</translation>
+    </message>
+    <message>
+        <source>Copy from Middle</source>
+        <translation>Copia del mig</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Middle</source>
+        <translation>Copia les línies seleccionades del mig</translation>
+    </message>
+    <message>
+        <source>C&amp;opy to Right</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right\tAlt+Right&quot;.</translatorcomment>
+        <translation>C&amp;opia a la dreta</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Right</source>
+        <translation>Copia les línies seleccionades a la dreta</translation>
+    </message>
+    <message>
+        <source>Copy fro&amp;m Right</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy fro&amp;m Right\tAlt+Shift+Left&quot;.</translatorcomment>
+        <translation>Copia des de la dret&amp;a</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Right</source>
+        <translation>Copia les línies seleccionades de la dreta</translation>
+    </message>
+    <message>
+        <source>Cop&amp;y to Left</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Cop&amp;y to Left\tAlt+Left&quot;.</translatorcomment>
+        <translation>Copia a l&apos;&amp;esquerra</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines to Left</source>
+        <translation>Copia les línies seleccionades a l&apos;esquerra</translation>
+    </message>
+    <message>
+        <source>Copy &amp;from Left</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;from Left\tAlt+Shift+Right&quot;.</translatorcomment>
+        <translation>Copia des de l&apos;es&amp;querra</translation>
+    </message>
+    <message>
+        <source>Copy Selected Lines from Left</source>
+        <translation>Copia les línies seleccionades de l&apos;esquerra</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Left) to Clipboard</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Copia la diferència seleccionada (esquerra) al porta-retalls</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Middle) to Clipboard</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Copia la diferència seleccionada (mig) al porta-retalls</translation>
+    </message>
+    <message>
+        <source>Copy Selected Diff (Right) to Clipboard</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Copia la diferència seleccionada (dreta) al porta-retalls</translation>
+    </message>
+    <message>
+        <source>Select Line &amp;Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Select Line &amp;Difference\tF4&quot;.</translatorcomment>
+        <translation>Selecciona la diferència de la &amp;línia</translation>
+    </message>
+    <message>
         <source>Add to &amp;Filters</source>
         <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>Afegeix als &amp;filtres</translation>
@@ -441,6 +529,14 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <source>Add to &amp;Display Filter</source>
         <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
         <translation>Afegeix al filtre de &amp;visualització</translation>
+    </message>
+    <message>
+        <source>Add to &amp;Line Filters</source>
+        <translation>Afegeix als filtres de línia</translation>
+    </message>
+    <message>
+        <source>Add to Substitution &amp;Filters</source>
+        <translation>Afegeix aquest canvi als F&amp;iltres de substitució</translation>
     </message>
     <message>
         <source>G&amp;o to Line %1</source>
@@ -3517,6 +3613,11 @@ Potser el fitxer és només de lectura?</translation>
     <message>
         <source>&amp;Redo</source>
         <translation>Re&amp;fés</translation>
+    </message>
+    <message>
+        <source>Select Line &amp;Difference</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Select Line &amp;Difference\tF4&quot;.</translatorcomment>
+        <translation>Selecciona la diferència de la &amp;línia</translation>
     </message>
     <message>
         <source>&amp;Go to...</source>

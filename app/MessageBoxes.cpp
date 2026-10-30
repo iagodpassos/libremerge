@@ -402,6 +402,11 @@ bool askCopyAllDiffs(QWidget *parent)
 	return askYesNo(parent, confirmCopyAllDiffsText(), kConfirmCopyAllDiffs, true);
 }
 
+bool askQuestion(QWidget *parent, const QString &text)
+{
+	return askYesNo(parent, text);
+}
+
 bool askOverwriteChangedFile(QWidget *parent, const QString &path)
 {
 	return askYesNo(parent, QCoreApplication::translate("MessageBoxes",

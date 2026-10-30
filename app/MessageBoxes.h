@@ -88,6 +88,8 @@ bool askSuggestIgnoreEol(QWidget *parent, bool *remembered);
 /** WinMerge's question before Copy All (IDS_CONFIRM_COPY_ALL_DIFFS), No
     the default, with "Don't ask this question again". */
 bool askCopyAllDiffs(QWidget *parent);
+/** A plain Yes/No question (upstream's MB_YESNO box). */
+bool askQuestion(QWidget *parent, const QString &text);
 /** CMergeDoc::DoSave's question before writing over a file another
     application changed since it was loaded. */
 bool askOverwriteChangedFile(QWidget *parent, const QString &path);

@@ -659,6 +659,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestCopyGranularityOpt(QStringLiteral("selftest-copy-granularity"),
 		QStringLiteral("Copy with text selected by each copy granularity, and undo it (for testing)"));
 	parser.addOption(selftestCopyGranularityOpt);
+	QCommandLineOption selftestPaneMenuOpt(QStringLiteral("selftest-pane-menu"),
+		QStringLiteral("Exercise the file comparison's pane menu: its copies, Select Line Difference and the filters (for testing)"));
+	parser.addOption(selftestPaneMenuOpt);
 	QCommandLineOption selftestIdenticalOpt(QStringLiteral("selftest-identical"),
 		QStringLiteral("Verify the identical files message, the self-compare and the Message Boxes page (for testing)"));
 	parser.addOption(selftestIdenticalOpt);
@@ -6148,8 +6151,10 @@ int main(int argc, char *argv[])
 				pane->viewport()->mapToGlobal(QPoint(40, 10)));
 			QCoreApplication::sendEvent(pane->viewport(), &rightClick);
 			DiffTextEdit::setContextMenuPresenterForTest({});
-			check(offered.value(0) == QStringLiteral(">") + FileCompareView::tr("Add to &Filters")
-				&& offered.value(1) == QStringLiteral("-") && offered.size() > 4
+			const int offeredFilters =
+				offered.indexOf(QStringLiteral(">") + FileCompareView::tr("Add to &Filters"));
+			check(offeredFilters >= 0 && offered.value(offeredFilters + 1) == QStringLiteral("-")
+				&& offered.size() > offeredFilters + 4
 				&& offered.constLast() == QStringLiteral("(with the item)"),
 				"right click: the pane's menu offers Add to Display Filter, above its own items");
 		}
@@ -6199,16 +6204,23 @@ int main(int argc, char *argv[])
 			open(view);
 			QMenu menu;
 			view.buildPaneMenu(0, &menu);
-			const QAction *first = menu.actions().value(0);
-			QMenu *filters = first != nullptr ? first->menu() : nullptr;
+			QMenu *filters = nullptr;
+			int filtersAt = -1;
+			for (int k = 0; k < menu.actions().size() && filters == nullptr; ++k)
+				if (menu.actions().at(k)->menu() != nullptr)
+				{
+					filters = menu.actions().at(k)->menu();
+					filtersAt = k;
+				}
 			QAction *add = filters != nullptr
 				? filters->findChild<QAction *>(QStringLiteral("addToDisplayFilter")) : nullptr;
 			if (add == nullptr)
 				return 1;
 			check(filters->title() == FileCompareView::tr("Add to &Filters")
 				&& add->text() == FileCompareView::tr("Add to &Display Filter")
-				&& menu.actions().value(1) != nullptr && menu.actions().value(1)->isSeparator(),
-				"pane menu: Add to Filters, at the top");
+				&& menu.actions().value(filtersAt + 1) != nullptr
+				&& menu.actions().value(filtersAt + 1)->isSeparator(),
+				"pane menu: Add to Filters, above Qt's items");
 			// the word at the cursor
 			view.setCursorViewLineForTest(0, 3);
 			add->trigger();
@@ -7994,6 +8006,429 @@ int main(int argc, char *argv[])
 		}
 
 		printf("line diffs: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestPaneMenuOpt))
+	{
+		// WinMerge's pane menu (IDR_POPUP_MERGEVIEW, OnContextMenu) and what
+		// its items do, on this run's own settings
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		const QString linesLeft = write("lines_l.txt", "top\na1\na2\na3\nbottom\n");
+		const QString linesRight = write("lines_r.txt", "top\nb1\nb2\nb3\nbottom\n");
+		const QString ghostRight = write("ghost_r.txt", "top\nb1\nbottom\n");
+		const QString same = write("same.txt", "top\nb1\nbottom\n");
+		const QString inlineLeft = write("inline_l.txt", "head\nx aaa y bbb z\ntail\n");
+		const QString inlineRight = write("inline_r.txt", "head\nx AAA y BBB z\ntail\n");
+		const QString stampLeft = write("stamp_l.txt", "keep\nstamp 1\nkeep2\n");
+		const QString stampRight = write("stamp_r.txt", "keep\nstamp 2\nkeep2\n");
+		const QString threeLeft = write("three_l.txt", "head\nabc one\ntail\n");
+		const QString threeMiddle = write("three_m.txt", "head\nxyz one\ntail\n");
+		const QString threeRight = write("three_r.txt", "head\nabc two\ntail\n");
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		QStringList shown;
+		lm::setMessageSinkForTest([&shown](const QString &text) { shown.append(text); });
+		QString asked;
+		bool answer = true;
+		lm::setQuestionSinkForTest([&asked, &answer](const QString &text, bool *) {
+			asked = text;
+			return answer;
+		});
+		const auto lines = [](FileCompareView &view, int side)
+		{
+			return view.realLinesForTest(side).join(QLatin1Char('|'));
+		};
+		const auto open = [](FileCompareView &view, const QStringList &paths)
+		{
+			QString error;
+			if (!view.compare(paths, &error))
+				std::exit(2);
+		};
+		// the names of the items above the Select Line Difference one
+		const auto itemNames = [](QMenu &menu)
+		{
+			QStringList names;
+			for (QAction *action : menu.actions())
+			{
+				if (action->objectName() == QStringLiteral("paneSelectLineDiff"))
+					break;
+				names.append(action->isSeparator() ? QStringLiteral("-") : action->objectName());
+			}
+			return names.join(QLatin1Char(' '));
+		};
+		const auto item = [](QMenu &menu, const char *name) {
+			return menu.findChild<QAction *>(QLatin1String(name));
+		};
+		const auto selected = [](FileCompareView &view, int side) {
+			return view.paneForTest(side)->textCursor().selectedText();
+		};
+
+		// which items each pane offers, and their names
+		{
+			FileCompareView view;
+			open(view, { linesLeft, linesRight });
+			QMenu left;
+			view.buildPaneMenu(0, &left);
+			QMenu right;
+			view.buildPaneMenu(1, &right);
+			printf("  2-way left: %s\n", qPrintable(itemNames(left)));
+			check(itemNames(left) == QStringLiteral("paneCopy_0_1 paneCopy_1_0 - paneCopyLines_0_1 "
+					"paneCopyLines_1_0 - paneDiffToClipboard_0 paneDiffToClipboard_1 -"),
+				"2-way, left pane: to and from the right");
+			check(itemNames(right) == QStringLiteral("paneCopy_1_0 paneCopy_0_1 - paneCopyLines_1_0 "
+					"paneCopyLines_0_1 - paneDiffToClipboard_0 paneDiffToClipboard_1 -"),
+				"2-way, right pane: to and from the left");
+			QAction *toRight = item(left, "paneCopy_0_1");
+			QAction *fromRight = item(left, "paneCopy_1_0");
+			check(toRight != nullptr && toRight->text() == FileCompareView::tr("C&opy to Right")
+				&& toRight->shortcut() == QKeySequence(Qt::ALT | Qt::Key_Right)
+				&& fromRight != nullptr && fromRight->text() == FileCompareView::tr("Copy fro&m Right")
+				&& fromRight->shortcut() == QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Left)
+				&& item(left, "paneSelectLineDiff")->shortcut() == QKeySequence(Qt::Key_F4)
+				&& item(left, "paneGoTo") != nullptr,
+				"their names and keys");
+		}
+		{
+			FileCompareView view;
+			open(view, { threeLeft, threeMiddle, threeRight });
+			QMenu left;
+			view.buildPaneMenu(0, &left);
+			QMenu middle;
+			view.buildPaneMenu(1, &middle);
+			QMenu right;
+			view.buildPaneMenu(2, &right);
+			const auto copies = [&itemNames](QMenu &menu) {
+				return itemNames(menu).section(QLatin1Char('-'), 0, 0).trimmed();
+			};
+			printf("  3-way: %s / %s / %s\n", qPrintable(copies(left)), qPrintable(copies(middle)),
+				qPrintable(copies(right)));
+			check(copies(left) == QStringLiteral("paneCopy_0_1 paneCopy_0_2 paneCopy_1_0 paneCopy_2_0")
+				&& copies(middle) == QStringLiteral("paneCopy_1_0 paneCopy_1_2 paneCopy_0_1 paneCopy_2_1")
+				&& copies(right) == QStringLiteral("paneCopy_2_1 paneCopy_2_0 paneCopy_1_2 paneCopy_0_2"),
+				"3-way: every other pane, to and from");
+			check(item(left, "paneCopy_0_2")->shortcut().isEmpty()
+				&& item(middle, "paneCopy_1_2")->shortcut() == QKeySequence(Qt::ALT | Qt::Key_Right)
+				&& item(left, "paneDiffToClipboard_2") != nullptr
+				&& !item(left, "addToSubstitutionFilters")->isEnabled()
+				&& !item(left, "addToLineFilters")->isEnabled(),
+				"3-way: keys for neighbors only, no filters to add to");
+			// a copy to the far side
+			view.setCursorViewLineForTest(0, 1);
+			QMenu menu;
+			view.buildPaneMenu(0, &menu);
+			item(menu, "paneCopy_0_2")->trigger();
+			check(lines(view, 2) == QStringLiteral("head|abc one|tail")
+				&& lines(view, 1) == QStringLiteral("head|xyz one|tail"),
+				"3-way: Copy to Right from the left pane");
+		}
+
+		// what is on offer goes by the cursor, the selection and read-only
+		{
+			FileCompareView view;
+			view.setReadOnlySides({ false, true });
+			open(view, { linesLeft, linesRight });
+			view.setCursorViewLineForTest(0, 0);
+			QMenu outside;
+			view.buildPaneMenu(0, &outside);
+			view.setCursorViewLineForTest(0, 2);
+			QMenu inside;
+			view.buildPaneMenu(0, &inside);
+			check(!item(outside, "paneCopy_1_0")->isEnabled()
+				&& !item(outside, "paneDiffToClipboard_0")->isEnabled()
+				&& !item(outside, "addToLineFilters")->isEnabled(),
+				"nothing to copy out of the differences");
+			check(item(inside, "paneCopy_1_0")->isEnabled()
+				&& !item(inside, "paneCopy_0_1")->isEnabled()
+				&& item(inside, "paneDiffToClipboard_1")->isEnabled(),
+				"in a difference, but not into a read-only pane");
+			view.selectForTest(0, 0, 0, 0, 2);
+			QMenu noDiff;
+			view.buildPaneMenu(0, &noDiff);
+			view.selectForTest(0, 1, 0, 2, 1);
+			QMenu someDiff;
+			view.buildPaneMenu(0, &someDiff);
+			check(!item(noDiff, "paneCopy_1_0")->isEnabled()
+				&& item(noDiff, "addToLineFilters")->isEnabled()
+				&& item(someDiff, "paneCopy_1_0")->isEnabled(),
+				"a selection counts by the differences it takes in");
+		}
+
+		// a right click (OnRButtonDown, OnRButtonUp), the menu handed over
+		// instead of opened, and Undo and Redo of the whole comparison
+		{
+			FileCompareView view;
+			view.resize(900, 600);
+			view.show();
+			open(view, { linesLeft, linesRight });
+			QCoreApplication::processEvents();
+			DiffTextEdit *pane = view.paneForTest(0);
+			const auto rightClick = [pane](int line, int character) {
+				QTextCursor at(pane->document()->findBlockByNumber(line));
+				at.setPosition(at.position() + character);
+				const QPoint point = pane->cursorRect(at).center();
+				QContextMenuEvent event(QContextMenuEvent::Mouse, point,
+					pane->viewport()->mapToGlobal(point));
+				QCoreApplication::sendEvent(pane->viewport(), &event);
+			};
+			QAction *undoOffered = nullptr;
+			bool undoEnabled = false;
+			DiffTextEdit::setContextMenuPresenterForTest([&](QMenu *menu) {
+				undoOffered = menu->findChild<QAction *>(QStringLiteral("edit-undo"));
+				if (undoOffered != nullptr)
+				{
+					undoEnabled = undoOffered->isEnabled();
+					undoOffered->trigger();
+				}
+			});
+			view.selectForTest(0, 1, 0, 2, 2);
+			rightClick(1, 1);
+			check(selected(view, 0).size() > 2, "a right click in the selection keeps it");
+			rightClick(3, 1);
+			check(selected(view, 0).isEmpty() && view.cursorViewLineForTest(0) == 3,
+				"a right click elsewhere puts the cursor there");
+			view.gotoFirstDiff();
+			check(view.currentDiffForTest() == 0, "(a current difference)");
+			rightClick(0, 1);
+			check(view.currentDiffForTest() == -1 && view.cursorViewLineForTest(0) == 0,
+				"and out of the current difference, none is current");
+			// the copy went into the right pane: the left pane's menu undoes it
+			view.setCursorViewLineForTest(0, 2);
+			view.copyCurrentDiff(0, 1, false);
+			const QString copied = lines(view, 1);
+			rightClick(2, 1);
+			check(copied == lines(view, 0) && undoEnabled
+				&& lines(view, 1) == QStringLiteral("top|b1|b2|b3|bottom"),
+				"Undo in one pane's menu undoes the copy into the other");
+			DiffTextEdit::setContextMenuPresenterForTest({});
+		}
+
+		// Copy Selected Lines
+		{
+			FileCompareView view;
+			open(view, { linesLeft, linesRight });
+			view.setCursorViewLineForTest(0, 2);
+			{
+				QMenu menu;
+				view.buildPaneMenu(0, &menu);
+				item(menu, "paneCopyLines_0_1")->trigger();
+			}
+			printf("  the cursor's line: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == QStringLiteral("top|b1|a2|b3|bottom"), "no selection: the cursor's line");
+			view.undoActive();
+			check(lines(view, 1) == QStringLiteral("top|b1|b2|b3|bottom"), "and undone");
+			// by lines, whatever the granularity says
+			mgr->Set(OPT_COPY_GRANULARITY, 3);
+			view.selectForTest(0, 2, 1, 3, 1);
+			{
+				QMenu menu;
+				view.buildPaneMenu(0, &menu);
+				item(menu, "paneCopyLines_0_1")->trigger();
+			}
+			printf("  the selected lines: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == QStringLiteral("top|b1|a2|a3|bottom"),
+				"a selection: its lines, whole, with Character in the options");
+			view.undoActive();
+			// into the pane it is selected in
+			view.selectForTest(0, 1, 0, 1, 1);
+			{
+				QMenu menu;
+				view.buildPaneMenu(0, &menu);
+				item(menu, "paneCopyLines_1_0")->trigger();
+			}
+			check(lines(view, 0) == QStringLiteral("top|b1|a2|a3|bottom"),
+				"Copy Selected Lines from Right, into the left pane");
+		}
+
+		// to the clipboard
+		{
+			FileCompareView view;
+			open(view, { linesLeft, ghostRight });
+			view.setCursorViewLineForTest(0, 2);
+			{
+				QMenu menu;
+				view.buildPaneMenu(0, &menu);
+				item(menu, "paneDiffToClipboard_0")->trigger();
+			}
+			const QString first = QGuiApplication::clipboard()->text();
+			{
+				QMenu menu;
+				view.buildPaneMenu(0, &menu);
+				item(menu, "paneDiffToClipboard_1")->trigger();
+			}
+			const QString second = QGuiApplication::clipboard()->text();
+			check(first == QStringLiteral("a1\na2\na3\n") && second == QStringLiteral("b1\n"),
+				"a side's text of the difference, without ghost lines");
+		}
+
+		// Select Line Difference, and the difference it leaves selected
+		{
+			FileCompareView view;
+			open(view, { inlineLeft, inlineRight });
+			view.setCursorViewLineForTest(0, 1);
+			view.selectLineDiff(false);
+			check(selected(view, 0) == QStringLiteral("aaa") && selected(view, 1) == QStringLiteral("AAA"),
+				"F4: the first difference in the line, in both panes");
+			view.selectLineDiff(false);
+			check(selected(view, 0) == QStringLiteral("bbb") && selected(view, 1) == QStringLiteral("BBB"),
+				"F4 again: the next one");
+			view.selectLineDiff(false);
+			check(selected(view, 0) == QStringLiteral("aaa"), "past the last: round the file");
+			view.selectLineDiff(true);
+			check(selected(view, 0) == QStringLiteral("bbb"), "Shift+F4: the previous one");
+			mgr->Set(OPT_COPY_GRANULARITY, 1);
+			view.copyToRight();
+			printf("  inline diff after F4: %s\n", qPrintable(lines(view, 1)));
+			check(lines(view, 1) == QStringLiteral("head|x AAA y bbb z|tail"),
+				"by inline diff: the difference F4 selected");
+			view.undoActive();
+			mgr->Set(OPT_COPY_GRANULARITY, 3);
+			view.setCursorViewLineForTest(0, 1);
+			view.selectLineDiff(false);
+			view.copyToRight();
+			check(lines(view, 1) == QStringLiteral("head|x aaa y BBB z|tail"),
+				"by character: the characters it selected");
+			view.undoActive();
+			// out of date: as greyed out, nothing happens
+			shown.clear();
+			view.setCursorViewLineForTest(0, 1);
+			view.typeAtForTest(0, 0, QStringLiteral("q"));
+			view.selectLineDiff(false);
+			check(!view.lineDiffSelectable() && selected(view, 0).isEmpty() && shown.isEmpty(),
+				"out of date: nothing selected");
+		}
+		{
+			FileCompareView view;
+			open(view, { same, ghostRight });
+			shown.clear();
+			view.selectLineDiff(false);
+			check(shown == QStringList{ FileCompareView::tr("No differences found to select") },
+				"identical files: says there is none");
+		}
+
+		// Add to Line Filters: the selection's text, filters switched on
+		{
+			FileCompareView view;
+			open(view, { stampLeft, stampRight });
+			check(view.diffCount() == 1 && !lm::lineFiltersEnabled(), "(a difference, no filter in use)");
+			view.selectForTest(0, 1, 0, 1, 6);
+			{
+				QMenu menu;
+				view.buildPaneMenu(0, &menu);
+				item(menu, "addToLineFilters")->trigger();
+			}
+			LineFiltersList filters;
+			lm::copyLineFilters(&filters);
+			printf("  line filter: %s\n", filters.GetCount() > 0 ? filters.GetAt(0).filterStr.c_str() : "(none)");
+			check(filters.GetCount() == 1 && filters.GetAt(0).enabled && lm::lineFiltersEnabled()
+				&& view.diffCount() == 0 && view.ignoredDiffCount() == 1,
+				"the difference is ignored now");
+			lm::saveLineFilters(false, LineFiltersList());
+		}
+
+		// Add to Substitution Filters: the difference as a pair, if Yes
+		{
+			FileCompareView view;
+			open(view, { inlineLeft, inlineRight });
+			view.setCursorViewLineForTest(0, 1);
+			const QString pair = QStringLiteral("\"aaa\" <-> \"AAA\"");
+			const auto add = [&]() {
+				QMenu menu;
+				view.buildPaneMenu(0, &menu);
+				item(menu, "addToSubstitutionFilters")->trigger();
+			};
+			answer = false;
+			add();
+			SubstitutionFiltersList pairs;
+			lm::copySubstitutionFilters(&pairs);
+			check(asked.contains(pair) && pairs.GetCount() == 0 && selected(view, 0) == QStringLiteral("aaa"),
+				"asks, and No adds nothing");
+			view.setCursorViewLineForTest(0, 1);
+			answer = true;
+			add();
+			lm::copySubstitutionFilters(&pairs);
+			check(pairs.GetCount() == 1 && pairs.GetEnabled()
+				&& pairs.GetAt(0).pattern == "aaa" && pairs.GetAt(0).replacement == "AAA"
+				&& lm::currentSubstitutionFilters() != nullptr,
+				"Yes adds the pair, the filters switched on");
+			shown.clear();
+			asked.clear();
+			view.setCursorViewLineForTest(0, 1);
+			add();
+			check(asked.isEmpty() && shown.size() == 1 && shown.first().contains(pair)
+				&& shown.first().startsWith(
+					FileCompareView::tr("The pair is already in the Substitution Filters list")),
+				"a pair it has: says so, asks nothing");
+			SubstitutionFiltersList none;
+			none.SetEnabled(false);
+			lm::saveSubstitutionFilters(none);
+		}
+		{
+			FileCompareView view;
+			open(view, { same, ghostRight });
+			shown.clear();
+			view.addLineDiffToSubstitutionFilters(0);
+			check(shown == QStringList{
+					FileCompareView::tr("No differences found to add as substitution filter") },
+				"identical files: none to add");
+		}
+
+		// the Edit menu's item and the keys without a menu item
+		{
+			MainWindow window;
+			window.openFileComparison({ linesLeft, linesRight });
+			QCoreApplication::processEvents();
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			const auto trigger = [&window](const char *name) {
+				QAction *action = window.findChild<QAction *>(QLatin1String(name));
+				if (action == nullptr)
+					std::exit(2);
+				action->trigger();
+			};
+			view->setCursorViewLineForTest(0, 1);
+			trigger("editSelectLineDiff");
+			const QString forward = selected(*view, 0);
+			trigger("editSelectPrevLineDiff");
+			check(forward == QStringLiteral("a") && !selected(*view, 0).isEmpty(),
+				"Edit > Select Line Difference and Shift+F4");
+			view->setCursorViewLineForTest(0, 2);
+			trigger("editDiffToClipboard2");
+			check(QGuiApplication::clipboard()->text() == QStringLiteral("b1\nb2\nb3\n"),
+				"Ctrl+2: the right side's text");
+			view->setCursorViewLineForTest(1, 2);
+			trigger("mergeCopyFromLeft");
+			check(lines(*view, 1) == lines(*view, 0), "Alt+Shift+Right: from the left, into the right pane");
+			view->undoActive();
+			view->setCursorViewLineForTest(0, 2);
+			trigger("mergeCopyFromRight");
+			check(lines(*view, 0) == QStringLiteral("top|b1|b2|b3|bottom"),
+				"Alt+Shift+Left: from the right, into the left pane");
+		}
+
+		lm::setMessageSinkForTest({});
+		lm::setQuestionSinkForTest({});
+		mgr->Set(OPT_COPY_GRANULARITY, mgr->GetDefault<int>(OPT_COPY_GRANULARITY));
+		printf("pane menu: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

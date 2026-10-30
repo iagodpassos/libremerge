@@ -323,6 +323,43 @@ MainWindow::MainWindow(QWidget *parent)
 				hex->redo();
 		});
 	editMenu->addSeparator();
+	// WinMerge's Edit > Select Line Difference (F4); Shift+F4, the previous
+	// one, has no menu item (ID_SELECTLINEDIFF, ID_SELECTPREVLINEDIFF)
+	QAction *lineDiffAction = addMenuAction(editMenu, tr("Select Line &Difference"),
+		QKeySequence(Qt::Key_F4), [fileView]() {
+			if (auto *view = fileView())
+				view->selectLineDiff(false);
+		});
+	lineDiffAction->setObjectName(QStringLiteral("editSelectLineDiff"));
+	editMenu->addSeparator();
+	// the keys of the pane menu's commands that no menu here has: from the
+	// neighbors into the active pane, and a difference to the clipboard
+	const auto addFileKey = [this, fileView](const char *name, const QKeySequence &key,
+		std::function<void(FileCompareView *)> run) {
+		auto *action = new QAction(this);
+		action->setObjectName(QLatin1String(name));
+		action->setShortcut(key);
+		connect(action, &QAction::triggered, this, [fileView, run]() {
+			if (auto *view = fileView())
+				run(view);
+		});
+		addAction(action);
+	};
+	addFileKey("editSelectPrevLineDiff", QKeySequence(Qt::SHIFT | Qt::Key_F4),
+		[](FileCompareView *view) { view->selectLineDiff(true); });
+	addFileKey("mergeCopyFromLeft", QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Right),
+		[](FileCompareView *view) { view->copyFromLeft(); });
+	addFileKey("mergeCopyFromRight", QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Left),
+		[](FileCompareView *view) { view->copyFromRight(); });
+	addFileKey("editDiffToClipboard1", QKeySequence(Qt::CTRL | Qt::Key_1),
+		[](FileCompareView *view) { view->copySelectedDiffToClipboard(0); });
+	addFileKey("editDiffToClipboard2", QKeySequence(Qt::CTRL | Qt::Key_2),
+		[](FileCompareView *view) { view->copySelectedDiffToClipboard(1); });
+	addFileKey("editDiffToClipboard3", QKeySequence(Qt::CTRL | Qt::Key_3),
+		[](FileCompareView *view) {
+			if (view->paneCount() == 3)
+				view->copySelectedDiffToClipboard(2);
+		});
 	// WinMerge's Edit > Find... (Ctrl+F) and Replace... (Ctrl+H), the
 	// dialogs of the active pane. On the Mac, Command+H hides the
 	// application: Replace takes Option+Command+F there, the Mac's own
@@ -349,14 +386,19 @@ MainWindow::MainWindow(QWidget *parent)
 	replaceAction->setObjectName(QStringLiteral("editReplace"));
 	// greyed out over a read-only pane (OnUpdateEditReplace) while the menu
 	// shows; its shortcut does nothing there either
-	connect(editMenu, &QMenu::aboutToShow, this, [fileView, hexView, replaceAction]() {
-		const FileCompareView *view = fileView();
-		const HexCompareView *hex = hexView();
-		replaceAction->setEnabled(view != nullptr ? view->activePaneEditable()
-			: hex == nullptr || hex->activePaneEditable());
+	connect(editMenu, &QMenu::aboutToShow, this,
+		[fileView, hexView, replaceAction, lineDiffAction]() {
+			const FileCompareView *view = fileView();
+			const HexCompareView *hex = hexView();
+			replaceAction->setEnabled(view != nullptr ? view->activePaneEditable()
+				: hex == nullptr || hex->activePaneEditable());
+			// OnUpdateSelectLineDiff
+			lineDiffAction->setEnabled(view != nullptr && view->lineDiffSelectable());
+		});
+	connect(editMenu, &QMenu::aboutToHide, this, [replaceAction, lineDiffAction]() {
+		replaceAction->setEnabled(true);
+		lineDiffAction->setEnabled(true);
 	});
-	connect(editMenu, &QMenu::aboutToHide, this,
-		[replaceAction]() { replaceAction->setEnabled(true); });
 	// Edit > Marker... (Ctrl+Shift+M): the markers of every pane
 	QAction *markAction = addMenuAction(editMenu, tr("&Marker..."),
 		QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_M), [fileView]() {

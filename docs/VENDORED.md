@@ -116,10 +116,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 644 | 169 | 250 | 0 | 3 |
-| Spanish | 632 | 183 | 248 | 3 | 0 |
-| Catalan | 330 | 178 | 250 | 308 | 0 |
-| French | 649 | 185 | 232 | 0 | 0 |
+| German | 658 | 178 | 250 | 0 | 3 |
+| Spanish | 646 | 192 | 248 | 3 | 0 |
+| Catalan | 344 | 184 | 250 | 311 | 0 |
+| French | 663 | 194 | 232 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -168,6 +168,10 @@ says so in a comment:
   (`CMergeDoc::CopyMultiplePartialList`) copies it whole when the
   selection starts on the file's first line, the text before the
   selection's start on that line included.
+- Add to Line Filters in the pane menu switches the line filters on, as
+  Add to Substitution Filters does with its own. Upstream
+  (`CMergeEditView::OnAddToLineFilters`) only adds to the list, so with
+  the filters off, their default, nothing changes on screen.
 
 Where upstream falls back on Windows' line ending, LibreMerge falls back
 on the one of macOS and Linux:

@@ -607,6 +607,19 @@ void DiffTextEdit::setContextMenuPresenterForTest(std::function<void(QMenu *menu
 
 void DiffTextEdit::contextMenuEvent(QContextMenuEvent *event)
 {
+	// CCrystalTextView::OnRButtonDown: outside the selection, the cursor
+	// goes where the click is and nothing stays selected; and
+	// CMergeEditView::OnRButtonUp as the left button's release
+	if (event->reason() == QContextMenuEvent::Mouse)
+	{
+		const QTextCursor clicked = cursorForPosition(event->pos());
+		const QTextCursor cursor = textCursor();
+		if (!cursor.hasSelection() || clicked.position() < cursor.selectionStart()
+			|| clicked.position() >= cursor.selectionEnd())
+			setTextCursor(clicked);
+		if (m_mouseReleaseHook)
+			m_mouseReleaseHook();
+	}
 	QMenu *menu = createStandardContextMenu(event->pos());
 	if (m_hasHiddenLines && !isReadOnly() && selectionSpansHiddenLine())
 	{

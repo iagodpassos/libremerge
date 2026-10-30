@@ -59,6 +59,7 @@
 #include "FilterEngine/ILineDataProvider.h"
 #include "FilterList.h"
 #include "LineFilterHelper.h"
+#include "LineFiltersList.h"
 #include "MovedLines.h"
 #include "OptionsDef.h"
 #include "OptionsMgr.h"
@@ -67,6 +68,8 @@
 #include "codepage_detect.h"
 #include "unicoder.h"
 #include "stringdiffs.h"
+#include "SubstitutionFiltersList.h"
+#include "UnicodeString.h"
 
 namespace
 {
@@ -177,6 +180,13 @@ int u16Offset(const QString &line, int byteOffset, bool roundUp)
 		i += u16len;
 	}
 	return size;
+}
+
+/** A position in a document as a CEPoint's offset in the line and line. */
+std::pair<int, int> viewPointOf(const QTextDocument *doc, int position)
+{
+	const QTextBlock block = doc->findBlock(position);
+	return { position - block.position(), block.blockNumber() };
 }
 
 /** ShowCannotCopyInvisibleLinesError. */
@@ -318,22 +328,19 @@ private:
 };
 
 /**
- * A copy with text selected (CMergeEditView::OnX2Y and
- * MergeDocDiffCopy.cpp): the differences the selection takes in, as the
- * copy granularity says, every difference it touches, the inline
- * differences it takes in whole, or the lines or the very characters it
- * selects. The target's text changes as upstream's buffer changes it
- * (DeleteText, InsertText), each line touched replaced whole, in one
- * undoable step, and the files are compared again (FlushAndRescan).
- * Differences copied whole merge in place, as the current one does.
+ * The panes' lines as upstream's text buffers hold them, and what
+ * CMergeDoc and DiffList tell about them: the difference a line is in, and
+ * the differences inside the lines of a block.
  */
-class FileCompareView::SelectionCopy
+class FileCompareView::PaneLines
 {
 public:
-	SelectionCopy(FileCompareView &view, int sourceSide, int targetSide);
-	void run();
+	explicit PaneLines(FileCompareView &view);
+	/** One side's text of a block, its last line's ending too
+	    (CMergeEditView::SelDiffCopy). */
+	QString diffText(int side, int blockIndex) const;
 
-private:
+protected:
 	/** WinMerge's CEPoint: a UTF-16 offset in a view line. */
 	struct Point
 	{
@@ -387,17 +394,48 @@ private:
 	int lineToDiff(int line) const;
 	int nextSignificantDiffFromLine(int line) const;
 	int prevSignificantDiffFromLine(int line) const;
-	void getSelectedDiffs(int &firstDiff, int &lastDiff) const;
-	void getFullySelectedDiffs(int &firstDiff, int &lastDiff, int &firstWordDiff,
-		int &lastWordDiff) const;
 	std::vector<WordDiff> wordDiffsInBlock(int blockIndex, bool ignoreDiffOptions) const;
 	std::vector<WordDiff> wordDiffsInRange(const int begin[3], const int end[3],
 		bool ignoreDiffOptions) const;
+	bool equalCurrentWordDiff(int pane, const Point &start, const Point &end) const;
+	static QList<Piece> textBetween(const Lines &lines, const Point &start, Point end);
+	static QString joined(const QList<Piece> &pieces);
+
+	FileCompareView &m_view;
+	const std::vector<Block> &m_blocks;
+	Lines m_lines[3]; // the panes' lines, the target's kept as it is edited
+};
+
+/**
+ * A copy with text selected (CMergeEditView::OnX2Y and
+ * MergeDocDiffCopy.cpp): the differences the selection takes in, as the
+ * copy granularity says, every difference it touches, the inline
+ * differences it takes in whole, or the lines or the very characters it
+ * selects; or by lines whatever it says (Copy Selected Lines). The
+ * target's text changes as upstream's buffer changes it (DeleteText,
+ * InsertText), each line touched replaced whole, in one undoable step, and
+ * the files are compared again (FlushAndRescan). Differences copied whole
+ * merge in place, as the current one does.
+ */
+class FileCompareView::SelectionCopy : public PaneLines
+{
+public:
+	SelectionCopy(FileCompareView &view, int sourceSide, int targetSide);
+	void run();
+	/** OnX2Y with selectedLineOnly. */
+	void runLines();
+	/** OnUpdateX2Y past the read-only check: whether there is something to
+	    copy, by the selection or the cursor. */
+	bool canCopy() const;
+
+private:
+	void getSelectedDiffs(int &firstDiff, int &lastDiff) const;
+	void getFullySelectedDiffs(int &firstDiff, int &lastDiff, int &firstWordDiff,
+		int &lastWordDiff) const;
 	Point correspondingPoint(const WordDiff &wdiff, const Point &pt, int targetPane,
 		bool ptInDiff) const;
 	void characterRange(int blockIndex, const Point &start, const Point &end,
 		Point *srcStart, Point *srcEnd, Point *dstStart, Point *dstEnd) const;
-	static QList<Piece> textBetween(const Lines &lines, const Point &start, Point end);
 	static int distance(const Lines &lines, const Point &pt1, const Point &pt2);
 	static Point advance(const Lines &lines, Point pt, int distance);
 	static int findWordDiffIndex(const std::vector<WordDiff> &worddiffs, const Point &pt,
@@ -416,24 +454,51 @@ private:
 	void finish();
 	void resetTargetCursor();
 
-	FileCompareView &m_view;
-	const std::vector<Block> &m_blocks;
 	const int m_src;
 	const int m_dst;
 	const int m_active;
-	Point m_start; // the selection, in the active pane
+	Point m_start; // the selection, or the cursor, in the active pane
 	Point m_end;
-	Lines m_lines[3]; // the panes' lines, the target's kept as it is edited
+	bool m_selection = false;
 	QTextCursor m_cursor; // the target's edits, one undoable step
 	QList<bool> m_flagsBefore;
 	bool m_edited = false;
 	int m_topLine = INT_MAX; // the highest line edited
 };
 
-FileCompareView::SelectionCopy::SelectionCopy(FileCompareView &view, int sourceSide,
-	int targetSide)
+/**
+ * CMergeDoc::Computelinediff and HighlightDiffRect: from the selection in a
+ * pane, the next or the previous difference inside the lines, on to the
+ * next difference past a block's last one, selected in every pane.
+ */
+class FileCompareView::LineDiffSelection : public PaneLines
+{
+public:
+	LineDiffSelection(FileCompareView &view, int pane);
+	/** False when there is none to select. */
+	bool compute(bool reversed);
+	void select();
+	QString selectedText(int side) const;
+
+private:
+	void selectIn(int side);
+
+	const int m_pane;
+	Point m_first[3];
+	Point m_second[3];
+};
+
+FileCompareView::PaneLines::PaneLines(FileCompareView &view)
 	: m_view(view)
 	, m_blocks(view.m_blocks)
+{
+	for (int side = 0; side < view.m_paneCount; ++side)
+		m_lines[side] = readLines(side);
+}
+
+FileCompareView::SelectionCopy::SelectionCopy(FileCompareView &view, int sourceSide,
+	int targetSide)
+	: PaneLines(view)
 	, m_src(sourceSide)
 	, m_dst(targetSide)
 	, m_active(view.m_activePane)
@@ -441,18 +506,17 @@ FileCompareView::SelectionCopy::SelectionCopy(FileCompareView &view, int sourceS
 	const QTextCursor cursor = view.m_panes[m_active]->textCursor();
 	const QTextDocument *doc = cursor.document();
 	const auto point = [doc](int position) {
-		const QTextBlock block = doc->findBlock(position);
-		return Point{ position - block.position(), block.blockNumber() };
+		const auto [x, y] = viewPointOf(doc, position);
+		return Point{ x, y };
 	};
 	m_start = point(cursor.selectionStart());
 	m_end = point(cursor.selectionEnd());
-	for (int side = 0; side < view.m_paneCount; ++side)
-		m_lines[side] = readLines(side);
+	m_selection = cursor.hasSelection();
 }
 
-/** OnX2Y's branch for a selection. Upstream also takes it for the inline
-    difference F4 selected (EqualCurrentWordDiff), and copies a column
-    selection by its own rule; neither is here. */
+/** OnX2Y's branch for a selection, or the inline difference F4 selected
+    (EqualCurrentWordDiff). Upstream copies a column selection by its own
+    rule, which is not here. */
 void FileCompareView::SelectionCopy::run()
 {
 	COptionsMgr *mgr = GetOptionsMgr();
@@ -477,7 +541,48 @@ void FileCompareView::SelectionCopy::run()
 		copyMultipleList(firstDiff, lastDiff);
 }
 
-FileCompareView::SelectionCopy::Lines FileCompareView::SelectionCopy::readLines(int side) const
+void FileCompareView::SelectionCopy::runLines()
+{
+	if (m_selection || equalCurrentWordDiff(m_src, m_start, m_end))
+	{
+		int firstDiff = -1;
+		int lastDiff = -1;
+		getSelectedDiffs(firstDiff, lastDiff);
+		if (firstDiff != -1 && lastDiff != -1)
+			copyMultiplePartialList(firstDiff, lastDiff, false);
+		return;
+	}
+	const int current = m_view.m_current >= 0
+		? m_view.m_current : m_view.activeDiffAtLine(m_start.y);
+	if (current == -1 || !significant(current))
+		return;
+	lineListCopy(current, m_start.y, m_start.y);
+	finish();
+}
+
+bool FileCompareView::SelectionCopy::canCopy() const
+{
+	if (m_selection || equalCurrentWordDiff(m_active, m_start, m_end))
+	{
+		COptionsMgr *mgr = GetOptionsMgr();
+		int firstDiff = -1;
+		int lastDiff = -1;
+		if (mgr != nullptr && mgr->GetInt(OPT_COPY_GRANULARITY) == InlineDiff)
+		{
+			int firstWordDiff = -1;
+			int lastWordDiff = -1;
+			getFullySelectedDiffs(firstDiff, lastDiff, firstWordDiff, lastWordDiff);
+			return (firstDiff != -1 && lastDiff != -1)
+				|| (firstWordDiff != -1 && lastWordDiff != -1);
+		}
+		getSelectedDiffs(firstDiff, lastDiff);
+		return firstDiff != -1 && lastDiff != -1;
+	}
+	const int current = m_view.m_current;
+	return m_view.activeDiffAtLine(m_start.y) >= 0 || (current >= 0 && significant(current));
+}
+
+FileCompareView::PaneLines::Lines FileCompareView::PaneLines::readLines(int side) const
 {
 	Lines lines;
 	const QTextDocument *doc = m_view.m_panes[side]->document();
@@ -498,7 +603,7 @@ FileCompareView::SelectionCopy::Lines FileCompareView::SelectionCopy::readLines(
 
 /** A difference that counts (IsDiffSignificant); one merged in place is
     no more. */
-bool FileCompareView::SelectionCopy::significant(int blockIndex) const
+bool FileCompareView::PaneLines::significant(int blockIndex) const
 {
 	const Block &block = m_blocks[blockIndex];
 	return !block.trivial && !block.resolved;
@@ -506,7 +611,7 @@ bool FileCompareView::SelectionCopy::significant(int blockIndex) const
 
 /** DiffList::LineToDiff: the difference a view line is in, an ignored one
     too. */
-int FileCompareView::SelectionCopy::lineToDiff(int line) const
+int FileCompareView::PaneLines::lineToDiff(int line) const
 {
 	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
 		if (!m_blocks[b].resolved && line >= m_blocks[b].viewBegin
@@ -515,7 +620,7 @@ int FileCompareView::SelectionCopy::lineToDiff(int line) const
 	return -1;
 }
 
-int FileCompareView::SelectionCopy::nextSignificantDiffFromLine(int line) const
+int FileCompareView::PaneLines::nextSignificantDiffFromLine(int line) const
 {
 	for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
 		if (significant(b) && m_blocks[b].viewBegin >= line)
@@ -523,7 +628,7 @@ int FileCompareView::SelectionCopy::nextSignificantDiffFromLine(int line) const
 	return -1;
 }
 
-int FileCompareView::SelectionCopy::prevSignificantDiffFromLine(int line) const
+int FileCompareView::PaneLines::prevSignificantDiffFromLine(int line) const
 {
 	for (int b = static_cast<int>(m_blocks.size()) - 1; b >= 0; --b)
 		if (significant(b) && m_blocks[b].viewEnd <= line)
@@ -593,6 +698,12 @@ void FileCompareView::SelectionCopy::getFullySelectedDiffs(int &firstDiff, int &
 		return;
 	}
 
+	if (equalCurrentWordDiff(m_active, ptStart, ptEnd))
+	{
+		firstWordDiff = m_view.m_curWordDiff.wordDiff;
+		lastWordDiff = firstWordDiff;
+		return;
+	}
 	if (ptStart == ptEnd)
 	{
 		firstDiff = -1;
@@ -661,8 +772,8 @@ void FileCompareView::SelectionCopy::getFullySelectedDiffs(int &firstDiff, int &
 /** CMergeDoc::GetWordDiffArrayInDiffBlock: a block's inline differences,
     worked out over the whole block, or line by line in one of more than
     21 lines (IsDiffPerLine). */
-std::vector<FileCompareView::SelectionCopy::WordDiff>
-FileCompareView::SelectionCopy::wordDiffsInBlock(int blockIndex, bool ignoreDiffOptions) const
+std::vector<FileCompareView::PaneLines::WordDiff>
+FileCompareView::PaneLines::wordDiffsInBlock(int blockIndex, bool ignoreDiffOptions) const
 {
 	const Block &block = m_blocks[blockIndex];
 	constexpr int LineLimit = 20;
@@ -685,8 +796,8 @@ FileCompareView::SelectionCopy::wordDiffsInBlock(int blockIndex, bool ignoreDiff
 /** CMergeDoc::GetWordDiffArrayInRange: the view lines of each pane joined
     with their endings and diffed at once; with ignoreDiffOptions, case
     and white space are not left out as the compare options say. */
-std::vector<FileCompareView::SelectionCopy::WordDiff>
-FileCompareView::SelectionCopy::wordDiffsInRange(const int begin[3], const int end[3],
+std::vector<FileCompareView::PaneLines::WordDiff>
+FileCompareView::PaneLines::wordDiffsInRange(const int begin[3], const int end[3],
 	bool ignoreDiffOptions) const
 {
 	const int panes = m_view.m_paneCount;
@@ -972,7 +1083,7 @@ void FileCompareView::SelectionCopy::characterRange(int blockIndex, const Point 
 
 /** GetTextWithoutEmptys: the text from one place to another, ghost lines
     left out. */
-QList<FileCompareView::SelectionCopy::Piece> FileCompareView::SelectionCopy::textBetween(
+QList<FileCompareView::PaneLines::Piece> FileCompareView::PaneLines::textBetween(
 	const Lines &lines, const Point &start, Point end)
 {
 	QList<Piece> pieces;
@@ -1298,7 +1409,16 @@ void FileCompareView::SelectionCopy::copyMultiplePartialList(int firstDiff, int 
 		showCannotCopyInvisibleLinesError(&m_view);
 		return;
 	}
-	if (!character)
+	// (F4's difference of no length at the file's very start: the current
+	// difference goes whole)
+	if (firstLineDiff <= 0 && lastLineDiff == -1)
+	{
+		const int current = m_view.m_current >= 0
+			? m_view.m_current : m_view.activeDiffAtLine(m_start.y);
+		if (current >= 0)
+			listCopy(current);
+	}
+	else if (!character)
 		lineListCopy(lastDiff, firstDiff == lastDiff ? firstLineDiff : 0, lastLineDiff);
 	else
 		characterListCopy(lastDiff, m_start, m_end);
@@ -1375,6 +1495,211 @@ void FileCompareView::SelectionCopy::resetTargetCursor()
 	m_view.m_syncing = true;
 	pane->setTextCursor(cursor);
 	m_view.m_syncing = false;
+}
+
+bool FileCompareView::PaneLines::equalCurrentWordDiff(int pane, const Point &start,
+	const Point &end) const
+{
+	const CurrentWordDiff &current = m_view.m_curWordDiff;
+	return current.pane == pane && current.startChar == start.x && current.startLine == start.y
+		&& current.endChar == end.x && current.endLine == end.y;
+}
+
+/** The pieces as one text, with their line endings. */
+QString FileCompareView::PaneLines::joined(const QList<Piece> &pieces)
+{
+	QString text;
+	for (const Piece &piece : pieces)
+		text += piece.text + piece.eol;
+	return text;
+}
+
+QString FileCompareView::PaneLines::diffText(int side, int blockIndex) const
+{
+	const Block &block = m_blocks[blockIndex];
+	const Lines &lines = m_lines[side];
+	return joined(textBetween(lines, Point{ 0, block.viewBegin },
+			Point{ lines.length(block.viewEnd), block.viewEnd }))
+		+ (block.viewEnd < lines.count() ? lines.eol.at(block.viewEnd) : QString());
+}
+
+FileCompareView::LineDiffSelection::LineDiffSelection(FileCompareView &view, int pane)
+	: PaneLines(view)
+	, m_pane(pane)
+{
+}
+
+bool FileCompareView::LineDiffSelection::compute(bool reversed)
+{
+	const int blockCount = static_cast<int>(m_blocks.size());
+	if (blockCount == 0 || m_view.m_diffStale)
+		return false;
+
+	const QTextCursor cursor = m_view.m_panes[m_pane]->textCursor();
+	const QTextDocument *doc = cursor.document();
+	const auto [startX, startY] = viewPointOf(doc, cursor.selectionStart());
+	const auto [endX, endY] = viewPointOf(doc, cursor.selectionEnd());
+	Point ptStart{ startX, startY };
+	const Point ptEnd{ endX, endY };
+	const Lines &active = m_lines[m_pane];
+
+	int nWordDiff = 0;
+	std::vector<WordDiff> worddiffs;
+	int nDiff = lineToDiff(ptStart.y);
+	if (nDiff != -1)
+		worddiffs = wordDiffsInBlock(nDiff, false);
+
+	// the inline difference at the selection, or the next one past that
+	if (!worddiffs.empty())
+	{
+		const int size = static_cast<int>(worddiffs.size());
+		bool goToNextWordDiff = true;
+		if (equalCurrentWordDiff(m_pane, ptStart, ptEnd))
+		{
+			nWordDiff = m_view.m_curWordDiff.wordDiff;
+		}
+		else
+		{
+			nWordDiff = reversed ? size - 1 : 0;
+			for (; nWordDiff >= 0 && nWordDiff < size; nWordDiff += reversed ? -1 : 1)
+			{
+				const WordDiff &worddiff = worddiffs[nWordDiff];
+				if (worddiff.begin[m_pane].y > ptStart.y || ptStart.y > worddiff.end[m_pane].y)
+					continue;
+				const int begin = worddiff.begin[m_pane].y < ptStart.y
+					? 0 : worddiff.begin[m_pane].x;
+				const int end = worddiff.end[m_pane].y > ptStart.y
+					? active.length(ptStart.y) : worddiff.end[m_pane].x;
+				const bool inside = begin <= ptStart.x && ptStart.x <= end;
+				if (inside || (reversed ? ptStart.x >= end : ptStart.x <= begin))
+				{
+					goToNextWordDiff = false;
+					break;
+				}
+			}
+		}
+		if (goToNextWordDiff)
+		{
+			if (!reversed)
+			{
+				if (nWordDiff < size)
+					++nWordDiff;
+				if (nWordDiff == size)
+				{
+					ptStart.y = m_blocks[nDiff].viewEnd;
+					worddiffs.clear();
+				}
+			}
+			else if (nWordDiff <= 0)
+			{
+				ptStart.y = m_blocks[nDiff].viewBegin;
+				worddiffs.clear();
+			}
+			else
+			{
+				--nWordDiff;
+			}
+		}
+	}
+
+	// or the next difference's first one, the previous one's last; from a
+	// line of no difference, the one after or before it (GetNextDiff,
+	// GetPrevDiff), round the file
+	if (worddiffs.empty())
+	{
+		nDiff = lineToDiff(ptStart.y);
+		if (nDiff != -1)
+		{
+			nDiff = (nDiff + (reversed ? blockCount - 1 : 1)) % blockCount;
+		}
+		else if (!reversed)
+		{
+			nDiff = 0;
+			for (int b = 0; b < blockCount; ++b)
+				if (m_blocks[b].viewBegin >= ptStart.y)
+				{
+					nDiff = b;
+					break;
+				}
+		}
+		else
+		{
+			nDiff = blockCount - 1;
+			for (int b = blockCount - 1; b >= 0; --b)
+				if (m_blocks[b].viewEnd <= ptStart.y)
+				{
+					nDiff = b;
+					break;
+				}
+		}
+		worddiffs = wordDiffsInBlock(nDiff, false);
+		nWordDiff = reversed ? static_cast<int>(worddiffs.size()) - 1 : 0;
+		// none in it: its first line
+		if (worddiffs.empty())
+		{
+			const int line = m_blocks[nDiff].viewBegin;
+			for (int side = 0; side < m_view.m_paneCount; ++side)
+			{
+				m_first[side] = Point{ 0, line };
+				m_second[side] = Point{ 0, line < active.count() - 1 ? line + 1 : line };
+			}
+			nWordDiff = -1;
+		}
+	}
+
+	if (nWordDiff != -1)
+		for (int side = 0; side < m_view.m_paneCount; ++side)
+		{
+			m_first[side] = worddiffs[nWordDiff].begin[side];
+			m_second[side] = worddiffs[nWordDiff].end[side];
+		}
+
+	CurrentWordDiff &current = m_view.m_curWordDiff;
+	current.pane = m_pane;
+	current.startChar = m_first[m_pane].x;
+	current.startLine = m_first[m_pane].y;
+	current.endChar = m_second[m_pane].x;
+	current.endLine = m_second[m_pane].y;
+	current.diff = nDiff;
+	current.wordDiff = nWordDiff;
+	return true;
+}
+
+/** HighlightDiffRect in every pane, the active pane's scroll the one the
+    others take. */
+void FileCompareView::LineDiffSelection::select()
+{
+	m_view.m_syncing = true;
+	for (int side = 0; side < m_view.m_paneCount; ++side)
+		if (side != m_pane)
+			selectIn(side);
+	selectIn(m_pane);
+	const int top = m_view.m_panes[m_pane]->verticalScrollBar()->value();
+	const int left = m_view.m_panes[m_pane]->horizontalScrollBar()->value();
+	for (int side = 0; side < m_view.m_paneCount; ++side)
+	{
+		m_view.m_panes[side]->verticalScrollBar()->setValue(top);
+		m_view.m_panes[side]->horizontalScrollBar()->setValue(left);
+	}
+	m_view.m_syncing = false;
+}
+
+void FileCompareView::LineDiffSelection::selectIn(int side)
+{
+	QTextDocument *doc = m_view.m_panes[side]->document();
+	const auto position = [doc](const Point &pt) {
+		const QTextBlock block = doc->findBlockByNumber(qBound(0, pt.y, doc->blockCount() - 1));
+		return block.position() + qBound(0, pt.x, block.length() - 1);
+	};
+	QTextCursor cursor(doc);
+	cursor.setPosition(position(m_first[side]));
+	cursor.setPosition(position(m_second[side]), QTextCursor::KeepAnchor);
+	m_view.m_panes[side]->setTextCursor(cursor);
+}
+
+QString FileCompareView::LineDiffSelection::selectedText(int side) const
+{
+	return joined(textBetween(m_lines[side], m_first[side], m_second[side]));
 }
 
 FileCompareView::~FileCompareView() = default;
@@ -2203,6 +2528,7 @@ bool FileCompareView::runDiff(QString *error)
 	}
 
 	m_blocks.clear();
+	m_curWordDiff = CurrentWordDiff();
 	m_diffCount = 0;
 	for (int i = 0; i < diffList.GetSize(); ++i)
 	{
@@ -3652,6 +3978,7 @@ void FileCompareView::applyBlockCopy(int blockIndex, int sourceSide,
 		m_blocks[b2].end[target] += delta;
 	}
 	block.resolved = true;
+	m_curWordDiff = CurrentWordDiff();
 	if (!block.trivial)
 		--m_diffCount;
 	m_wordSpans.erase(std::remove_if(m_wordSpans.begin(), m_wordSpans.end(),
@@ -3675,6 +4002,158 @@ void FileCompareView::copyToLeft(bool advance)
 {
 	const int target = qMax(m_activePane - 1, 0);
 	copyCurrentDiff(target + 1, target, advance);
+}
+
+void FileCompareView::copyFromLeft()
+{
+	// (MenuIDtoXY: none from the first pane)
+	if (m_activePane > 0)
+		copyCurrentDiff(m_activePane - 1, m_activePane, false);
+}
+
+void FileCompareView::copyFromRight()
+{
+	if (m_activePane < m_paneCount - 1)
+		copyCurrentDiff(m_activePane + 1, m_activePane, false);
+}
+
+void FileCompareView::copyLines(int sourceSide, int targetSide)
+{
+	if (m_diffStale)
+		recompare();
+	if (sourceSide >= m_paneCount || targetSide >= m_paneCount
+		|| sourceSide == targetSide)
+		return;
+	if (m_readOnly[targetSide])
+	{
+		m_status->setText(tr("The merge target is read-only."));
+		return;
+	}
+	SelectionCopy(*this, sourceSide, targetSide).runLines();
+}
+
+void FileCompareView::copySelectedDiffToClipboard(int side)
+{
+	if (side < 0 || side >= m_paneCount)
+		return;
+	if (m_diffStale)
+		recompare();
+	const int diff = m_current >= 0 ? m_current
+		: activeDiffAtLine(m_panes[m_activePane]->textCursor().blockNumber());
+	if (diff < 0 || diff >= static_cast<int>(m_blocks.size()))
+		return;
+	const QString text = PaneLines(*this).diffText(side, diff);
+	if (!text.isEmpty())
+		QGuiApplication::clipboard()->setText(text);
+}
+
+/** The differences merged in place are gone, as upstream's rescan after
+    every copy has them. */
+void FileCompareView::rescanIfMerged()
+{
+	for (const Block &block : m_blocks)
+		if (block.resolved)
+		{
+			recompare();
+			return;
+		}
+}
+
+void FileCompareView::selectLineDiff(bool reversed)
+{
+	if (m_diffStale)
+		return;
+	rescanIfMerged();
+	LineDiffSelection selection(*this, m_activePane);
+	if (!selection.compute(reversed))
+	{
+		lm::showInformation(this, tr("No differences found to select"));
+		return;
+	}
+	selection.select();
+}
+
+/** LibreMerge: line filters are switched on, as the substitution filters
+    are below; upstream adds the filter with them off, the default, and
+    nothing changes on screen. */
+void FileCompareView::addSelectionToLineFilters(int side)
+{
+	if (side < 0 || side >= m_paneCount || m_diffStale)
+		return;
+	const QTextCursor cursor = m_panes[side]->textCursor();
+	if (!cursor.hasSelection())
+		return;
+	// (GetTextWithoutEmptys: no ghost line, nor a hidden one)
+	QString text;
+	const int start = cursor.selectionStart();
+	const int end = cursor.selectionEnd();
+	for (QTextBlock block = m_panes[side]->document()->findBlock(start);
+		block.isValid() && block.position() <= end; block = block.next())
+	{
+		if (isGhostBlock(block) || !block.isVisible())
+			continue;
+		const int from = qMax(0, start - block.position());
+		const int to = qMin(end - block.position(), block.length() - 1);
+		text += block.text().mid(from, qMax(0, to - from));
+		if (end >= block.position() + block.length())
+			text += lineEol(side, block);
+	}
+	if (text.isEmpty())
+		return;
+	LineFiltersList filters;
+	lm::copyLineFilters(&filters);
+	filters.AddFilter(strutils::to_regex(text.toStdString()), true);
+	lm::saveLineFilters(true, filters);
+	rescan();
+}
+
+void FileCompareView::addLineDiffToSubstitutionFilters(int side)
+{
+	// (upstream: "Not clear what to do for a 3-way merge")
+	if (side < 0 || m_paneCount != 2 || side >= m_paneCount || m_diffStale)
+		return;
+	rescanIfMerged();
+	LineDiffSelection selection(*this, side);
+	if (!selection.compute(false))
+	{
+		lm::showInformation(this, tr("No differences found to add as substitution filter"));
+		return;
+	}
+	selection.select();
+	const QString left = selection.selectedText(0);
+	const QString right = selection.selectedText(1);
+	if (left.isEmpty())
+		return;
+	const QString pair = QStringLiteral("\"%1\" <-> \"%2\"").arg(left, right);
+	const String pattern = left.toStdString();
+	const String replacement = right.toStdString();
+	SubstitutionFiltersList filters;
+	lm::copySubstitutionFilters(&filters);
+	for (size_t f = 0; f < filters.GetCount(); ++f)
+		if (filters.GetAt(f).pattern == pattern && filters.GetAt(f).replacement == replacement)
+		{
+			lm::showInformation(this, tr("The pair is already in the Substitution Filters list")
+				+ QStringLiteral("\n\n") + pair);
+			return;
+		}
+	if (!lm::askQuestion(this, tr("Add this change to Substitution Filters?")
+			+ QStringLiteral("\n\n") + pair))
+		return;
+	filters.Add(pattern, replacement, false, true, false, true);
+	filters.SetEnabled(true);
+	lm::saveSubstitutionFilters(filters);
+	rescan();
+}
+
+/** CMergeDoc::EqualCurrentWordDiff, for a pane's cursor. */
+bool FileCompareView::equalCurrentWordDiff(int pane, const QTextCursor &cursor) const
+{
+	const QTextDocument *doc = cursor.document();
+	const auto [startX, startY] = viewPointOf(doc, cursor.selectionStart());
+	const auto [endX, endY] = viewPointOf(doc, cursor.selectionEnd());
+	return m_curWordDiff.pane == pane && m_curWordDiff.startChar == startX
+		&& m_curWordDiff.startLine == startY && m_curWordDiff.endChar == endX
+		&& m_curWordDiff.endLine == endY;
 }
 
 /** Upstream's OnAllRight and OnAllLeft: "Copy all differences to other
@@ -3703,10 +4182,12 @@ void FileCompareView::copyCurrentDiff(int sourceSide, int targetSide, bool advan
 		|| sourceSide == targetSide)
 		return;
 	// upstream's OnX2Y: text selected in the pane the copy goes from or
-	// to copies what the selection takes in, as the copy granularity
-	// says; "and advance" goes on to the next difference (OnX2YNext)
+	// to, or the inline difference F4 selected, copies what the selection
+	// takes in, as the copy granularity says; "and advance" goes on to the
+	// next difference (OnX2YNext)
 	if ((m_activePane == sourceSide || m_activePane == targetSide)
-		&& m_panes[m_activePane]->textCursor().hasSelection())
+		&& (m_panes[m_activePane]->textCursor().hasSelection()
+			|| equalCurrentWordDiff(sourceSide, m_panes[m_activePane]->textCursor())))
 	{
 		if (m_readOnly[targetSide])
 		{
@@ -4499,18 +4980,168 @@ void FileCompareView::addSelectionToDisplayFilter(int side)
 		addToDisplayFilter(text);
 }
 
-/** WinMerge's pane menu has "Add to Filters" above Undo, with the line
-    and the substitution filters in it too; those two are not here. */
+/** WinMerge's pane menu (IDR_POPUP_MERGEVIEW, CMergeEditView::OnContextMenu),
+    above Qt's own items and Go to below them. Its Scripts need plugins, and
+    its Go to Definition, Go to Moved Line, Open and Shell Menu are not
+    here. */
 void FileCompareView::buildPaneMenu(int side, QMenu *menu)
 {
+	m_activePane = side;
+	updateHeaderStyles();
 	QAction *first = menu->actions().value(0);
+	const auto addItem = [menu](QAction *before, const QString &text, const QString &name,
+		bool enabled, const QKeySequence &shortcut) {
+		auto *action = new QAction(text, menu);
+		action->setObjectName(name);
+		action->setEnabled(enabled);
+		if (!shortcut.isEmpty())
+		{
+			action->setShortcut(shortcut);
+			action->setShortcutVisibleInContextMenu(true);
+		}
+		menu->insertAction(before, action);
+		return action;
+	};
+
+	// the copies from and to this pane, by the other panes' names; the keys
+	// are those of its neighbors, and a pane of three's far side has none
+	struct CopyItem
+	{
+		QString text;
+		QString lines;
+		int source;
+		int target;
+		QKeySequence shortcut;
+	};
+	const int last = m_paneCount - 1;
+	const bool threeWay = m_paneCount == 3;
+	const QKeySequence altLeft(Qt::ALT | Qt::Key_Left);
+	const QKeySequence altRight(Qt::ALT | Qt::Key_Right);
+	const QKeySequence altShiftLeft(Qt::ALT | Qt::SHIFT | Qt::Key_Left);
+	const QKeySequence altShiftRight(Qt::ALT | Qt::SHIFT | Qt::Key_Right);
+	const auto toMiddle = [&](int source) {
+		return CopyItem{ tr("Copy to Middle"), tr("Copy Selected Lines to Middle"), source, 1, {} };
+	};
+	const auto fromMiddle = [&](int target) {
+		return CopyItem{ tr("Copy from Middle"), tr("Copy Selected Lines from Middle"), 1, target, {} };
+	};
+	const auto toRight = [&](int source, const QKeySequence &key) {
+		return CopyItem{ tr("C&opy to Right"), tr("Copy Selected Lines to Right"), source, last, key };
+	};
+	const auto fromRight = [&](int target, const QKeySequence &key) {
+		return CopyItem{ tr("Copy fro&m Right"), tr("Copy Selected Lines from Right"), last, target, key };
+	};
+	const auto toLeft = [&](int source, const QKeySequence &key) {
+		return CopyItem{ tr("Cop&y to Left"), tr("Copy Selected Lines to Left"), source, 0, key };
+	};
+	const auto fromLeft = [&](int target, const QKeySequence &key) {
+		return CopyItem{ tr("Copy &from Left"), tr("Copy Selected Lines from Left"), 0, target, key };
+	};
+	QList<CopyItem> copies;
+	if (!threeWay)
+		copies = side == 0 ? QList<CopyItem>{ toRight(0, altRight), fromRight(0, altShiftLeft) }
+			: QList<CopyItem>{ toLeft(last, altLeft), fromLeft(last, altShiftRight) };
+	else if (side == 0)
+		copies = { toMiddle(0), toRight(0, {}), fromMiddle(0), fromRight(0, {}) };
+	else if (side == 1)
+		copies = { toLeft(1, altLeft), toRight(1, altRight), fromLeft(1, altShiftRight),
+			fromRight(1, altShiftLeft) };
+	else
+		copies = { toMiddle(last), toLeft(last, {}), fromMiddle(last), fromLeft(last, {}) };
+
+	// OnUpdateX2Y; while out of date the copy itself compares again first
+	const bool copyable = m_diffStale || SelectionCopy(*this, side, side).canCopy();
+	const auto itemName = [](const char *what, int source, int target) {
+		return QStringLiteral("%1_%2_%3").arg(QLatin1String(what)).arg(source).arg(target);
+	};
+	for (const CopyItem &item : copies)
+	{
+		QAction *action = addItem(first, item.text, itemName("paneCopy", item.source, item.target),
+			copyable && !m_readOnly[item.target], item.shortcut);
+		const int source = item.source;
+		const int target = item.target;
+		connect(action, &QAction::triggered, this,
+			[this, source, target]() { copyCurrentDiff(source, target, false); });
+	}
+	menu->insertSeparator(first);
+	for (const CopyItem &item : copies)
+	{
+		QAction *action = addItem(first, item.lines, itemName("paneCopyLines", item.source, item.target),
+			copyable && !m_readOnly[item.target], QKeySequence());
+		const int source = item.source;
+		const int target = item.target;
+		connect(action, &QAction::triggered, this,
+			[this, source, target]() { copyLines(source, target); });
+	}
+	menu->insertSeparator(first);
+
+	// OnUpdateSelDiffCopyFirst and the others
+	const bool inDiff = m_current >= 0
+		|| activeDiffAtLine(m_panes[side]->textCursor().blockNumber()) >= 0;
+	const auto addToClipboard = [&](const QString &text, int pane, Qt::Key key) {
+		QAction *action = addItem(first, text, QStringLiteral("paneDiffToClipboard_%1").arg(pane),
+			inDiff, QKeySequence(Qt::CTRL | key));
+		connect(action, &QAction::triggered, this,
+			[this, pane]() { copySelectedDiffToClipboard(pane); });
+	};
+	addToClipboard(tr("Copy Selected Diff (Left) to Clipboard"), 0, Qt::Key_1);
+	if (threeWay)
+	{
+		addToClipboard(tr("Copy Selected Diff (Middle) to Clipboard"), 1, Qt::Key_2);
+		addToClipboard(tr("Copy Selected Diff (Right) to Clipboard"), 2, Qt::Key_3);
+	}
+	else
+	{
+		addToClipboard(tr("Copy Selected Diff (Right) to Clipboard"), 1, Qt::Key_2);
+	}
+	menu->insertSeparator(first);
+
+	QAction *lineDiff = addItem(first, tr("Select Line &Difference"),
+		QStringLiteral("paneSelectLineDiff"), !m_diffStale, QKeySequence(Qt::Key_F4));
+	connect(lineDiff, &QAction::triggered, this, [this]() { selectLineDiff(false); });
+
 	auto *filters = new QMenu(tr("Add to &Filters"), menu);
 	QAction *display = filters->addAction(tr("Add to &Display Filter"));
 	display->setObjectName(QStringLiteral("addToDisplayFilter"));
 	connect(display, &QAction::triggered, this,
 		[this, side]() { addSelectionToDisplayFilter(side); });
+	// OnUpdateAddToLineFilters and OnUpdateAddToSubstitutionFilters
+	QAction *lineFilter = filters->addAction(tr("Add to &Line Filters"));
+	lineFilter->setObjectName(QStringLiteral("addToLineFilters"));
+	lineFilter->setEnabled(m_panes[side]->textCursor().hasSelection() && !threeWay && !m_diffStale);
+	connect(lineFilter, &QAction::triggered, this,
+		[this, side]() { addSelectionToLineFilters(side); });
+	QAction *substitution = filters->addAction(tr("Add to Substitution &Filters"));
+	substitution->setObjectName(QStringLiteral("addToSubstitutionFilters"));
+	substitution->setEnabled(!threeWay && !m_diffStale);
+	connect(substitution, &QAction::triggered, this,
+		[this, side]() { addLineDiffToSubstitutionFilters(side); });
 	menu->insertMenu(first, filters);
 	menu->insertSeparator(first);
+
+	// Undo and Redo are those of the comparison (OnEditUndo), not of the
+	// pane's document alone
+	const QTextDocument *doc = m_panes[side]->document();
+	for (QAction *action : menu->actions())
+	{
+		const bool undo = action->objectName() == QStringLiteral("edit-undo");
+		if (!undo && action->objectName() != QStringLiteral("edit-redo"))
+			continue;
+		QObject::disconnect(action, &QAction::triggered, nullptr, nullptr);
+		connect(action, &QAction::triggered, this, [this, undo]() {
+			if (undo)
+				undoActive();
+			else
+				redoActive();
+		});
+		action->setEnabled(undo ? !m_undoOrder.isEmpty() || doc->isUndoAvailable()
+			: !m_redoOrder.isEmpty() || doc->isRedoAvailable());
+	}
+
+	menu->addSeparator();
+	QAction *goTo = addItem(nullptr, tr("&Go to..."), QStringLiteral("paneGoTo"), true,
+		goToShortcut());
+	connect(goTo, &QAction::triggered, this, [this, side]() { showGoTo(side); });
 }
 
 bool FileCompareView::lineHiddenForTest(int viewLine) const
