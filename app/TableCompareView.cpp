@@ -1984,6 +1984,8 @@ void TableCompareView::undo()
 	m_redoStack.append(current);
 	applyEntry(entry);
 	updateUndoActions();
+	// OnEditUndo's FlushAndRescan tells when the files are now identical
+	emit rescanned();
 }
 
 void TableCompareView::redo()
@@ -1997,6 +1999,7 @@ void TableCompareView::redo()
 	m_undoStack.append(current);
 	applyEntry(entry);
 	updateUndoActions();
+	emit rescanned();
 }
 
 void TableCompareView::clearHistory()

@@ -2423,7 +2423,7 @@ QStringList FileCompareView::collectRealLines(int side, QList<bool> *ghostFlags,
 	return lines;
 }
 
-bool FileCompareView::runDiff(QString *error)
+bool FileCompareView::runDiff(QString *error, bool countOnly)
 {
 	// Diff the real pane contents through temp files (the engine's diff
 	// core operates on files, like upstream does for edited buffers).
@@ -2499,6 +2499,18 @@ bool FileCompareView::runDiff(QString *error)
 			*error = tr("the files could not be compared as text");
 		m_status->setText(tr("Binary content \xE2\x80\x94 comparison not supported"));
 		return false;
+	}
+	if (countOnly)
+	{
+		m_diffCount = 0;
+		for (int i = 0; i < diffList.GetSize(); ++i)
+		{
+			DIFFRANGE dr;
+			diffList.GetDiff(i, dr);
+			if (dr.op != OP_TRIVIAL)
+				++m_diffCount;
+		}
+		return true;
 	}
 
 	// like upstream's FlagMovedLines: remember which real lines belong
@@ -4444,10 +4456,19 @@ void FileCompareView::swapSides()
     fall back to the stale-marker flow (F5), which may rebuild. */
 void FileCompareView::refreshAfterUndoRedo(const int countsBefore[3])
 {
+	// OnEditUndo and OnEditRedo's FlushAndRescan, which tells when the files
+	// are now identical. With other lines than before, the alignment's edits
+	// would clear the redo stack: the differences are only counted, and stay
+	// out of date for the next comparison (the modified listener marked them)
+	bool sameLines = true;
 	for (int side = 0; side < m_paneCount; ++side)
-		if (m_panes[side]->document()->blockCount() != countsBefore[side])
-			return; // stale marker already set by the modified listener
-	recompare();
+		sameLines = sameLines
+			&& m_panes[side]->document()->blockCount() == countsBefore[side];
+	if (sameLines)
+		recompare();
+	else
+		runDiff(nullptr, true);
+	emit rescanned();
 }
 
 void FileCompareView::undoActive()

@@ -441,7 +441,7 @@ private:
 	static bool canLoad(const QString &path, QString *error);
 	bool loadSide(int side, const QString &path, QString *error);
 	void startUntitled(int side);
-	bool runDiff(QString *error);
+	bool runDiff(QString *error, bool countOnly = false);
 	void rebuildAlignment();
 	void refreshSideMaps(int side);
 	QStringList collectRealLines(int side, QList<bool> *ghostFlags = nullptr,

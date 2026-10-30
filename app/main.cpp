@@ -2597,10 +2597,43 @@ int main(int argc, char *argv[])
 				"a copy of a selection to identical reports it");
 			view->undoActive();
 			view->undoActive();
+			settle();
 			shown.clear();
 			view->copyAllFrom(0, 1);
 			settle();
 			check(shown == QStringList{ filesSame }, "Copy All to identical reports it");
+		}
+		{
+			// undoing and redoing rescan and report too
+			const QString twin = dir.filePath(QStringLiteral("twin.txt"));
+			write(twin, "one two\n");
+			MainWindow window;
+			window.openFileComparison({ a, twin });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			view->typeAtForTest(0, 0, QStringLiteral("x"));
+			shown.clear();
+			view->undoActive();
+			settle();
+			check(shown == QStringList{ binaryMatch }, "undoing to identical reports it");
+			shown.clear();
+			view->redoActive();
+			settle();
+			check(shown.isEmpty() && view->diffCount() == 1, "redoing to different: no message");
+			view->undoActive();
+			settle();
+			// a line more: only counted, as realigning would clear Redo
+			view->typeAtForTest(0, 0, QStringLiteral("extra\n"));
+			shown.clear();
+			view->undoActive();
+			settle();
+			const bool reported = shown == QStringList{ binaryMatch };
+			shown.clear();
+			view->redoActive();
+			settle();
+			check(reported && shown.isEmpty()
+				&& view->realLinesForTest(0) == QStringList({ QStringLiteral("extra"), QStringLiteral("one two") }),
+				"with a line more: reported, and Redo is still there");
 		}
 		{
 			// a table's copy as well
@@ -2620,6 +2653,17 @@ int main(int argc, char *argv[])
 			}
 			check(table != nullptr && shown == QStringList{ filesSame },
 				"a table's copy to identical reports it");
+			if (table != nullptr)
+			{
+				shown.clear();
+				table->undo();
+				settle();
+				const bool undone = shown.isEmpty() && table->diffCount() == 1;
+				table->redo();
+				settle();
+				check(undone && shown == QStringList{ filesSame },
+					"a table's undo and redo rescan and report too");
+			}
 		}
 		{
 			const QString leftPng = dir.filePath(QStringLiteral("l.png"));
