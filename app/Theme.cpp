@@ -6,6 +6,7 @@
 #include <QApplication>
 #include <QPalette>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QStyle>
 #include <QStyleHints>
 #include <QToolTip>
@@ -20,6 +21,12 @@ namespace lm
 namespace
 {
 const QString kThemeKey = QStringLiteral("Appearance/Theme");
+
+#ifndef Q_OS_MACOS
+/** The application's own KDE color scheme, read by Breeze and by Plasma's
+    platform theme (KColorSchemeManager sets it). */
+constexpr const char *kKdeColorScheme = "KDE_COLOR_SCHEME_PATH";
+#endif
 
 /** A window darker than its text means a dark palette. */
 bool paletteIsDark(const QPalette &palette)
@@ -61,6 +68,41 @@ QPalette darkPalette()
 		palette.setColor(QPalette::Disabled, role, disabled);
 	palette.setColor(QPalette::Disabled, QPalette::Highlight,
 		QColor(0x3a, 0x3a, 0x3a));
+	return palette;
+}
+
+/** The application-wide light palette, in the tones of Fusion's own,
+    for a style whose standard palette is not light. */
+QPalette lightPalette()
+{
+	const QColor text(Qt::black);
+	const QColor disabled(0xbe, 0xbe, 0xbe);
+	QPalette palette;
+	palette.setColor(QPalette::Window, QColor(0xef, 0xef, 0xef));
+	palette.setColor(QPalette::WindowText, text);
+	palette.setColor(QPalette::Base, Qt::white);
+	palette.setColor(QPalette::AlternateBase, QColor(0xf7, 0xf7, 0xf7));
+	palette.setColor(QPalette::ToolTipBase, QColor(0xff, 0xff, 0xdc));
+	palette.setColor(QPalette::ToolTipText, text);
+	palette.setColor(QPalette::PlaceholderText, QColor(0x80, 0x80, 0x80));
+	palette.setColor(QPalette::Text, text);
+	palette.setColor(QPalette::Button, QColor(0xef, 0xef, 0xef));
+	palette.setColor(QPalette::ButtonText, text);
+	palette.setColor(QPalette::BrightText, Qt::white);
+	palette.setColor(QPalette::Light, Qt::white);
+	palette.setColor(QPalette::Midlight, QColor(0xca, 0xca, 0xca));
+	palette.setColor(QPalette::Mid, QColor(0xb8, 0xb8, 0xb8));
+	palette.setColor(QPalette::Dark, QColor(0x9f, 0x9f, 0x9f));
+	palette.setColor(QPalette::Shadow, QColor(0x76, 0x76, 0x76));
+	palette.setColor(QPalette::Highlight, QColor(0x30, 0x8c, 0xc6));
+	palette.setColor(QPalette::HighlightedText, Qt::white);
+	palette.setColor(QPalette::Link, QColor(0x00, 0x00, 0xff));
+	palette.setColor(QPalette::LinkVisited, QColor(0xff, 0x00, 0xff));
+	for (const QPalette::ColorRole role : { QPalette::WindowText,
+			QPalette::Text, QPalette::ButtonText })
+		palette.setColor(QPalette::Disabled, role, disabled);
+	palette.setColor(QPalette::Disabled, QPalette::Highlight,
+		QColor(0x91, 0x91, 0x91));
 	return palette;
 }
 #endif
@@ -168,6 +210,7 @@ void Theme::applyToApplication()
 	QStyleHints *hints = qApp->styleHints();
 	hints->unsetColorScheme();
 #endif
+	qApp->setProperty(kKdeColorScheme, QVariant());
 	QApplication::setPalette(QPalette());
 	const bool wanted = dark();
 	const bool matches = wanted == paletteIsDark(qApp->palette());
@@ -184,8 +227,24 @@ void Theme::applyToApplication()
 	}
 	else
 	{
-		const QPalette palette = wanted ? darkPalette()
+		// Plasma's own platform theme ignores the scheme asked for, and
+		// Breeze's standard palette is the desktop's color scheme: on a
+		// dark Plasma, Light came out dark. A standard palette that is
+		// not light gives way to ours
+		QPalette palette = wanted ? darkPalette()
 			: QApplication::style()->standardPalette();
+		if (!wanted && paletteIsDark(palette))
+			palette = lightPalette();
+		// Breeze paints the menu bar and the toolbars in the header colors
+		// of a KDE color scheme, not in the palette: the desktop's, white
+		// text on our light gray, unless the application names its own
+		// scheme, as KColorSchemeManager does
+		const QString scheme = QStandardPaths::locate(
+			QStandardPaths::GenericDataLocation,
+			wanted ? QStringLiteral("color-schemes/BreezeDark.colors")
+				: QStringLiteral("color-schemes/BreezeLight.colors"));
+		if (!scheme.isEmpty())
+			qApp->setProperty(kKdeColorScheme, scheme);
 		QApplication::setPalette(palette);
 		QToolTip::setPalette(palette);
 	}
