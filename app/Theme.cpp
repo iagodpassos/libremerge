@@ -72,8 +72,7 @@ QPalette darkPalette()
 	return palette;
 }
 
-/** The application-wide light palette, in the tones of Fusion's own,
-    for a style whose standard palette is not light. */
+/** The application-wide light palette, Fusion's own, whatever the style. */
 QPalette lightPalette()
 {
 	const QColor text(Qt::black);
@@ -85,7 +84,7 @@ QPalette lightPalette()
 	palette.setColor(QPalette::AlternateBase, QColor(0xf7, 0xf7, 0xf7));
 	palette.setColor(QPalette::ToolTipBase, QColor(0xff, 0xff, 0xdc));
 	palette.setColor(QPalette::ToolTipText, text);
-	palette.setColor(QPalette::PlaceholderText, QColor(0x80, 0x80, 0x80));
+	palette.setColor(QPalette::PlaceholderText, QColor(0, 0, 0, 128));
 	palette.setColor(QPalette::Text, text);
 	palette.setColor(QPalette::Button, QColor(0xef, 0xef, 0xef));
 	palette.setColor(QPalette::ButtonText, text);
@@ -104,6 +103,9 @@ QPalette lightPalette()
 		palette.setColor(QPalette::Disabled, role, disabled);
 	palette.setColor(QPalette::Disabled, QPalette::Highlight,
 		QColor(0x91, 0x91, 0x91));
+	palette.setColor(QPalette::Disabled, QPalette::Base, QColor(0xef, 0xef, 0xef));
+	palette.setColor(QPalette::Disabled, QPalette::Dark, QColor(0xbe, 0xbe, 0xbe));
+	palette.setColor(QPalette::Disabled, QPalette::Shadow, QColor(0xb1, 0xb1, 0xb1));
 	return palette;
 }
 #endif
@@ -228,14 +230,11 @@ void Theme::applyToApplication()
 	}
 	else
 	{
-		// Plasma's own platform theme ignores the scheme asked for, and
-		// Breeze's standard palette is the desktop's color scheme: on a
-		// dark Plasma, Light came out dark. A standard palette that is
-		// not light gives way to ours
-		QPalette palette = wanted ? darkPalette()
-			: QApplication::style()->standardPalette();
-		if (!wanted && paletteIsDark(palette))
-			palette = lightPalette();
+		// not the style's standard palette for Light: Plasma's own platform
+		// theme ignores the scheme asked for and Breeze's is the desktop's
+		// color scheme, so that on a dark Plasma Light came out dark, and a
+		// style that keeps QStyle's has Windows 2000's gray
+		const QPalette palette = wanted ? darkPalette() : lightPalette();
 		// Breeze paints the menu bar and the toolbars in the header colors
 		// of a KDE color scheme, not in the palette: the desktop's, white
 		// text on our light gray, unless the application names its own
