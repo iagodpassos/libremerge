@@ -306,7 +306,7 @@ void FilepathEdit::showMenu(const QPoint &globalPos)
 			const QString entry = recent.at(i);
 			QString name = QFileInfo(entry).fileName();
 			name.replace(QLatin1Char('&'), QStringLiteral("&&"));
-			recentMenu->addAction(QStringLiteral("&%1 %2").arg(QLatin1Char(keys[i]), name),
+			recentMenu->addAction(QStringLiteral("&%1 %2").arg(QString(QLatin1Char(keys[i])), name),
 				this, [this, entry]() { openRecent(entry); });
 		}
 	}
