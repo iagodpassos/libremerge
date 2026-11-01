@@ -32,6 +32,57 @@ jobs:
       - name: App selftests (offscreen)
         run: ./packaging/run_selftests.sh build/app/LibreMerge.app/Contents/MacOS/LibreMerge
 
+  oldest-qt:
+    # the distribution's Qt, the oldest supported: what compiles with the
+    # Qt of the other jobs may need a newer one than the README promises
+    name: Ubuntu (Qt 6.4)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build qt6-base-dev qt6-image-formats-plugins \
+            libgl1-mesa-dev libxkbcommon-dev libpoco-dev libboost-dev libicu-dev \
+            re2c lemon libarchive-dev
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+      - name: Build
+        run: cmake --build build --target LibreMerge
+      - name: App selftests (offscreen)
+        run: ./packaging/run_selftests.sh build/app/libremerge
+
+  plasma:
+    # a distribution's Qt with Plasma's own platform theme and Breeze, which
+    # no binary of Qt's loads, and which no offscreen run can stand in for
+    name: Debian 13 (Plasma theme)
+    runs-on: ubuntu-24.04
+    container: debian:13
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates build-essential \
+            cmake ninja-build pkgconf qt6-base-dev qt6-image-formats-plugins libgl-dev \
+            libxkbcommon-dev libpoco-dev libboost-dev libicu-dev re2c lemon libarchive-dev \
+            plasma-integration breeze xvfb xauth dbus
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+      - name: Build
+        run: cmake --build build --target LibreMerge
+      - name: Theme on Plasma, dark and light
+        run: |
+          for scheme in BreezeDark BreezeLight; do
+            config=$(mktemp -d)
+            cp "/usr/share/color-schemes/$scheme.colors" "$config/kdeglobals"
+            XDG_CONFIG_HOME="$config" XDG_CURRENT_DESKTOP=KDE KDE_SESSION_VERSION=6 \
+              KDE_FULL_SESSION=true QT_QPA_PLATFORMTHEME=kde QT_QPA_PLATFORM=xcb \
+              xvfb-run -a dbus-run-session -- build/app/libremerge --selftest-theme | tee "$config/log"
+            grep -q '^style: breeze$' "$config/log"
+            grep -q '^theme: ok$' "$config/log"
+          done
+
   linux:
     name: Ubuntu
     runs-on: ubuntu-24.04

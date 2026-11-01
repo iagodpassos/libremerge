@@ -1,4 +1,5 @@
-find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent)
+# the oldest the CI builds and tests, Ubuntu 24.04's
+find_package(Qt6 6.4 REQUIRED COMPONENTS Widgets Concurrent)
 find_package(LibArchive REQUIRED)
 
 qt_standard_project_setup()

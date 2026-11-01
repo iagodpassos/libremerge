@@ -1794,6 +1794,8 @@ int main(int argc, char *argv[])
 		};
 		lm::Theme *theme = lm::Theme::instance();
 		const QColor systemWindow = qApp->palette().color(QPalette::Window);
+		// (CI goes by this that it has the style it set out to test)
+		printf("style: %s\n", qPrintable(qApp->style()->objectName()));
 		check("starts following the system", theme->mode() == lm::ThemeMode::System);
 		int changes = 0;
 		QObject::connect(theme, &lm::Theme::changed, [&changes]() { ++changes; });
