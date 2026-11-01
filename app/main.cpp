@@ -1879,6 +1879,42 @@ int main(int argc, char *argv[])
 		dialog.saveForTest();
 		check("unchanged choice is quiet", changes == before);
 
+#ifndef Q_OS_MACOS
+		// the offscreen platform's palette is a light one, so that Dark
+		// replaces it: Breeze is told of the scheme (it reads the property),
+		// and the colors it left on a menu bar go, or the text stays that of
+		// the theme before
+		if (QGuiApplication::platformName() == QStringLiteral("offscreen"))
+		{
+			QTemporaryDir dataHome;
+			if (!dataHome.isValid() || !QDir(dataHome.path()).mkdir(QStringLiteral("color-schemes")))
+				return 2;
+			const QString darkScheme = dataHome.filePath(QStringLiteral("color-schemes/BreezeDark.colors"));
+			QFile schemeFile(darkScheme);
+			if (!schemeFile.open(QIODevice::WriteOnly))
+				return 2;
+			schemeFile.close();
+			qputenv("XDG_DATA_HOME", dataHome.path().toUtf8());
+			qputenv("XDG_DATA_DIRS", dataHome.path().toUtf8());
+			const auto schemeProperty = []() { return qApp->property("KDE_COLOR_SCHEME_PATH"); };
+			QMainWindow window;
+			QPalette stale;
+			stale.setColor(QPalette::WindowText, Qt::magenta);
+			const auto menuText = [&window]() {
+				return window.menuBar()->palette().color(QPalette::WindowText);
+			};
+			window.menuBar()->setPalette(stale);
+			theme->setMode(lm::ThemeMode::Dark);
+			check("Dark names the style's dark scheme", schemeProperty().toString() == darkScheme);
+			check("and the menu bar gives up the theme before's colors", menuText() != QColor(Qt::magenta));
+			window.menuBar()->setPalette(stale);
+			theme->setMode(lm::ThemeMode::Light);
+			check("Light, the platform's own, names none", !schemeProperty().isValid());
+			check("and the menu bar gives them up again", menuText() != QColor(Qt::magenta));
+			theme->setMode(lm::ThemeMode::System);
+		}
+#endif
+
 #ifdef LM_HAVE_PORTAL
 		// the portal's color-scheme values, bare (ReadOne, SettingChanged)
 		// or wrapped twice (the deprecated Read)

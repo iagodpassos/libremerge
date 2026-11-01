@@ -4,6 +4,7 @@
 #include "Theme.h"
 
 #include <QApplication>
+#include <QMenuBar>
 #include <QPalette>
 #include <QSettings>
 #include <QStandardPaths>
@@ -248,6 +249,13 @@ void Theme::applyToApplication()
 		QApplication::setPalette(palette);
 		QToolTip::setPalette(palette);
 	}
+	// Breeze gives the menu bar the scheme's colors once, and updates them
+	// only for a main window with top toolbars of its own, which ours are
+	// not: back to the application's, or its text stays that of the theme
+	// before, over the header of the new one
+	for (QWidget *window : QApplication::topLevelWidgets())
+		for (QMenuBar *bar : window->findChildren<QMenuBar *>())
+			bar->setPalette(QPalette());
 #endif
 	m_applying = false;
 }
