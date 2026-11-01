@@ -2341,6 +2341,7 @@ bool FileCompareView::loadSide(int side, const QString &path, QString *error)
 		doc->setUndoRedoEnabled(true);
 	}
 	doc->setModified(false);
+	m_undoSteps[side] = doc->availableUndoSteps();
 	m_syncing = false;
 	s.modified = false;
 
@@ -3026,6 +3027,9 @@ void FileCompareView::resetUndoHistory()
 		// round trip.
 		doc->setModified(true);
 		doc->setModified(false);
+		// (no change of the text tells of a cleared stack: the next change of
+		// colors alone would pass for an edit)
+		m_undoSteps[side] = doc->availableUndoSteps();
 	}
 	m_syncing = false;
 	m_undoOrder.clear();

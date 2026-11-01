@@ -1879,6 +1879,42 @@ int main(int argc, char *argv[])
 		dialog.saveForTest();
 		check("unchanged choice is quiet", changes == before);
 
+		// a theme is no edit of the files compared, whatever their language
+		{
+			QTemporaryDir dir;
+			if (!dir.isValid())
+				return 2;
+			const auto write = [&dir](const char *name, const QByteArray &bytes) {
+				const QString path = dir.filePath(QString::fromLatin1(name));
+				QFile f(path);
+				if (!f.open(QIODevice::WriteOnly))
+					std::exit(2);
+				f.write(bytes);
+				return path;
+			};
+			const auto same = [&](const char *what, const QStringList &paths) {
+				FileCompareView view;
+				QString error;
+				if (!view.compare(paths, &error))
+					std::exit(2);
+				QCoreApplication::processEvents();
+				const int differences = view.diffCount();
+				bool stale = false;
+				for (const lm::ThemeMode mode : { lm::ThemeMode::Dark, lm::ThemeMode::Light, lm::ThemeMode::System })
+				{
+					theme->setMode(mode);
+					QCoreApplication::processEvents();
+					stale = stale || view.diffStaleForTest();
+				}
+				printf("  %s: stale %d, modified %d, %d differences\n", what, stale, view.isModified(), view.diffCount());
+				check(what, !stale && !view.isModified() && view.diffCount() == differences);
+			};
+			same("a change of theme leaves plain text compared",
+				{ write("left.txt", "a\nb\nc\n"), write("right.txt", "a\nX\nc\nd\n") });
+			same("and a highlighted language too",
+				{ write("left.cpp", "int a; // one\nint b;\n"), write("right.cpp", "int a; // two\nint c;\nint d;\n") });
+		}
+
 #ifndef Q_OS_MACOS
 		// the offscreen platform's palette is a light one, so that Dark
 		// replaces it: Breeze is told of the scheme (it reads the property),
