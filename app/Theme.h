@@ -41,6 +41,10 @@ public:
 signals:
 	void changed();
 
+protected:
+	/** A palette the desktop hands over later does not undo a fixed choice. */
+	bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
 	Theme();
 	/** The system's appearance changed: follow it in System mode. */
@@ -48,6 +52,8 @@ private:
 
 	ThemeMode m_mode = ThemeMode::System;
 	bool m_applying = false;
+	bool m_reapplying = false;
+	bool m_kdeDesktop = false;
 	PortalAppearance *m_portal = nullptr; // Linux only
 };
 

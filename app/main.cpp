@@ -1949,6 +1949,25 @@ int main(int argc, char *argv[])
 			theme->setMode(lm::ThemeMode::Light);
 			check("Light, the platform's own, names none", !schemeProperty().isValid());
 			check("and the menu bar gives them up again", menuText() != QColor(Qt::magenta));
+			// the desktop hands over a palette of its own later, as Plasma's
+			// platform theme does when its color scheme changes: a fixed
+			// choice stays, whether it kept the platform's palette or not
+			QPalette desktopDark;
+			desktopDark.setColor(QPalette::Window, QColor(0x20, 0x23, 0x26));
+			desktopDark.setColor(QPalette::WindowText, QColor(0xfc, 0xfc, 0xfc));
+			window.menuBar()->setPalette(stale);
+			QApplication::setPalette(desktopDark);
+			QCoreApplication::processEvents();
+			check("Light stays when the desktop turns dark", !isDark(qApp->palette())
+				&& menuText() != QColor(Qt::magenta));
+			theme->setMode(lm::ThemeMode::Dark);
+			QPalette desktopLight;
+			desktopLight.setColor(QPalette::Window, QColor(0xef, 0xf0, 0xf1));
+			desktopLight.setColor(QPalette::WindowText, QColor(0x23, 0x26, 0x29));
+			QApplication::setPalette(desktopLight);
+			QCoreApplication::processEvents();
+			check("and Dark when it turns light", isDark(qApp->palette())
+				&& schemeProperty().toString() == darkScheme);
 			theme->setMode(lm::ThemeMode::System);
 		}
 #endif

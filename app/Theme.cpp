@@ -10,6 +10,7 @@
 #include <QStandardPaths>
 #include <QStyle>
 #include <QStyleHints>
+#include <QTimer>
 #include <QToolTip>
 
 #ifdef LM_HAVE_PORTAL
@@ -147,6 +148,32 @@ Theme::Theme()
 	connect(m_portal, &PortalAppearance::schemeChanged,
 		this, &Theme::systemChanged);
 #endif
+#ifndef Q_OS_MACOS
+	qApp->installEventFilter(this);
+	m_kdeDesktop = qEnvironmentVariable("XDG_CURRENT_DESKTOP")
+		.split(QLatin1Char(':')).contains(QStringLiteral("KDE"), Qt::CaseInsensitive);
+#endif
+}
+
+/** Plasma's platform theme hands the application the palette of a color
+    scheme the desktop switches to, and Qt's own themes their new one: a
+    fixed choice stays, whether it had replaced the platform's palette or
+    kept it, and the menu bar takes the colors again. System mode follows
+    the scheme through systemChanged. */
+bool Theme::eventFilter(QObject *watched, QEvent *event)
+{
+	if (watched == qApp && event->type() == QEvent::ApplicationPaletteChange
+		&& !m_applying && !m_reapplying && m_mode != ThemeMode::System)
+	{
+		// once the desktop's change is through
+		m_reapplying = true;
+		QTimer::singleShot(0, this, [this]() {
+			m_reapplying = false;
+			if (m_mode != ThemeMode::System)
+				applyToApplication();
+		});
+	}
+	return QObject::eventFilter(watched, event);
 }
 
 void Theme::setMode(ThemeMode mode)
@@ -187,8 +214,12 @@ bool Theme::dark() const
 		return portal == PortalAppearance::PreferDark;
 #endif
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+	// on a KDE desktop the palette goes first: Plasma's platform theme no
+	// longer updates its scheme while the application names one of its own
+	// (KDE_COLOR_SCHEME_PATH), its palette it does, and the scheme is only
+	// that palette's lightness
 	const Qt::ColorScheme scheme = qApp->styleHints()->colorScheme();
-	if (scheme != Qt::ColorScheme::Unknown)
+	if (!m_kdeDesktop && scheme != Qt::ColorScheme::Unknown)
 		return scheme == Qt::ColorScheme::Dark;
 #endif
 	// no color-scheme answer: a dark platform palette is the only signal
