@@ -355,6 +355,18 @@
         <translation>Modifié : appuyez sur F5 pour comparer à nouveau</translation>
     </message>
     <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translation>Diff. %1 sur %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translation>1 différence (%2 ign.)</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translation>%1 différences (%2 ign.)</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Les fichiers sont identiques</translation>
@@ -524,7 +536,7 @@ Veuillez effacer le filtre d&apos;affichage ou modifier les paramètres de filtr
     <message>
         <source>Select Line &amp;Difference</source>
         <translatorcomment>After WinMerge&apos;s &quot;Select Line &amp;Difference\tF4&quot;.</translatorcomment>
-        <translation>&amp;Sélectionner la différence suivante</translation>
+        <translation>Sélectionner la différence de &amp;ligne</translation>
     </message>
     <message>
         <source>Add to &amp;Filters</source>
@@ -569,18 +581,6 @@ Veuillez effacer le filtre d&apos;affichage ou modifier les paramètres de filtr
     <message>
         <source>&amp;All Moved Blocks</source>
         <translation>&amp;Tous les blocs déplacés</translation>
-    </message>
-    <message>
-        <source>Diff. %1 of %2 (%3 ign.)</source>
-        <translation>Diff. %1 sur %2 (%3 ign.)</translation>
-    </message>
-    <message>
-        <source>1 Difference (%1 ign.)</source>
-        <translation>1 différence (%2 ign.)</translation>
-    </message>
-    <message>
-        <source>%1 Differences (%2 ign.)</source>
-        <translation>%1 différences (%2 ign.)</translation>
     </message>
 </context>
 <context>
@@ -3389,7 +3389,7 @@ Le fichier est peut-être en lecture seule.</translation>
     <message>
         <source>Select Line &amp;Difference</source>
         <translatorcomment>After WinMerge&apos;s &quot;Select Line &amp;Difference\tF4&quot;.</translatorcomment>
-        <translation>&amp;Sélectionner la différence suivante</translation>
+        <translation>Sélectionner la &amp;différence de ligne</translation>
     </message>
     <message>
         <source>&amp;Go to...</source>
@@ -4821,6 +4821,10 @@ de 2	à 2
         <translation>Aucune différence trouvée à sélectionner</translation>
     </message>
     <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translation>%1 différences (%2 ign.)</translation>
+    </message>
+    <message>
         <source>Untitled Right</source>
         <translation>Sans titre à Droite</translation>
     </message>
@@ -4972,6 +4976,14 @@ de 2	à 2
         <translation>&amp;Date/Heure...</translation>
     </message>
     <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translation>Diff. %1 sur %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translation>1 différence (%2 ign.)</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Les fichiers sont identiques</translation>
@@ -5102,7 +5114,7 @@ Veuillez effacer le filtre d&apos;affichage ou modifier les paramètres de filtr
     <message>
         <source>Select Line &amp;Difference</source>
         <translatorcomment>After WinMerge&apos;s &quot;Select Line &amp;Difference\tF4&quot;.</translatorcomment>
-        <translation>&amp;Sélectionner la différence suivante</translation>
+        <translation>Sélectionner la différence de &amp;ligne</translation>
     </message>
     <message>
         <source>Add to &amp;Filters</source>
@@ -5148,18 +5160,6 @@ Veuillez effacer le filtre d&apos;affichage ou modifier les paramètres de filtr
         <source>cannot write %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>impossible d&apos;écrire %1</translation>
-    </message>
-    <message>
-        <source>%1 Differences (%2 ign.)</source>
-        <translation>%1 différences (%2 ign.)</translation>
-    </message>
-    <message>
-        <source>Diff. %1 of %2 (%3 ign.)</source>
-        <translation>Diff. %1 sur %2 (%3 ign.)</translation>
-    </message>
-    <message>
-        <source>1 Difference (%1 ign.)</source>
-        <translation>1 différence (%2 ign.)</translation>
     </message>
 </context>
 <context>

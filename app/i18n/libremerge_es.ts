@@ -352,6 +352,21 @@
         <translation>Modificado: pulse F5 para volver a comparar</translation>
     </message>
     <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Dif. %1 de %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>1 diferencia (%1 ign.)</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>%1 diferencias (%2 ign.)</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Los archivos son idénticos</translation>
@@ -427,10 +442,9 @@
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
-        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
-        <translation>Por ahora no se pueden combinar ni copiar diferencias que contienen líneas ocultas.
+        <translation>Actualmente no es posible combinar/copiar diferencias que contengan líneas ocultas.
 
-Borre el filtro de visualización o ajuste la configuración del filtro para mostrar todas las líneas antes de combinar.</translation>
+Desactive el filtro de visualización o ajuste la configuración del filtro para que se muestren todas las líneas antes de combinarlas.</translation>
     </message>
     <message>
         <source>Swapping reloads both files. Discard unsaved changes?</source>
@@ -570,21 +584,6 @@ Borre el filtro de visualización o ajuste la configuración del filtro para mos
         <source>&amp;All Moved Blocks</source>
         <translatorcomment>After WinMerge&apos;s &quot;&amp;All Moved Blocks&quot;.</translatorcomment>
         <translation>&amp;Todos los bloques desplazados</translation>
-    </message>
-    <message>
-        <source>Diff. %1 of %2 (%3 ign.)</source>
-        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
-        <translation>Dif. %1 de %2 (%3 ign.)</translation>
-    </message>
-    <message>
-        <source>1 Difference (%1 ign.)</source>
-        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
-        <translation>1 diferencia (%1 ign.)</translation>
-    </message>
-    <message>
-        <source>%1 Differences (%2 ign.)</source>
-        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
-        <translation>%1 diferencias (%2 ign.)</translation>
     </message>
 </context>
 <context>
@@ -1339,7 +1338,7 @@ Borre el filtro de visualización o ajuste la configuración del filtro para mos
     </message>
     <message>
         <source>File Filters</source>
-        <translation>Archivos de filtros</translation>
+        <translation>Filtros de archivo</translation>
     </message>
     <message>
         <source>Line Filters</source>
@@ -2784,7 +2783,6 @@ El archivo puede ser de solo lectura.</translation>
 %1
 
 %2</source>
-        <translatorcomment>After WinMerge&apos;s &quot;No se puede abrir el archivo\n%1\n\n%2&quot;.</translatorcomment>
         <translation>No se pueden abrir los archivos
 %1
 
@@ -3353,8 +3351,7 @@ El archivo puede ser de solo lectura.</translation>
     </message>
     <message>
         <source>&amp;Save</source>
-        <translatorcomment>After WinMerge&apos;s &quot;Sav&amp;e&quot;.</translatorcomment>
-        <translation>Gua&amp;rdar</translation>
+        <translation>&amp;Guardar</translation>
     </message>
     <message>
         <source>Reloa&amp;d</source>
@@ -4970,6 +4967,16 @@ desde2	hasta2
         <translation>Fec&amp;ha y hora...</translation>
     </message>
     <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Dif. %1 de %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>1 diferencia (%1 ign.)</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Los archivos son idénticos</translation>
@@ -5009,10 +5016,9 @@ desde2	hasta2
         <source>Merging/copying differences that contain hidden lines is not currently supported.
 
 Please clear the display filter or adjust the filter settings to show all lines before merging.</source>
-        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
-        <translation>Por ahora no se pueden combinar ni copiar diferencias que contienen líneas ocultas.
+        <translation>Actualmente no es posible combinar/copiar diferencias que contengan líneas ocultas.
 
-Borre el filtro de visualización o ajuste la configuración del filtro para mostrar todas las líneas antes de combinar.</translation>
+Desactive el filtro de visualización o ajuste la configuración del filtro para que se muestren todas las líneas antes de combinarlas.</translation>
     </message>
     <message>
         <source>No differences found to add as substitution filter</source>
@@ -5161,27 +5167,17 @@ Borre el filtro de visualización o ajuste la configuración del filtro para mos
         <translation>No se han encontrado diferencias para seleccionar</translation>
     </message>
     <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>%1 diferencias (%2 ign.)</translation>
+    </message>
+    <message>
         <source>Untitled Right</source>
         <translation>Derecho sin título</translation>
     </message>
     <message>
         <source>Untitled Middle</source>
         <translation>Central sin título</translation>
-    </message>
-    <message>
-        <source>Diff. %1 of %2 (%3 ign.)</source>
-        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
-        <translation>Dif. %1 de %2 (%3 ign.)</translation>
-    </message>
-    <message>
-        <source>1 Difference (%1 ign.)</source>
-        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
-        <translation>1 diferencia (%1 ign.)</translation>
-    </message>
-    <message>
-        <source>%1 Differences (%2 ign.)</source>
-        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
-        <translation>%1 diferencias (%2 ign.)</translation>
     </message>
 </context>
 <context>
