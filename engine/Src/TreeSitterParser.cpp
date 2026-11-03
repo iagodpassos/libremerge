@@ -31,7 +31,7 @@
 #include <algorithm>
 #include <climits>
 #include <cstring>
-#include <numeric>
+#include <set>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -1472,89 +1472,22 @@ void CTreeSitterParser::TranslateCoordinates(std::vector<HighlightEntry>& entrie
 	}
 }
 
-/**
- * @brief LibreMerge: for each capture, the color it gives back where it
- * ends, that of the innermost capture holding it and going on after it
- * (the captures of one tree nest or stay apart), or COLORINDEX_NONE.
- *
- * WinMerge's parser gave back normal text, so a capture inside another cut
- * it short: of a properties key "a.b" only "a" took the key's color, and
- * the text of a template string after its first ${} none.
- */
-std::vector<int> CTreeSitterParser::EnclosingColors(const std::vector<HighlightEntry>& entries)
-{
-	// of the captures of one node, the one that colors it (BuildLineCache's order)
-	const auto outranks = [](const HighlightEntry& a, const HighlightEntry& b)
-	{
-		const int aColorPrio = GetColorPriority(a.colorIndex);
-		const int bColorPrio = GetColorPriority(b.colorIndex);
-		if (aColorPrio != bColorPrio)
-			return aColorPrio > bColorPrio;
-		if (a.priority != b.priority)
-			return a.priority > b.priority;
-		return a.order < b.order;
-	};
-
-	std::vector<size_t> order(entries.size());
-	std::iota(order.begin(), order.end(), size_t(0));
-	// the outer before the inner: by start, then by end backwards
-	std::sort(order.begin(), order.end(), [&entries](size_t a, size_t b)
-	{
-		if (entries[a].startByte != entries[b].startByte)
-			return entries[a].startByte < entries[b].startByte;
-		return entries[a].endByte > entries[b].endByte;
-	});
-
-	std::vector<int> colors(entries.size(), COLORINDEX_NONE);
-	std::vector<size_t> holders;  // the captures holding the current one, outermost first
-	for (size_t index : order)
-	{
-		const HighlightEntry& h = entries[index];
-		while (!holders.empty() && entries[holders.back()].endByte <= h.startByte)
-			holders.pop_back();
-		const HighlightEntry* pParent = nullptr;
-		for (size_t j = holders.size(); j-- > 0; )
-		{
-			const HighlightEntry& e = entries[holders[j]];
-			if (e.endByte <= h.endByte)
-				continue;
-			if (pParent && (e.startByte != pParent->startByte || e.endByte != pParent->endByte))
-				break;
-			if (!pParent || outranks(e, *pParent))
-				pParent = &e;
-		}
-		if (pParent)
-			colors[index] = pParent->colorIndex;
-		holders.push_back(index);
-	}
-	return colors;
-}
-
 void CTreeSitterParser::EmitLineBlocks(const std::vector<HighlightEntry>& entries, int layerPriority, int nStartLine, int nEndLine)
 {
-	// LibreMerge: only the lines of the cache being built (WinMerge's
-	// parser wrote a capture's every line, and one going on into a chunk
-	// built before left blocks there after it was sorted)
-	const auto building = [nStartLine, nEndLine](uint32_t row)
+	for (const auto& h : entries)
 	{
-		return row >= static_cast<uint32_t>(nStartLine) && row <= static_cast<uint32_t>(nEndLine);
-	};
-	const std::vector<int> enclosingColors = EnclosingColors(entries);
-
-	for (size_t k = 0; k < entries.size(); k++)
-	{
-		const HighlightEntry& h = entries[k];
 		for (uint32_t row = h.startRow; row <= h.endRow && row < static_cast<uint32_t>(m_nLineCount); ++row)
 		{
-			if (row == h.endRow && h.endCol == 0)
-				break;
-			if (!building(row))
+			const int startChar = (row == h.startRow) ? static_cast<int>(h.startCol / sizeof(tchar_t)) : 0;
+			const int endChar = (row < h.endRow)
+				? m_pTextBuffer->GetLineLength(static_cast<int>(row))
+				: static_cast<int>(h.endCol / sizeof(tchar_t));
+			if (endChar <= startChar || m_cachedChunks[row / kCacheChunkSize])
 				continue;
 
-			uint32_t byteCol = (row == h.startRow) ? h.startCol : 0;
-
 			TreeSitterLineBlock block;
-			block.nCharPos = byteCol / sizeof(tchar_t);
+			block.nCharPos = startChar;
+			block.nEndCharPos = endChar;
 			block.nColorIndex = h.colorIndex;
 			block.nPriority = h.priority;
 			block.nLayerPriority = layerPriority;
@@ -1562,21 +1495,6 @@ void CTreeSitterParser::EmitLineBlocks(const std::vector<HighlightEntry>& entrie
 			block.nSpan = h.endByte - h.startByte;
 
 			m_lineBlocks[row].push_back(block);
-		}
-
-		if (h.endRow < static_cast<uint32_t>(m_nLineCount) && building(h.endRow))
-		{
-			TreeSitterLineBlock endBlock;
-
-			endBlock.nCharPos = h.endCol / sizeof(tchar_t);
-			// LibreMerge: the color of the capture around it, not normal text
-			endBlock.nColorIndex = enclosingColors[k];
-			endBlock.nLayerPriority = layerPriority;
-			endBlock.nPriority = INT_MIN;
-			endBlock.nOrder = h.order;
-			endBlock.nSpan = 0;
-
-			m_lineBlocks[h.endRow].push_back(endBlock);
 		}
 	}
 }
@@ -1699,81 +1617,117 @@ void CTreeSitterParser::RunInjectionQuery(int nStartLine, int nEndLine)
 
 void CTreeSitterParser::BuildLineCache(int nStartLine, int nEndLine)
 {
-	// Sort each line's blocks by character position and deterministic precedence.
-	// For identical start positions, keep the most specific / shortest capture.
+	// Convert the overlapping highlight intervals collected for each line into
+	// non-overlapping color transitions that ParseLine() can consume.
 	for (int i = nStartLine; i <= nEndLine && i < static_cast<int>(m_lineBlocks.size()); i++)
 	{
-		auto& blocks = m_lineBlocks[i];
-		std::sort(blocks.begin(), blocks.end(),
-			[](const TreeSitterLineBlock& a, const TreeSitterLineBlock& b)
+		auto& intervals = m_lineBlocks[i];
+		// Each interval contributes a start and an end event. The active set at
+		// any position therefore contains exactly the intervals covering the
+		// text from that position up to the next event.
+		struct Event
+		{
+			int position;
+			size_t intervalIndex;
+			bool starts;
+		};
+		std::vector<Event> events;
+		events.reserve(intervals.size() * 2);
+		for (size_t j = 0; j < intervals.size(); ++j)
+		{
+			events.push_back({ intervals[j].nCharPos, j, true });
+			events.push_back({ intervals[j].nEndCharPos, j, false });
+		}
+		std::sort(events.begin(), events.end(), [](const Event& a, const Event& b)
 			{
-				if (a.nCharPos != b.nCharPos)
-					return a.nCharPos < b.nCharPos;
-				if (a.nLayerPriority != b.nLayerPriority)
-					return a.nLayerPriority < b.nLayerPriority;
-
-				// LibreMerge: where a capture ends and another starts, the
-				// one starting colors; of captures starting together, or
-				// going on together into a line, the inner one, as the
-				// queries are written for (WinMerge's parser took the one of
-				// the higher color, the outer one included)
-				const bool aEnd = a.nPriority == INT_MIN;
-				const bool bEnd = b.nPriority == INT_MIN;
-				if (aEnd != bEnd)
-					return aEnd;
-				if (a.nSpan != b.nSpan)
-					return a.nSpan > b.nSpan;
-
-				const int aColorPrio = GetColorPriority(a.nColorIndex);
-				const int bColorPrio = GetColorPriority(b.nColorIndex);
-				if (aColorPrio != bColorPrio)
-					return aColorPrio < bColorPrio;
-
-				if (a.nPriority != b.nPriority)
-					return a.nPriority < b.nPriority;
-
-				// Descending order: higher order (later pattern in highlights.scm)
-				// sorts first, so the lower order (earlier/more specific pattern)
-				// ends up last and is kept by the dedup step below.
-				return a.nOrder > b.nOrder;
+				if (a.position != b.position)
+					return a.position < b.position;
+				if (a.starts != b.starts)
+					return !a.starts; // Process intervals ending here before intervals starting here.
+				return a.intervalIndex < b.intervalIndex;
 			});
 
-		// LibreMerge: one block for each position, of the color showing
-		// there: the top layer's, or the one under it where the top one has
-		// none (an injected region's text between its captures shows the
-		// document's color, a heading's around its inline code). Of the
-		// blocks of a layer at one position, the last one wins.
-		std::vector<TreeSitterLineBlock> merged;
-		merged.reserve(blocks.size());
-		std::vector<int> layerColors;
-		for (size_t j = 0; j < blocks.size(); )
+		// Order active intervals from lowest to highest precedence: layer first,
+		// then earlier start position, color rank, capture priority, and query
+		// order. The greatest element wins at the current span.
+		auto lowerPriority = [&intervals](size_t a, size_t b)
 		{
-			const int pos = blocks[j].nCharPos;
-			for (; j < blocks.size() && blocks[j].nCharPos == pos; j++)
+			const auto& lhs = intervals[a];
+			const auto& rhs = intervals[b];
+			if (lhs.nLayerPriority != rhs.nLayerPriority)
+				return lhs.nLayerPriority < rhs.nLayerPriority;
+			if (lhs.nCharPos != rhs.nCharPos)
+				return lhs.nCharPos < rhs.nCharPos;
+			// LibreMerge: of captures starting together, or going on together
+			// into the line, the inner one, as the queries are written for
+			// (WinMerge takes the one of the higher color there, so only "a"
+			// of a properties key "a.b" took the key's color)
+			if (lhs.nSpan != rhs.nSpan)
+				return lhs.nSpan > rhs.nSpan;
+			const int lhsColorPriority = GetColorPriority(lhs.nColorIndex);
+			const int rhsColorPriority = GetColorPriority(rhs.nColorIndex);
+			if (lhsColorPriority != rhsColorPriority)
+				return lhsColorPriority < rhsColorPriority;
+			if (lhs.nPriority != rhs.nPriority)
+				return lhs.nPriority < rhs.nPriority;
+			if (lhs.nOrder != rhs.nOrder)
+				return lhs.nOrder > rhs.nOrder;
+			return a < b;
+		};
+		std::set<size_t, decltype(lowerPriority)> active(lowerPriority);
+		// The input records are intervals; the output records are color
+		// transitions. Keep each output span's end position so adjacent spans
+		// with the same color can be merged.
+		std::vector<TreeSitterLineBlock> blocks;
+		blocks.reserve(events.size());
+		int currentColor = COLORINDEX_NORMALTEXT;
+		for (size_t e = 0; e < events.size();)
+		{
+			const int pos = events[e].position;
+			// Gather all events at this position. Apply endings first, then
+			// beginnings, so the active set describes the following span [pos, next).
+			size_t nextEvent = e;
+			while (nextEvent < events.size() && events[nextEvent].position == pos)
+				++nextEvent;
+			for (size_t j = e; j < nextEvent; ++j)
 			{
-				const size_t layer = static_cast<size_t>((std::max)(0, blocks[j].nLayerPriority));
-				if (layer >= layerColors.size())
-					layerColors.resize(layer + 1, COLORINDEX_NONE);
-				layerColors[layer] = blocks[j].nColorIndex;
+				if (!events[j].starts)
+					active.erase(events[j].intervalIndex);
 			}
-			int color = COLORINDEX_NORMALTEXT;
-			for (size_t layer = layerColors.size(); layer-- > 0; )
+			for (size_t j = e; j < nextEvent; ++j)
+				if (events[j].starts)
+					active.insert(events[j].intervalIndex);
+
+			if (nextEvent == events.size())
+				break;
+			// Select the highest-precedence interval, or normal text if none is
+			// active. Emit a transition only when the visible color changes.
+			const TreeSitterLineBlock* best = active.empty() ? nullptr : &intervals[*active.rbegin()];
+			const int color = best ? best->nColorIndex : COLORINDEX_NORMALTEXT;
+			if (color != currentColor)
 			{
-				if (layerColors[layer] != COLORINDEX_NONE)
-				{
-					color = layerColors[layer];
-					break;
-				}
-			}
-			if (merged.empty() || merged.back().nColorIndex != color)
-			{
-				TreeSitterLineBlock block = blocks[j - 1];
+				TreeSitterLineBlock block = best ? *best : intervals.front();
 				block.nCharPos = pos;
+				block.nEndCharPos = events[nextEvent].position;
 				block.nColorIndex = color;
-				merged.push_back(block);
+				blocks.push_back(block);
+				currentColor = color;
 			}
+			else if (!blocks.empty())
+				blocks.back().nEndCharPos = events[nextEvent].position;
+			e = nextEvent;
 		}
-		blocks = std::move(merged);
+		if (!events.empty() && currentColor != COLORINDEX_NORMALTEXT)
+		{
+			// Restore the default color after the final interval, since ParseLine()
+			// treats each emitted block as the color extending to the next block.
+			TreeSitterLineBlock block = intervals.front();
+			block.nCharPos = events.back().position;
+			block.nEndCharPos = events.back().position;
+			block.nColorIndex = COLORINDEX_NORMALTEXT;
+			blocks.push_back(block);
+		}
+		intervals = std::move(blocks);
 	}
 }
 

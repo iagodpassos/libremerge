@@ -153,6 +153,7 @@ private:
 struct TreeSitterLineBlock
 {
 	int nCharPos;
+	int nEndCharPos;
 	int nColorIndex;
 	int nPriority;
 	int nLayerPriority;
@@ -301,7 +302,6 @@ private:
 	void TranslateCoordinates(std::vector<HighlightEntry>& entries, uint32_t injectionStartRow, uint32_t injectStartCol);
 	// LibreMerge: the lines whose cache is being built, the only ones written
 	void EmitLineBlocks(const std::vector<HighlightEntry>& entries, int layerPriority, int nStartLine, int nEndLine);
-	static std::vector<int> EnclosingColors(const std::vector<HighlightEntry>& entries);
 	void RunHighlightQuery(int nStartLine, int nEndLine);
 	void RunLocalsQuery();
 	void RunTagsQuery();

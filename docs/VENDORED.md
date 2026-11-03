@@ -6,6 +6,7 @@ LibreMerge vendors the comparison engine of **WinMerge**.
 - **Commit:** `94a7a3fc5efee0f8b45d08a354299453509467b5` (master, 2026-10-17)
 - **Files taken from later commits** (each as upstream has it there, the local changes below kept):
   - `engine/Src/DiffList.{cpp,h}` at `2f609e631` (2026-11-03): significant and ignored difference counts (#3649) and the difference of a significant index (#3754)
+  - `engine/Src/TreeSitterParser.{cpp,h}` at `29ede74ed` (2026-10-23): overlapping highlight captures resolved as intervals (#3718), merged into the port
 - **License of vendored code:** GPL-2.0-or-later (original SPDX headers preserved in every file). `Externals/xdiff` is LGPL-2.1 (from git's LibXDiff fork). `Src/diffutils` is GPLv2+ (© Free Software Foundation).
 - **LibreMerge as a whole:** GPL-3.0-or-later (a valid downstream license of GPL-2.0-or-later + compatible with Qt 6 / LGPLv3).
 
@@ -327,20 +328,19 @@ so the text goes to Tree-sitter in the editor's encoding, UTF-8 here, and
 its byte offsets count `sizeof(tchar_t)` per character; on POSIX the
 grammar modules are `tree-sitter-<language>.so`, loaded with `dlopen()`,
 the folder is listed with `std::filesystem` and the default one is next
-to the program (`env::GetProgPath()`). Three things it does unlike the
+to the program (`env::GetProgPath()`). Two things it does unlike the
 Tree-sitter hosts its queries are written for are corrected (marked
 `LibreMerge:` in the code):
 - the queries' text predicates (`#eq?`, `#match?`, `#any-of?`, with their
   `not-` and `any-` forms) are checked, so a pattern colors only the nodes
   it names; upstream reads `#set!` alone, and javascript's rule for
   `require` gave every TypeScript identifier the function color
-- of nested captures the inner one colors, and where it ends the outer
-  one's color comes back, across an injection too; upstream let the higher
-  color win where captures start together and gave back normal text, so
-  only `a` of a properties key `a.b` took the key's color, and the text of
-  a TOML multi-line string took its key's
-- a chunk of the line cache writes only its own lines; upstream wrote a
-  capture's every line, leaving unsorted blocks in a chunk built before
+- of captures starting together, or going on together into a line, the
+  inner one colors; upstream lets the higher color win there, so only `a`
+  of a properties key `a.b` took the key's color, and the text of a TOML
+  multi-line string took its key's (the outer capture's color coming back
+  where an inner one ends, and a chunk of the cache writing only its own
+  lines, LibreMerge's own until 2026-10, are upstream's since `29ede74ed`)
 
 **Portable fixes (bugs on all platforms, hidden by Win32 behavior):**
 - `DirItem::SetFile`: no longer appends a trailing dot to extensionless
