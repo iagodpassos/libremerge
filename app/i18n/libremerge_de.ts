@@ -350,6 +350,18 @@
         <translation>Bearbeitet – F5 drücken, um neu zu vergleichen</translation>
     </message>
     <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translation>Diff. %1 von %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translation>1 Unterschied (%1 ign.)</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translation>%1 Unterschiede (%2 ign.)</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Dateien sind identisch</translation>
@@ -4951,6 +4963,14 @@ von2	zu2
         <translation>&amp;Datum und Uhrzeit...</translation>
     </message>
     <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translation>Diff. %1 von %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translation>1 Unterschied (%1 ign.)</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Dateien sind identisch</translation>
@@ -5139,6 +5159,10 @@ Bitte deaktivieren Sie den Anzeigefilter oder passen Sie die Filtereinstellungen
     <message>
         <source>No differences found to select</source>
         <translation>Keine Unterschiede zur Auswahl gefunden</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translation>%1 Unterschiede (%2 ign.)</translation>
     </message>
     <message>
         <source>Untitled Right</source>

@@ -3488,10 +3488,14 @@ void FileCompareView::updateStatus()
 	QString text;
 	if (m_diffStale)
 		text = tr("Edited \xE2\x80\x94 press F5 to recompare");
-	else if (m_diffCount == 0)
-		text = tr("Files are identical");
 	else
 	{
+		// MergeTextFormatter::GetDiffStatusString: the ignored differences
+		// apart, out of the numbers
+		int ignored = 0;
+		for (const Block &block : m_blocks)
+			if (block.trivial)
+				++ignored;
 		int index = 0;
 		if (m_current >= 0)
 		{
@@ -3499,9 +3503,17 @@ void FileCompareView::updateStatus()
 				if (!m_blocks[b].trivial && !m_blocks[b].resolved)
 					++index;
 		}
-		text = index > 0
-			? tr("Difference %1 of %2").arg(index).arg(m_diffCount)
-			: tr("%n difference(s) found", nullptr, m_diffCount);
+		if (ignored > 0)
+			text = index > 0
+				? tr("Diff. %1 of %2 (%3 ign.)").arg(index).arg(m_diffCount).arg(ignored)
+				: m_diffCount == 1 ? tr("1 Difference (%1 ign.)").arg(ignored)
+				: tr("%1 Differences (%2 ign.)").arg(m_diffCount).arg(ignored);
+		else if (m_diffCount == 0)
+			text = tr("Files are identical");
+		else
+			text = index > 0
+				? tr("Difference %1 of %2").arg(index).arg(m_diffCount)
+				: tr("%n difference(s) found", nullptr, m_diffCount);
 	}
 	bool modified = false;
 	for (int side = 0; side < m_paneCount; ++side)
@@ -5549,7 +5561,7 @@ void FileCompareView::showGoTo(int fromPane)
 		twoWay ? (fromPane == 1 ? 2 : 0) : fromPane, m_paneCount,
 		{ lastLine[0] + 1, twoWay ? -1 : lastLine[1] + 1,
 			twoWay ? lastLine[1] + 1 : lastLine[2] + 1 },
-		static_cast<int>(m_blocks.size()));
+		m_diffCount);
 	if (!GoToDialog::run(&dialog))
 		return;
 	const int number = dialog.number() - 1;
@@ -5561,10 +5573,25 @@ void FileCompareView::showGoTo(int fromPane)
 	}
 	else
 	{
-		const int diff = qBound(0, number, static_cast<int>(m_blocks.size()) - 1);
-		if (diff >= 0)
-			gotoDiff(diff, true);
+		// by the number the status bar gives it, the ignored ones not
+		// counted (DiffList::GetDiffFromSignificantIndex)
+		int significant = 0;
+		for (int b = 0; b < static_cast<int>(m_blocks.size()); ++b)
+		{
+			if (m_blocks[b].trivial)
+				continue;
+			if (significant++ == number)
+			{
+				gotoDiff(b, true);
+				break;
+			}
+		}
 	}
+}
+
+QString FileCompareView::statusTextForTest() const
+{
+	return m_status->text();
 }
 
 /** A pane scrolled vertically, whatever moved it: the other panes follow

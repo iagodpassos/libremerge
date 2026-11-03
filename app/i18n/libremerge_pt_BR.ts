@@ -316,6 +316,18 @@
         <translation>Editado — pressione F5 para recomparar</translation>
     </message>
     <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translation>Dif. %1 de %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translation>1 Diferença (%1 ign.)</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translation>%1 Diferenças (%2 ign.)</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translation>Os arquivos são idênticos</translation>
     </message>
@@ -4515,6 +4527,14 @@ de2	para2
         <translation>&amp;Data/Hora...</translation>
     </message>
     <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translation>Dif. %1 de %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translation>1 Diferença (%1 ign.)</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translation>Os arquivos são idênticos</translation>
     </message>
@@ -4684,6 +4704,10 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     <message>
         <source>No differences found to select</source>
         <translation>Nenhuma diferença encontrada para selecionar</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translation>%1 Diferenças (%2 ign.)</translation>
     </message>
     <message>
         <source>Untitled Right</source>

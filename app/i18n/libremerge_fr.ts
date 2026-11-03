@@ -570,6 +570,18 @@ Veuillez effacer le filtre d&apos;affichage ou modifier les paramètres de filtr
         <source>&amp;All Moved Blocks</source>
         <translation>&amp;Tous les blocs déplacés</translation>
     </message>
+    <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translation>Diff. %1 sur %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translation>1 différence (%2 ign.)</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translation>%1 différences (%2 ign.)</translation>
+    </message>
 </context>
 <context>
     <name>FileFilterMenu</name>
@@ -5136,6 +5148,18 @@ Veuillez effacer le filtre d&apos;affichage ou modifier les paramètres de filtr
         <source>cannot write %1</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>impossible d&apos;écrire %1</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translation>%1 différences (%2 ign.)</translation>
+    </message>
+    <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translation>Diff. %1 sur %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translation>1 différence (%2 ign.)</translation>
     </message>
 </context>
 <context>

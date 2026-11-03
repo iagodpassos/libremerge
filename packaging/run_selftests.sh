@@ -102,6 +102,7 @@ run_one selftest-line-diffs
 run_one selftest-copy-granularity
 run_one selftest-pane-menu
 run_one selftest-table-menu
+run_one selftest-ignored-diffs
 run_one selftest-view-eol
 run_one selftest-identical
 run_one selftest-reload

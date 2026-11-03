@@ -138,6 +138,7 @@ public:
 	int drawnWordSpansForTest(int side) const { return m_drawnWordSpans[side]; }
 	/** Edited since the differences were last worked out (for tests). */
 	bool diffStaleForTest() const { return m_diffStale; }
+	QString statusTextForTest() const;
 	/** Word-level highlights on one side (for tests). */
 	int wordSpanCountForTest(int side) const
 	{

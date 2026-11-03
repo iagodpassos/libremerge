@@ -4,6 +4,8 @@ LibreMerge vendors the comparison engine of **WinMerge**.
 
 - **Origin repository:** https://github.com/WinMerge/winmerge
 - **Commit:** `94a7a3fc5efee0f8b45d08a354299453509467b5` (master, 2026-10-17)
+- **Files taken from later commits** (each as upstream has it there, the local changes below kept):
+  - `engine/Src/DiffList.{cpp,h}` at `2f609e631` (2026-11-03): significant and ignored difference counts (#3649) and the difference of a significant index (#3754)
 - **License of vendored code:** GPL-2.0-or-later (original SPDX headers preserved in every file). `Externals/xdiff` is LGPL-2.1 (from git's LibXDiff fork). `Src/diffutils` is GPLv2+ (© Free Software Foundation).
 - **LibreMerge as a whole:** GPL-3.0-or-later (a valid downstream license of GPL-2.0-or-later + compatible with Qt 6 / LGPLv3).
 
@@ -116,10 +118,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 679 | 188 | 256 | 0 | 3 |
-| Spanish | 667 | 202 | 254 | 3 | 0 |
-| Catalan | 362 | 192 | 256 | 316 | 0 |
-| French | 681 | 207 | 238 | 0 | 0 |
+| German | 685 | 188 | 256 | 0 | 3 |
+| Spanish | 667 | 202 | 254 | 9 | 0 |
+| Catalan | 362 | 192 | 256 | 322 | 0 |
+| French | 687 | 207 | 238 | 0 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says

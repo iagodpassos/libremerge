@@ -571,6 +571,21 @@ Borre el filtro de visualización o ajuste la configuración del filtro para mos
         <translatorcomment>After WinMerge&apos;s &quot;&amp;All Moved Blocks&quot;.</translatorcomment>
         <translation>&amp;Todos los bloques desplazados</translation>
     </message>
+    <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Dif. %1 de %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>1 diferencia (%1 ign.)</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>%1 diferencias (%2 ign.)</translation>
+    </message>
 </context>
 <context>
     <name>FileFilterMenu</name>
@@ -5152,6 +5167,21 @@ Borre el filtro de visualización o ajuste la configuración del filtro para mos
     <message>
         <source>Untitled Middle</source>
         <translation>Central sin título</translation>
+    </message>
+    <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Dif. %1 de %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>1 diferencia (%1 ign.)</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>%1 diferencias (%2 ign.)</translation>
     </message>
 </context>
 <context>

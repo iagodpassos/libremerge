@@ -665,6 +665,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestTableMenuOpt(QStringLiteral("selftest-table-menu"),
 		QStringLiteral("Exercise the table comparison's cell menu: its copies, Select Line Difference, the filters and Convert Line Endings (for testing)"));
 	parser.addOption(selftestTableMenuOpt);
+	QCommandLineOption selftestIgnoredDiffsOpt(QStringLiteral("selftest-ignored-diffs"),
+		QStringLiteral("Count the ignored differences apart in the status bar and in Go To (for testing)"));
+	parser.addOption(selftestIgnoredDiffsOpt);
 	QCommandLineOption selftestViewEolOpt(QStringLiteral("selftest-view-eol"),
 		QStringLiteral("Exercise View Whitespace, View EOL and Convert Line Endings (for testing)"));
 	parser.addOption(selftestViewEolOpt);
@@ -8793,6 +8796,85 @@ int main(int argc, char *argv[])
 		lm::setMessageSinkForTest({});
 		lm::setQuestionSinkForTest({});
 		printf("table menu: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestIgnoredDiffsOpt))
+	{
+		// WinMerge's #3649 and #3754: the ignored differences apart in the
+		// status bar's numbers, and Go To going by those numbers
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		// the middle difference, its lines both filtered, is the ignored one
+		LineFiltersList filters;
+		filters.AddFilter("^IGNORED", true);
+		lm::saveLineFilters(true, filters);
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare({ write("left.txt", "a\nx1\nb\nIGNORED one\nc\nx2\nd\n"),
+					write("right.txt", "a\ny1\nb\nIGNORED two\nc\ny2\nd\n") }, &error))
+				return 2;
+			printf("  %s\n", qPrintable(view.statusTextForTest()));
+			check(view.diffCount() == 2
+					&& view.statusTextForTest().startsWith(FileCompareView::tr("%1 Differences (%2 ign.)").arg(2).arg(1)),
+				"two differences, one ignored apart");
+			view.gotoLastDiff();
+			printf("  %s\n", qPrintable(view.statusTextForTest()));
+			check(view.statusTextForTest().startsWith(FileCompareView::tr("Diff. %1 of %2 (%3 ign.)").arg(2).arg(2).arg(1)),
+				"the last one: number 2 of 2, the ignored one not counted");
+			QString range;
+			GoToDialog::setPresenterForTest([&range](GoToDialog *dialog) {
+				dialog->differenceButtonForTest()->click();
+				range = dialog->rangeLabelForTest()->text();
+				dialog->numberFieldForTest()->setText(QStringLiteral("2"));
+				return true;
+			});
+			view.gotoFirstDiff();
+			view.showGoTo(0);
+			GoToDialog::setPresenterForTest({});
+			printf("  Go To: %s, current %d\n", qPrintable(range), view.currentDiffForTest());
+			check(range == QStringLiteral("(1-2)") && view.currentDiffForTest() == 2,
+				"Go To: as many as the status bar counts, the second past the ignored one");
+		}
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare({ write("one_l.txt", "a\nIGNORED one\nb\n"),
+					write("one_r.txt", "a\nIGNORED two\nb\nc\n") }, &error))
+				return 2;
+			printf("  %s\n", qPrintable(view.statusTextForTest()));
+			check(view.statusTextForTest().startsWith(FileCompareView::tr("1 Difference (%1 ign.)").arg(1)),
+				"one difference and one ignored");
+		}
+		{
+			TableCompareView table;
+			QString error;
+			if (!table.compare(write("left.csv", "id,v\n1,a\nk,1\nIGNORED,x\nk,2\n3,c\n"),
+					write("right.csv", "id,v\n1,A\nk,1\nIGNORED,y\nk,2\n3,C\n"), &error))
+				return 2;
+			printf("  table: %s\n", qPrintable(table.statusTextForTest()));
+			check(table.statusTextForTest().startsWith(TableCompareView::tr("%1 Differences (%2 ign.)").arg(2).arg(1)),
+				"a table counts them apart too");
+		}
+		lm::saveLineFilters(false, LineFiltersList());
+		printf("ignored diffs: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

@@ -367,6 +367,21 @@
         <translation>Modificat: premeu F5 per a tornar a comparar</translation>
     </message>
     <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Dif. %1 de %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>1 diferència (%1 ign.)</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>%1 diferències (%2 ign.)</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Els fitxers són idèntics</translation>
@@ -5258,6 +5273,16 @@ de2	a2
         <translation>&amp;Data i hora...</translation>
     </message>
     <message>
+        <source>Diff. %1 of %2 (%3 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Dif. %1 de %2 (%3 ign.)</translation>
+    </message>
+    <message>
+        <source>1 Difference (%1 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>1 diferència (%1 ign.)</translation>
+    </message>
+    <message>
         <source>Files are identical</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Els fitxers són idèntics</translation>
@@ -5450,6 +5475,11 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
     <message>
         <source>No differences found to select</source>
         <translation>No s&apos;han trobat diferències per seleccionar</translation>
+    </message>
+    <message>
+        <source>%1 Differences (%2 ign.)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>%1 diferències (%2 ign.)</translation>
     </message>
     <message>
         <source>Untitled Right</source>

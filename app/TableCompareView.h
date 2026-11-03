@@ -202,6 +202,7 @@ public:
 	DisplayFilterBar *displayFilterBarForTest() const { return m_filterBar; }
 	QTableView *tableForTest(int side) const { return m_tables[side]; }
 	int currentDiffForTest() const { return m_current; }
+	QString statusTextForTest() const;
 	/** Select cells of a grid's rows, the first one current and the grid
 	    the active one (for tests). */
 	void selectCellsForTest(int side, int fromRow, int fromColumn, int toRow, int toColumn);

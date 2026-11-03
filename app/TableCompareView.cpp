@@ -1607,20 +1607,35 @@ void TableCompareView::computeCellDiffs()
 	}
 }
 
+QString TableCompareView::statusTextForTest() const
+{
+	return m_status->text();
+}
+
 void TableCompareView::updateStatus()
 {
 	QString text;
-	if (m_diffCount == 0)
-		text = tr("Files are identical");
-	else if (m_current >= 0)
-	{
-		int index = 0;
+	// MergeTextFormatter::GetDiffStatusString: the ignored differences
+	// apart, out of the numbers
+	int ignored = 0;
+	for (const Block &block : m_blocks)
+		if (block.trivial)
+			++ignored;
+	int index = 0;
+	if (m_current >= 0)
 		for (int b = 0; b <= m_current
 			&& b < static_cast<int>(m_blocks.size()); ++b)
 			if (!m_blocks[b].trivial)
 				++index;
+	if (ignored > 0)
+		text = index > 0
+			? tr("Diff. %1 of %2 (%3 ign.)").arg(index).arg(m_diffCount).arg(ignored)
+			: m_diffCount == 1 ? tr("1 Difference (%1 ign.)").arg(ignored)
+			: tr("%1 Differences (%2 ign.)").arg(m_diffCount).arg(ignored);
+	else if (m_diffCount == 0)
+		text = tr("Files are identical");
+	else if (index > 0)
 		text = tr("Difference %1 of %2").arg(index).arg(m_diffCount);
-	}
 	else
 		text = tr("%n difference(s) found", nullptr, m_diffCount);
 	// each side's delimiter when the Table options give them different ones
