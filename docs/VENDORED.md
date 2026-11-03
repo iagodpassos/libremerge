@@ -7,6 +7,7 @@ LibreMerge vendors the comparison engine of **WinMerge**.
 - **Files taken from later commits** (each as upstream has it there, the local changes below kept):
   - `engine/Src/DiffList.{cpp,h}` at `2f609e631` (2026-11-03): significant and ignored difference counts (#3649) and the difference of a significant index (#3754)
   - `engine/Src/TreeSitterParser.{cpp,h}` at `29ede74ed` (2026-10-23): overlapping highlight captures resolved as intervals (#3718), merged into the port
+  - `engine/Externals/winimerge/src/WinIMergeLib/ImgMergeBuffer.hpp` at winimerge `10e78f722` (the commit WinMerge pins since `616ab15b7`, 2026-10-25): undo of a paste (#41) and the destination canvas extended to copy a whole difference (#42); upstream's file now ends its lines in LF
 - **License of vendored code:** GPL-2.0-or-later (original SPDX headers preserved in every file). `Externals/xdiff` is LGPL-2.1 (from git's LibXDiff fork). `Src/diffutils` is GPLv2+ (© Free Software Foundation).
 - **LibreMerge as a whole:** GPL-3.0-or-later (a valid downstream license of GPL-2.0-or-later + compatible with Qt 6 / LGPLv3).
 

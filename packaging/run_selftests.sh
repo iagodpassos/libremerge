@@ -32,6 +32,14 @@ PNG
   base64 -d > "$TMP/right.png" <<'PNG'
 iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAAiElEQVR4nO3QQQrDMBAEwX16fm6fc7INMkWibtBNLEPNsXmjB+gC0AN0AegBugD0AF0AeoDuPsDMs/cjBXD/ZwABBBBAAAEEEEAAmwL8aQHoAboA9ABdAHqALgA94Kr5zNdbfn/5xcUFEMDmAG8XgB6gC0AP0AWgB+gC0AN0AegBugD0AN32ACcCDIwDSDcRXgAAAABJRU5ErkJggg==
 PNG
+  # 40x40 with a blue box past the edge of a 30x30 one: copying it all
+  # grows the smaller image (WinIMerge's #42)
+  base64 -d > "$TMP/big.png" <<'PNG'
+iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAIAAAADnC86AAAANUlEQVR4nO3NIREAAAgAMZLQPwqxaIDAINjduxeLyjwpwGAwGAwGg8FgMBj8Ep4/GAwGr+EGjRBZW+HdLAIAAAAASUVORK5CYII=
+PNG
+  base64 -d > "$TMP/small.png" <<'PNG'
+iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAIAAAC0Ujn1AAAAJ0lEQVR4nGM4ISdHI8QwavSo0aNGjxo9avSo0aNGjxo9avSo0eQjAE1lkj7s7aamAAAAAElFTkSuQmCC
+PNG
 }
 
 fails=0
@@ -131,6 +139,7 @@ done
 run_one selftest-desktop-integration
 run_one selftest-table "$TMP/left.csv" "$TMP/right.csv"
 run_one selftest-image "$TMP/left.png" "$TMP/right.png"
+run_one selftest-image "$TMP/big.png" "$TMP/small.png"
 run_one selftest-merge3 "$TMP/w3a.txt" "$TMP/w3b.txt" "$TMP/w3c.txt"
 
 echo "== $fails failure(s)"
