@@ -42,6 +42,7 @@ qt_add_executable(LibreMerge
   Icons.cpp
   ItemCheckStyle.cpp
   LocationPane.cpp
+  PopupList.cpp
   SyntaxHighlighter.cpp
   Theme.cpp
   FolderCompareView.cpp

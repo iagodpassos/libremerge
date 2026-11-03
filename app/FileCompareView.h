@@ -14,6 +14,8 @@
 
 #include "FileOps.h"
 
+namespace LangServices { struct TextDefinition; }
+
 class QAction;
 class QCheckBox;
 class QLabel;
@@ -254,6 +256,17 @@ public:
 	/** The highlighting as the options have it now (WinMerge's
 	    CMergeEditView::RefreshOptions sets each view's text type again). */
 	void refreshSyntaxHighlighting();
+	/** WinMerge's syntax type "Auto Syntax" (SYNTAX_TYPE_AUTO). */
+	static constexpr int kAutoSyntax = -1;
+	/** CMergeEditView::ChangeSyntaxType: the files colored by a syntax type
+	    (a LangServices::LanguageId), or by the ones their extensions give
+	    (kAutoSyntax); of one pane, or of all (-1); compared again. */
+	void setSyntaxType(int type, int pane = -1);
+	/** The syntax type a pane is colored by, SRC_PLAIN for none. */
+	int syntaxType(int pane) const;
+	int activePane() const { return m_activePane; }
+	/** The status bar's syntax column of a pane (for tests). */
+	QString syntaxLabelForTest(int pane) const;
 	/** The tabs as the options have them now: what the Tab key inserts
 	    (CMergeEditView::RefreshOptions), and the tab size too, which
 	    upstream only sets as the files load (DocumentsLoaded), so that
@@ -546,6 +559,10 @@ private:
 	std::function<bool()> m_savePrompt;
 	QLabel *m_posLabels[3];
 	QLabel *m_encLabels[3];
+	QLabel *m_syntaxLabels[3];
+	// CMergeDoc::m_bChangedSchemeManually, with the type chosen: a pane's
+	// syntax type, or kAutoSyntax for the one its extension gives
+	int m_syntaxManual[3] = { kAutoSyntax, kAutoSyntax, kAutoSyntax };
 	QLabel *m_eolLabels[3];
 	std::unique_ptr<SyntaxHighlighter> m_highlighters[3];
 	LocationPane *m_locationPane;
@@ -561,6 +578,15 @@ private:
 	/** The path the highlighting goes by: the file's, or one with the
 	    command line's extension. */
 	QString highlightPath(const QString &path) const;
+	/** SetTextTypesByFileType for a pane: its extension's type, another
+	    pane's, or XML by a declaration on contentPane's first line. */
+	LangServices::TextDefinition *autoSyntaxDefinition(int pane, int contentPane) const;
+	/** A pane's highlighter again, by the type chosen or its own. */
+	void rebuildHighlighter(int pane, int contentPane = 0);
+	/** UpdateSyntaxStatus. */
+	void updateSyntaxLabel(int pane);
+	/** ShowSyntaxTypeMenu, from a click on the syntax column. */
+	void showSyntaxTypeMenu(int pane, const QPoint &globalPos);
 	QSet<int> m_movedLines[3];       // real lines inside moved blocks
 	QHash<int, int> m_movedRight;    // the first file's moved lines -> the second's
 	std::vector<int> m_realToView[3]; // real line -> view line, ditto

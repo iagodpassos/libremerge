@@ -400,6 +400,21 @@
         <translation>  Auswahl: %1 | %2</translation>
     </message>
     <message>
+        <source>Plain Text</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Normaler Text</translation>
+    </message>
+    <message>
+        <source>Auto Syntax</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Automatische Syntax</translation>
+    </message>
+    <message>
+        <source>Apply to this pane only</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Nur auf diesen Bereich anwenden</translation>
+    </message>
+    <message>
         <source>No differences found to select</source>
         <translation>Keine Unterschiede zur Auswahl gefunden</translation>
     </message>
@@ -3460,6 +3475,10 @@ Patches sind nicht betroffen.</translation>
         <translation>&amp;Originalgröße</translation>
     </message>
     <message>
+        <source>Syntax Highlight</source>
+        <translation>S&amp;yntaxhervorhebung</translation>
+    </message>
+    <message>
         <source>&amp;View Whitespace</source>
         <translatorcomment>After WinMerge&apos;s &quot;&amp;View Whitespace&quot;.</translatorcomment>
         <translation>Leerzei&amp;chen anzeigen</translation>
@@ -4815,6 +4834,25 @@ von2	zu2
     <message>
         <source>Close</source>
         <translation>Schließen</translation>
+    </message>
+</context>
+<context>
+    <name>SyntaxHighlighter</name>
+    <message>
+        <source>No Highlighting</source>
+        <translation>Keine Hervorhebung</translation>
+    </message>
+    <message>
+        <source>Portable Object</source>
+        <translation>Portable Object</translation>
+    </message>
+    <message>
+        <source>Resources</source>
+        <translation>Ressourcen</translation>
+    </message>
+    <message>
+        <source>Shell</source>
+        <translation>Shell</translation>
     </message>
 </context>
 <context>

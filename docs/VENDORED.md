@@ -120,10 +120,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 685 | 188 | 256 | 0 | 3 |
-| Spanish | 667 | 202 | 254 | 9 | 0 |
-| Catalan | 362 | 192 | 256 | 322 | 0 |
-| French | 687 | 207 | 238 | 0 | 0 |
+| German | 690 | 188 | 256 | 3 | 3 |
+| Spanish | 676 | 200 | 254 | 10 | 0 |
+| Catalan | 367 | 192 | 256 | 325 | 0 |
+| French | 692 | 207 | 238 | 3 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -153,6 +153,12 @@ Parts of WinMerge's editor are written again in `app/`, after upstream's
 code. Where that code has an evident slip, the rewrite corrects it and
 says so in a comment:
 
+- A change of Options > Editor > "Highlight syntax" colors each file by the
+  types it opened with (`SetTextTypesByFileType`: a file whose extension
+  gives none takes another pane's, XML by a declaration on the first
+  line), a type chosen in View > Syntax Highlight or in the status bar
+  kept. Upstream (`CMergeEditView::RefreshOptions`) takes each pane's own
+  extension alone there, so such a file lost the type it opened with.
 - The tab size of Options > Editor reaches the open comparisons as the
   dialog is accepted. Upstream sets it only as files load
   (`CMergeEditView::DocumentsLoaded`), so they kept the old size until

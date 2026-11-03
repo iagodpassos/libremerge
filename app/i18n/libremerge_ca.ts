@@ -420,6 +420,21 @@
         <translation>  Sel: %1 | %2</translation>
     </message>
     <message>
+        <source>Plain Text</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Text sense format</translation>
+    </message>
+    <message>
+        <source>Auto Syntax</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Sintaxi automàtica</translation>
+    </message>
+    <message>
+        <source>Apply to this pane only</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Aplica només a aquesta subfinestra</translation>
+    </message>
+    <message>
         <source>No differences found to select</source>
         <translation>No s&apos;han trobat diferències per seleccionar</translation>
     </message>
@@ -3750,6 +3765,10 @@ Potser el fitxer és només de lectura?</translation>
         <translation>Mida &amp;real</translation>
     </message>
     <message>
+        <source>Syntax Highlight</source>
+        <translation>Ressaltat de la sintaxi</translation>
+    </message>
+    <message>
         <source>&amp;View Whitespace</source>
         <translatorcomment>After WinMerge&apos;s &quot;&amp;View Whitespace&quot;.</translatorcomment>
         <translation>Mostra els esp&amp;ais</translation>
@@ -5116,6 +5135,25 @@ de2	a2
     <message>
         <source>Close</source>
         <translation>Tanca</translation>
+    </message>
+</context>
+<context>
+    <name>SyntaxHighlighter</name>
+    <message>
+        <source>No Highlighting</source>
+        <translation>Sense ressaltat</translation>
+    </message>
+    <message>
+        <source>Portable Object</source>
+        <translation>Objecte portable</translation>
+    </message>
+    <message>
+        <source>Resources</source>
+        <translation>Recursos</translation>
+    </message>
+    <message>
+        <source>Shell</source>
+        <translation>Finestra d&apos;ordres</translation>
     </message>
 </context>
 <context>

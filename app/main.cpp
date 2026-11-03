@@ -66,7 +66,9 @@
 #include <QTimer>
 #include <QTranslator>
 #include "FileCompareView.h"
+#include "PopupList.h"
 #include "SyntaxHighlighter.h"
+#include "TextDefinition.h"
 #include "SyntaxColors.h"
 #include "TableCompareView.h"
 #include "TableFiles.h"
@@ -665,6 +667,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestTableMenuOpt(QStringLiteral("selftest-table-menu"),
 		QStringLiteral("Exercise the table comparison's cell menu: its copies, Select Line Difference, the filters and Convert Line Endings (for testing)"));
 	parser.addOption(selftestTableMenuOpt);
+	QCommandLineOption selftestSyntaxMenuOpt(QStringLiteral("selftest-syntax-menu"),
+		QStringLiteral("Exercise View > Syntax Highlight and the status bar's syntax column (for testing)"));
+	parser.addOption(selftestSyntaxMenuOpt);
 	QCommandLineOption selftestIgnoredDiffsOpt(QStringLiteral("selftest-ignored-diffs"),
 		QStringLiteral("Count the ignored differences apart in the status bar and in Go To (for testing)"));
 	parser.addOption(selftestIgnoredDiffsOpt);
@@ -8796,6 +8801,214 @@ int main(int argc, char *argv[])
 		lm::setMessageSinkForTest({});
 		lm::setQuestionSinkForTest({});
 		printf("table menu: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestSyntaxMenuOpt))
+	{
+		// WinMerge's View > Syntax Highlight and the status bar's syntax
+		// column (ChangeSyntaxType, ShowSyntaxTypeMenu), and the types the
+		// files open with (SetTextTypesByFileType)
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		const auto open = [](FileCompareView &view, const QStringList &paths)
+		{
+			QString error;
+			if (!view.compare(paths, &error))
+				std::exit(2);
+		};
+		const auto name = [](int type) { return SyntaxHighlighter::typeName(type); };
+		const QString cLeft = write("left.c", "int a;\n// one\nint b;\n");
+		const QString cRight = write("right.c", "int a;\n// two\nint b;\n");
+		// (an extension no type knows; ".txt" is plain text's own)
+		const QString text = write("notes.dat", "int a;\n");
+
+		// the types the files open with
+		{
+			FileCompareView view;
+			open(view, { cLeft, text });
+			printf("  %s | %s\n", qPrintable(view.syntaxLabelForTest(0)), qPrintable(view.syntaxLabelForTest(1)));
+			check(view.syntaxType(0) == LangServices::SRC_C && view.syntaxType(1) == LangServices::SRC_C
+					&& view.syntaxLabelForTest(1) == name(LangServices::SRC_C),
+				"a file whose extension gives none takes the other's type");
+		}
+		{
+			FileCompareView view;
+			open(view, { write("a.data", "<?xml version=\"1.0\"?>\n<a/>\n"), write("b.data", "<?xml version=\"1.0\"?>\n<b/>\n") });
+			check(view.syntaxType(0) == LangServices::SRC_XML && view.syntaxType(1) == LangServices::SRC_XML,
+				"with no type at all, XML by the declaration on the first line");
+		}
+		{
+			FileCompareView view;
+			open(view, { write("a.zzz", "x\n"), write("b.zzz", "y\n") });
+			check(view.syntaxType(0) == LangServices::SRC_PLAIN
+					&& view.syntaxLabelForTest(0) == FileCompareView::tr("Plain Text"),
+				"none: plain text, named so");
+		}
+
+		// View > Syntax Highlight, for every pane
+		{
+			MainWindow window;
+			window.resize(1000, 600);
+			window.show();
+			window.openFileComparison(cLeft, cRight);
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			auto *submenu = window.findChild<QAction *>(QStringLiteral("viewSyntaxHighlight"));
+			if (view == nullptr || submenu == nullptr || submenu->menu() == nullptr)
+				return 2;
+			emit submenu->menu()->aboutToShow();
+			const QList<QAction *> top = submenu->menu()->actions();
+			auto *cItem = window.findChild<QAction *>(QStringLiteral("syntaxType_%1").arg(LangServices::SRC_C));
+			auto *python = window.findChild<QAction *>(QStringLiteral("syntaxType_%1").arg(LangServices::SRC_PYTHON));
+			check(top.size() == 3 && top.at(0)->objectName() == QStringLiteral("syntaxType_0")
+					&& top.at(1)->menu() != nullptr && top.at(2)->menu() != nullptr
+					&& cItem != nullptr && cItem->isChecked() && cItem->isEnabled()
+					&& python != nullptr && !python->isChecked(),
+				"No Highlighting, A-L and M-Z, the pane's type marked");
+			python->trigger();
+			check(view->syntaxType(0) == LangServices::SRC_PYTHON && view->syntaxType(1) == LangServices::SRC_PYTHON
+					&& view->syntaxLabelForTest(0) == name(LangServices::SRC_PYTHON),
+				"a type from the menu: every pane");
+		}
+
+		// the status bar's column: a pane only, then Auto Syntax again
+		{
+			FileCompareView view;
+			view.resize(900, 400);
+			view.show();
+			open(view, { cLeft, cRight });
+			QStringList seen;
+			int seenSelected = -1;
+			bool seenEnabled = false;
+			lm::PopupList::Selection answer;
+			lm::PopupList::setPresenterForTest([&](const QStringList &items, int selected, bool enabled,
+				const QString &checkBoxText) {
+				seen = items;
+				seenSelected = selected;
+				seenEnabled = enabled;
+				seen.append(checkBoxText);
+				return answer;
+			});
+			const auto click = [&view](int pane) {
+				auto *label = view.findChild<QLabel *>(QStringLiteral("syntaxLabel%1").arg(pane));
+				if (label == nullptr)
+					std::exit(2);
+				QMouseEvent press(QEvent::MouseButtonPress, QPointF(2, 2), label->mapToGlobal(QPointF(2, 2)),
+					Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+				QCoreApplication::sendEvent(label, &press);
+			};
+			// "Auto Syntax", then the types from "No Highlighting" on
+			const int jsonRow = 1 + LangServices::SRC_JSON;
+			answer = { jsonRow, true };
+			click(1);
+			check(seen.value(0) == FileCompareView::tr("Auto Syntax")
+					&& seen.value(1) == name(LangServices::SRC_PLAIN)
+					&& seenSelected == 1 + LangServices::SRC_C && seenEnabled
+					&& seen.last() == FileCompareView::tr("Apply to this pane only"),
+				"the column's list: Auto Syntax and the types, the pane's selected");
+			check(view.syntaxType(0) == LangServices::SRC_C && view.syntaxType(1) == LangServices::SRC_JSON,
+				"Apply to this pane only: that pane's type alone");
+			answer = { 0, true };
+			click(1);
+			check(view.syntaxType(1) == LangServices::SRC_C, "Auto Syntax: its extension's type back");
+			answer = { 1 + LangServices::SRC_PLAIN, false };
+			click(0);
+			check(view.syntaxType(0) == LangServices::SRC_PLAIN && view.syntaxType(1) == LangServices::SRC_PLAIN
+					&& view.syntaxLabelForTest(1) == FileCompareView::tr("Plain Text"),
+				"No Highlighting for both: plain text");
+			answer = {};
+			click(0);
+			check(view.syntaxType(0) == LangServices::SRC_PLAIN, "the list closed: nothing changes");
+			lm::PopupList::setPresenterForTest({});
+			// the popup itself, when shots are asked for: taken and closed
+			const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+			if (!shots.isEmpty())
+			{
+				QTimer::singleShot(300, [&shots]() {
+					if (QWidget *popup = QApplication::activePopupWidget())
+					{
+						popup->grab().save(shots + QStringLiteral("/syntax-popup.png"));
+						popup->close();
+					}
+				});
+				click(1);
+				view.grab().save(shots + QStringLiteral("/syntax-status.png"));
+			}
+		}
+
+		// "Ignore comment differences" goes by the type chosen
+		{
+			const bool comments = mgr->GetBool(OPT_CMP_FILTER_COMMENTLINES);
+			mgr->Set(OPT_CMP_FILTER_COMMENTLINES, true);
+			FileCompareView view;
+			open(view, { write("one.txt", "int a;\n// one\nint b;\n"), write("two.txt", "int a;\n// two\nint b;\n") });
+			const int before = view.diffCount();
+			view.setSyntaxType(LangServices::SRC_C);
+			printf("  differences: %d, then %d\n", before, view.diffCount());
+			check(before == 1 && view.diffCount() == 0,
+				"the comments C/C++ tells apart, once the files are C/C++");
+			mgr->Set(OPT_CMP_FILTER_COMMENTLINES, comments);
+		}
+
+		// "Highlight syntax" off: plain text, nothing to choose
+		{
+			mgr->Set(OPT_SYNTAX_HIGHLIGHT, false);
+			MainWindow window;
+			window.resize(1000, 600);
+			window.show();
+			window.openFileComparison(cLeft, cRight);
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			auto *submenu = window.findChild<QAction *>(QStringLiteral("viewSyntaxHighlight"));
+			if (view == nullptr || submenu == nullptr)
+				return 2;
+			emit submenu->menu()->aboutToShow();
+			auto *cItem = window.findChild<QAction *>(QStringLiteral("syntaxType_%1").arg(LangServices::SRC_C));
+			bool listEnabled = true;
+			lm::PopupList::setPresenterForTest([&listEnabled](const QStringList &, int, bool enabled, const QString &) {
+				listEnabled = enabled;
+				return lm::PopupList::Selection{};
+			});
+			auto *label = view->findChild<QLabel *>(QStringLiteral("syntaxLabel0"));
+			QMouseEvent press(QEvent::MouseButtonPress, QPointF(2, 2), label->mapToGlobal(QPointF(2, 2)),
+				Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+			QCoreApplication::sendEvent(label, &press);
+			lm::PopupList::setPresenterForTest({});
+			check(view->syntaxType(0) == LangServices::SRC_PLAIN
+					&& view->syntaxLabelForTest(0) == name(LangServices::SRC_PLAIN)
+					&& cItem != nullptr && !cItem->isEnabled() && !listEnabled,
+				"Highlight syntax off: No Highlighting, the items and the list disabled");
+			mgr->Set(OPT_SYNTAX_HIGHLIGHT, true);
+		}
+		printf("syntax menu: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

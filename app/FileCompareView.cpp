@@ -24,6 +24,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QRegularExpression>
 #include "Dialogs.h"
 #include <QScrollBar>
 #include <QWheelEvent>
@@ -46,7 +47,9 @@
 #include "GoToDialog.h"
 #include "PaneSearch.h"
 #include "LocationPane.h"
+#include "PopupList.h"
 #include "SyntaxHighlighter.h"
+#include "TextDefinition.h"
 #include "FileOps.h"
 #include "MessageBoxes.h"
 #include "Settings.h"
@@ -1875,6 +1878,12 @@ FileCompareView::FileCompareView(QWidget *parent)
 		statusRow->setSpacing(0);
 		m_posLabels[i] = new QLabel(this);
 		m_posLabels[i]->setContentsMargins(6, 1, 6, 1);
+		// WinMerge's syntax column (COLUMN_SYNTAX): a click shows the types
+		m_syntaxLabels[i] = new ClickableLabel(this, [this, i](const QPoint &globalPos) {
+			showSyntaxTypeMenu(i, globalPos);
+		});
+		m_syntaxLabels[i]->setObjectName(QStringLiteral("syntaxLabel%1").arg(i));
+		m_syntaxLabels[i]->setContentsMargins(6, 1, 6, 1);
 		m_encLabels[i] = new QLabel(this);
 		m_encLabels[i]->setContentsMargins(6, 1, 6, 1);
 		m_eolLabels[i] = new ClickableLabel(this, [this, i](const QPoint &globalPos) {
@@ -1884,6 +1893,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 		});
 		m_eolLabels[i]->setContentsMargins(0, 1, 6, 1);
 		statusRow->addWidget(m_posLabels[i], 1);
+		statusRow->addWidget(m_syntaxLabels[i]);
 		statusRow->addWidget(m_encLabels[i]);
 		statusRow->addWidget(m_eolLabels[i]);
 		column->addLayout(statusRow);
@@ -2120,6 +2130,7 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 		m_headers[i]->setVisible(visible);
 		m_panes[i]->setVisible(visible);
 		m_posLabels[i]->setVisible(visible);
+		m_syntaxLabels[i]->setVisible(visible);
 		m_encLabels[i]->setVisible(visible);
 		m_eolLabels[i]->setVisible(visible);
 		m_diffPaneEdits[i]->setVisible(visible);
@@ -2140,8 +2151,12 @@ bool FileCompareView::compare(const QStringList &paths, QString *error)
 		if (!loadSide(i, paths.at(i), error))
 			return false;
 		m_panes[i]->setReadOnly(m_readOnly[i]);
-		m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
-			m_panes[i]->document(), highlightPath(paths.at(i)));
+	}
+	// OpenDocs: the types the extensions give (SetTextTypesByFileType)
+	for (int i = 0; i < m_paneCount; ++i)
+	{
+		m_syntaxManual[i] = kAutoSyntax;
+		rebuildHighlighter(i);
 	}
 	suggestIgnoreEol();
 	if (!runDiff(error))
@@ -2166,6 +2181,7 @@ void FileCompareView::startBlank()
 		m_headers[i]->setVisible(visible);
 		m_panes[i]->setVisible(visible);
 		m_posLabels[i]->setVisible(visible);
+		m_syntaxLabels[i]->setVisible(visible);
 		m_encLabels[i]->setVisible(visible);
 		m_eolLabels[i]->setVisible(visible);
 		m_diffPaneEdits[i]->setVisible(visible);
@@ -2628,10 +2644,14 @@ bool FileCompareView::runDiff(QString *error, bool countOnly)
 	if (auto substitutions = lm::currentSubstitutionFilters())
 		wrapper.SetSubstitutionList(substitutions);
 	// "Ignore comment differences" needs the language to tell comments
-	// from code: the first pane's, as WinMerge's Rescan takes it (the temp
-	// files carry no extension)
-	wrapper.SetFilterCommentsSourceDef(
-		QFileInfo(highlightPath(m_sides[0].path)).suffix().toLower().toStdString());
+	// from code: the first pane's, as WinMerge's Rescan takes it, its
+	// syntax type, else its extension's (the temp files carry none)
+	if (syntaxType(0) != LangServices::SRC_PLAIN)
+		wrapper.SetFilterCommentsSourceDef(
+			LangServices::GetTextType(static_cast<LangServices::LanguageId>(syntaxType(0))));
+	else
+		wrapper.SetFilterCommentsSourceDef(
+			QFileInfo(highlightPath(m_sides[0].path)).suffix().toLower().toStdString());
 
 	COptionsMgr *mgr = GetOptionsMgr();
 	const bool detectMoved = mgr != nullptr
@@ -3630,16 +3650,107 @@ void FileCompareView::updateHeader(int side)
 	m_headers[side]->setOriginalText(text);
 }
 
+/** RefreshOptions: plain text with "Highlight syntax" off, the type
+    chosen in the menus kept, the others the extensions'. LibreMerge: by
+    the rule the files open with (SetTextTypesByFileType), where upstream's
+    takes each pane's own extension alone, and a file whose extension
+    gives none lost the other's type it opened with. */
 void FileCompareView::refreshSyntaxHighlighting()
 {
-	for (int i = 0; i < 3; ++i)
+	for (int i = 0; i < m_paneCount; ++i)
+		if (m_highlighters[i] != nullptr)
+			rebuildHighlighter(i);
+}
+
+LangServices::TextDefinition *FileCompareView::autoSyntaxDefinition(int pane, int contentPane) const
+{
+	// the extension's type; a file whose extension gives none takes that
+	// of the last pane whose does
+	if (LangServices::TextDefinition *own =
+			SyntaxHighlighter::definitionForPath(highlightPath(m_sides[pane].path)))
+		return own;
+	LangServices::TextDefinition *typed = nullptr;
+	for (int p = 0; p < m_paneCount; ++p)
+		if (LangServices::TextDefinition *def =
+				SyntaxHighlighter::definitionForPath(highlightPath(m_sides[p].path)))
+			typed = def;
+	if (typed != nullptr)
+		return typed;
+	// with none at all, CCrystalTextView::SetTextTypeByContent: XML by the
+	// declaration on the first line
+	static const QRegularExpression xmlDeclaration(QStringLiteral("^\\s*<\\?xml\\s+.+?\\?>\\s*$"));
+	const QStringList lines = collectRealLines(qBound(0, contentPane, m_paneCount - 1));
+	if (!lines.isEmpty() && xmlDeclaration.match(lines.first()).hasMatch())
+		return LangServices::GetTextType(LangServices::SRC_XML);
+	return nullptr;
+}
+
+void FileCompareView::rebuildHighlighter(int pane, int contentPane)
+{
+	LangServices::TextDefinition *def = m_syntaxManual[pane] != kAutoSyntax
+		? LangServices::GetTextType(static_cast<LangServices::LanguageId>(m_syntaxManual[pane]))
+		: autoSyntaxDefinition(pane, contentPane);
+	m_highlighters[pane].reset();
+	m_highlighters[pane] = std::make_unique<SyntaxHighlighter>(m_panes[pane]->document(), def);
+	updateSyntaxLabel(pane);
+}
+
+int FileCompareView::syntaxType(int pane) const
+{
+	return pane >= 0 && pane < 3 && m_highlighters[pane] != nullptr
+		? m_highlighters[pane]->languageType() : static_cast<int>(LangServices::SRC_PLAIN);
+}
+
+QString FileCompareView::syntaxLabelForTest(int pane) const
+{
+	return m_syntaxLabels[pane]->text();
+}
+
+void FileCompareView::updateSyntaxLabel(int pane)
+{
+	// plain text named so while the option colors the files
+	const COptionsMgr *mgr = GetOptionsMgr();
+	const int type = syntaxType(pane);
+	m_syntaxLabels[pane]->setText(type == LangServices::SRC_PLAIN && mgr != nullptr
+			&& mgr->GetBool(OPT_SYNTAX_HIGHLIGHT)
+		? tr("Plain Text") : SyntaxHighlighter::typeName(type));
+}
+
+void FileCompareView::setSyntaxType(int type, int pane)
+{
+	// SetTextType, or SetTextTypeAuto, then FlushAndRescan
+	for (int p = 0; p < m_paneCount; ++p)
 	{
-		if (m_highlighters[i] == nullptr)
+		if (pane >= 0 && p != pane)
 			continue;
-		m_highlighters[i].reset();
-		m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
-			m_panes[i]->document(), highlightPath(m_sides[i].path));
+		m_syntaxManual[p] = type;
+		rebuildHighlighter(p, pane < 0 ? 0 : pane);
 	}
+	rescan();
+}
+
+void FileCompareView::showSyntaxTypeMenu(int pane, const QPoint &globalPos)
+{
+	// "Auto Syntax" and every type, the current one selected, the list
+	// enabled as View > Syntax Highlight's items are; the check box limits
+	// the choice to this pane
+	QList<int> types{ kAutoSyntax };
+	QStringList names{ tr("Auto Syntax") };
+	int selected = 1;
+	for (int type = LangServices::SRC_PLAIN; type < LangServices::SRC_MAX_ENTRY; ++type)
+	{
+		if (type == syntaxType(pane))
+			selected = static_cast<int>(types.size());
+		types.append(type);
+		names.append(SyntaxHighlighter::typeName(type));
+	}
+	const COptionsMgr *mgr = GetOptionsMgr();
+	const lm::PopupList::Selection selection = lm::PopupList::show(this,
+		m_syntaxLabels[pane]->font(), names, selected,
+		mgr != nullptr && mgr->GetBool(OPT_SYNTAX_HIGHLIGHT), tr("Apply to this pane only"), false,
+		globalPos);
+	if (selection.index >= 0)
+		setSyntaxType(types.at(selection.index), selection.checkBoxChecked ? pane : -1);
 }
 
 /** Apply the light (WinMerge classic) or dark palette to every themed
@@ -3677,10 +3788,10 @@ void FileCompareView::applyTheme()
 		m_posLabels[i]->setStyleSheet(statusStyle);
 		m_encLabels[i]->setStyleSheet(statusStyle);
 		m_eolLabels[i]->setStyleSheet(statusStyle);
+		m_syntaxLabels[i]->setStyleSheet(statusStyle);
 		// syntax palettes are theme-specific: rebuild and rehighlight
 		if (m_highlighters[i] != nullptr)
-			m_highlighters[i] = std::make_unique<SyntaxHighlighter>(
-				m_panes[i]->document(), highlightPath(m_sides[i].path));
+			rebuildHighlighter(i);
 	}
 	QPalette locPal = m_locationPane->palette();
 	locPal.setColor(QPalette::Base,
@@ -3788,8 +3899,12 @@ bool FileCompareView::changeFile(int side, const QString &path, const QString &d
 		lm::showError(this, error);
 		return false;
 	}
-	m_highlighters[side] = std::make_unique<SyntaxHighlighter>(
-		m_panes[side]->document(), highlightPath(path));
+	// OpenDocs again: the types the extensions give, of that file and of
+	// the panes that go by theirs
+	m_syntaxManual[side] = kAutoSyntax;
+	for (int p = 0; p < m_paneCount; ++p)
+		if (m_syntaxManual[p] == kAutoSyntax)
+			rebuildHighlighter(p);
 	updateHeader(side);
 
 	// MoveOnLoad: the first difference when the option asks, the first

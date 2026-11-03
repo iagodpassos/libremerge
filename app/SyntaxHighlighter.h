@@ -9,7 +9,7 @@
 
 #include "CrystalLineSyntaxParser.h" // engine: ParseFunc + language lookup
 
-namespace LangServices { struct ISyntaxParser; }
+namespace LangServices { struct ISyntaxParser; struct TextDefinition; }
 class DocumentTextBuffer;
 
 /**
@@ -25,7 +25,19 @@ class SyntaxHighlighter : public QSyntaxHighlighter
 	Q_OBJECT
 public:
 	SyntaxHighlighter(QTextDocument *document, const QString &filePath);
+	/** By a language (CCrystalTextView::SetTextType): none, or SRC_PLAIN's,
+	    for plain text. */
+	SyntaxHighlighter(QTextDocument *document, LangServices::TextDefinition *def);
 	~SyntaxHighlighter() override;
+
+	/** The language a file's extension gives, or none. */
+	static LangServices::TextDefinition *definitionForPath(const QString &filePath);
+	/** WinMerge's name of a syntax type (IDS_COLORSCHEME_*), by
+	    LangServices::LanguageId. */
+	static QString typeName(int type);
+	/** The syntax type it colors by, a LangServices::LanguageId: SRC_PLAIN
+	    for none, and with "Highlight syntax" off. */
+	int languageType() const { return m_type; }
 
 	bool hasLanguage() const { return m_parse != nullptr || m_parser != nullptr; }
 	QString languageName() const { return m_languageName; }
@@ -54,6 +66,7 @@ private:
 	bool m_rehighlighting = false;
 	QTimer m_rehighlightTimer;
 	QString m_languageName;
+	int m_type = 0;
 	// by COLORINDEX: the syntax colors run up to COLORINDEX_USER2 (21)
 	static constexpr int kFormatCount = 32;
 	QTextCharFormat m_formats[kFormatCount];

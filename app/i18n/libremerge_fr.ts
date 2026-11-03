@@ -409,6 +409,21 @@
         <translation>  Sél : %1 | %2</translation>
     </message>
     <message>
+        <source>Plain Text</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Texte brut</translation>
+    </message>
+    <message>
+        <source>Auto Syntax</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Syntaxe automatique</translation>
+    </message>
+    <message>
+        <source>Apply to this pane only</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Appliquer à ce volet uniquement</translation>
+    </message>
+    <message>
         <source>The merge target is read-only.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>La cible de la fusion est en lecture seule.</translation>
@@ -3485,6 +3500,10 @@ Le fichier est peut-être en lecture seule.</translation>
         <translation>&amp;Taille réelle</translation>
     </message>
     <message>
+        <source>Syntax Highlight</source>
+        <translation>Surbrillance syntaxique</translation>
+    </message>
+    <message>
         <source>&amp;View Whitespace</source>
         <translatorcomment>After WinMerge&apos;s &quot;&amp;View Whitespace&quot;.</translatorcomment>
         <translation>Afficher les es&amp;paces</translation>
@@ -4802,6 +4821,25 @@ de 2	à 2
     <message>
         <source>Close</source>
         <translation>Fermer</translation>
+    </message>
+</context>
+<context>
+    <name>SyntaxHighlighter</name>
+    <message>
+        <source>No Highlighting</source>
+        <translation>Aucune surbrillance</translation>
+    </message>
+    <message>
+        <source>Portable Object</source>
+        <translation>Objet portable</translation>
+    </message>
+    <message>
+        <source>Resources</source>
+        <translation>Ressources</translation>
+    </message>
+    <message>
+        <source>Shell</source>
+        <translation>Shell</translation>
     </message>
 </context>
 <context>

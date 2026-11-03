@@ -3,6 +3,8 @@
 
 #include "SyntaxHighlighter.h"
 
+#include <QCoreApplication>
+
 #include <QFileInfo>
 #include <QTextBlock>
 #include <QTextDocument>
@@ -93,16 +95,93 @@ private:
 };
 
 SyntaxHighlighter::SyntaxHighlighter(QTextDocument *document, const QString &filePath)
+	: SyntaxHighlighter(document, definitionForPath(filePath))
+{
+}
+
+LangServices::TextDefinition *SyntaxHighlighter::definitionForPath(const QString &filePath)
+{
+	const std::string ext = QFileInfo(filePath).suffix().toLower().toStdString();
+	return ext.empty() ? nullptr : LangServices::GetTextType(ext.c_str());
+}
+
+QString SyntaxHighlighter::typeName(int type)
+{
+	// WinMerge's IDS_COLORSCHEME_* (Merge.rc), by LanguageId, the names
+	// its catalogs leave as they are untranslated; LibreMerge's ABL is its
+	// own, and WinMerge's RTF is not built here
+	static const std::pair<int, const char *> names[] = {
+		{ LangServices::SRC_PLAIN, QT_TRANSLATE_NOOP("SyntaxHighlighter", "No Highlighting") },
+		{ LangServices::SRC_ABAP, "ABAP" },
+		{ LangServices::SRC_ABL, "ABL/Progress 4GL" },
+		{ LangServices::SRC_ADA, "Ada" },
+		{ LangServices::SRC_ASP, "ASP" },
+		{ LangServices::SRC_AUTOIT, "AutoIt" },
+		{ LangServices::SRC_BASIC, "Basic" },
+		{ LangServices::SRC_BATCH, "Batch" },
+		{ LangServices::SRC_C, "C/C++" },
+		{ LangServices::SRC_CSHARP, "C#" },
+		{ LangServices::SRC_CSS, "CSS" },
+		{ LangServices::SRC_DCL, "DCL" },
+		{ LangServices::SRC_DLANG, "D" },
+		{ LangServices::SRC_FORTRAN, "Fortran" },
+		{ LangServices::SRC_FSHARP, "F#" },
+		{ LangServices::SRC_FSHARP_SIGNATURE, "F# Signature" },
+		{ LangServices::SRC_GO, "Go" },
+		{ LangServices::SRC_HTML, "HTML" },
+		{ LangServices::SRC_INI, "INI" },
+		{ LangServices::SRC_INNOSETUP, "InnoSetup" },
+		{ LangServices::SRC_INSTALLSHIELD, "InstallShield" },
+		{ LangServices::SRC_JAVA, "Java" },
+		{ LangServices::SRC_JAVASCRIPT, "JavaScript" },
+		{ LangServices::SRC_JSON, "JSON" },
+		{ LangServices::SRC_LISP, "AutoLISP" },
+		{ LangServices::SRC_LUA, "Lua" },
+		{ LangServices::SRC_MARKDOWN, "Markdown" },
+		{ LangServices::SRC_MATLAB, "MATLAB" },
+		{ LangServices::SRC_NSIS, "NSIS" },
+		{ LangServices::SRC_PASCAL, "Pascal" },
+		{ LangServices::SRC_PERL, "Perl" },
+		{ LangServices::SRC_PHP, "PHP" },
+		{ LangServices::SRC_PO, QT_TRANSLATE_NOOP("SyntaxHighlighter", "Portable Object") },
+		{ LangServices::SRC_POWERSHELL, "PowerShell" },
+		{ LangServices::SRC_PROPERTIES, "Properties" },
+		{ LangServices::SRC_PYTHON, "Python" },
+		{ LangServices::SRC_REXX, "REXX" },
+		{ LangServices::SRC_RSRC, QT_TRANSLATE_NOOP("SyntaxHighlighter", "Resources") },
+		{ LangServices::SRC_RUBY, "Ruby" },
+		{ LangServices::SRC_RUST, "Rust" },
+		{ LangServices::SRC_SGML, "SGML" },
+		{ LangServices::SRC_SH, QT_TRANSLATE_NOOP("SyntaxHighlighter", "Shell") },
+		{ LangServices::SRC_SIOD, "SIOD" },
+		{ LangServices::SRC_SMARTY, "Smarty" },
+		{ LangServices::SRC_SQL, "SQL" },
+		{ LangServices::SRC_TCL, "TCL" },
+		{ LangServices::SRC_TEX, "TEX" },
+		{ LangServices::SRC_TOML, "TOML" },
+		{ LangServices::SRC_TSX, "TypeScript JSX" },
+		{ LangServices::SRC_TYPESCRIPT, "TypeScript" },
+		{ LangServices::SRC_VERILOG, "Verilog" },
+		{ LangServices::SRC_VHDL, "VHDL" },
+		{ LangServices::SRC_XML, "XML" },
+		{ LangServices::SRC_YAML, "YAML" },
+	};
+	for (const auto &[id, name] : names)
+		if (id == type)
+			return QCoreApplication::translate("SyntaxHighlighter", name);
+	return QString();
+}
+
+SyntaxHighlighter::SyntaxHighlighter(QTextDocument *document, LangServices::TextDefinition *def)
 	// the document comes last (setDocument below): a parser of the whole
 	// document then hears of an edit before the highlighting does
 	: QSyntaxHighlighter(static_cast<QObject *>(document))
 {
-	const std::string ext = QFileInfo(filePath).suffix().toLower().toStdString();
-	LangServices::TextDefinition *def = ext.empty() ? nullptr : LangServices::GetTextType(ext.c_str());
 	// WinMerge's "Highlight syntax" off: plain text (SRC_PLAIN)
 	const COptionsMgr *options = GetOptionsMgr();
 	if (options != nullptr && !options->GetBool(OPT_SYNTAX_HIGHLIGHT))
 		def = nullptr;
+	m_type = def != nullptr ? static_cast<int>(def->type) : static_cast<int>(LangServices::SRC_PLAIN);
 	if (def != nullptr && def->type != LangServices::LanguageId::SRC_PLAIN)
 	{
 		// the parser WinMerge's view takes, the registry's for the

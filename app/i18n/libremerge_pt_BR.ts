@@ -363,6 +363,18 @@
         <translation>  Sel: %1 | %2</translation>
     </message>
     <message>
+        <source>Plain Text</source>
+        <translation>Texto Simples</translation>
+    </message>
+    <message>
+        <source>Auto Syntax</source>
+        <translation>Sintaxe Automática</translation>
+    </message>
+    <message>
+        <source>Apply to this pane only</source>
+        <translation>Aplicar somente a este painel</translation>
+    </message>
+    <message>
         <source>No differences found to select</source>
         <translation>Nenhuma diferença encontrada para selecionar</translation>
     </message>
@@ -3152,6 +3164,10 @@ O arquivo pode ser somente leitura.</translation>
         <translation>Tamanho Ori&amp;ginal</translation>
     </message>
     <message>
+        <source>Syntax Highlight</source>
+        <translation>Destaque de Sintaxe</translation>
+    </message>
+    <message>
         <source>&amp;View Whitespace</source>
         <translation>Ver Espaços em &amp;Branco</translation>
     </message>
@@ -4398,6 +4414,25 @@ de2	para2
     <message>
         <source>Close</source>
         <translation>Fechar</translation>
+    </message>
+</context>
+<context>
+    <name>SyntaxHighlighter</name>
+    <message>
+        <source>No Highlighting</source>
+        <translation>Sem Destaque</translation>
+    </message>
+    <message>
+        <source>Portable Object</source>
+        <translation>Objeto Portátil</translation>
+    </message>
+    <message>
+        <source>Resources</source>
+        <translation>Recursos</translation>
+    </message>
+    <message>
+        <source>Shell</source>
+        <translation>Shell</translation>
     </message>
 </context>
 <context>

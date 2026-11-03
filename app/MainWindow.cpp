@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "MainWindow.h"
+#include "SyntaxHighlighter.h"
+#include "TextDefinition.h"
 
 #include <QAbstractButton>
 #include <QAction>
@@ -589,6 +591,42 @@ MainWindow::MainWindow(QWidget *parent)
 			else if (auto *image = imageView()) image->zoomReset();
 			else if (auto *hex = hexView()) hex->zoomReset();
 		});
+	// WinMerge's View > Syntax Highlight (OnUpdateViewChangeScheme,
+	// OnChangeScheme, OnUpdateChangeScheme): "No Highlighting", then the
+	// types from A to L and from M to Z, the active pane's marked, for
+	// every pane
+	QMenu *syntaxMenu = viewMenu->addMenu(tr("Syntax Highlight"));
+	syntaxMenu->menuAction()->setObjectName(QStringLiteral("viewSyntaxHighlight"));
+	connect(viewMenu, &QMenu::aboutToShow, this, [syntaxMenu, fileView]() {
+		syntaxMenu->menuAction()->setEnabled(fileView() != nullptr);
+	});
+	connect(syntaxMenu, &QMenu::aboutToShow, this, [this, syntaxMenu, fileView]() {
+		syntaxMenu->clear();
+		FileCompareView *view = fileView();
+		if (view == nullptr)
+			return;
+		const COptionsMgr *mgr = GetOptionsMgr();
+		const bool enabled = mgr != nullptr && mgr->GetBool(OPT_SYNTAX_HIGHLIGHT);
+		const int current = view->syntaxType(view->activePane());
+		auto *group = new QActionGroup(syntaxMenu);
+		const auto add = [&](QMenu *menu, int type) {
+			QAction *action = menu->addAction(SyntaxHighlighter::typeName(type));
+			action->setObjectName(QStringLiteral("syntaxType_%1").arg(type));
+			action->setCheckable(true);
+			action->setChecked(type == current);
+			action->setEnabled(enabled);
+			group->addAction(action);
+			connect(action, &QAction::triggered, this, [fileView, type]() {
+				if (FileCompareView *target = fileView())
+					target->setSyntaxType(type);
+			});
+		};
+		add(syntaxMenu, LangServices::SRC_PLAIN);
+		QMenu *firstHalf = syntaxMenu->addMenu(QStringLiteral("A-L"));
+		QMenu *secondHalf = syntaxMenu->addMenu(QStringLiteral("M-Z"));
+		for (int type = LangServices::SRC_PLAIN + 1; type < LangServices::SRC_MAX_ENTRY; ++type)
+			add(type < LangServices::SRC_MARKDOWN ? firstHalf : secondHalf, type);
+	});
 	viewMenu->addSeparator();
 	// WinMerge's View Whitespace and View EOL (OnViewWhitespace, OnViewEOL)
 	// of the text window: the option turned over, the open comparisons
