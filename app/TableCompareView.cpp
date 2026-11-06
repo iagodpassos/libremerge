@@ -2967,6 +2967,9 @@ void TableCompareView::buildCellMenu(int side, QMenu *menu)
 void TableCompareView::selectCellsForTest(int side, int fromRow, int fromColumn, int toRow,
 	int toColumn)
 {
+	// the grid takes the focus, as a click on a cell gives it: in a window
+	// that is active another grid may have it, and activeSide() goes by it
+	m_tables[side]->setFocus(Qt::OtherFocusReason);
 	setActiveSide(side);
 	QItemSelectionModel *selection = m_tables[side]->selectionModel();
 	selection->clearSelection();
