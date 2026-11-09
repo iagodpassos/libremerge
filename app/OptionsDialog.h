@@ -16,14 +16,17 @@ class QTreeWidgetItem;
 
 namespace lm
 {
+class SubeditList;
 struct TableSettings;
+class WildcardDropList;
 }
 
 /**
  * The application options dialog, laid out like WinMerge's (Preferences
  * dialog): a page tree on the left, where a category's pages sit indented
  * under it (General; Compare > General, Folder, Table, Binary, Image;
- * Message Boxes; Editor > General; Backup Files; Codepage), and the
+ * Message Boxes; Editor > General, Compare/Merge, Syntax; Backup Files;
+ * Codepage), and the
  * selected page on the right with its own Defaults button. Every option
  * sits on the page and at the position WinMerge gives it.
  */
@@ -84,6 +87,7 @@ public:
 		MessageBoxesPage,
 		EditorPage,  ///< Editor > General
 		EditorCompareMergePage, ///< Editor > Compare/Merge
+		EditorSyntaxPage, ///< Editor > Syntax
 		BackupPage,
 		CodepagePage,
 	};
@@ -111,6 +115,8 @@ public:
 	void setMessageBoxAnswerForTest(int row, int answerIndex);
 	void resetMessageBoxesForTest() { resetMessageBoxes(); }
 	void saveForTest() { save(); }
+	/** The Editor > Syntax list (for tests). */
+	lm::SubeditList *syntaxListForTest() const { return m_syntaxList; }
 
 protected:
 	bool eventFilter(QObject *watched, QEvent *event) override;
@@ -130,6 +136,7 @@ private:
 	QWidget *buildEditorPage();
 	QWidget *buildEditorCompareMergePage();
 	void updateLineDiffControls();
+	QWidget *buildEditorSyntaxPage();
 	QWidget *buildBackupPage();
 	QWidget *buildCodepagePage();
 	void showCustomCodepage(int codepage);
@@ -154,17 +161,17 @@ private:
 	QComboBox *m_cmbAutoComplete;
 	QComboBox *m_cmbAutoReload;
 	// Compare > Table
-	QComboBox *m_cmbCsvPatterns = nullptr;
+	lm::WildcardDropList *m_cmbCsvPatterns = nullptr;
 	QLineEdit *m_editCsvDelimiter = nullptr;
-	QComboBox *m_cmbTsvPatterns = nullptr;
-	QComboBox *m_cmbDsvPatterns = nullptr;
+	lm::WildcardDropList *m_cmbTsvPatterns = nullptr;
+	lm::WildcardDropList *m_cmbDsvPatterns = nullptr;
 	QLineEdit *m_editDsvDelimiter = nullptr;
 	QCheckBox *m_chkAllowNewlines = nullptr;
 	QLineEdit *m_editQuote = nullptr;
 	// Compare > Binary
-	QComboBox *m_cmbBinaryPatterns = nullptr;
+	lm::WildcardDropList *m_cmbBinaryPatterns = nullptr;
 	// Compare > Image
-	QComboBox *m_cmbImagePatterns = nullptr;
+	lm::WildcardDropList *m_cmbImagePatterns = nullptr;
 	QCheckBox *m_chkImageInFolderCompare = nullptr;
 	QComboBox *m_cmbTheme;
 	QComboBox *m_cmbLanguage;
@@ -199,6 +206,8 @@ private:
 	QRadioButton *m_radWordLevel = nullptr;
 	QComboBox *m_cmbBreakType = nullptr;
 	QLineEdit *m_editBreakChars = nullptr;
+	// Editor > Syntax
+	lm::SubeditList *m_syntaxList = nullptr;
 	// Message Boxes
 	QTreeWidget *m_messageList;
 	// the Answer drop-down of each question, by row (null for the

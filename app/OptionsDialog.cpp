@@ -10,14 +10,17 @@
 #include "ItemCheckStyle.h"
 #include "MessageBoxes.h"
 #include "Settings.h"
+#include "SubeditList.h"
 #include "TableFiles.h"
 #include "Theme.h"
+#include "WildcardDropList.h"
 
 #include <algorithm>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFocusEvent>
+#include <QFontInfo>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -37,6 +40,8 @@
 #include "ExConverter.h"
 #include "OptionsMgr.h"
 #include "OptionsDef.h"
+#include "OptionsEditorSyntax.h"
+#include "TextDefinition.h"
 #include "charsets.h"
 
 namespace
@@ -68,40 +73,14 @@ void addLabeled(QVBoxLayout *box, const QString &label, QWidget *control)
 	box->addWidget(control);
 }
 
-const char *const kPatternsProperty = "lmPatterns";
-
-/** The patterns of a pattern list, kept apart from the field: picking an
-    item of the drop-down would leave it in the field otherwise. */
-void setPatterns(QComboBox *combo, const QString &patterns)
+/** WinMerge's pattern fields of the Compare pages (WildcardDropList with
+    6 buttons to a row), their drop-down offering WinMerge's defaults. */
+lm::WildcardDropList *patternList(QWidget *parent, const QString &fixedPatterns)
 {
-	combo->setProperty(kPatternsProperty, patterns);
-	combo->setEditText(patterns);
-	// a long list shows from its first pattern, as upstream's field does
-	combo->lineEdit()->setCursorPosition(0);
-}
-
-/** WinMerge's WildcardDropList: a pattern list whose drop-down holds the
-    default patterns, each picked turning on or off in the field, which
-    also takes any pattern typed. */
-void setUpPatternList(QComboBox *combo, const QString &fixedPatterns)
-{
-	combo->setEditable(true);
-	combo->setInsertPolicy(QComboBox::NoInsert);
-	combo->addItems(fixedPatterns.split(QLatin1Char(';'), Qt::SkipEmptyParts));
-	QObject::connect(combo->lineEdit(), &QLineEdit::textEdited, combo,
-		[combo](const QString &text) { combo->setProperty(kPatternsProperty, text); });
-	QObject::connect(combo, &QComboBox::activated, combo, [combo](int index) {
-		const QString pattern = combo->itemText(index);
-		QStringList patterns = combo->property(kPatternsProperty).toString()
-			.split(QLatin1Char(';'), Qt::SkipEmptyParts);
-		for (QString &p : patterns)
-			p = p.trimmed();
-		if (patterns.contains(pattern))
-			patterns.removeAll(pattern);
-		else
-			patterns.append(pattern);
-		setPatterns(combo, patterns.join(QLatin1Char(';')));
-	});
+	auto *list = new lm::WildcardDropList(parent);
+	list->setColumns(6);
+	list->setFixedPatterns(fixedPatterns);
+	return list;
 }
 
 /** A field for one character, as narrow as WinMerge's. */
@@ -215,6 +194,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	QTreeWidgetItem *editor = addCategory(nullptr, tr("Editor"), -1);
 	addCategory(editor, tr("General"), EditorPage);
 	addCategory(editor, tr("Compare/Merge"), EditorCompareMergePage);
+	addCategory(editor, tr("Syntax"), EditorSyntaxPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	addCategory(nullptr, tr("Codepage"), CodepagePage);
 	m_categories->expandAll();
@@ -231,6 +211,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildMessageBoxesPage());
 	m_pages->addWidget(buildEditorPage());
 	m_pages->addWidget(buildEditorCompareMergePage());
+	m_pages->addWidget(buildEditorSyntaxPage());
 	m_pages->addWidget(buildBackupPage());
 	m_pages->addWidget(buildCodepagePage());
 	pageArea->addWidget(m_pages, 1);
@@ -446,8 +427,7 @@ QWidget *OptionsDialog::buildTablePage()
 
 	auto *csv = new QGroupBox(tr("CSV"), page);
 	auto *csvLayout = new QVBoxLayout(csv);
-	m_cmbCsvPatterns = new QComboBox(csv);
-	setUpPatternList(m_cmbCsvPatterns, defaults.csvFilePatterns);
+	m_cmbCsvPatterns = patternList(csv, defaults.csvFilePatterns);
 	addLabeled(csvLayout, tr("File patterns:"), m_cmbCsvPatterns);
 	m_editCsvDelimiter = characterField(csv);
 	addLabeled(csvLayout, tr("D&elimiter character:"), m_editCsvDelimiter);
@@ -455,15 +435,13 @@ QWidget *OptionsDialog::buildTablePage()
 
 	auto *tsv = new QGroupBox(tr("TSV"), page);
 	auto *tsvLayout = new QVBoxLayout(tsv);
-	m_cmbTsvPatterns = new QComboBox(tsv);
-	setUpPatternList(m_cmbTsvPatterns, defaults.tsvFilePatterns);
+	m_cmbTsvPatterns = patternList(tsv, defaults.tsvFilePatterns);
 	addLabeled(tsvLayout, tr("File patterns:"), m_cmbTsvPatterns);
 	box->addWidget(tsv);
 
 	auto *dsv = new QGroupBox(tr("Custom Delimiter-Separated Values"), page);
 	auto *dsvLayout = new QVBoxLayout(dsv);
-	m_cmbDsvPatterns = new QComboBox(dsv);
-	setUpPatternList(m_cmbDsvPatterns, defaults.dsvFilePatterns);
+	m_cmbDsvPatterns = patternList(dsv, defaults.dsvFilePatterns);
 	addLabeled(dsvLayout, tr("File patterns:"), m_cmbDsvPatterns);
 	m_editDsvDelimiter = characterField(dsv);
 	addLabeled(dsvLayout, tr("D&elimiter character:"), m_editDsvDelimiter);
@@ -485,8 +463,7 @@ QWidget *OptionsDialog::buildBinaryPage()
 {
 	auto *page = new QWidget(this);
 	auto *box = new QVBoxLayout(page);
-	m_cmbBinaryPatterns = new QComboBox(page);
-	setUpPatternList(m_cmbBinaryPatterns, lm::defaultBinaryFilePatterns());
+	m_cmbBinaryPatterns = patternList(page, lm::defaultBinaryFilePatterns());
 	addLabeled(box, tr("Binary file &patterns:"), m_cmbBinaryPatterns);
 
 	auto *group = new QGroupBox(tr("Hex editor settings"), page);
@@ -526,8 +503,7 @@ QWidget *OptionsDialog::buildImagePage()
 {
 	auto *page = new QWidget(this);
 	auto *box = new QVBoxLayout(page);
-	m_cmbImagePatterns = new QComboBox(page);
-	setUpPatternList(m_cmbImagePatterns, lm::defaultImageFilePatterns());
+	m_cmbImagePatterns = patternList(page, lm::defaultImageFilePatterns());
 	addLabeled(box, tr("Image file &patterns:"), m_cmbImagePatterns);
 	m_chkImageInFolderCompare = new QCheckBox(
 		tr("&Enable image compare in folder compare"), page);
@@ -750,6 +726,42 @@ void OptionsDialog::updateLineDiffControls()
     the field is left for another control, by key, click or accelerator
     (the page saves it within range all the same). Not when the window
     goes to the back or closes. */
+/** WinMerge's Editor > Syntax page (PropEditorSyntax): each file type
+    with its extensions, in the order of the types (LangServices'
+    LanguageId), the extensions edited in a pattern field whose drop-down
+    offers the type's own (InitList). */
+QWidget *OptionsDialog::buildEditorSyntaxPage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+	m_syntaxList = new lm::SubeditList(page);
+	m_syntaxList->setObjectName(QStringLiteral("syntaxList"));
+	m_syntaxList->setHeaderLabels({ tr("File Type"), tr("Extension") });
+	// the columns 60 and 256 points wide by WinMerge's 9-point dialog
+	// font, measured here by the list's: the same pixels at 96 dpi, and
+	// wide enough for the type names at the Mac's 72, where points alone
+	// cut them
+	const qreal perPoint = QFontInfo(m_syntaxList->font()).pixelSize() / 9.0;
+	m_syntaxList->setColumnWidth(0, qRound(60 * perPoint));
+	m_syntaxList->setColumnWidth(1, qRound(256 * perPoint));
+	m_syntaxList->setReadOnlyColumn(0);
+	m_syntaxList->setWildcardDropListColumn(1);
+	String fixedPattern[LangServices::SRC_MAX_ENTRY];
+	Options::EditorSyntax::GetDefaults(GetOptionsMgr(), fixedPattern);
+	for (int i = LangServices::SRC_ABAP; i < LangServices::SRC_MAX_ENTRY; ++i)
+	{
+		const LangServices::TextDefinition *def = LangServices::GetTextType(i);
+		if (def == nullptr)
+			continue;
+		auto *item = new QTreeWidgetItem(m_syntaxList);
+		item->setText(0, QString::fromUtf8(def->name));
+		m_syntaxList->setDropListFixedPattern(i - 1, 1,
+			QString::fromStdString(fixedPattern[i - 1]));
+	}
+	box->addWidget(m_syntaxList, 1);
+	return page;
+}
+
 bool OptionsDialog::eventFilter(QObject *watched, QEvent *event)
 {
 	if (watched == m_editTabSize && event->type() == QEvent::FocusOut)
@@ -961,9 +973,14 @@ void OptionsDialog::load()
 	}
 	m_cmbCompareMethod->setCurrentIndex(lm::currentCompareMethod());
 	showTableSettings(lm::TableSettings::load());
-	setPatterns(m_cmbBinaryPatterns, lm::binaryFilePatterns());
-	setPatterns(m_cmbImagePatterns, lm::imageFilePatterns());
+	m_cmbBinaryPatterns->setPatterns(lm::binaryFilePatterns());
+	m_cmbImagePatterns->setPatterns(lm::imageFilePatterns());
 	m_chkImageInFolderCompare->setChecked(lm::imageCompareInFolderCompare());
+	// Editor > Syntax (PropEditorSyntax::ReadOptions)
+	String extensions[LangServices::SRC_MAX_ENTRY];
+	Options::EditorSyntax::Load(GetOptionsMgr(), extensions);
+	for (int row = 0; row < m_syntaxList->topLevelItemCount(); ++row)
+		m_syntaxList->topLevelItem(row)->setText(1, QString::fromStdString(extensions[row]));
 	loadMessageBoxes();
 }
 
@@ -1026,6 +1043,14 @@ void OptionsDialog::save()
 		mgr->SaveOption(OPT_BREAK_ON_WORDS, m_radWordLevel->isChecked());
 		mgr->SaveOption(OPT_BREAK_TYPE, m_cmbBreakType->currentIndex());
 		mgr->SaveOption(OPT_BREAK_SEPARATORS, m_editBreakChars->text().toStdString());
+		// Editor > Syntax (PropEditorSyntax::WriteOptions): each type's
+		// extensions without the ones another of them takes in, saved and
+		// handed to the type lookup at once
+		String extensions[LangServices::SRC_MAX_ENTRY];
+		for (int row = 0; row < m_syntaxList->topLevelItemCount(); ++row)
+			extensions[row] = lm::removeDuplicatePatterns(
+				m_syntaxList->topLevelItem(row)->text(1)).toStdString();
+		Options::EditorSyntax::Save(mgr, extensions);
 		int mode = 0;
 		for (int i = 0; i < 3; ++i)
 			if (m_radCodepage[i]->isChecked())
@@ -1082,10 +1107,10 @@ void OptionsDialog::save()
 
 void OptionsDialog::showTableSettings(const lm::TableSettings &table)
 {
-	setPatterns(m_cmbCsvPatterns, table.csvFilePatterns);
+	m_cmbCsvPatterns->setPatterns(table.csvFilePatterns);
 	m_editCsvDelimiter->setText(table.csvDelimiter);
-	setPatterns(m_cmbTsvPatterns, table.tsvFilePatterns);
-	setPatterns(m_cmbDsvPatterns, table.dsvFilePatterns);
+	m_cmbTsvPatterns->setPatterns(table.tsvFilePatterns);
+	m_cmbDsvPatterns->setPatterns(table.dsvFilePatterns);
 	m_editDsvDelimiter->setText(table.dsvDelimiter);
 	m_chkAllowNewlines->setChecked(table.allowNewlinesInQuotes);
 	m_editQuote->setText(table.quote);
@@ -1132,10 +1157,10 @@ void OptionsDialog::restoreDefaults(int page)
 		showTableSettings(lm::TableSettings());
 		break;
 	case BinaryPage:
-		setPatterns(m_cmbBinaryPatterns, lm::defaultBinaryFilePatterns());
+		m_cmbBinaryPatterns->setPatterns(lm::defaultBinaryFilePatterns());
 		break;
 	case ImagePage:
-		setPatterns(m_cmbImagePatterns, lm::defaultImageFilePatterns());
+		m_cmbImagePatterns->setPatterns(lm::defaultImageFilePatterns());
 		m_chkImageInFolderCompare->setChecked(false);
 		break;
 	case MessageBoxesPage:
@@ -1163,6 +1188,15 @@ void OptionsDialog::restoreDefaults(int page)
 			updateLineDiffControls();
 		}
 		break;
+	case EditorSyntaxPage:
+	{
+		// PropEditorSyntax::OnDefaults
+		String extensions[LangServices::SRC_MAX_ENTRY];
+		Options::EditorSyntax::GetDefaults(GetOptionsMgr(), extensions);
+		for (int row = 0; row < m_syntaxList->topLevelItemCount(); ++row)
+			m_syntaxList->topLevelItem(row)->setText(1, QString::fromStdString(extensions[row]));
+		break;
+	}
 	case BackupPage:
 		m_chkBackup->setChecked(true);
 		break;

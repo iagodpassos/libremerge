@@ -55,6 +55,7 @@ set(L1_SOURCES
 )
 set(L2_SOURCES
   Src/CompareOptions.cpp
+  Src/OptionsEditorSyntax.cpp
   Src/CompareStats.cpp
   Src/DiffWrapper.cpp
   Src/DiffList.cpp

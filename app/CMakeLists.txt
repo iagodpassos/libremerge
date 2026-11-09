@@ -28,6 +28,8 @@ qt_add_executable(LibreMerge
   HexDialogs.cpp
   FilepathEdit.cpp
   OptionsDialog.cpp
+  SubeditList.cpp
+  WildcardDropList.cpp
   FiltersDialog.cpp
   FileFilterCombo.cpp
   FileFilterMenu.cpp

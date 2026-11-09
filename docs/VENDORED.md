@@ -19,7 +19,7 @@ LibreMerge vendors the comparison engine of **WinMerge**.
 | `engine/Externals/xdiff/` | `Externals/xdiff/` | git's xdiff (histogram/patience algorithms) |
 | `engine/Src/CompareEngines/` | `Src/CompareEngines/` | Folder-compare methods (byte, binary, time/size, existence, quick) |
 | `engine/Src/FilterEngine/` | `Src/FilterEngine/` | Filter expression language (re2c lexer, lemon parser) |
-| `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect`, `TableProps` (the table layout `DiffWrapper` takes), `TreeSitterParser` (Tree-sitter highlighting and comment detection) |
+| `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect`, `TableProps` (the table layout `DiffWrapper` takes), `TreeSitterParser` (Tree-sitter highlighting and comment detection), `OptionsEditorSyntax` (the extensions of each file type, Options > Editor > Syntax) |
 | `engine/Src/Common/` | `Src/Common/` | Portable utilities: `unicoder`, `UnicodeString`, `UniFile`, `paths`, `OptionsMgr`/`IniOptionsMgr`, `charsets`, `TempFile` support |
 | `tests/` | `Testing/GoogleTest/` | Upstream unit tests for the engine + `TestData/` |
 | `engine/Externals/tree-sitter/` | `Externals/tree-sitter/` | [Tree-sitter](https://github.com/tree-sitter/tree-sitter)'s runtime, 0.25.10, as WinMerge vendors it (`lib.c` builds it) — MIT, its Unicode headers under ICU's license |
@@ -120,10 +120,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 690 | 188 | 256 | 3 | 3 |
-| Spanish | 676 | 200 | 254 | 10 | 0 |
-| Catalan | 367 | 192 | 256 | 325 | 0 |
-| French | 692 | 207 | 238 | 3 | 0 |
+| German | 693 | 188 | 256 | 3 | 3 |
+| Spanish | 679 | 200 | 254 | 10 | 0 |
+| Catalan | 370 | 192 | 256 | 325 | 0 |
+| French | 695 | 207 | 238 | 3 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -183,6 +183,11 @@ says so in a comment:
   Add to Substitution Filters does with its own. Upstream
   (`CMergeEditView::OnAddToLineFilters`) only adds to the list, so with
   the filters off, their default, nothing changes on screen.
+- A pattern of the drop-down of a pattern field (`WildcardDropList`, in
+  Options > Compare > Table, Binary and Image and in Options > Editor >
+  Syntax) comes back whole as the drop-down closes. Upstream copies each
+  pattern into a buffer of 20 characters, so one longer than 19 was
+  shown cut and, once a pattern was clicked, saved cut.
 
 Where upstream falls back on Windows' line ending, LibreMerge falls back
 on the one of macOS and Linux:

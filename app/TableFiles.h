@@ -60,6 +60,10 @@ QList<TableProps> tablePropertiesOfSides(const QStringList &paths);
     null QChar) for an empty field. */
 QChar characterOfField(const QString &text);
 
+/** PathMatchSpec: whether a name matches one of a list of wildcards
+    (separated by ';' or spaces), without case. */
+bool pathMatchSpec(const QString &name, const QString &specs);
+
 /** WildcardRemoveDuplicatePatterns: a pattern that a later one of the
     list takes in goes. */
 QString removeDuplicatePatterns(const QString &patterns);

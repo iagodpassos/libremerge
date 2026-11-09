@@ -4251,6 +4251,18 @@ Bitte benutzen Sie Werte von 1 - %1.</translation>
         <translation>Vergleichen/Zusammenführen</translation>
     </message>
     <message>
+        <source>Syntax</source>
+        <translation>Syntax</translation>
+    </message>
+    <message>
+        <source>File Type</source>
+        <translation>Dateityp</translation>
+    </message>
+    <message>
+        <source>Extension</source>
+        <translation>Erweiterung</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Sicherungsdateien</translation>
     </message>

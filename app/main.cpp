@@ -67,11 +67,13 @@
 #include <QTranslator>
 #include "FileCompareView.h"
 #include "PopupList.h"
+#include "SubeditList.h"
 #include "SyntaxHighlighter.h"
 #include "TextDefinition.h"
 #include "SyntaxColors.h"
 #include "TableCompareView.h"
 #include "TableFiles.h"
+#include "WildcardDropList.h"
 #include "Settings.h"
 #include "ImageCompareView.h"
 #include "ImageFormats.h"
@@ -670,6 +672,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestSyntaxMenuOpt(QStringLiteral("selftest-syntax-menu"),
 		QStringLiteral("Exercise View > Syntax Highlight and the status bar's syntax column (for testing)"));
 	parser.addOption(selftestSyntaxMenuOpt);
+	QCommandLineOption selftestSyntaxOptionsOpt(QStringLiteral("selftest-syntax-options"),
+		QStringLiteral("Exercise Options > Editor > Syntax and the pattern fields' drop-down (for testing)"));
+	parser.addOption(selftestSyntaxOptionsOpt);
 	QCommandLineOption selftestIgnoredDiffsOpt(QStringLiteral("selftest-ignored-diffs"),
 		QStringLiteral("Count the ignored differences apart in the status bar and in Go To (for testing)"));
 	parser.addOption(selftestIgnoredDiffsOpt);
@@ -1648,13 +1653,13 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
 			OptionsDialog::BinaryPage, OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
 			-1, OptionsDialog::EditorPage, OptionsDialog::EditorCompareMergePage,
-			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
-		bool ok = tree.size() == 13;
+			OptionsDialog::EditorSyntaxPage, OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
+		bool ok = tree.size() == 14;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1665,16 +1670,16 @@ int main(int argc, char *argv[])
 			OptionsDialog::FolderPage, OptionsDialog::TablePage, OptionsDialog::BinaryPage,
 			OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
 			OptionsDialog::EditorPage, OptionsDialog::EditorPage,
-			OptionsDialog::EditorCompareMergePage, OptionsDialog::BackupPage,
-			OptionsDialog::CodepagePage };
-		for (int i = 0; ok && i < 13; ++i)
+			OptionsDialog::EditorCompareMergePage, OptionsDialog::EditorSyntaxPage,
+			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
+		for (int i = 0; ok && i < 14; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
 			printf("item %d: page %d, title \"%s\"\n", i,
 				dialog.currentPageForTest(), qPrintable(dialog.windowTitle()));
 			ok = dialog.currentPageForTest() == expectedPage[i]
-				&& nested == ((i >= 1 && i <= 6) || (i >= 8 && i <= 10));
+				&& nested == ((i >= 1 && i <= 6) || (i >= 8 && i <= 11));
 		}
 
 		const auto boxes = [&dialog](OptionsDialog::Page page) {
@@ -1699,7 +1704,7 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(11); // Backup Files
+		dialog.selectCategoryForTest(12); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 
@@ -8804,6 +8809,249 @@ int main(int argc, char *argv[])
 		return ok ? 0 : 1;
 	}
 
+	if (parser.isSet(selftestSyntaxOptionsOpt))
+	{
+		// WinMerge's WildcardDropList (the pattern fields of the Compare
+		// pages and of the Syntax list) and its Editor > Syntax page
+		// (PropEditorSyntax, Options::EditorSyntax): each file type's
+		// extensions, saved and handed to the type lookup
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto key = [](QWidget *target, int key, Qt::KeyboardModifiers modifiers = Qt::NoModifier,
+			const QString &text = QString()) {
+			QKeyEvent press(QEvent::KeyPress, key, modifiers, text);
+			QApplication::sendEvent(target, &press);
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+
+		// the drop-down
+		{
+			QWidget host;
+			host.resize(420, 80);
+			auto *field = new lm::WildcardDropList(&host);
+			field->setGeometry(10, 10, 400, field->sizeHint().height());
+			field->setFixedPatterns(QStringLiteral("*.csv;*.txt"));
+			host.show();
+			int closed = 0;
+			QObject::connect(field, &lm::WildcardDropList::closedUp, [&closed]() { ++closed; });
+			field->setPatterns(QStringLiteral("*.csv;*.abc"));
+			field->showPopup();
+			check(field->isPopupVisibleForTest()
+					&& field->popupPatternsForTest() == QStringList({ QStringLiteral("*.csv"),
+						QStringLiteral("*.txt"), QStringLiteral("*.abc") })
+					&& field->popupLitForTest() == QList<bool>({ true, false, true }),
+				"the defaults, lit when the field takes them in, then its own");
+			if (!shots.isEmpty())
+				field->popupForTest()->grab().save(shots + QStringLiteral("/wildcard-droplist.png"));
+			field->clickPopupPatternForTest(1);
+			{
+				// a right click closes it as a click elsewhere does
+				QWidget *popup = field->popupForTest();
+				const QPointF at(2, 2);
+				QMouseEvent right(QEvent::MouseButtonPress, at, popup->mapToGlobal(at),
+					Qt::RightButton, Qt::RightButton, Qt::NoModifier);
+				QApplication::sendEvent(popup, &right);
+			}
+			settle();
+			check(!field->isPopupVisibleForTest() && closed == 1
+					&& field->currentText() == QStringLiteral("*.csv;*.txt;*.abc"),
+				"a click lights a pattern; closed, the field takes the lit ones");
+			field->showPopup();
+			field->clickPopupPatternForTest(0);
+			field->clickPopupCloseForTest();
+			settle();
+			check(closed == 2 && field->currentText() == QStringLiteral("*.csv;*.txt;*.abc"),
+				"the close button leaves the field as it was");
+			field->showPopup();
+			field->clickPopupPatternForTest(0);
+			key(field->popupForTest(), Qt::Key_Escape);
+			settle();
+			check(closed == 3 && field->currentText() == QStringLiteral("*.csv;*.txt;*.abc"),
+				"so does Esc");
+			field->showPopup();
+			field->lineEdit()->end(false);
+			key(field->popupForTest(), Qt::Key_Semicolon, Qt::NoModifier, QStringLiteral(";"));
+			key(field->popupForTest(), Qt::Key_X, Qt::NoModifier, QStringLiteral("x"));
+			key(field->popupForTest(), Qt::Key_Return);
+			settle();
+			check(closed == 4 && field->currentText() == QStringLiteral("*.csv;*.txt;*.abc;x"),
+				"typed while it is open: the field's, kept as it closes");
+			field->setFixedPatterns(QStringLiteral("c;cc;cpp"));
+			field->setPatterns(QStringLiteral("c*"));
+			field->showPopup();
+			check(field->popupLitForTest() == QList<bool>({ true, true, true, true })
+					&& field->popupPatternsForTest().last() == QStringLiteral("c*"),
+				"a wildcard of the field lights the defaults it takes in");
+			field->clickPopupPatternForTest(3);
+			field->hidePopup();
+			settle();
+			check(field->currentText() == QStringLiteral("c;cc;cpp"),
+				"put out, the wildcard goes and the defaults stay");
+			field->setAllowUserAddedPatterns(false);
+			field->setPatterns(QStringLiteral("cpp;zz"));
+			field->showPopup();
+			check(field->popupPatternsForTest().size() == 3
+					&& field->popupLitForTest() == QList<bool>({ false, false, true }),
+				"without the field's own: the defaults only");
+			field->hidePopup();
+			settle();
+			check(field->currentText() == QStringLiteral("cpp;zz"), "unclicked, the field stays");
+		}
+
+		// the page: a type's extensions saved, and what opens by them
+		{
+			OptionsDialog dialog;
+			dialog.resize(900, 600);
+			dialog.show();
+			dialog.selectCategoryForTest(11); // Editor > Syntax
+			settle();
+			lm::SubeditList *list = dialog.syntaxListForTest();
+			if (list == nullptr || dialog.currentPageForTest() != OptionsDialog::EditorSyntaxPage)
+				return 2;
+			int cRow = -1;
+			int ablRow = -1;
+			for (int row = 0; row < list->topLevelItemCount(); ++row)
+			{
+				if (list->topLevelItem(row)->text(0) == QStringLiteral("C"))
+					cRow = row;
+				if (list->topLevelItem(row)->text(0) == QStringLiteral("ABL/Progress 4GL"))
+					ablRow = row;
+			}
+			const QString cDefault = QString::fromUtf8(LangServices::GetTextType(LangServices::SRC_C)->exts);
+			printf("  %d types, C: %s\n", list->topLevelItemCount(), qPrintable(list->topLevelItem(qMax(0, cRow))->text(1)));
+			check(list->topLevelItemCount() == LangServices::SRC_MAX_ENTRY - 1
+					&& list->topLevelItem(0)->text(0) == QStringLiteral("ABAP")
+					&& list->topLevelItem(0)->text(1) == QStringLiteral("abap")
+					&& cRow == LangServices::SRC_C - 1 && list->topLevelItem(cRow)->text(1) == cDefault
+					&& ablRow == LangServices::SRC_ABL - 1,
+				"the types in their order, plain text left out, with their extensions");
+			check(dialog.windowTitle().contains(OptionsDialog::tr("Syntax")), "the title names the page");
+
+			// a click on a row that has no focus selects it; one on the
+			// focused row's extension edits it
+			const auto click = [list](int row, int column) {
+				const QRect cell = list->visualRect(list->model()->index(row, column));
+				const QPointF at = cell.center();
+				QMouseEvent press(QEvent::MouseButtonPress, at, list->viewport()->mapToGlobal(at),
+					Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+				QApplication::sendEvent(list->viewport(), &press);
+				QMouseEvent release(QEvent::MouseButtonRelease, at, list->viewport()->mapToGlobal(at),
+					Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+				QApplication::sendEvent(list->viewport(), &release);
+			};
+			list->setCurrentItem(list->topLevelItem(0));
+			click(cRow, 1);
+			check(list->editorForTest() == nullptr && list->currentItem() == list->topLevelItem(cRow),
+				"a click on another row selects it");
+			click(cRow, 0);
+			check(list->editorForTest() == nullptr, "the type's column is not edited");
+			click(cRow, 1);
+			lm::WildcardDropList *editor = list->editorForTest();
+			const QStringList cPatterns = cDefault.split(QLatin1Char(';'));
+			check(editor != nullptr && editor->isPopupVisibleForTest()
+					&& editor->popupPatternsForTest() == cPatterns
+					&& !editor->popupLitForTest().contains(false)
+					&& editor->lineEdit()->cursorPosition() == cDefault.size(),
+				"the focused row's extension: a field over it, its drop-down open");
+			if (editor == nullptr)
+				return 2;
+			if (!shots.isEmpty())
+			{
+				dialog.grab().save(shots + QStringLiteral("/syntax-page.png"));
+				editor->popupForTest()->grab().save(shots + QStringLiteral("/syntax-droplist.png"));
+			}
+			editor->clickPopupPatternForTest(static_cast<int>(cPatterns.size()) - 1);
+			key(editor->popupForTest(), Qt::Key_Return);
+			settle();
+			QStringList withoutLast = cPatterns;
+			withoutLast.removeLast();
+			check(list->editorForTest() == nullptr
+					&& list->topLevelItem(cRow)->text(1) == withoutLast.join(QLatin1Char(';')),
+				"closed: the cell takes the lit patterns, the field goes");
+
+			// OK: the types' extensions saved, a pattern another one takes
+			// in left out, and handed to the type lookup
+			list->topLevelItem(cRow)->setText(1, QStringLiteral("c;cpp;xyz;CPP"));
+			dialog.saveForTest();
+			check(QString::fromStdString(mgr->GetString(_T("FileTypes/C.exts"))) == QStringLiteral("c;xyz;CPP")
+					&& QSettings().value(QStringLiteral("FileTypes/C.exts")).toString() == QStringLiteral("c;xyz;CPP")
+					&& QSettings().value(QStringLiteral("FileTypes/ABL/Progress 4GL.exts")).toString()
+						== QStringLiteral("p;i;w;cls"),
+				"saved under FileTypes/<type>.exts, without the duplicate");
+			const LangServices::TextDefinition *xyz = LangServices::GetTextType("xyz");
+			check(xyz != nullptr && xyz->type == LangServices::SRC_C
+					&& LangServices::GetTextType("cc") == nullptr,
+				"the type lookup takes the new extensions at once");
+			{
+				const bool comments = mgr->GetBool(OPT_CMP_FILTER_COMMENTLINES);
+				mgr->Set(OPT_CMP_FILTER_COMMENTLINES, true);
+				FileCompareView view;
+				QString error;
+				if (!view.compare({ write("left.xyz", "int a;\n// one\nint b;\n"),
+						write("right.xyz", "int a;\n// two\nint b;\n") }, &error))
+					return 2;
+				printf("  %s, %d differences\n", qPrintable(view.syntaxLabelForTest(0)), view.diffCount());
+				check(view.syntaxType(0) == LangServices::SRC_C
+						&& view.syntaxLabelForTest(0) == SyntaxHighlighter::typeName(LangServices::SRC_C)
+						&& view.diffCount() == 0,
+					"a .xyz file opens as C/C++, its comments told apart");
+				mgr->Set(OPT_CMP_FILTER_COMMENTLINES, comments);
+			}
+
+			// Defaults: the built-in extensions back
+			dialog.restoreDefaultsForTest();
+			check(list->topLevelItem(cRow)->text(1) == cDefault, "Defaults: the built-in extensions");
+			dialog.saveForTest();
+			check(LangServices::GetTextType("xyz") == nullptr
+					&& LangServices::GetTextType("cc") != nullptr
+					&& QString::fromStdString(mgr->GetString(_T("FileTypes/C.exts"))) == cDefault,
+				"saved, the lookup has them back");
+		}
+
+		// the Compare pages' fields are such fields, six buttons to a row
+		{
+			OptionsDialog dialog;
+			const QList<lm::WildcardDropList *> fields = {
+				dialog.pageForTest(OptionsDialog::TablePage)->findChild<lm::WildcardDropList *>(),
+				dialog.pageForTest(OptionsDialog::BinaryPage)->findChild<lm::WildcardDropList *>(),
+				dialog.pageForTest(OptionsDialog::ImagePage)->findChild<lm::WildcardDropList *>() };
+			check(!fields.contains(nullptr)
+					&& fields.at(1)->fixedPatterns() == lm::defaultBinaryFilePatterns()
+					&& fields.at(2)->fixedPatterns() == lm::defaultImageFilePatterns(),
+				"the Table, Binary and Image pattern fields");
+		}
+
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
 	if (parser.isSet(selftestSyntaxMenuOpt))
 	{
 		// WinMerge's View > Syntax Highlight and the status bar's syntax
@@ -12196,13 +12444,20 @@ int main(int argc, char *argv[])
 			check(pane->bytesPerLine() != 8 && !view.statusTextForTest(0).contains(HexView::tr("OEM")),
 				"the defaults back: as many bytes as fit, ANSI");
 
-			// the patterns: a pattern of the drop-down toggles in the field
-			auto *patterns = binaryPage->findChild<QComboBox *>();
-			emit patterns->activated(0);
+			// the patterns: a pattern of the drop-down put out and lit
+			// again, the field the lit ones in the drop-down's order
+			auto *patterns = binaryPage->findChild<lm::WildcardDropList *>();
+			if (patterns == nullptr)
+				return 2;
+			patterns->showPopup();
+			patterns->clickPopupPatternForTest(0);
+			patterns->hidePopup();
 			options.saveForTest();
 			const QString kept = QSettings().value(QStringLiteral("BinaryCompare/FilePatterns")).toString();
-			emit patterns->activated(0);
-			check(kept == QStringLiteral("*.frx") && patterns->currentText() == QStringLiteral("*.frx;*.bin"),
+			patterns->showPopup();
+			patterns->clickPopupPatternForTest(0);
+			patterns->hidePopup();
+			check(kept == QStringLiteral("*.frx") && patterns->currentText() == QStringLiteral("*.bin;*.frx"),
 				"Binary file patterns: *.bin of the drop-down goes and comes back");
 			QSettings().remove(QStringLiteral("BinaryCompare/FilePatterns"));
 		}
@@ -15796,10 +16051,17 @@ int main(int argc, char *argv[])
 					&& fields.at(2)->text() == QStringLiteral("\"")
 					&& boxes.at(0)->isChecked(),
 				"Defaults: WinMerge's");
-			emit lists.at(0)->activated(0);
-			const bool ticksOff = lists.at(0)->currentText().isEmpty();
-			emit lists.at(0)->activated(0);
-			check(ticksOff && lists.at(0)->currentText() == QStringLiteral("*.csv"),
+			auto *csvPatterns = qobject_cast<lm::WildcardDropList *>(lists.at(0));
+			if (csvPatterns == nullptr)
+				return 2;
+			csvPatterns->showPopup();
+			csvPatterns->clickPopupPatternForTest(0);
+			csvPatterns->hidePopup();
+			const bool ticksOff = csvPatterns->currentText().isEmpty();
+			csvPatterns->showPopup();
+			csvPatterns->clickPopupPatternForTest(0);
+			csvPatterns->hidePopup();
+			check(ticksOff && csvPatterns->currentText() == QStringLiteral("*.csv"),
 				"a default pattern of the drop-down ticks off and on");
 			lists.at(1)->setEditText(QStringLiteral("*.tsv;*.TSV"));
 			boxes.at(0)->setChecked(false);

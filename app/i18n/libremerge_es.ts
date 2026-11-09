@@ -4255,6 +4255,18 @@ Por favor, use valores entre 1 y %1.</translation>
         <translation>Comparar/Combinar</translation>
     </message>
     <message>
+        <source>Syntax</source>
+        <translation>Sintaxis</translation>
+    </message>
+    <message>
+        <source>File Type</source>
+        <translation>Tipo de archivo</translation>
+    </message>
+    <message>
+        <source>Extension</source>
+        <translation>Extensión</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Copias de seguridad</translation>
     </message>

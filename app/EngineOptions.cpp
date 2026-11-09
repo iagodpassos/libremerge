@@ -24,6 +24,7 @@
 #include "SubstitutionList.h"
 #include "OptionsMgr.h"
 #include "OptionsDef.h"
+#include "OptionsEditorSyntax.h"
 #include "options_global.h"
 #include "UnicodeString.h"
 #include "charsets.h"
@@ -352,6 +353,10 @@ void installEngineOptions()
 	// WinMerge's Editor page: the highlighting, and the parsers it takes
 	options.InitOption(OPT_SYNTAX_HIGHLIGHT, true);
 	options.InitOption(OPT_SYNTAX_HIGHLIGHT_MODE, 1);
+	// its Syntax page: the extensions of each file type, the built-in
+	// ones the defaults, the saved ones handed to the type lookup
+	// (OptionsInit: Options::EditorSyntax::Init)
+	Options::EditorSyntax::Init(&options);
 	// its original EOL, and its tabs
 	options.InitOption(OPT_ALLOW_MIXED_EOL, false);
 	options.InitOption(OPT_TAB_SIZE, 4, 0, 64);

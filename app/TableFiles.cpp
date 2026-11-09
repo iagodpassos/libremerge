@@ -140,22 +140,24 @@ QChar characterOfField(const QString &text)
 	return text.at(0);
 }
 
+bool pathMatchSpec(const QString &name, const QString &specs)
+{
+	static const QRegularExpression separators(QStringLiteral("[; ]"));
+	for (const QString &spec : specs.split(separators, Qt::SkipEmptyParts))
+	{
+		const QRegularExpression wildcard(QRegularExpression::anchoredPattern(
+			QRegularExpression::wildcardToRegularExpression(spec,
+				QRegularExpression::UnanchoredWildcardConversion)),
+			QRegularExpression::CaseInsensitiveOption);
+		if (wildcard.match(name).hasMatch())
+			return true;
+	}
+	return false;
+}
+
 QString removeDuplicatePatterns(const QString &patterns)
 {
 	static const QRegularExpression separators(QStringLiteral("[; ]"));
-	// PathMatchSpec: a name against a list of wildcards, without case
-	const auto pathMatchSpec = [](const QString &name, const QString &specs) {
-		for (const QString &spec : specs.split(separators, Qt::SkipEmptyParts))
-		{
-			const QRegularExpression wildcard(QRegularExpression::anchoredPattern(
-				QRegularExpression::wildcardToRegularExpression(spec,
-					QRegularExpression::UnanchoredWildcardConversion)),
-				QRegularExpression::CaseInsensitiveOption);
-			if (wildcard.match(name).hasMatch())
-				return true;
-		}
-		return false;
-	};
 	// upstream walks the list once: a pattern the rest of the list takes
 	// in goes with the separator after it; the last one always stays
 	QString list = patterns;

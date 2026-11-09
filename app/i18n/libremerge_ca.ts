@@ -4542,6 +4542,18 @@ Useu valors entre 1 i %1.</translation>
         <translation>Compara/fusiona</translation>
     </message>
     <message>
+        <source>Syntax</source>
+        <translation>Sintaxi</translation>
+    </message>
+    <message>
+        <source>File Type</source>
+        <translation>Tipus de fitxer</translation>
+    </message>
+    <message>
+        <source>Extension</source>
+        <translation>Extensió</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Fitxers de còpia de seguretat</translation>
     </message>

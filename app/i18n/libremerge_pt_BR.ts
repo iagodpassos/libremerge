@@ -3790,6 +3790,18 @@ Checando identidade binária...</translation>
         <translation>Comparar/Unir</translation>
     </message>
     <message>
+        <source>Syntax</source>
+        <translation>Sintaxe</translation>
+    </message>
+    <message>
+        <source>File Type</source>
+        <translation>Tipo de Arquivo</translation>
+    </message>
+    <message>
+        <source>Extension</source>
+        <translation>Extensão</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Arquivos de Backup</translation>
     </message>

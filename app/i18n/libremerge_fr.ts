@@ -4241,6 +4241,18 @@ Vérification de l&apos;identité binaire...</translation>
         <translation>Comparer/Fusionner</translation>
     </message>
     <message>
+        <source>Syntax</source>
+        <translation>Syntaxe</translation>
+    </message>
+    <message>
+        <source>File Type</source>
+        <translation>Type de fichier</translation>
+    </message>
+    <message>
+        <source>Extension</source>
+        <translation>Extension</translation>
+    </message>
+    <message>
         <source>Backup Files</source>
         <translation>Fichiers de sauvegarde</translation>
     </message>
