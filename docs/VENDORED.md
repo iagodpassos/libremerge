@@ -19,9 +19,11 @@ LibreMerge vendors the comparison engine of **WinMerge**.
 | `engine/Externals/xdiff/` | `Externals/xdiff/` | git's xdiff (histogram/patience algorithms) |
 | `engine/Src/CompareEngines/` | `Src/CompareEngines/` | Folder-compare methods (byte, binary, time/size, existence, quick) |
 | `engine/Src/FilterEngine/` | `Src/FilterEngine/` | Filter expression language (re2c lexer, lemon parser) |
-| `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect`, `TableProps` (the table layout `DiffWrapper` takes), `TreeSitterParser` (Tree-sitter highlighting and comment detection), `OptionsEditorSyntax` (the extensions of each file type, Options > Editor > Syntax) |
+| `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect`, `TableProps` (the table layout `DiffWrapper` takes), `TreeSitterParser` (Tree-sitter highlighting and comment detection), `OptionsEditorSyntax` (the extensions of each file type, Options > Editor > Syntax), `OptionsDiffColors`, `OptionsDirColors`, `OptionsSyntaxColors` and `OptionsCustomColors` (the color options a color scheme fills) |
 | `engine/Src/Common/` | `Src/Common/` | Portable utilities: `unicoder`, `UnicodeString`, `UniFile`, `paths`, `OptionsMgr`/`IniOptionsMgr`, `charsets`, `TempFile` support |
 | `tests/` | `Testing/GoogleTest/` | Upstream unit tests for the engine + `TestData/` |
+| `engine/Externals/crystaledit/editlib/` | `Externals/crystaledit/editlib/` | The editor's language definitions (`TextDefinition`), its built-in parsers and `SyntaxColors` (the editor's colors and their defaults) |
+| `ColorSchemes/` | `ColorSchemes/` | WinMerge's seven color schemes (Options > Colors > Color Schemes), byte for byte; `VS Dark.ini` is rkodey's [winmerge-visual-studio-dark](https://github.com/rkodey/winmerge-visual-studio-dark), as WinMerge ships it |
 | `engine/Externals/tree-sitter/` | `Externals/tree-sitter/` | [Tree-sitter](https://github.com/tree-sitter/tree-sitter)'s runtime, 0.25.10, as WinMerge vendors it (`lib.c` builds it) — MIT, its Unicode headers under ICU's license |
 | `engine/Externals/winimerge/src/WinIMergeLib/` | [WinMerge/winimerge](https://github.com/WinMerge/winimerge) `src/WinIMergeLib/` @ `da639cdf` (the commit WinMerge pins) | Image-compare core: `ImgDiffBuffer.hpp` (block diff, overlay, blink, wipe), `ImgMergeBuffer.hpp` (copy diff, undo, save), `Diff.hpp` (embedded xdiff for insertion/deletion alignment) — GPL-2.0-or-later |
 
@@ -120,10 +122,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 693 | 188 | 256 | 3 | 3 |
-| Spanish | 679 | 200 | 254 | 10 | 0 |
-| Catalan | 370 | 192 | 256 | 325 | 0 |
-| French | 695 | 207 | 238 | 3 | 0 |
+| German | 705 | 189 | 255 | 3 | 3 |
+| Spanish | 691 | 201 | 253 | 10 | 0 |
+| Catalan | 375 | 193 | 255 | 332 | 0 |
+| French | 707 | 208 | 237 | 3 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -232,6 +234,42 @@ own with Ctrl held) and ".." goes back up, as `CDirView` does. Archives
 compare with their subfolders whatever the option: going up out of an
 archive's extracted folders, which upstream's temporary path contexts
 handle, is not offered.
+
+## Colors and color schemes
+
+The views take their colors from WinMerge's color options
+(`OptionsDiffColors`, `OptionsDirColors`, `OptionsSyntaxColors`,
+`OptionsCustomColors`, with upstream's defaults), which a color scheme
+fills as upstream's `COptionsMgr::ImportOptions` does: picked on Options >
+Colors > Color Schemes, at startup and when the light or dark mode in
+effect changes (`OPT_COLOR_MODE_EFFECTIVE`). The colors are used by
+upstream's rules: a line's background and text in a difference
+(`CMergeEditView::GetLineColors2`, the SNP colors of three files
+included), the word differences (`GetAdditionalTextBlocks`), the margin
+and its numbers (`DrawMargin`), the folder items by result
+(`CDirView::GetColors`, `OPT_DIRCLR_USE_COLORS`), the location pane on
+`COLORINDEX_WHITESPACE`. Where Windows is in upstream's way:
+
+- `GetSysColor` (`ports/posix_compat.h`, the indexes in
+  `ports/windows.h`) is answered by the application: the scheme's own
+  system colors when it switches them on (`SysColorHook`), the Qt palette
+  otherwise (`COLOR_WINDOW` its base, `COLOR_WINDOWTEXT` its text,
+  `COLOR_BTNFACE` its window, and so on).
+- A scheme's system colors go on the application palette on Linux, where
+  LibreMerge already sets it, when their lightness agrees with the mode;
+  upstream's hook recolors every window of the process. On macOS the
+  native controls and the title bar keep the system's appearance, the
+  light or dark the mode asks for.
+- "Default text coloring" (`OPT_CLR_DEFAULT_TEXT_COLORING`) takes the text
+  colors from the palette as they are drawn: upstream reads them once,
+  when the options load, and so follows the system after a restart.
+- "Follow system" asks the system's own appearance while a mode is fixed:
+  `AppleInterfaceStyle` on macOS, the desktop portal on Linux.
+- The user's schemes are kept in the application's data folder
+  (`ColorSchemes` under QStandardPaths' AppDataLocation): there is no
+  "My Documents" choice (`OPT_USERDATA_LOCATION`).
+- A scheme is saved as upstream's `CIniOptionsMgr` writes it, the
+  options saved into it in that order under `[WinMerge]`.
 
 ## Deliberately excluded (and why)
 

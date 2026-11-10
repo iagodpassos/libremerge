@@ -43,6 +43,7 @@
 #include "OptionsDialog.h"
 #include "TableFiles.h"
 #include "Theme.h"
+#include "SyntaxColors.h"
 
 // engine
 #include "DiffWrapper.h"
@@ -494,18 +495,26 @@ public:
 				return displayText(cells[real].at(index.column()));
 			return role == Qt::EditRole ? QVariant(QString()) : QVariant();
 		}
-		if (role == Qt::BackgroundRole)
+		if (role == Qt::BackgroundRole || role == Qt::ForegroundRole)
 		{
+			// the colors of the scheme, background and text, as the text
+			// comparison's lines (GetLineColors2); a text color the scheme
+			// leaves none, the table's own
+			const bool background = role == Qt::BackgroundRole;
 			const lm::DiffColors &C = lm::diffColors();
+			const auto pick = [background](const QColor &back, const QColor &text) -> QVariant {
+				const QColor &color = background ? back : text;
+				return color.isValid() ? QVariant(color) : QVariant();
+			};
 			if (real < 0)
-				return C.diffDeleted;
+				return pick(C.diffDeleted, C.diffText);
 			for (size_t b = 0; b < m_view->m_blocks.size(); ++b)
 			{
 				const auto &block = m_view->m_blocks[b];
 				if (viewRow < block.viewBegin || viewRow > block.viewEnd)
 					continue;
 				if (block.trivial)
-					return C.trivial;
+					return pick(C.trivial, C.trivialText);
 				const bool current =
 					static_cast<int>(b) == m_view->m_current;
 				// the cells' own differences are the differences inside
@@ -513,8 +522,9 @@ public:
 				if (lm::viewLineDifferences()
 					&& m_view->m_cellDiffs[m_side].contains(
 						cellKey(real, index.column())))
-					return current ? C.selWordDiffDeleted : C.wordDiffDeleted;
-				return current ? C.selDiff : C.diff;
+					return current ? pick(C.selWordDiffDeleted, C.selWordDiffText)
+						: pick(C.wordDiffDeleted, C.wordDiffText);
+				return current ? pick(C.selDiff, C.selDiffText) : pick(C.diff, C.diffText);
 			}
 			return {};
 		}
@@ -806,17 +816,12 @@ TableCompareView::TableCompareView(QWidget *parent)
 void TableCompareView::applyTheme()
 {
 	const bool dark = lm::Theme::instance()->dark();
+	// the grids in the color scheme's text colors, as the text panes
 	QPalette pal;
-	if (dark)
-	{
-		pal.setColor(QPalette::Base, QColor(0x1e, 0x1e, 0x1e));
-		pal.setColor(QPalette::Text, QColor(0xd4, 0xd4, 0xd4));
-	}
-	else
-	{
-		pal.setColor(QPalette::Base, Qt::white);
-		pal.setColor(QPalette::Text, Qt::black);
-	}
+	pal.setColor(QPalette::Base, lm::syntaxColor(COLORINDEX_BKGND));
+	pal.setColor(QPalette::Text, lm::syntaxColor(COLORINDEX_NORMALTEXT));
+	pal.setColor(QPalette::Highlight, lm::syntaxColor(COLORINDEX_SELBKGND));
+	pal.setColor(QPalette::HighlightedText, lm::syntaxColor(COLORINDEX_SELTEXT));
 	for (QTableView *table : m_tables)
 		table->setPalette(pal);
 	m_status->setStyleSheet(dark

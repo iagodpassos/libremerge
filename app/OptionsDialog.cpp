@@ -4,6 +4,8 @@
 #include "OptionsDialog.h"
 
 #include "BinaryFiles.h"
+#include "FileOps.h"
+#include "ColorSettings.h"
 #include "ImageFormats.h"
 #include "EngineOptions.h"
 #include "HexDialogs.h"
@@ -19,6 +21,9 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QFileInfo>
+#include <QFile>
+#include <QDir>
 #include <QFocusEvent>
 #include <QFontInfo>
 #include <QGroupBox>
@@ -195,6 +200,8 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	addCategory(editor, tr("General"), EditorPage);
 	addCategory(editor, tr("Compare/Merge"), EditorCompareMergePage);
 	addCategory(editor, tr("Syntax"), EditorSyntaxPage);
+	QTreeWidgetItem *colors = addCategory(nullptr, tr("Colors"), -1);
+	addCategory(colors, tr("Color Schemes"), ColorSchemesPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	addCategory(nullptr, tr("Codepage"), CodepagePage);
 	m_categories->expandAll();
@@ -212,16 +219,17 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildEditorPage());
 	m_pages->addWidget(buildEditorCompareMergePage());
 	m_pages->addWidget(buildEditorSyntaxPage());
+	m_pages->addWidget(buildColorSchemesPage());
 	m_pages->addWidget(buildBackupPage());
 	m_pages->addWidget(buildCodepagePage());
 	pageArea->addWidget(m_pages, 1);
 	// every WinMerge page has its own Defaults button, resetting only it
 	auto *defaultsRow = new QHBoxLayout;
 	defaultsRow->addStretch(1);
-	auto *defaultsButton = new QPushButton(tr("Defaults"), this);
-	connect(defaultsButton, &QPushButton::clicked, this,
+	m_defaultsButton = new QPushButton(tr("Defaults"), this);
+	connect(m_defaultsButton, &QPushButton::clicked, this,
 		[this]() { restoreDefaults(m_pages->currentIndex()); });
-	defaultsRow->addWidget(defaultsButton);
+	defaultsRow->addWidget(m_defaultsButton);
 	pageArea->addLayout(defaultsRow);
 	body->addLayout(pageArea, 1);
 	layout->addLayout(body, 1);
@@ -237,6 +245,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 		accept();
 	});
 	connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+	m_cancelButton = buttons->button(QDialogButtonBox::Cancel);
 	layout->addWidget(buttons);
 
 	load();
@@ -253,6 +262,8 @@ void OptionsDialog::selectCategory(QTreeWidgetItem *item)
 	while (pageItem->childCount() > 0)
 		pageItem = pageItem->child(0);
 	m_pages->setCurrentIndex(pageItem->data(0, Qt::UserRole).toInt());
+	// the Color Schemes page is WinMerge's one without a Defaults button
+	m_defaultsButton->setVisible(m_pages->currentIndex() != ColorSchemesPage);
 	QString path = pageItem->text(0);
 	for (QTreeWidgetItem *parent = pageItem->parent(); parent != nullptr;
 		parent = parent->parent())
@@ -308,14 +319,8 @@ QWidget *OptionsDialog::buildGeneralPage()
 		tr("Immediately") });
 	addLabeled(box, tr("Auto-reload modified files:"), m_cmbAutoReload);
 
-	// the theme (LibreMerge's own) sits with the language, closing the page
+	// the language (LibreMerge's own) closes the page
 	box->addSpacing(8);
-	m_cmbTheme = new QComboBox(page);
-	m_cmbTheme->setObjectName(QStringLiteral("theme"));
-	m_cmbTheme->addItem(tr("System default"), static_cast<int>(lm::ThemeMode::System));
-	m_cmbTheme->addItem(tr("Light"), static_cast<int>(lm::ThemeMode::Light));
-	m_cmbTheme->addItem(tr("Dark"), static_cast<int>(lm::ThemeMode::Dark));
-	addLabeled(box, tr("Theme:"), m_cmbTheme);
 	m_cmbLanguage = new QComboBox(page);
 	m_cmbLanguage->setObjectName(QStringLiteral("language"));
 	m_cmbLanguage->addItem(tr("System default"), QString());
@@ -762,6 +767,184 @@ QWidget *OptionsDialog::buildEditorSyntaxPage()
 	return page;
 }
 
+/** WinMerge's Colors > Color Schemes page (PropColorSchemes): the color
+    mode, the scheme of each mode, and the user's own schemes saved and
+    deleted. A scheme picked, or another mode, is imported at once: the
+    colors are in the options from then on, and only OK closes the
+    dialog. */
+QWidget *OptionsDialog::buildColorSchemesPage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+	m_cmbColorMode = new QComboBox(page);
+	m_cmbColorMode->setObjectName(QStringLiteral("colorMode"));
+	m_cmbColorMode->addItems({ tr("Light"), tr("Dark"), tr("Follow system") });
+	addLabeled(box, tr("Color &mode:"), m_cmbColorMode);
+	m_cmbColorScheme = new QComboBox(page);
+	m_cmbColorScheme->setObjectName(QStringLiteral("colorScheme"));
+	addLabeled(box, tr("&Light mode scheme:"), m_cmbColorScheme);
+	m_cmbColorSchemeDark = new QComboBox(page);
+	m_cmbColorSchemeDark->setObjectName(QStringLiteral("colorSchemeDark"));
+	addLabeled(box, tr("&Dark mode scheme:"), m_cmbColorSchemeDark);
+
+	auto *custom = new QGroupBox(tr("Your custom schemes"), page);
+	auto *customLayout = new QVBoxLayout(custom);
+	m_btnSaveScheme = new QPushButton(tr("&Save current scheme..."), custom);
+	m_btnSaveScheme->setObjectName(QStringLiteral("saveScheme"));
+	m_btnDeleteScheme = new QPushButton(tr("Delete &current scheme..."), custom);
+	m_btnDeleteScheme->setObjectName(QStringLiteral("deleteScheme"));
+	customLayout->addWidget(m_btnSaveScheme);
+	customLayout->addWidget(m_btnDeleteScheme);
+	box->addWidget(custom);
+	box->addStretch(1);
+
+	// OnCbnSelchangeColorMode, OnCbnSelchangeColorScheme
+	for (QComboBox *combo : { m_cmbColorMode, m_cmbColorScheme, m_cmbColorSchemeDark })
+		connect(combo, &QComboBox::activated, this, [this]() {
+			updateColorSchemeControls();
+			updateColorScheme();
+		});
+	connect(m_btnSaveScheme, &QPushButton::clicked, this, &OptionsDialog::saveCurrentScheme);
+	connect(m_btnDeleteScheme, &QPushButton::clicked, this, &OptionsDialog::deleteCurrentScheme);
+	return page;
+}
+
+/** WinMergeDarkMode::GetEffectiveColorMode: dark for Dark, the system's
+    for "Follow system". */
+bool OptionsDialog::effectiveColorModeDark() const
+{
+	switch (m_cmbColorMode->currentIndex())
+	{
+	case 1: return true;
+	case 2: return lm::Theme::instance()->systemDark();
+	default: return false;
+	}
+}
+
+/** GetCurrentColorSchemePath: the file of the scheme of the mode in
+    effect. */
+QString OptionsDialog::currentColorSchemePath() const
+{
+	return lm::ColorSchemes::path(effectiveColorModeDark()
+		? m_cmbColorSchemeDark->currentText() : m_cmbColorScheme->currentText());
+}
+
+/** ReloadColorSchemes: every scheme of the folders in both lists. */
+void OptionsDialog::reloadColorSchemes()
+{
+	const QStringList names = lm::ColorSchemes::names();
+	for (QComboBox *combo : { m_cmbColorScheme, m_cmbColorSchemeDark })
+	{
+		combo->clear();
+		combo->addItems(names);
+	}
+}
+
+void OptionsDialog::showColorSchemes(const QString &light, const QString &dark)
+{
+	m_cmbColorScheme->setCurrentIndex(m_cmbColorScheme->findText(light));
+	m_cmbColorSchemeDark->setCurrentIndex(m_cmbColorSchemeDark->findText(dark));
+}
+
+/** UpdateControls: each scheme's list where its mode can be in effect,
+    Delete for a scheme of the user's own. */
+void OptionsDialog::updateColorSchemeControls()
+{
+	const int mode = m_cmbColorMode->currentIndex();
+	m_cmbColorScheme->setEnabled(mode == 0 || mode == 2);
+	m_cmbColorSchemeDark->setEnabled(mode == 1 || mode == 2);
+	m_btnDeleteScheme->setEnabled(lm::ColorSchemes::isPrivatePath(currentColorSchemePath()));
+}
+
+/** The schemes the lists show (WriteOptions); a list with no scheme at
+    all leaves its option as it was. */
+void OptionsDialog::writeColorSchemeOptions()
+{
+	if (m_cmbColorScheme->count() > 0)
+		lm::setColorSchemeName(false, m_cmbColorScheme->currentText());
+	if (m_cmbColorSchemeDark->count() > 0)
+		lm::setColorSchemeName(true, m_cmbColorSchemeDark->currentText());
+}
+
+/** UpdateColorScheme: the options written with the mode the colors are
+    now of (OPT_COLOR_MODE_EFFECTIVE), and that mode's scheme imported;
+    then the dialog can only be accepted (OnColorSchemeChanged). The mode
+    itself takes effect with OK, which writes the schemes only: a mode
+    whose colors were not imported here is then the Theme's to import. */
+void OptionsDialog::updateColorScheme()
+{
+	writeColorSchemeOptions();
+	lm::setColorsAreDark(effectiveColorModeDark());
+	if (!lm::importColorScheme(currentColorSchemePath()))
+	{
+		lm::showWarning(this, tr("Failed to import options from file."));
+		return;
+	}
+	m_colorsImported = true;
+	m_cancelButton->setEnabled(false);
+}
+
+/** OnSaveCurrentScheme: the colors in a file of the user's schemes'
+    folder, which the lists then show. */
+void OptionsDialog::saveCurrentScheme()
+{
+	const QString folder = lm::ColorSchemes::privateFolder();
+	QDir().mkpath(folder);
+	QString path = lm::askSaveAsPath(this, tr("Select file for export"), folder,
+		tr("Options files (*.ini);;All Files (*)"));
+	if (path.isEmpty())
+		return;
+	if (QFileInfo(path).suffix().isEmpty())
+		path += QStringLiteral(".ini");
+	const QString light = m_cmbColorScheme->currentText();
+	const QString dark = m_cmbColorSchemeDark->currentText();
+	lm::saveColorScheme(path);
+	reloadColorSchemes();
+	showColorSchemes(light, dark);
+}
+
+/** OnDeleteCurrentScheme: the scheme in effect, when it is the user's
+    own, deleted once confirmed; its mode takes WinMerge's default scheme
+    again. */
+void OptionsDialog::deleteCurrentScheme()
+{
+	const QString path = currentColorSchemePath();
+	if (!lm::ColorSchemes::isPrivatePath(path))
+		return;
+	if (!lm::askWarning(this, tr("Are you sure you want to delete\n\n%1 ?")
+			.arg(QDir::toNativeSeparators(path))))
+		return;
+	QFile file(path);
+	if (!file.remove())
+	{
+		lm::showWarning(this, file.errorString());
+		return;
+	}
+	QString light = m_cmbColorScheme->currentText();
+	QString dark = m_cmbColorSchemeDark->currentText();
+	reloadColorSchemes();
+	if (!effectiveColorModeDark())
+		light = QStringLiteral("Default");
+	else
+		dark = QStringLiteral("VS Dark");
+	showColorSchemes(light, dark);
+	writeColorSchemeOptions();
+	updateColorSchemeControls();
+	updateColorScheme();
+}
+
+bool OptionsDialog::cancelEnabledForTest() const
+{
+	return m_cancelButton->isEnabled();
+}
+
+void OptionsDialog::reject()
+{
+	if (m_cancelButton != nullptr && !m_cancelButton->isEnabled())
+		return;
+	QDialog::reject();
+}
+
 bool OptionsDialog::eventFilter(QObject *watched, QEvent *event)
 {
 	if (watched == m_editTabSize && event->type() == QEvent::FocusOut)
@@ -920,8 +1103,14 @@ void OptionsDialog::load()
 	m_chkCloseSelector->setChecked(closeSelectorOnCompare());
 	m_cmbAutoComplete->setCurrentIndex(autoCompleteSource());
 	m_cmbAutoReload->setCurrentIndex(autoReloadModifiedFiles());
-	m_cmbTheme->setCurrentIndex(qMax(0, m_cmbTheme->findData(
-		static_cast<int>(lm::Theme::instance()->mode()))));
+	// Colors > Color Schemes (PropColorSchemes::ReadOptions): the mode as
+	// WinMerge numbers it, light, dark, then following the system
+	const lm::ThemeMode mode = lm::Theme::instance()->mode();
+	m_cmbColorMode->setCurrentIndex(mode == lm::ThemeMode::Light ? 0
+		: mode == lm::ThemeMode::Dark ? 1 : 2);
+	reloadColorSchemes();
+	showColorSchemes(lm::colorSchemeName(false), lm::colorSchemeName(true));
+	updateColorSchemeControls();
 	const int langIndex =
 		m_cmbLanguage->findData(settings.value(kLanguage).toString());
 	m_cmbLanguage->setCurrentIndex(qMax(0, langIndex));
@@ -998,9 +1187,13 @@ void OptionsDialog::save()
 	settings.setValue(kAutoComplete, m_cmbAutoComplete->currentIndex());
 	settings.setValue(kAutoReload, m_cmbAutoReload->currentIndex());
 	settings.setValue(kLanguage, m_cmbLanguage->currentData().toString());
-	// takes effect at once, unlike the language
-	lm::Theme::instance()->setMode(
-		static_cast<lm::ThemeMode>(m_cmbTheme->currentData().toInt()));
+	// Colors > Color Schemes (PropColorSchemes::WriteOptions): the
+	// schemes, then the mode, which takes effect at once, unlike the
+	// language
+	writeColorSchemeOptions();
+	const int colorMode = m_cmbColorMode->currentIndex();
+	lm::Theme::instance()->setMode(colorMode == 0 ? lm::ThemeMode::Light
+		: colorMode == 1 ? lm::ThemeMode::Dark : lm::ThemeMode::System);
 	settings.setValue(kBackup, m_chkBackup->isChecked());
 
 	if (COptionsMgr *mgr = GetOptionsMgr())
@@ -1132,7 +1325,6 @@ void OptionsDialog::restoreDefaults(int page)
 		m_chkCloseSelector->setChecked(false);
 		m_cmbAutoComplete->setCurrentIndex(AutoCompleteFileSystem);
 		m_cmbAutoReload->setCurrentIndex(AutoReloadOnWindowActivated);
-		m_cmbTheme->setCurrentIndex(0); // follow the system
 		m_cmbLanguage->setCurrentIndex(0);
 		break;
 	case ComparePage:

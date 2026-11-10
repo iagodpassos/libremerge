@@ -3,6 +3,10 @@
 
 #include "Theme.h"
 
+#ifdef Q_OS_MACOS
+#include "MacServices.h"
+#endif
+
 #include <QApplication>
 #include <QMenuBar>
 #include <QPalette>
@@ -227,6 +231,24 @@ bool Theme::dark() const
 	return paletteIsDark(qApp->palette());
 }
 
+bool Theme::systemDark() const
+{
+	if (m_mode == ThemeMode::System)
+		return dark();
+#ifdef Q_OS_MACOS
+	return lm::systemAppearanceIsDark();
+#else
+#ifdef LM_HAVE_PORTAL
+	const PortalAppearance::Scheme portal = m_portal->scheme();
+	if (portal != PortalAppearance::Unavailable)
+		return portal == PortalAppearance::PreferDark;
+#endif
+	// without the desktop's portal its setting is out of reach while a
+	// mode is fixed: the platform palette was replaced by the mode's
+	return dark();
+#endif
+}
+
 void Theme::applyToApplication()
 {
 	m_applying = true;
@@ -286,49 +308,41 @@ void Theme::applyToApplication()
 	for (QWidget *window : QApplication::topLevelWidgets())
 		for (QMenuBar *bar : window->findChildren<QMenuBar *>())
 			bar->setPalette(QPalette());
+	// the system's colors, before a scheme's go in
+	lm::setBasePalette(qApp->palette());
 #endif
+	// the colors of the mode now in effect (OPT_COLOR_MODE_EFFECTIVE):
+	// its scheme imported when the mode changed, then the scheme's system
+	// colors on the palette
+	lm::syncColorSchemeWithMode(dark());
+	applySchemePalette();
 	m_applying = false;
 }
 
-const DiffColors &diffColors()
+void Theme::applySchemePalette()
 {
-	// WinMerge's defaults (Src/OptionsDiffColors.cpp)
-	static const DiffColors light = {
-		QColor(239, 203, 5), QColor(192, 192, 192),
-		QColor(239, 119, 116), QColor(240, 192, 192),
-		QColor(251, 242, 191), QColor(233, 233, 233),
-		QColor(241, 226, 173), QColor(255, 170, 130),
-		QColor(255, 160, 160), QColor(200, 129, 108),
-		QColor(228, 155, 82), QColor(248, 112, 78),
-	};
-	// same roles, tuned for light text on a #1e1e1e editor
-	static const DiffColors dark = {
-		QColor(90, 78, 10), QColor(58, 58, 58),
-		QColor(122, 52, 50), QColor(84, 62, 62),
-		QColor(72, 68, 40), QColor(50, 50, 50),
-		QColor(130, 108, 36), QColor(160, 84, 48),
-		QColor(168, 88, 88), QColor(150, 78, 52),
-		QColor(140, 90, 45), QColor(150, 70, 45),
-	};
-	return Theme::instance()->dark() ? dark : light;
+#ifndef Q_OS_MACOS
+	QPalette palette = qApp->palette();
+	if (!lm::applySystemColors(&palette))
+		return;
+	// a scheme's dark system colors in light mode, or light ones in dark
+	// mode, stay off the window: the mode decides it, and what decides the
+	// mode on KDE is the palette's lightness (the views take the scheme's
+	// colors all the same)
+	if (paletteIsDark(palette) != dark())
+		return;
+	QApplication::setPalette(palette);
+	QToolTip::setPalette(palette);
+	for (QWidget *window : QApplication::topLevelWidgets())
+		for (QMenuBar *bar : window->findChildren<QMenuBar *>())
+			bar->setPalette(QPalette());
+#endif
 }
 
-QColor markerColor(int color)
+void Theme::colorsChanged()
 {
-	static const QColor light[4] = {
-		QColor(255, 255, 127), QColor(127, 255, 127), QColor(255, 127, 127), QColor(127, 127, 255),
-	};
-	// "VS Dark" has the search's gray-blue and a blue-violet third color,
-	// next to its selection's blue: the match found was hard to tell from
-	// the others. The search's is a dark green here (where upstream's light
-	// yellow would be one with the differences' gold) and the third color a
-	// purple, both as far from the selection and the differences as
-	// WinMerge's light colors are from its own
-	static const QColor dark[4] = {
-		QColor(40, 112, 52), QColor(42, 161, 152), QColor(211, 54, 130), QColor(136, 80, 148),
-	};
-	const int index = qBound(0, color, 3);
-	return Theme::instance()->dark() ? dark[index] : light[index];
+	applyToApplication();
+	emit changed();
 }
 
 } // namespace lm

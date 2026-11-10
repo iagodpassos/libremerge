@@ -4662,9 +4662,68 @@ Useu valors entre 1 i %1.</translation>
         <translation>Fosc</translation>
     </message>
     <message>
-        <source>Theme:</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Tema:</translation>
+        <source>Colors</source>
+        <translation>Colors</translation>
+    </message>
+    <message>
+        <source>Color Schemes</source>
+        <translation>Esquemes de colors</translation>
+    </message>
+    <message>
+        <source>Follow system</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Segons el sistema</translation>
+    </message>
+    <message>
+        <source>Color &amp;mode:</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>&amp;Mode de color:</translation>
+    </message>
+    <message>
+        <source>&amp;Light mode scheme:</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Esquema del mode c&amp;lar:</translation>
+    </message>
+    <message>
+        <source>&amp;Dark mode scheme:</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Es&amp;quema del mode fosc:</translation>
+    </message>
+    <message>
+        <source>Your custom schemes</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Els vostres esquemes personalitzats</translation>
+    </message>
+    <message>
+        <source>&amp;Save current scheme...</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>&amp;Desa l&apos;esquema actual...</translation>
+    </message>
+    <message>
+        <source>Delete &amp;current scheme...</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Suprimeix l&apos;esquema a&amp;ctual...</translation>
+    </message>
+    <message>
+        <source>Failed to import options from file.</source>
+        <translation>No s&apos;ha pogut importar les opcions del fitxer.</translation>
+    </message>
+    <message>
+        <source>Select file for export</source>
+        <translation>Trieu el fitxer a exportar</translation>
+    </message>
+    <message>
+        <source>Options files (*.ini);;All Files (*)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Fitxers d&apos;opcions de configuració (*.ini)|*.ini|Tots els fitxers (*.*)|*.*||&quot;.</translatorcomment>
+        <translation>Fitxers d&apos;opcions de configuració (*.ini);;Tots els fitxers (*)</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to delete
+
+%1 ?</source>
+        <translation>Esteu segur que voleu suprimir
+
+%1 ?</translation>
     </message>
     <message>
         <source>Language:</source>

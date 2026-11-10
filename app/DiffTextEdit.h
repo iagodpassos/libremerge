@@ -58,6 +58,10 @@ public:
 	    order they are drawn (for tests). */
 	QStringList markedTextsForTest() const;
 	QList<QColor> markedColorsForTest() const;
+	/** The margin's color of each row a difference colors, and the
+	    differences' own selections (for tests). */
+	QHash<int, QColor> gutterLineColorsForTest() const { return m_lineColors; }
+	QList<QTextEdit::ExtraSelection> highlightSelectionsForTest() const { return m_baseSelections; }
 
 	/** numbers[viewLine] = 1-based real line number, or -1 for ghost
 	    lines (no number drawn). Empty list falls back to 1:1 numbering. */

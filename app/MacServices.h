@@ -40,4 +40,8 @@ void activateAppForTest();
     success). */
 void ignoreQuitRequestsForTest();
 
+/** Whether the system is set to its dark appearance, whatever the
+    application asks for its own windows. */
+bool systemAppearanceIsDark();
+
 } // namespace lm

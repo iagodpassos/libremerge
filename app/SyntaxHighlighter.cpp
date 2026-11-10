@@ -212,38 +212,18 @@ SyntaxHighlighter::SyntaxHighlighter(QTextDocument *document, LangServices::Text
 	if (!hasLanguage())
 		return;
 
-	// foreground only (diff colors own the background); classic light
-	// palette or a dark-editor equivalent, per the active theme
-	auto set = [this](int index, const QColor &color, bool bold = false) {
+	// foreground only (the differences own the background): the colors and
+	// the bold of the color scheme (SyntaxColors, COLORINDEX_*), the
+	// normal text left to the pane's own color
+	for (const int index : { COLORINDEX_KEYWORD, COLORINDEX_FUNCNAME, COLORINDEX_COMMENT,
+			COLORINDEX_NUMBER, COLORINDEX_OPERATOR, COLORINDEX_STRING,
+			COLORINDEX_PREPROCESSOR, COLORINDEX_USER1, COLORINDEX_USER2 })
+	{
 		if (index < 0 || index >= kFormatCount)
-			return;
-		m_formats[index].setForeground(color);
-		if (bold)
-			m_formats[index].setFontWeight(QFont::DemiBold);
-	};
-	if (lm::Theme::instance()->dark())
-	{
-		set(COLORINDEX_KEYWORD, QColor(0x56, 0x9c, 0xd6), true);
-		set(COLORINDEX_FUNCNAME, QColor(0xdc, 0xdc, 0xaa));
-		set(COLORINDEX_COMMENT, QColor(0x6a, 0x99, 0x55));
-		set(COLORINDEX_NUMBER, QColor(0xb5, 0xce, 0xa8));
-		set(COLORINDEX_OPERATOR, QColor(0xc8, 0xc8, 0xc8));
-		set(COLORINDEX_STRING, QColor(0xce, 0x91, 0x78));
-		set(COLORINDEX_PREPROCESSOR, QColor(0x4e, 0xc9, 0xb0));
-		set(COLORINDEX_USER1, QColor(0x4f, 0xc1, 0xff));
-		set(COLORINDEX_USER2, QColor(0xd7, 0xba, 0x7d));
-	}
-	else
-	{
-		set(COLORINDEX_KEYWORD, QColor(0x00, 0x00, 0xbf), true);
-		set(COLORINDEX_FUNCNAME, QColor(0x6f, 0x00, 0x8a));
-		set(COLORINDEX_COMMENT, QColor(0x00, 0x80, 0x00));
-		set(COLORINDEX_NUMBER, QColor(0xa8, 0x40, 0x00));
-		set(COLORINDEX_OPERATOR, QColor(0x40, 0x40, 0x40));
-		set(COLORINDEX_STRING, QColor(0xa3, 0x15, 0x15));
-		set(COLORINDEX_PREPROCESSOR, QColor(0x00, 0x60, 0x70));
-		set(COLORINDEX_USER1, QColor(0x00, 0x70, 0x70));
-		set(COLORINDEX_USER2, QColor(0x70, 0x40, 0x00));
+			continue;
+		m_formats[index].setForeground(lm::syntaxColor(index));
+		if (lm::syntaxBold(index))
+			m_formats[index].setFontWeight(QFont::Bold);
 	}
 }
 

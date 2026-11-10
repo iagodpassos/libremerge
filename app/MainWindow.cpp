@@ -54,6 +54,7 @@
 #include "NewComparisonView.h"
 #include "ProjectLinks.h"
 #include "StarPrompt.h"
+#include "Theme.h"
 #ifdef Q_OS_MACOS
 #include "MacServices.h"
 #endif
@@ -2079,6 +2080,10 @@ void MainWindow::showOptions()
 		lm::initSyntaxParserFactories();
 		lm::updateCodepageModule();
 		lm::updateBreakChars();
+		// a color scheme imported: the palette and every view take the
+		// colors (CMainFrame::OnOptions refreshes every document's)
+		if (dialog.colorsImported())
+			lm::Theme::instance()->colorsChanged();
 		for (int i = 0; i < m_tabs->count(); ++i)
 			if (auto *file = qobject_cast<FileCompareView *>(m_tabs->widget(i)))
 			{

@@ -108,12 +108,21 @@ static inline void RaiseException(unsigned long code, unsigned long flags,
 	abort();
 }
 
-/* Win32 system colors: no equivalent on POSIX; the GUI layer owns colors.
-   Used only when importing option files that reference system colors. */
+/* Win32 system colors (the COLOR_* indexes of ports/windows.h): the GUI
+   layer answers them, from its palette or a color scheme's own, through
+   lm_sysColorProvider (ports/options_global.cpp); 0 (black) until it is
+   set. The color options' defaults and the import of a color scheme that
+   names system colors ask for them. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern unsigned long (*lm_sysColorProvider)(int index);
+#ifdef __cplusplus
+}
+#endif
 static inline unsigned long GetSysColor(int index)
 {
-	(void)index;
-	return 0;
+	return lm_sysColorProvider != 0 ? lm_sysColorProvider(index) : 0;
 }
 
 /* Case-insensitive memory compare (MSVC _memicmp), used by markdown.cpp */

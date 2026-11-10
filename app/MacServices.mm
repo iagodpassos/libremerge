@@ -143,4 +143,12 @@ QStringList appMenuItemsForTest(const QString &menuTitle)
 	return items;
 }
 
+/** The system's own appearance setting (AppleInterfaceStyle), whatever
+    the application asks for its windows. */
+bool systemAppearanceIsDark()
+{
+	NSString *style = [[NSUserDefaults standardUserDefaults] stringForKey:@"AppleInterfaceStyle"];
+	return style != nil && [style caseInsensitiveCompare:@"Dark"] == NSOrderedSame;
+}
+
 } // namespace lm

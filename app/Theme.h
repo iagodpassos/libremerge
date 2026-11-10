@@ -4,6 +4,8 @@
 #include <QColor>
 #include <QObject>
 
+#include "ColorSettings.h"
+
 namespace lm
 {
 
@@ -16,9 +18,10 @@ enum class ThemeMode
 	Dark,
 };
 
-/** Application theme: WinMerge-style light or a dark equivalent, either
-    fixed or following the system appearance (the default). Chosen in
-    Options > General. */
+/** Application theme: WinMerge's color mode, light or dark, either fixed
+    or following the system appearance (the default), each mode with its
+    color scheme (ColorSettings). Chosen in Options > Colors > Color
+    Schemes. */
 class Theme : public QObject
 {
 	Q_OBJECT
@@ -30,6 +33,10 @@ public:
 
 	/** The resolved appearance. */
 	bool dark() const;
+	/** The system's own appearance, as "Follow system" would resolve it
+	    (WinMergeDarkMode::GetEffectiveColorMode), whatever mode is in
+	    effect. */
+	bool systemDark() const;
 
 	/** Make the whole application follow the resolved appearance, not
 	    only the content areas: on macOS the window appearance is asked
@@ -37,6 +44,11 @@ public:
 	    platform's when the two disagree (an AppImage's is always light).
 	    Runs before every changed(); call it once at startup. */
 	void applyToApplication();
+
+	/** The colors changed (a color scheme imported, Options accepted):
+	    the palette takes the scheme's system colors again, and every
+	    view its colors, through changed(). */
+	void colorsChanged();
 
 signals:
 	void changed();
@@ -49,6 +61,10 @@ private:
 	Theme();
 	/** The system's appearance changed: follow it in System mode. */
 	void systemChanged();
+	/** The scheme's system colors on the application palette, where
+	    LibreMerge owns it (not on macOS, whose native controls follow
+	    the system's appearance), when they agree with the mode. */
+	void applySchemePalette();
 
 	ThemeMode m_mode = ThemeMode::System;
 	bool m_applying = false;
@@ -56,26 +72,5 @@ private:
 	bool m_kdeDesktop = false;
 	PortalAppearance *m_portal = nullptr; // Linux only
 };
-
-/** The difference palette (WinMerge defaults in light mode, a matching
-    dark set otherwise). */
-struct DiffColors
-{
-	QColor diff, diffDeleted;
-	QColor selDiff, selDiffDeleted;
-	QColor trivial, trivialDeleted;
-	QColor wordDiff, wordDiffDeleted;
-	QColor selWordDiff, selWordDiffDeleted;
-	QColor moved, selMoved;
-};
-
-const DiffColors &diffColors();
-
-/** The background of what a marker marks (upstream's
-    COLORINDEX_MARKERBKGND0 to 3: the search's, then the Marker dialog's
-    three): WinMerge's defaults in light mode; in dark mode the first two
-    of the Marker dialog's from its "VS Dark" color scheme, the search's
-    and the third LibreMerge's own, apart from the selection's blue. */
-QColor markerColor(int color);
 
 } // namespace lm

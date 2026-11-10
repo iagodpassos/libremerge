@@ -9,6 +9,7 @@
 class QCheckBox;
 class QComboBox;
 class QLineEdit;
+class QPushButton;
 class QRadioButton;
 class QStackedWidget;
 class QTreeWidget;
@@ -25,8 +26,8 @@ class WildcardDropList;
  * The application options dialog, laid out like WinMerge's (Preferences
  * dialog): a page tree on the left, where a category's pages sit indented
  * under it (General; Compare > General, Folder, Table, Binary, Image;
- * Message Boxes; Editor > General, Compare/Merge, Syntax; Backup Files;
- * Codepage), and the
+ * Message Boxes; Editor > General, Compare/Merge, Syntax; Colors > Color
+ * Schemes; Backup Files; Codepage), and the
  * selected page on the right with its own Defaults button. Every option
  * sits on the page and at the position WinMerge gives it.
  */
@@ -35,6 +36,9 @@ class OptionsDialog : public QDialog
 	Q_OBJECT
 public:
 	explicit OptionsDialog(QWidget *parent = nullptr);
+	/** Esc and the window's close do nothing once Cancel is disabled, as
+	    a dialog's IDCANCEL then. */
+	void reject() override;
 
 	// QSettings keys for the General options (defaults follow WinMerge)
 	static bool scrollToFirstDiff();
@@ -88,6 +92,7 @@ public:
 		EditorPage,  ///< Editor > General
 		EditorCompareMergePage, ///< Editor > Compare/Merge
 		EditorSyntaxPage, ///< Editor > Syntax
+		ColorSchemesPage, ///< Colors > Color Schemes
 		BackupPage,
 		CodepagePage,
 	};
@@ -115,6 +120,12 @@ public:
 	void setMessageBoxAnswerForTest(int row, int answerIndex);
 	void resetMessageBoxesForTest() { resetMessageBoxes(); }
 	void saveForTest() { save(); }
+	/** Whether a color scheme was imported while the dialog was open:
+	    the views take the colors again once it is accepted. */
+	bool colorsImported() const { return m_colorsImported; }
+	/** Whether Cancel still closes the dialog (a scheme imported leaves
+	    only OK, for tests). */
+	bool cancelEnabledForTest() const;
 	/** The Editor > Syntax list (for tests). */
 	lm::SubeditList *syntaxListForTest() const { return m_syntaxList; }
 
@@ -137,6 +148,16 @@ private:
 	QWidget *buildEditorCompareMergePage();
 	void updateLineDiffControls();
 	QWidget *buildEditorSyntaxPage();
+	QWidget *buildColorSchemesPage();
+	bool effectiveColorModeDark() const;
+	QString currentColorSchemePath() const;
+	void reloadColorSchemes();
+	void showColorSchemes(const QString &light, const QString &dark);
+	void updateColorSchemeControls();
+	void writeColorSchemeOptions();
+	void updateColorScheme();
+	void saveCurrentScheme();
+	void deleteCurrentScheme();
 	QWidget *buildBackupPage();
 	QWidget *buildCodepagePage();
 	void showCustomCodepage(int codepage);
@@ -173,7 +194,6 @@ private:
 	// Compare > Image
 	lm::WildcardDropList *m_cmbImagePatterns = nullptr;
 	QCheckBox *m_chkImageInFolderCompare = nullptr;
-	QComboBox *m_cmbTheme;
 	QComboBox *m_cmbLanguage;
 	// Compare > General
 	QRadioButton *m_radWhitespace[3];
@@ -208,6 +228,15 @@ private:
 	QLineEdit *m_editBreakChars = nullptr;
 	// Editor > Syntax
 	lm::SubeditList *m_syntaxList = nullptr;
+	// Colors > Color Schemes
+	QComboBox *m_cmbColorMode = nullptr;
+	QComboBox *m_cmbColorScheme = nullptr;
+	QComboBox *m_cmbColorSchemeDark = nullptr;
+	QPushButton *m_btnSaveScheme = nullptr;
+	QPushButton *m_btnDeleteScheme = nullptr;
+	bool m_colorsImported = false;
+	QPushButton *m_defaultsButton = nullptr;
+	QPushButton *m_cancelButton = nullptr;
 	// Message Boxes
 	QTreeWidget *m_messageList;
 	// the Answer drop-down of each question, by row (null for the

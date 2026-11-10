@@ -4372,9 +4372,61 @@ Por favor, use valores entre 1 y %1.</translation>
         <translation>Oscuro</translation>
     </message>
     <message>
-        <source>Theme:</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Tema:</translation>
+        <source>Colors</source>
+        <translation>Colores</translation>
+    </message>
+    <message>
+        <source>Color Schemes</source>
+        <translation>Esquemas de colores</translation>
+    </message>
+    <message>
+        <source>Follow system</source>
+        <translation>Según el sistema</translation>
+    </message>
+    <message>
+        <source>Color &amp;mode:</source>
+        <translation>&amp;Modo de color:</translation>
+    </message>
+    <message>
+        <source>&amp;Light mode scheme:</source>
+        <translation>Esquema del modo c&amp;laro:</translation>
+    </message>
+    <message>
+        <source>&amp;Dark mode scheme:</source>
+        <translation>Es&amp;quema del modo oscuro:</translation>
+    </message>
+    <message>
+        <source>Your custom schemes</source>
+        <translation>Sus esquemas personalizados</translation>
+    </message>
+    <message>
+        <source>&amp;Save current scheme...</source>
+        <translation>&amp;Guardar el esquema actual en...</translation>
+    </message>
+    <message>
+        <source>Delete &amp;current scheme...</source>
+        <translation>Eliminar el esquema a&amp;ctual en...</translation>
+    </message>
+    <message>
+        <source>Failed to import options from file.</source>
+        <translation>Error al importar opciones del archivo.</translation>
+    </message>
+    <message>
+        <source>Select file for export</source>
+        <translation>Seleccione archivo a exportar</translation>
+    </message>
+    <message>
+        <source>Options files (*.ini);;All Files (*)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Archivos de opciones (*.ini) |*.ini| Todos los archivos (*.*) |*.*| |&quot;.</translatorcomment>
+        <translation>Archivos de opciones (*.ini);;Todos los archivos (*)</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to delete
+
+%1 ?</source>
+        <translation>¿Está seguro de que desea eliminar
+
+%1?</translation>
     </message>
     <message>
         <source>Language:</source>

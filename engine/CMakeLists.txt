@@ -56,6 +56,10 @@ set(L1_SOURCES
 set(L2_SOURCES
   Src/CompareOptions.cpp
   Src/OptionsEditorSyntax.cpp
+  Src/OptionsDiffColors.cpp
+  Src/OptionsDirColors.cpp
+  Src/OptionsSyntaxColors.cpp
+  Src/OptionsCustomColors.cpp
   Src/CompareStats.cpp
   Src/DiffWrapper.cpp
   Src/DiffList.cpp
@@ -105,6 +109,7 @@ set(L2_SOURCES
   Externals/crystaledit/editlib/utils/fpattern.cpp
   Externals/crystaledit/editlib/utils/icu.cpp
   Externals/crystaledit/editlib/TextDefinition.cpp
+  Externals/crystaledit/editlib/SyntaxColors.cpp
   ports/exconverter_icu.cpp
   ports/file_transform_posix.cpp
   ports/table_props_posix.cpp

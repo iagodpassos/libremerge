@@ -497,6 +497,11 @@ private:
 	void computeWordSpans(int blockIndex, const int first[3], const int last[3],
 		const DIFFOPTIONS &options, int breakType, bool byteLevel);
 	void applyHighlights();
+	/** CMergeEditView::GetLineColors2: the background and the text color
+	    of a row of a difference on a side, in the scheme's colors (the text
+	    invalid for none); false for a row that keeps the plain text's. */
+	bool diffLineColors(size_t blockIndex, int side, int row, QColor *background,
+		QColor *text) const;
 	void updateStatus();
 	void updateDiffPane();
 	void updatePaneStatus(int side);

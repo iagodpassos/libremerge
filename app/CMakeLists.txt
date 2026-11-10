@@ -47,6 +47,7 @@ qt_add_executable(LibreMerge
   PopupList.cpp
   SyntaxHighlighter.cpp
   Theme.cpp
+  ColorSettings.cpp
   FolderCompareView.cpp
   FolderCompareDriver.cpp
   ArchiveCompare.cpp
@@ -149,6 +150,22 @@ else()
       $<TARGET_FILE_DIR:LibreMerge>/Filters)
 endif()
 
+# WinMerge's color schemes (ColorSchemes/*.ini, Options > Colors > Color
+# Schemes), shipped as files as the filters are: the bundle's
+# Resources/ColorSchemes on macOS, share/libremerge/ColorSchemes elsewhere,
+# and next to a build's binary
+file(GLOB LM_COLOR_SCHEME_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/ColorSchemes/*.ini)
+if(APPLE)
+  target_sources(LibreMerge PRIVATE ${LM_COLOR_SCHEME_FILES})
+  set_source_files_properties(${LM_COLOR_SCHEME_FILES}
+    PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/ColorSchemes")
+else()
+  add_custom_command(TARGET LibreMerge POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:LibreMerge>/ColorSchemes
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LM_COLOR_SCHEME_FILES}
+      $<TARGET_FILE_DIR:LibreMerge>/ColorSchemes)
+endif()
+
 # WinMerge's TreeSitterGrammars folder (engine/TreeSitterGrammars.cmake):
 # the grammar modules and their queries, in the bundle's Resources on
 # macOS and next to a build's binary elsewhere (installed under the
@@ -213,6 +230,8 @@ if(UNIX AND NOT APPLE)
     DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
   install(FILES ${LM_FILTER_FILES}
     DESTINATION ${CMAKE_INSTALL_DATADIR}/libremerge/Filters)
+  install(FILES ${LM_COLOR_SCHEME_FILES}
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/libremerge/ColorSchemes)
   # the grammar modules are the platform's code: the libdir, with their
   # queries beside them; the binary finds them relative to itself
   set(LM_TREE_SITTER_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/libremerge/TreeSitterGrammars)

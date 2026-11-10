@@ -1094,7 +1094,9 @@ void DiffTextEdit::paintGutter(QPaintEvent *event)
 					? m_lineNumbers.at(blockNumber) : -1;
 			if (number > 0)
 			{
-				painter.setPen(palette().color(QPalette::PlaceholderText));
+				// DrawMargin: the numbers in COLORINDEX_NORMALTEXT on the
+				// margin's COLORINDEX_SELMARGIN
+				painter.setPen(palette().color(QPalette::Text));
 				painter.drawText(0, top, width - 6, bottom - top,
 					Qt::AlignRight | Qt::AlignVCenter, QString::number(number));
 			}

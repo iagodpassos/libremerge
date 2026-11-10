@@ -17,3 +17,6 @@ void SetOptionsMgr(COptionsMgr *pOptionsMgr)
 {
 	g_pOptionsMgr = pOptionsMgr;
 }
+
+// GetSysColor's answer (posix_compat.h): the application's, once it sets it
+extern "C" unsigned long (*lm_sysColorProvider)(int index) = nullptr;

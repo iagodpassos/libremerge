@@ -4,6 +4,7 @@
 // like "Settings/IgnoreSpace" map naturally onto QSettings groups.
 #include "pch.h"
 #include "EngineOptions.h"
+#include "ColorSettings.h"
 #include "Settings.h"
 
 #include <algorithm>
@@ -375,6 +376,8 @@ void installEngineOptions()
 	options.InitOption(OPT_BREAK_TYPE, 1, 0, 1);
 	options.InitOption(OPT_BREAK_SEPARATORS, _T(".,:;?[](){}<=>`'!\"#$%&^~\\|@+-*/"));
 	updateBreakChars();
+	// the Colors pages' options, and the colors of the mode in effect
+	initColorOptions();
 	TreeSitterRegistry::Instance().Initialize(treeSitterGrammarsDir().toStdString());
 	initSyntaxParserFactories();
 }

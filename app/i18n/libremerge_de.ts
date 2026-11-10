@@ -4369,9 +4369,62 @@ Bitte benutzen Sie Werte von 1 - %1.</translation>
         <translation>Dunkel</translation>
     </message>
     <message>
-        <source>Theme:</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Design:</translation>
+        <source>Colors</source>
+        <translation>Farben</translation>
+    </message>
+    <message>
+        <source>Color Schemes</source>
+        <translation>Farbschema</translation>
+    </message>
+    <message>
+        <source>Follow system</source>
+        <translation>Systemeinstellung verwenden</translation>
+    </message>
+    <message>
+        <source>Color &amp;mode:</source>
+        <translation>&amp;Farbmodus:</translation>
+    </message>
+    <message>
+        <source>&amp;Light mode scheme:</source>
+        <translation>&amp;Hellmodus-Schema:</translation>
+    </message>
+    <message>
+        <source>&amp;Dark mode scheme:</source>
+        <translation>&amp;Dunkelmodus-Schema:</translation>
+    </message>
+    <message>
+        <source>Your custom schemes</source>
+        <translation>Ihre individuellen Schemata</translation>
+    </message>
+    <message>
+        <source>&amp;Save current scheme...</source>
+        <translation>&amp;Aktuelles Schema speichern...</translation>
+    </message>
+    <message>
+        <source>Delete &amp;current scheme...</source>
+        <translation>&amp;Aktuelles Schema löschen...</translation>
+    </message>
+    <message>
+        <source>Failed to import options from file.</source>
+        <translation>Konnte die Einstellungen nicht aus der Datei importieren.</translation>
+    </message>
+    <message>
+        <source>Select file for export</source>
+        <translation>Datei zum Exportieren auswählen</translation>
+    </message>
+    <message>
+        <source>Options files (*.ini);;All Files (*)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Einstellungsdateien (*.ini)|*.ini|Alle Dateien (*.*)|*.*||&quot;.</translatorcomment>
+        <translation>Einstellungsdateien (*.ini);;Alle Dateien (*)</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to delete
+
+%1 ?</source>
+        <translation>Wollen Sie wirklich
+
+%1
+löschen?</translation>
     </message>
     <message>
         <source>Language:</source>

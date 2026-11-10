@@ -3890,8 +3890,60 @@ Checando identidade binária...</translation>
         <translation>Escuro</translation>
     </message>
     <message>
-        <source>Theme:</source>
-        <translation>Tema:</translation>
+        <source>Colors</source>
+        <translation>Cores</translation>
+    </message>
+    <message>
+        <source>Color Schemes</source>
+        <translation>Esquemas de Cores</translation>
+    </message>
+    <message>
+        <source>Follow system</source>
+        <translation>Seguir o sistema</translation>
+    </message>
+    <message>
+        <source>Color &amp;mode:</source>
+        <translation>&amp;Modo de cor:</translation>
+    </message>
+    <message>
+        <source>&amp;Light mode scheme:</source>
+        <translation>Esquema do modo &amp;claro:</translation>
+    </message>
+    <message>
+        <source>&amp;Dark mode scheme:</source>
+        <translation>Esquema do modo &amp;escuro:</translation>
+    </message>
+    <message>
+        <source>Your custom schemes</source>
+        <translation>Seus esquemas personalizados</translation>
+    </message>
+    <message>
+        <source>&amp;Save current scheme...</source>
+        <translation>&amp;Salvar esquema atual...</translation>
+    </message>
+    <message>
+        <source>Delete &amp;current scheme...</source>
+        <translation>Ex&amp;cluir esquema atual...</translation>
+    </message>
+    <message>
+        <source>Failed to import options from file.</source>
+        <translation>Falha na importação de opções do arquivo.</translation>
+    </message>
+    <message>
+        <source>Select file for export</source>
+        <translation>Selecione o arquivo para exportar</translation>
+    </message>
+    <message>
+        <source>Options files (*.ini);;All Files (*)</source>
+        <translation>Arquivos de Opções (*.ini);;Todos os Arquivos (*)</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to delete
+
+%1 ?</source>
+        <translation>Tem certeza de que quer excluir 
+
+%1 ?</translation>
     </message>
     <message>
         <source>Whitespaces</source>

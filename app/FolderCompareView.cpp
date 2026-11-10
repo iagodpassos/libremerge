@@ -9,6 +9,8 @@
 #include "FileOps.h"
 #include "Icons.h"
 #include "Theme.h"
+#include "SyntaxColors.h"
+#include <windows.h> // ports: COLOR_*
 
 #include <QAction>
 #include <QActionGroup>
@@ -180,36 +182,41 @@ QString threeWayText(lm::FolderCompareItem::ThreeWayInfo info)
 	return {};
 }
 
-QColor categoryColor(lm::FolderCompareItem::Category category)
+/** CDirView::GetColors: an item's background and text in the color
+    scheme's folder colors (DIRCOLORSETTINGS): a filtered one's, one that
+    is not in every folder's, a different one's, an identical one's, and
+    the editor's text colors for the rest (an error, an item no longer
+    compared). */
+void itemColors(lm::FolderCompareItem::Category category, QColor *background, QColor *text)
 {
-	if (lm::Theme::instance()->dark())
-	{
-		// same hues as the light pastels, tuned for light text
-		// (matching the dark set in lm::diffColors())
-		switch (category)
-		{
-		case lm::FolderCompareItem::Different:
-		case lm::FolderCompareItem::MissingLeft:
-		case lm::FolderCompareItem::MissingMiddle:
-		case lm::FolderCompareItem::MissingRight: return QColor(105, 92, 38);
-		case lm::FolderCompareItem::LeftOnly: return QColor(42, 62, 96);
-		case lm::FolderCompareItem::MiddleOnly: return QColor(74, 52, 96);
-		case lm::FolderCompareItem::RightOnly: return QColor(38, 82, 58);
-		case lm::FolderCompareItem::Error: return QColor(110, 48, 48);
-		default: return {};
-		}
-	}
+	const lm::DirColors &colors = lm::dirColors();
 	switch (category)
 	{
-	case lm::FolderCompareItem::Different:
+	case lm::FolderCompareItem::Skipped:
+		*background = colors.filtered;
+		*text = colors.filteredText;
+		return;
+	case lm::FolderCompareItem::LeftOnly:
+	case lm::FolderCompareItem::MiddleOnly:
+	case lm::FolderCompareItem::RightOnly:
 	case lm::FolderCompareItem::MissingLeft:
 	case lm::FolderCompareItem::MissingMiddle:
-	case lm::FolderCompareItem::MissingRight: return QColor(255, 243, 176);
-	case lm::FolderCompareItem::LeftOnly: return QColor(224, 236, 255);
-	case lm::FolderCompareItem::MiddleOnly: return QColor(238, 224, 255);
-	case lm::FolderCompareItem::RightOnly: return QColor(224, 255, 232);
-	case lm::FolderCompareItem::Error: return QColor(255, 214, 214);
-	default: return {};
+	case lm::FolderCompareItem::MissingRight:
+		*background = colors.notExistAll;
+		*text = colors.notExistAllText;
+		return;
+	case lm::FolderCompareItem::Different:
+		*background = colors.diff;
+		*text = colors.diffText;
+		return;
+	case lm::FolderCompareItem::Identical:
+		*background = colors.equal;
+		*text = colors.equalText;
+		return;
+	default:
+		*background = lm::syntaxColor(COLORINDEX_BKGND);
+		*text = lm::syntaxColor(COLORINDEX_NORMALTEXT);
+		return;
 	}
 }
 
@@ -239,16 +246,16 @@ void FolderCompareView::setRowCategory(QTreeWidgetItem *row,
 		? QObject::tr("Folder: %1").arg(text) : text);
 	row->setData(0, RoleCategory, static_cast<int>(category));
 	row->setData(0, RoleThreeWay, static_cast<int>(threeWay));
-	const QColor color = categoryColor(category);
-	// explicit text color so the row stays readable whatever the
-	// platform palette is: black on the light pastels, near-white on
-	// the dark category colors
-	const QColor textColor = lm::Theme::instance()->dark()
-		? QColor(0xd4, 0xd4, 0xd4) : QColor(Qt::black);
+	// OnCustomDraw: the items in the scheme's colors, unless the folder
+	// comparison colors none (OPT_DIRCLR_USE_COLORS)
+	QColor color;
+	QColor textColor;
+	if (lm::dirColors().use)
+		itemColors(category, &color, &textColor);
 	for (int col = 0; col < colCount(); ++col)
 	{
 		row->setBackground(col, color.isValid() ? QBrush(color) : QBrush());
-		row->setForeground(col, color.isValid() ? QBrush(textColor) : QBrush());
+		row->setForeground(col, textColor.isValid() ? QBrush(textColor) : QBrush());
 	}
 }
 
@@ -464,7 +471,16 @@ void FolderCompareView::applyTheme()
 	}
 	setPalette(pal);
 	setAutoFillBackground(true); // gaps between widgets follow the theme
-	m_tree->setPalette(pal);
+	// the list on the scheme's margin color, or the system's window
+	// (CDirView::RefreshOptions), its text the system's
+	QPalette listPalette = pal;
+	const QColor margin = lm::dirColors().use ? lm::dirColors().margin
+		: lm::systemColor(COLOR_WINDOW);
+	listPalette.setColor(QPalette::Base, margin);
+	listPalette.setColor(QPalette::AlternateBase,
+		margin.lightness() < 128 ? margin.lighter(112) : margin.darker(104));
+	listPalette.setColor(QPalette::Text, lm::systemColor(COLOR_WINDOWTEXT));
+	m_tree->setPalette(listPalette);
 	m_status->setStyleSheet(dark
 		? QStringLiteral("QLabel { background: #2c2c2c; color: #b8b8b8; }")
 		: QStringLiteral("QLabel { background: #ececec; color: #303030; }"));

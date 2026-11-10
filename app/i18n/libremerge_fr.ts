@@ -4358,9 +4358,61 @@ Vérification de l&apos;identité binaire...</translation>
         <translation>Foncé</translation>
     </message>
     <message>
-        <source>Theme:</source>
-        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
-        <translation>Thème :</translation>
+        <source>Colors</source>
+        <translation>Couleurs</translation>
+    </message>
+    <message>
+        <source>Color Schemes</source>
+        <translation>Schémas de couleurs</translation>
+    </message>
+    <message>
+        <source>Follow system</source>
+        <translation>Suivre le système</translation>
+    </message>
+    <message>
+        <source>Color &amp;mode:</source>
+        <translation>Mode de &amp;couleur :</translation>
+    </message>
+    <message>
+        <source>&amp;Light mode scheme:</source>
+        <translation>&amp;Schéma du mode clair :</translation>
+    </message>
+    <message>
+        <source>&amp;Dark mode scheme:</source>
+        <translation>&amp;Schéma du mode foncé :</translation>
+    </message>
+    <message>
+        <source>Your custom schemes</source>
+        <translation>Vos schémas personnalisés</translation>
+    </message>
+    <message>
+        <source>&amp;Save current scheme...</source>
+        <translation>&amp;Sauvegarder le schéma actuel...</translation>
+    </message>
+    <message>
+        <source>Delete &amp;current scheme...</source>
+        <translation>Supprimer le schéma &amp;actuel...</translation>
+    </message>
+    <message>
+        <source>Failed to import options from file.</source>
+        <translation>Échec lors de l&apos;importation des préférences à partir du fichier.</translation>
+    </message>
+    <message>
+        <source>Select file for export</source>
+        <translation>Sélectionner le fichier pour exportation</translation>
+    </message>
+    <message>
+        <source>Options files (*.ini);;All Files (*)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Fichiers de préférences (*.ini)|*.ini|Tous les fichiers (*.*)|*.*||&quot;.</translatorcomment>
+        <translation>Fichiers de préférences (*.ini);;Tous les fichiers (*)</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to delete
+
+%1 ?</source>
+        <translation>Êtes-vous sûr de vouloir supprimer
+
+%1 ?</translation>
     </message>
     <message>
         <source>Language:</source>

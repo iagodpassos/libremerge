@@ -75,6 +75,8 @@
 #include "stringdiffs.h"
 #include "SubstitutionFiltersList.h"
 #include "UnicodeString.h"
+#include "SyntaxColors.h"
+#include <windows.h> // ports: COLOR_*
 
 namespace
 {
@@ -3221,6 +3223,73 @@ void FileCompareView::computeWordSpans(int blockIndex, const int first[3], const
 	}
 }
 
+bool FileCompareView::diffLineColors(size_t blockIndex, int side, int row,
+	QColor *background, QColor *text) const
+{
+	const lm::DiffColors &C = lm::diffColors();
+	const Block &block = m_blocks[blockIndex];
+	const bool current = static_cast<int>(blockIndex) == m_current;
+	const int len = qMax(0, block.end[side] - block.begin[side] + 1);
+	const bool ghost = row >= len;
+	*text = C.diffText;
+	if (block.resolved)
+	{
+		// merged in place since the last recompare: its real lines look
+		// like common text, its filler like an ignored difference's
+		if (!ghost)
+			return false;
+		*background = C.trivialDeleted;
+		*text = C.trivialText;
+		return true;
+	}
+	// LF_SNP: of three files, the one that is as its neighbor (the first in
+	// a difference of the third only, the third in one of the first only)
+	if (m_paneCount == 3 && !block.trivial
+		&& ((side == 0 && block.op == OP_3RDONLY) || (side == 2 && block.op == OP_1STONLY)))
+	{
+		*background = current ? (ghost ? C.selSnpDeleted : C.selSnp)
+			: (ghost ? C.snpDeleted : C.snp);
+		*text = current ? C.selSnpText : C.snpText;
+		return true;
+	}
+	if (block.trivial)
+	{
+		// an ignored difference cannot be the current one
+		*background = ghost ? C.trivialDeleted : C.trivial;
+		*text = C.trivialText;
+		return true;
+	}
+	// LF_MOVED: a line of a moved block; a filler line across from one
+	// too (FlagMovedLines also asks where the block went, which the
+	// moved lines here do not keep)
+	bool moved = false;
+	if (!ghost)
+		moved = m_movedLines[side].contains(block.begin[side] + row);
+	else if (m_paneCount == 2)
+	{
+		const int other = 1 - side;
+		moved = row < block.end[other] - block.begin[other] + 1
+			&& m_movedLines[other].contains(block.begin[other] + row);
+	}
+	if (!ghost)
+	{
+		if (current)
+		{
+			*background = moved ? C.selMoved : C.selDiff;
+			*text = moved ? C.selMovedText : C.selDiffText;
+		}
+		else
+		{
+			*background = moved ? C.moved : C.diff;
+			*text = moved ? C.movedText : C.diffText;
+		}
+		return true;
+	}
+	*background = current ? (moved ? C.selMovedDeleted : C.selDiffDeleted)
+		: (moved ? C.movedDeleted : C.diffDeleted);
+	return true;
+}
+
 void FileCompareView::applyHighlights()
 {
 	const lm::DiffColors &C = lm::diffColors();
@@ -3230,7 +3299,11 @@ void FileCompareView::applyHighlights()
 		QHash<int, QColor> gutterColors;
 		QTextDocument *doc = m_panes[side]->document();
 
-		auto addLineSelection = [&](int viewLine, const QColor &color) {
+		// a difference's line: its background across the pane, and its
+		// text in the difference's text color when the scheme has one (the
+		// syntax colors give way to it, as upstream draws a line whose text
+		// color is set)
+		auto addLineSelection = [&](int viewLine, const QColor &color, const QColor &text) {
 			const QTextBlock textBlock = doc->findBlockByNumber(viewLine);
 			if (!textBlock.isValid())
 				return;
@@ -3238,6 +3311,11 @@ void FileCompareView::applyHighlights()
 			selection.format.setBackground(color);
 			selection.format.setProperty(QTextFormat::FullWidthSelection, true);
 			selection.cursor = QTextCursor(textBlock);
+			if (text.isValid() && textBlock.length() > 1)
+			{
+				selection.format.setForeground(text);
+				selection.cursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+			}
 			selections.append(selection);
 			gutterColors.insert(viewLine, color);
 		};
@@ -3245,28 +3323,12 @@ void FileCompareView::applyHighlights()
 		for (size_t b = 0; b < m_blocks.size(); ++b)
 		{
 			const Block &block = m_blocks[b];
-			const bool current = (static_cast<int>(b) == m_current);
-			const int len = qMax(0, block.end[side] - block.begin[side] + 1);
 			for (int v = block.viewBegin; v <= block.viewEnd; ++v)
 			{
-				const bool ghost = (v - block.viewBegin) >= len;
 				QColor color;
-				if (block.trivial)
-					color = ghost ? C.trivialDeleted : C.trivial;
-				else if (block.resolved)
-				{
-					if (!ghost)
-						continue; // merged: real lines look like common text
-					color = C.trivialDeleted;
-				}
-				else if (!ghost && m_movedLines[side].contains(
-					block.begin[side] + (v - block.viewBegin)))
-					color = current ? C.selMoved : C.moved;
-				else if (current)
-					color = ghost ? C.selDiffDeleted : C.selDiff;
-				else
-					color = ghost ? C.diffDeleted : C.diff;
-				addLineSelection(v, color);
+				QColor text;
+				if (diffLineColors(b, side, v - block.viewBegin, &color, &text))
+					addLineSelection(v, color, text);
 			}
 		}
 
@@ -3301,6 +3363,11 @@ void FileCompareView::applyHighlights()
 			selection.format.setBackground(current
 				? (span.oneSided ? C.selWordDiffDeleted : C.selWordDiff)
 				: (span.oneSided ? C.wordDiffDeleted : C.wordDiff));
+			// GetAdditionalTextBlocks: the word difference's text color
+			// when the scheme has one
+			const QColor wordText = current ? C.selWordDiffText : C.wordDiffText;
+			if (wordText.isValid())
+				selection.format.setForeground(wordText);
 			QTextCursor cursor(textBlock);
 			cursor.setPosition(textBlock.position() + span.start);
 			cursor.setPosition(textBlock.position() + span.start + span.length,
@@ -3363,21 +3430,11 @@ void FileCompareView::applyHighlights()
 				continue;
 			for (int side = 0; side < m_paneCount; ++side)
 			{
-				const bool ghost = (top - block.viewBegin) >= len[side];
+				// in the colors the part's first line has (GetLineColors2)
 				QColor color;
-				if (block.resolved)
-				{
-					if (!ghost)
-						continue; // merged: real lines look like common text
-					color = C.trivialDeleted;
-				}
-				else if (!ghost && m_movedLines[side].contains(
-					block.begin[side] + (top - block.viewBegin)))
-					color = current ? C.selMoved : C.moved;
-				else if (current)
-					color = ghost ? C.selDiffDeleted : C.selDiff;
-				else
-					color = ghost ? C.diffDeleted : C.diff;
+				QColor text;
+				if (!diffLineColors(b, side, top - block.viewBegin, &color, &text))
+					continue; // merged: real lines look like common text
 				const int first = shownOf(top);
 				const int last = shownOf(end) - 1;
 				if (last >= first)
@@ -3478,6 +3535,11 @@ void FileCompareView::updateDiffPane()
 			selection.format.setBackground(C.selDiff);
 			selection.format.setProperty(QTextFormat::FullWidthSelection, true);
 			selection.cursor = QTextCursor(textBlock);
+			if (C.selDiffText.isValid() && textBlock.length() > 1)
+			{
+				selection.format.setForeground(C.selDiffText);
+				selection.cursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+			}
 			selections.append(selection);
 		}
 		for (const WordSpan &span : m_wordSpans)
@@ -3492,6 +3554,8 @@ void FileCompareView::updateDiffPane()
 			QTextEdit::ExtraSelection selection;
 			selection.format.setBackground(
 				span.oneSided ? C.selWordDiffDeleted : C.selWordDiff);
+			if (C.selWordDiffText.isValid())
+				selection.format.setForeground(C.selWordDiffText);
 			QTextCursor cursor(textBlock);
 			cursor.setPosition(textBlock.position() + span.start);
 			cursor.setPosition(textBlock.position() + span.start + span.length,
@@ -3753,31 +3817,26 @@ void FileCompareView::showSyntaxTypeMenu(int pane, const QPoint &globalPos)
 		setSyntaxType(types.at(selection.index), selection.checkBoxChecked ? pane : -1);
 }
 
-/** Apply the light (WinMerge classic) or dark palette to every themed
-    part of the view: editor panes, gutters, diff pane, location pane,
-    status strips, headers, syntax colors and diff highlights. */
+/** The panes in the color scheme's text colors (COLORINDEX_BKGND,
+    NORMALTEXT, SELBKGND, SELTEXT, SELMARGIN for the margin, WHITESPACE
+    for the location pane), and the theme's light or dark for the rest:
+    status strips, headers, syntax colors and diff highlights again. */
 void FileCompareView::applyTheme()
 {
 	const bool dark = lm::Theme::instance()->dark();
+	const QColor background = lm::syntaxColor(COLORINDEX_BKGND);
+	const QColor text = lm::syntaxColor(COLORINDEX_NORMALTEXT);
 	QPalette pal;
-	if (dark)
-	{
-		pal.setColor(QPalette::Base, QColor(0x1e, 0x1e, 0x1e));
-		pal.setColor(QPalette::Text, QColor(0xd4, 0xd4, 0xd4));
-		pal.setColor(QPalette::Window, QColor(0x2a, 0x2a, 0x2a));
-		pal.setColor(QPalette::PlaceholderText, QColor(0x70, 0x70, 0x70));
-		pal.setColor(QPalette::Highlight, QColor(0x26, 0x4f, 0x78));
-		pal.setColor(QPalette::HighlightedText, QColor(0xe6, 0xe6, 0xe6));
-	}
-	else
-	{
-		pal.setColor(QPalette::Base, Qt::white);
-		pal.setColor(QPalette::Text, Qt::black);
-		pal.setColor(QPalette::Window, QColor(0xf0, 0xf0, 0xf0));
-		pal.setColor(QPalette::PlaceholderText, QColor(0x88, 0x88, 0x88));
-		pal.setColor(QPalette::Highlight, QColor(0xb5, 0xd5, 0xff));
-		pal.setColor(QPalette::HighlightedText, Qt::black);
-	}
+	pal.setColor(QPalette::Base, background);
+	pal.setColor(QPalette::Text, text);
+	pal.setColor(QPalette::Window, lm::syntaxColor(COLORINDEX_SELMARGIN));
+	pal.setColor(QPalette::Highlight, lm::syntaxColor(COLORINDEX_SELBKGND));
+	pal.setColor(QPalette::HighlightedText, lm::syntaxColor(COLORINDEX_SELTEXT));
+	// COLORINDEX_INTERMEDIATECOLOR: a third of the way from the
+	// background to the text
+	pal.setColor(QPalette::PlaceholderText, QColor(
+		(text.red() + 2 * background.red()) / 3, (text.green() + 2 * background.green()) / 3,
+		(text.blue() + 2 * background.blue()) / 3));
 	const QString statusStyle = dark
 		? QStringLiteral("QLabel { background: #2c2c2c; color: #b8b8b8; }")
 		: QStringLiteral("QLabel { background: #ececec; color: #303030; }");
@@ -3793,11 +3852,11 @@ void FileCompareView::applyTheme()
 		if (m_highlighters[i] != nullptr)
 			rebuildHighlighter(i);
 	}
+	// CLocationView: the bars on COLORINDEX_WHITESPACE, their shadow the
+	// system's button shadow
 	QPalette locPal = m_locationPane->palette();
-	locPal.setColor(QPalette::Base,
-		dark ? QColor(0x24, 0x24, 0x24) : QColor(Qt::white));
-	locPal.setColor(QPalette::Mid,
-		dark ? QColor(0x50, 0x50, 0x50) : QColor(0xc0, 0xc0, 0xc0));
+	locPal.setColor(QPalette::Base, lm::syntaxColor(COLORINDEX_WHITESPACE));
+	locPal.setColor(QPalette::Mid, lm::systemColor(COLOR_BTNSHADOW));
 	m_locationPane->setPalette(locPal);
 	m_status->setStyleSheet(statusStyle);
 	lm::applyToolbarTheme(this);

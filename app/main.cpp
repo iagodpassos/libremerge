@@ -71,6 +71,7 @@
 #include "SyntaxHighlighter.h"
 #include "TextDefinition.h"
 #include "SyntaxColors.h"
+#include <windows.h> // ports: COLOR_*
 #include "TableCompareView.h"
 #include "TableFiles.h"
 #include "WildcardDropList.h"
@@ -675,6 +676,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestSyntaxOptionsOpt(QStringLiteral("selftest-syntax-options"),
 		QStringLiteral("Exercise Options > Editor > Syntax and the pattern fields' drop-down (for testing)"));
 	parser.addOption(selftestSyntaxOptionsOpt);
+	QCommandLineOption selftestColorSchemesOpt(QStringLiteral("selftest-color-schemes"),
+		QStringLiteral("Exercise Options > Colors > Color Schemes and the views' colors from them (for testing)"));
+	parser.addOption(selftestColorSchemesOpt);
 	QCommandLineOption selftestIgnoredDiffsOpt(QStringLiteral("selftest-ignored-diffs"),
 		QStringLiteral("Count the ignored differences apart in the status bar and in Go To (for testing)"));
 	parser.addOption(selftestIgnoredDiffsOpt);
@@ -1653,13 +1657,14 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
 			OptionsDialog::BinaryPage, OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
 			-1, OptionsDialog::EditorPage, OptionsDialog::EditorCompareMergePage,
-			OptionsDialog::EditorSyntaxPage, OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
-		bool ok = tree.size() == 14;
+			OptionsDialog::EditorSyntaxPage, -1, OptionsDialog::ColorSchemesPage,
+			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
+		bool ok = tree.size() == 16;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1671,15 +1676,16 @@ int main(int argc, char *argv[])
 			OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
 			OptionsDialog::EditorPage, OptionsDialog::EditorPage,
 			OptionsDialog::EditorCompareMergePage, OptionsDialog::EditorSyntaxPage,
+			OptionsDialog::ColorSchemesPage, OptionsDialog::ColorSchemesPage,
 			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
-		for (int i = 0; ok && i < 14; ++i)
+		for (int i = 0; ok && i < 16; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
 			printf("item %d: page %d, title \"%s\"\n", i,
 				dialog.currentPageForTest(), qPrintable(dialog.windowTitle()));
 			ok = dialog.currentPageForTest() == expectedPage[i]
-				&& nested == ((i >= 1 && i <= 6) || (i >= 8 && i <= 11));
+				&& nested == ((i >= 1 && i <= 6) || (i >= 8 && i <= 13));
 		}
 
 		const auto boxes = [&dialog](OptionsDialog::Page page) {
@@ -1704,7 +1710,7 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(12); // Backup Files
+		dialog.selectCategoryForTest(14); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 
@@ -1830,15 +1836,17 @@ int main(int argc, char *argv[])
 			check("no Theme menu", !themeMenu);
 		}
 
+		// WinMerge's color mode, on Colors > Color Schemes: Light, Dark,
+		// then Follow system (LibreMerge's default)
 		OptionsDialog dialog;
-		auto *combo = dialog.pageForTest(OptionsDialog::GeneralPage)
-			->findChild<QComboBox *>(QStringLiteral("theme"));
-		check("theme choice on the General page", combo != nullptr && combo->count() == 3
-			&& combo->currentIndex() == 0);
+		auto *combo = dialog.pageForTest(OptionsDialog::ColorSchemesPage)
+			->findChild<QComboBox *>(QStringLiteral("colorMode"));
+		check("color mode on Colors > Color Schemes", combo != nullptr && combo->count() == 3
+			&& combo->currentIndex() == 2);
 		if (combo == nullptr)
 			return 1;
 
-		combo->setCurrentIndex(2); // Dark
+		combo->setCurrentIndex(1); // Dark
 		dialog.saveForTest();
 		QCoreApplication::processEvents();
 		check("dark saved", theme->mode() == lm::ThemeMode::Dark && theme->dark()
@@ -1857,7 +1865,7 @@ int main(int argc, char *argv[])
 			&& isDark(QToolTip::palette()));
 #endif
 
-		combo->setCurrentIndex(1); // Light
+		combo->setCurrentIndex(0); // Light
 		dialog.saveForTest();
 		QCoreApplication::processEvents();
 		check("light saved", theme->mode() == lm::ThemeMode::Light && !theme->dark()
@@ -1873,9 +1881,8 @@ int main(int argc, char *argv[])
 			&& !isDark(QToolTip::palette()));
 #endif
 
-		// Defaults: back to the system, and to the platform's own palette
-		dialog.restoreDefaultsForTest();
-		check("defaults follow the system", combo->currentIndex() == 0);
+		// Follow system: back to the platform's own palette
+		combo->setCurrentIndex(2);
 		dialog.saveForTest();
 		QCoreApplication::processEvents();
 		check("system restored", theme->mode() == lm::ThemeMode::System
@@ -8809,6 +8816,249 @@ int main(int argc, char *argv[])
 		return ok ? 0 : 1;
 	}
 
+	if (parser.isSet(selftestColorSchemesOpt))
+	{
+		// WinMerge's color schemes (ColorSchemes, PropColorSchemes): the
+		// colors they import into the options, the page that picks them,
+		// saves and deletes them, and the views taking their colors
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto scheme = [](const char *name) { return lm::ColorSchemes::path(QString::fromLatin1(name)); };
+		lm::Theme::instance()->setMode(lm::ThemeMode::Light);
+		settle();
+		const lm::DiffColors &C = lm::diffColors();
+
+		// the schemes
+		const QStringList names = lm::ColorSchemes::names();
+		printf("  %s\n", qPrintable(names.join(QStringLiteral(", "))));
+		check(names == QStringList({ QStringLiteral("Default"), QStringLiteral("Midnight"),
+				QStringLiteral("Modern"), QStringLiteral("Solarized Dark"),
+				QStringLiteral("Solarized Light"), QStringLiteral("Twilight"), QStringLiteral("VS Dark") }),
+			"WinMerge's seven schemes, sorted");
+		check(lm::colorSchemeName(false) == QStringLiteral("Default")
+				&& lm::colorSchemeName(true) == QStringLiteral("VS Dark") && !lm::colorsAreDark(),
+			"Default for light, VS Dark for dark, the colors light");
+		check(!lm::ColorSchemes::isPrivatePath(scheme("Default")) && scheme("None").isEmpty(),
+			"the schemes shipped are no user's");
+
+		// VS Dark: its colors, its system colors
+		check(lm::importColorScheme(scheme("VS Dark")), "VS Dark imported");
+		check(C.diff == QColor(0x37, 0x3d, 0x29) && !C.diffText.isValid()
+				&& C.wordDiff == QColor(0x3d, 0x65, 0x25),
+			"its difference colors, no text color of their own");
+		check(lm::hasSystemColors() && lm::systemColor(COLOR_WINDOW) == QColor(0x1e, 0x1e, 0x1e),
+			"its system colors answer GetSysColor");
+		check(lm::syntaxColor(COLORINDEX_BKGND) == QColor(0x1e, 0x1e, 0x1e)
+				&& lm::syntaxColor(COLORINDEX_NORMALTEXT) == QColor(0xd4, 0xd4, 0xd4)
+				&& lm::syntaxColor(COLORINDEX_SELBKGND) == QColor(0x26, 0x4f, 0x78),
+			"its own text colors");
+		check(lm::dirColors().equal == QColor(0x1e, 0x1e, 0x1e)
+				&& lm::dirColors().notExistAll == QColor(0x4b, 0x18, 0x18)
+				&& lm::markerColor(0) == QColor(0x58, 0x6e, 0x75),
+			"its folder and marker colors");
+
+		// Default: the system colors it names are the system's as it comes in
+		check(lm::importColorScheme(scheme("Default")), "Default imported");
+		// (the palette as the import found it: on macOS the light one the
+		// mode asked for comes after a while)
+		const QPalette palette = QGuiApplication::palette();
+		// (by value: macOS gives its palette in extended RGB)
+		check(!lm::hasSystemColors() && C.diff == QColor(239, 203, 5)
+				&& C.diffText.rgb() == palette.color(QPalette::Text).rgb()
+				&& lm::dirColors().equal.rgb() == palette.color(QPalette::Base).rgb(),
+			"its colors, the system's window and text where it names them");
+		check(lm::syntaxColor(COLORINDEX_BKGND).rgb() == palette.color(QPalette::Base).rgb()
+				&& lm::syntaxColor(COLORINDEX_KEYWORD) == QColor(0, 0, 255)
+				&& lm::syntaxBold(COLORINDEX_KEYWORD),
+			"default text coloring: the system's; the keywords blue and bold");
+
+		// the mode in effect: another mode's colors give way to its scheme
+		lm::setColorsAreDark(false);
+		check(lm::syncColorSchemeWithMode(true) && lm::colorsAreDark()
+				&& C.diff == QColor(0x37, 0x3d, 0x29) && !lm::syncColorSchemeWithMode(true),
+			"dark in effect: VS Dark, imported once");
+		check(lm::syncColorSchemeWithMode(false) && !lm::colorsAreDark() && C.diff == QColor(239, 203, 5),
+			"light again: Default");
+
+		// the page
+		{
+			OptionsDialog dialog;
+			dialog.show();
+			dialog.selectCategoryForTest(13); // Colors > Color Schemes
+			settle();
+			QWidget *page = dialog.pageForTest(OptionsDialog::ColorSchemesPage);
+			auto *mode = page->findChild<QComboBox *>(QStringLiteral("colorMode"));
+			auto *light = page->findChild<QComboBox *>(QStringLiteral("colorScheme"));
+			auto *darkList = page->findChild<QComboBox *>(QStringLiteral("colorSchemeDark"));
+			auto *save = page->findChild<QPushButton *>(QStringLiteral("saveScheme"));
+			auto *remove = page->findChild<QPushButton *>(QStringLiteral("deleteScheme"));
+			if (mode == nullptr || light == nullptr || darkList == nullptr || save == nullptr || remove == nullptr)
+				return 2;
+			bool defaultsShown = false;
+			for (QPushButton *button : dialog.findChildren<QPushButton *>())
+				if (button->text() == OptionsDialog::tr("Defaults"))
+					defaultsShown = defaultsShown || button->isVisible();
+			check(dialog.currentPageForTest() == OptionsDialog::ColorSchemesPage
+					&& dialog.windowTitle().contains(OptionsDialog::tr("Color Schemes")) && !defaultsShown,
+				"Colors > Color Schemes, without a Defaults button");
+			if (!qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS").isEmpty())
+				dialog.grab().save(qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS")
+					+ QStringLiteral("/color-schemes-page.png"));
+			check(mode->currentIndex() == 0 && light->count() == 7
+					&& light->currentText() == QStringLiteral("Default")
+					&& darkList->currentText() == QStringLiteral("VS Dark")
+					&& light->isEnabled() && !darkList->isEnabled() && !remove->isEnabled()
+					&& dialog.cancelEnabledForTest(),
+				"Light: its scheme's list, no Delete for a scheme shipped");
+			light->setCurrentIndex(light->findText(QStringLiteral("Solarized Light")));
+			emit light->activated(light->currentIndex());
+			check(lm::colorSchemeName(false) == QStringLiteral("Solarized Light")
+					&& C.diff == QColor(0xdd, 0xff, 0xdd) && !dialog.cancelEnabledForTest(),
+				"a scheme picked: imported at once, Cancel disabled");
+			dialog.reject();
+			check(dialog.isVisible(), "Esc and the window's close leave it open");
+			mode->setCurrentIndex(2);
+			emit mode->activated(2);
+			check(light->isEnabled() && darkList->isEnabled(), "Follow system: both lists");
+
+			// Save current scheme: the colors in the user's folder, the
+			// lists showing it
+			const QString mine = QDir(lm::ColorSchemes::privateFolder()).filePath(QStringLiteral("Mine.ini"));
+			QFile::remove(mine);
+			lm::setSaveAsPathForTest([](const QString &start) {
+				return QDir(start).filePath(QStringLiteral("Mine"));
+			});
+			mode->setCurrentIndex(0);
+			emit mode->activated(0);
+			save->click();
+			lm::setSaveAsPathForTest({});
+			QFile saved(mine);
+			const QByteArray text = saved.open(QIODevice::ReadOnly) ? saved.readAll() : QByteArray();
+			check(text.startsWith("[WinMerge]\n") && text.contains("\nSettings/DifferenceColor=")
+					&& text.contains("\nDefaultSyntaxColors/Values=26\n")
+					&& text.contains("\nCustom Colors/15=") && text.contains("\nSettings/SysColorHookEnabled=0\n")
+					&& !text.contains("DefaultTextColoring"),
+				"Save current scheme: the colors in the user's folder, .ini added");
+			check(light->findText(QStringLiteral("Mine")) >= 0
+					&& light->currentText() == QStringLiteral("Solarized Light"),
+				"listed, the choice kept");
+			light->setCurrentIndex(light->findText(QStringLiteral("Mine")));
+			emit light->activated(light->currentIndex());
+			check(remove->isEnabled() && lm::ColorSchemes::isPrivatePath(scheme("Mine"))
+					&& C.diff == QColor(0xdd, 0xff, 0xdd),
+				"the user's scheme: Delete, and the colors as saved");
+			QString asked;
+			lm::setQuestionSinkForTest([&asked](const QString &question, bool *) {
+				asked = question;
+				return true;
+			});
+			remove->click();
+			lm::setQuestionSinkForTest({});
+			check(!QFileInfo::exists(mine) && asked.contains(QStringLiteral("Mine.ini"))
+					&& light->currentText() == QStringLiteral("Default") && light->findText(QStringLiteral("Mine")) < 0
+					&& lm::colorSchemeName(false) == QStringLiteral("Default") && C.diff == QColor(239, 203, 5),
+				"Delete: asked, gone, Default again and imported");
+			dialog.saveForTest();
+		}
+
+		// the views: a text comparison's panes and differences, and the
+		// SNP lines of three files
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare({ write("left.txt", "one\ntwo\nthree\n"), write("right.txt", "one\nTWO\nthree\n") }, &error))
+				return 2;
+			DiffTextEdit *pane = view.paneForTest(0);
+			bool line = false;
+			for (const QTextEdit::ExtraSelection &selection : pane->highlightSelectionsForTest())
+				if (selection.format.property(QTextFormat::FullWidthSelection).toBool())
+					line = line || ((selection.format.background().color() == C.diff
+							|| selection.format.background().color() == C.selDiff)
+						&& selection.format.foreground().color().rgb() == C.diffText.rgb());
+			check(pane->palette().color(QPalette::Base).rgb() == lm::syntaxColor(COLORINDEX_BKGND).rgb()
+					&& pane->palette().color(QPalette::Window).rgb() == lm::syntaxColor(COLORINDEX_SELMARGIN).rgb()
+					&& pane->palette().color(QPalette::Text).rgb() == lm::syntaxColor(COLORINDEX_NORMALTEXT).rgb(),
+				"the panes in the scheme's text colors");
+			check(line, "a difference: its background and its text color");
+		}
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare({ write("a.txt", "one\ntwo\nthree\n"), write("b.txt", "one\ntwo\nthree\n"),
+					write("c.txt", "one\nTWO\nthree\n") }, &error))
+				return 2;
+			const QColor left = view.paneForTest(0)->gutterLineColorsForTest().value(1);
+			const QColor middle = view.paneForTest(1)->gutterLineColorsForTest().value(1);
+			printf("  three files: %s | %s\n", qPrintable(left.name()), qPrintable(middle.name()));
+			check((left == C.snp || left == C.selSnp) && (middle == C.diff || middle == C.selDiff),
+				"three files: the first as the second, in the SNP color");
+		}
+
+		// each scheme on a comparison of two files and one of two folders,
+		// when shots are asked for (LIBREMERGE_SELFTEST_SHOTS=<folder>,
+		// LIBREMERGE_SELFTEST_FILES=<left>|<right>|<left folder>|<right folder>)
+		const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+		const QStringList files = qEnvironmentVariable("LIBREMERGE_SELFTEST_FILES").split(QLatin1Char('|'));
+		if (!shots.isEmpty() && files.size() == 4)
+		{
+			MainWindow window;
+			window.resize(1100, 640);
+			window.show();
+			window.openFileComparison({ files.at(0), files.at(1) });
+			settle();
+			MainWindow folders;
+			folders.resize(1100, 420);
+			folders.show();
+			folders.openFolderComparison({ files.at(2), files.at(3) });
+			for (int i = 0; i < 100; ++i)
+				settle();
+			for (const QString &name : lm::ColorSchemes::names())
+			{
+				const bool darkScheme = name != QStringLiteral("Default") && name != QStringLiteral("Modern")
+					&& name != QStringLiteral("Solarized Light");
+				lm::Theme::instance()->setMode(darkScheme ? lm::ThemeMode::Dark : lm::ThemeMode::Light);
+				lm::setColorSchemeName(darkScheme, name);
+				lm::importColorScheme(lm::ColorSchemes::path(name));
+				lm::setColorsAreDark(darkScheme);
+				lm::Theme::instance()->colorsChanged();
+				for (int i = 0; i < 30; ++i)
+					settle();
+				QString file = name;
+				file.replace(QLatin1Char(' '), QLatin1Char('-'));
+				window.grab().save(shots + QStringLiteral("/scheme-") + file + QStringLiteral(".png"));
+				folders.grab().save(shots + QStringLiteral("/folders-") + file + QStringLiteral(".png"));
+			}
+		}
+
+		lm::Theme::instance()->setMode(lm::ThemeMode::System);
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
 	if (parser.isSet(selftestSyntaxOptionsOpt))
 	{
 		// WinMerge's WildcardDropList (the pattern fields of the Compare
@@ -12028,8 +12278,9 @@ int main(int argc, char *argv[])
 				&& searchOff && countsSearch,
 			"the search's marker: under the user's, off with them, and counted for the next color");
 
-		// the dark theme: the match found (the selection's blue) apart from
-		// the other occurrences (green) and the third color (purple)
+		// the dark theme: its scheme's marker colors (VS Dark's
+		// COLORINDEX_MARKERBKGND0 for the search, the Marker dialog's
+		// third), the match found in the selection's color
 		lm::Theme::instance()->setMode(lm::ThemeMode::Dark);
 		{
 			lm::LastSearchInfos search;
@@ -12045,11 +12296,11 @@ int main(int argc, char *argv[])
 		for (int i = 0; i < darkTexts.size(); ++i)
 			darkMarks.append(darkTexts.at(i) + QLatin1Char('/') + darkColors.value(i).name());
 		printf("  dark: %s\n", qPrintable(darkMarks.join(QStringLiteral(" "))));
-		check(darkMarks.contains(QStringLiteral("cherry/#287034"))
-				&& darkMarks.contains(QStringLiteral("Cherry/#287034"))
-				&& darkMarks.contains(QStringLiteral("banana/#885094"))
+		check(darkMarks.contains(QStringLiteral("cherry/#586e75"))
+				&& darkMarks.contains(QStringLiteral("Cherry/#586e75"))
+				&& darkMarks.contains(QStringLiteral("banana/#6c71c4"))
 				&& panes[0]->textCursor().selectedText() == QStringLiteral("cherry"),
-			"the dark theme: the search's marker green, the third color purple, the match found in the selection's blue");
+			"the dark theme: VS Dark's marker colors, the match found selected");
 		lm::Theme::instance()->setMode(lm::ThemeMode::System);
 
 		// --- the Edit menu ---
