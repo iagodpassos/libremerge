@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <map>
 #include <QColor>
 #include <QPalette>
 #include <QString>
@@ -69,6 +70,14 @@ QColor systemColor(int index);
 /** The palette with the scheme's system colors in it, when the scheme
     has them on; false (and the palette as it was) otherwise. */
 bool applySystemColors(QPalette *palette);
+/** GetOrgSysColor: the system's own color, whatever the scheme's. */
+QColor originalSystemColor(int index);
+/** SysColorHook::Deserialize: a scheme's system colors, as COLORREFs by
+    COLOR_* index. */
+std::map<int, int> systemColorRefs(const QString &text);
+/** The system colors a scheme's file has (OPT_SYSCOLOR_HOOK_ENABLED and
+    OPT_SYSCOLOR_HOOK_COLORS); false for a file it cannot read. */
+bool readSchemeSystemColors(const QString &path, bool *enabled, QString *colors);
 /** Whether the colors in effect bring system colors of their own. */
 bool hasSystemColors();
 /** The application palette before the scheme's system colors went into

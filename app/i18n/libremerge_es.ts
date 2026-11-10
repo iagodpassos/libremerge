@@ -4429,6 +4429,170 @@ Por favor, use valores entre 1 y %1.</translation>
 %1?</translation>
     </message>
     <message>
+        <source>Differences</source>
+        <translation>Diferencias</translation>
+    </message>
+    <message>
+        <source>Text</source>
+        <translation>Texto</translation>
+    </message>
+    <message>
+        <source>Markers</source>
+        <translation>Marcadores</translation>
+    </message>
+    <message>
+        <source>Folder Compare</source>
+        <translation>Comparación de carpetas</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>Sistema</translation>
+    </message>
+    <message>
+        <source>Background</source>
+        <translation>Fondo</translation>
+    </message>
+    <message>
+        <source>Deleted</source>
+        <translation>Eliminada</translation>
+    </message>
+    <message>
+        <source>Difference:</source>
+        <translation>Diferencia:</translation>
+    </message>
+    <message>
+        <source>Selected Difference:</source>
+        <translation>Diferencia seleccionada:</translation>
+    </message>
+    <message>
+        <source>Ignored Difference:</source>
+        <translation>Diferencia ignorada:</translation>
+    </message>
+    <message>
+        <source>Moved:</source>
+        <translation>Movida:</translation>
+    </message>
+    <message>
+        <source>Selected Moved:</source>
+        <translation>Movida seleccionada:</translation>
+    </message>
+    <message>
+        <source>Same As Next (3 panes):</source>
+        <translation>Igual que el siguiente (3 paneles):</translation>
+    </message>
+    <message>
+        <source>Same As Next (Selected):</source>
+        <translation>Igual que el siguiente (seleccionado):</translation>
+    </message>
+    <message>
+        <source>Word Difference:</source>
+        <translation>Diferencia de palabra:</translation>
+    </message>
+    <message>
+        <source>Selected Word Diff:</source>
+        <translation>Diferencia de palabra seleccionada:</translation>
+    </message>
+    <message>
+        <source>Keywords:</source>
+        <translation>Palabras clave:</translation>
+    </message>
+    <message>
+        <source>Function names:</source>
+        <translation>Funciones:</translation>
+    </message>
+    <message>
+        <source>Comments:</source>
+        <translation>Comentarios:</translation>
+    </message>
+    <message>
+        <source>Numbers:</source>
+        <translation>Números:</translation>
+    </message>
+    <message>
+        <source>Operators:</source>
+        <translation>Operadores:</translation>
+    </message>
+    <message>
+        <source>Strings:</source>
+        <translation>Cadenas:</translation>
+    </message>
+    <message>
+        <source>Preprocessor:</source>
+        <translation>Preprocesador:</translation>
+    </message>
+    <message>
+        <source>User 1:</source>
+        <translation>Usuario 1:</translation>
+    </message>
+    <message>
+        <source>User 2:</source>
+        <translation>Usuario 2:</translation>
+    </message>
+    <message>
+        <source>Bold</source>
+        <translation>Negrita</translation>
+    </message>
+    <message>
+        <source>&amp;Use customized text colors</source>
+        <translation>&amp;Usar colores personalizados para el texto</translation>
+    </message>
+    <message>
+        <source>Whitespace:</source>
+        <translation>Espacios en blanco:</translation>
+    </message>
+    <message>
+        <source>Regular text:</source>
+        <translation>Texto normal:</translation>
+    </message>
+    <message>
+        <source>Selection:</source>
+        <translation>Selección:</translation>
+    </message>
+    <message>
+        <source>Margin:</source>
+        <translation>Margen:</translation>
+    </message>
+    <message>
+        <source>Search Marker:</source>
+        <translation>Marcador de búsqueda:</translation>
+    </message>
+    <message>
+        <source>User Defined Marker 1:</source>
+        <translation>Personalizado #1:</translation>
+    </message>
+    <message>
+        <source>User Defined Marker 2:</source>
+        <translation>Personalizado #2:</translation>
+    </message>
+    <message>
+        <source>User Defined Marker 3:</source>
+        <translation>Personalizado #3:</translation>
+    </message>
+    <message>
+        <source>&amp;Use folder compare colors</source>
+        <translation>&amp;Usar colores para comparar carpetas</translation>
+    </message>
+    <message>
+        <source>Items equal:</source>
+        <translation>Elementos iguales:</translation>
+    </message>
+    <message>
+        <source>Items different:</source>
+        <translation>Elementos diferentes:</translation>
+    </message>
+    <message>
+        <source>Items missing:</source>
+        <translation>Elementos inexistentes:</translation>
+    </message>
+    <message>
+        <source>Items filtered:</source>
+        <translation>Elementos filtrados:</translation>
+    </message>
+    <message>
+        <source>&amp;Use custom system colors</source>
+        <translation>&amp;Usar colores personalizados del sistema</translation>
+    </message>
+    <message>
         <source>Language:</source>
         <translation>Idioma:</translation>
     </message>

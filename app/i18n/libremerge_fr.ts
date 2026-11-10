@@ -4415,6 +4415,171 @@ Vérification de l&apos;identité binaire...</translation>
 %1 ?</translation>
     </message>
     <message>
+        <source>Differences</source>
+        <translation>Différences</translation>
+    </message>
+    <message>
+        <source>Text</source>
+        <translation>Texte</translation>
+    </message>
+    <message>
+        <source>Markers</source>
+        <translation>Marqueurs</translation>
+    </message>
+    <message>
+        <source>Folder Compare</source>
+        <translation>Comparaison de dossiers</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>Système</translation>
+    </message>
+    <message>
+        <source>Background</source>
+        <translation>Arrière-plan</translation>
+    </message>
+    <message>
+        <source>Deleted</source>
+        <translation>Supprimé</translation>
+    </message>
+    <message>
+        <source>Difference:</source>
+        <translation>Différence :</translation>
+    </message>
+    <message>
+        <source>Selected Difference:</source>
+        <translation>Différence sélectionnée :</translation>
+    </message>
+    <message>
+        <source>Ignored Difference:</source>
+        <translation>Différence ignorée :</translation>
+    </message>
+    <message>
+        <source>Moved:</source>
+        <translation>Déplacé :</translation>
+    </message>
+    <message>
+        <source>Selected Moved:</source>
+        <translation>Déplacé sélectionné :</translation>
+    </message>
+    <message>
+        <source>Same As Next (3 panes):</source>
+        <translation>Identique au suivant
+(3 volets) :</translation>
+    </message>
+    <message>
+        <source>Same As Next (Selected):</source>
+        <translation>Identique au suivant (sélectionné) :</translation>
+    </message>
+    <message>
+        <source>Word Difference:</source>
+        <translation>Différence de mot :</translation>
+    </message>
+    <message>
+        <source>Selected Word Diff:</source>
+        <translation>Différence de mot sélectionné :</translation>
+    </message>
+    <message>
+        <source>Keywords:</source>
+        <translation>Mots clés :</translation>
+    </message>
+    <message>
+        <source>Function names:</source>
+        <translation>Nom des fonctions :</translation>
+    </message>
+    <message>
+        <source>Comments:</source>
+        <translation>Commentaires :</translation>
+    </message>
+    <message>
+        <source>Numbers:</source>
+        <translation>Nombres :</translation>
+    </message>
+    <message>
+        <source>Operators:</source>
+        <translation>Opérateurs :</translation>
+    </message>
+    <message>
+        <source>Strings:</source>
+        <translation>Chaînes :</translation>
+    </message>
+    <message>
+        <source>Preprocessor:</source>
+        <translation>Préprocesseur :</translation>
+    </message>
+    <message>
+        <source>User 1:</source>
+        <translation>Utilisateur 1 :</translation>
+    </message>
+    <message>
+        <source>User 2:</source>
+        <translation>Utilisateur 2 :</translation>
+    </message>
+    <message>
+        <source>Bold</source>
+        <translation>Gras</translation>
+    </message>
+    <message>
+        <source>&amp;Use customized text colors</source>
+        <translation>&amp;Utiliser des couleurs de texte personnalisées</translation>
+    </message>
+    <message>
+        <source>Whitespace:</source>
+        <translation>Caractère d&apos;espace :</translation>
+    </message>
+    <message>
+        <source>Regular text:</source>
+        <translation>Texte régulier :</translation>
+    </message>
+    <message>
+        <source>Selection:</source>
+        <translation>Sélection :</translation>
+    </message>
+    <message>
+        <source>Margin:</source>
+        <translation>Marge :</translation>
+    </message>
+    <message>
+        <source>Search Marker:</source>
+        <translation>Marqueur de recherche :</translation>
+    </message>
+    <message>
+        <source>User Defined Marker 1:</source>
+        <translation>Marqueur 1 défini par l&apos;utilisateur :</translation>
+    </message>
+    <message>
+        <source>User Defined Marker 2:</source>
+        <translation>Marqueur 2 défini par l&apos;utilisateur :</translation>
+    </message>
+    <message>
+        <source>User Defined Marker 3:</source>
+        <translation>Marqueur 3 défini par l&apos;utilisateur :</translation>
+    </message>
+    <message>
+        <source>&amp;Use folder compare colors</source>
+        <translation>&amp;Utiliser les couleurs de comparaison de dossier</translation>
+    </message>
+    <message>
+        <source>Items equal:</source>
+        <translation>Éléments égaux :</translation>
+    </message>
+    <message>
+        <source>Items different:</source>
+        <translation>Éléments différents :</translation>
+    </message>
+    <message>
+        <source>Items missing:</source>
+        <translation>Éléments manquants :</translation>
+    </message>
+    <message>
+        <source>Items filtered:</source>
+        <translation>Éléments filtrés :</translation>
+    </message>
+    <message>
+        <source>&amp;Use custom system colors</source>
+        <translation>&amp;Utiliser les couleurs du système personnalisées</translation>
+    </message>
+    <message>
         <source>Language:</source>
         <translation>Langue :</translation>
     </message>

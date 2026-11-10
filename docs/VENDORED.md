@@ -122,10 +122,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 705 | 189 | 255 | 3 | 3 |
-| Spanish | 691 | 201 | 253 | 10 | 0 |
-| Catalan | 375 | 193 | 255 | 332 | 0 |
-| French | 707 | 208 | 237 | 3 | 0 |
+| German | 746 | 189 | 255 | 3 | 3 |
+| Spanish | 732 | 201 | 253 | 10 | 0 |
+| Catalan | 415 | 193 | 255 | 333 | 0 |
+| French | 748 | 208 | 237 | 3 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -190,6 +190,19 @@ says so in a comment:
   Syntax) comes back whole as the drop-down closes. Upstream copies each
   pattern into a buffer of 20 characters, so one longer than 19 was
   shown cut and, once a pattern was clicked, saved cut.
+- Ticking or unticking Options > Colors > Text's "Use customized text
+  colors" puts the text colors back to their defaults. Upstream
+  (`PropTextColors::OnDefaultsStandardColors`) puts every color of the
+  editor back, the Syntax and Markers pages' too, which those pages go on
+  showing as they were, and OK then saves the defaults.
+- Options > Colors > System's Defaults take the system colors of the
+  scheme of the mode in effect. Upstream (`PropSysColors::OnDefaults`)
+  takes the light mode's scheme (`OPT_COLOR_SCHEME`) whatever the mode, so
+  in dark mode they put the light scheme's, usually none, on a dark one.
+- A color scheme picked shows its colors on the Colors pages, the other
+  pages keeping what they were left with. Upstream
+  (`CPreferencesDlg::OnColorSchemeChanged`) reads every page again, an
+  unsaved change of theirs lost.
 
 Where upstream falls back on Windows' line ending, LibreMerge falls back
 on the one of macOS and Linux:
@@ -270,6 +283,10 @@ and its numbers (`DrawMargin`), the folder items by result
   "My Documents" choice (`OPT_USERDATA_LOCATION`).
 - A scheme is saved as upstream's `CIniOptionsMgr` writes it, the
   options saved into it in that order under `[WinMerge]`.
+- The Colors pages choose a color in Qt's own color dialog rather than
+  the platform's, which on macOS has no place for the sixteen custom
+  colors that upstream's `ChooseColor` keeps in the options
+  (`Options::CustomColors`) and a scheme saves.
 
 ## Deliberately excluded (and why)
 

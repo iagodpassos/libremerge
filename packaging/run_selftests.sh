@@ -114,6 +114,7 @@ run_one selftest-ignored-diffs
 run_one selftest-syntax-menu
 run_one selftest-syntax-options
 run_one selftest-color-schemes
+run_one selftest-color-pages
 run_one selftest-view-eol
 run_one selftest-identical
 run_one selftest-reload

@@ -2080,9 +2080,10 @@ void MainWindow::showOptions()
 		lm::initSyntaxParserFactories();
 		lm::updateCodepageModule();
 		lm::updateBreakChars();
-		// a color scheme imported: the palette and every view take the
-		// colors (CMainFrame::OnOptions refreshes every document's)
-		if (dialog.colorsImported())
+		// a color changed or a color scheme imported: the palette and every
+		// view take the colors (CMainFrame::OnOptions refreshes every
+		// document's)
+		if (dialog.colorsChanged())
 			lm::Theme::instance()->colorsChanged();
 		for (int i = 0; i < m_tabs->count(); ++i)
 			if (auto *file = qobject_cast<FileCompareView *>(m_tabs->widget(i)))

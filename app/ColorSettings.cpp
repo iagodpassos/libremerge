@@ -93,10 +93,11 @@ std::map<int, QColor> parseSystemColors(const String &text)
 }
 
 /** What a system color is in the application palette (GetSysColor). */
-QColor paletteColor(int index)
+QColor paletteColor(int index, bool system = false)
 {
 	const Cache &c = cache();
-	const QPalette palette = c.unhooked && c.hasBasePalette ? c.basePalette : QGuiApplication::palette();
+	const QPalette palette = (c.unhooked || system) && c.hasBasePalette
+		? c.basePalette : QGuiApplication::palette();
 	switch (index)
 	{
 	case COLOR_WINDOW: return palette.color(QPalette::Base);
@@ -209,6 +210,12 @@ public:
 	std::map<String, String> ReadStoredSection(const String &) override { return {}; }
 	void SetSerializing(bool) override {}
 
+	/** The "[WinMerge]" values of a scheme's file (ReadIniFile). */
+	static std::map<String, String> read(const QString &path)
+	{
+		return ReadIniFile(path.toStdString(), _T("WinMerge"));
+	}
+
 	QByteArray text() const
 	{
 		QByteArray text("[WinMerge]\n");
@@ -271,6 +278,31 @@ void setBasePalette(const QPalette &palette)
 bool hasSystemColors()
 {
 	return cache().hookEnabled && !cache().hookColors.empty();
+}
+
+QColor originalSystemColor(int index)
+{
+	return paletteColor(index, true);
+}
+
+std::map<int, int> systemColorRefs(const QString &text)
+{
+	std::map<int, int> colors;
+	for (const auto &[index, color] : parseSystemColors(text.toStdString()))
+		colors[index] = colorRefFromColor(color);
+	return colors;
+}
+
+bool readSchemeSystemColors(const QString &path, bool *enabled, QString *colors)
+{
+	const std::map<String, String> values = SchemeFileOptions::read(path);
+	if (values.empty())
+		return false;
+	const auto hook = values.find(OPT_SYSCOLOR_HOOK_ENABLED);
+	*enabled = hook != values.end() && QString::fromStdString(hook->second).toInt() != 0;
+	const auto list = values.find(OPT_SYSCOLOR_HOOK_COLORS);
+	*colors = list != values.end() ? QString::fromStdString(list->second) : QString();
+	return true;
 }
 
 bool applySystemColors(QPalette *palette)

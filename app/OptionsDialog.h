@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <array>
+#include <memory>
+#include <string>
 #include <QDialog>
+#include <QHash>
 #include <QList>
 #include <QPair>
+#include <QSet>
 #include <QString>
 
 class QCheckBox;
@@ -14,9 +19,11 @@ class QRadioButton;
 class QStackedWidget;
 class QTreeWidget;
 class QTreeWidgetItem;
+class SyntaxColors;
 
 namespace lm
 {
+class ColorButton;
 class SubeditList;
 struct TableSettings;
 class WildcardDropList;
@@ -27,7 +34,8 @@ class WildcardDropList;
  * dialog): a page tree on the left, where a category's pages sit indented
  * under it (General; Compare > General, Folder, Table, Binary, Image;
  * Message Boxes; Editor > General, Compare/Merge, Syntax; Colors > Color
- * Schemes; Backup Files; Codepage), and the
+ * Schemes, Differences, Syntax, Text, Markers, Folder Compare, System;
+ * Backup Files; Codepage), and the
  * selected page on the right with its own Defaults button. Every option
  * sits on the page and at the position WinMerge gives it.
  */
@@ -36,6 +44,7 @@ class OptionsDialog : public QDialog
 	Q_OBJECT
 public:
 	explicit OptionsDialog(QWidget *parent = nullptr);
+	~OptionsDialog() override;
 	/** Esc and the window's close do nothing once Cancel is disabled, as
 	    a dialog's IDCANCEL then. */
 	void reject() override;
@@ -93,6 +102,12 @@ public:
 		EditorCompareMergePage, ///< Editor > Compare/Merge
 		EditorSyntaxPage, ///< Editor > Syntax
 		ColorSchemesPage, ///< Colors > Color Schemes
+		MergeColorsPage,  ///< Colors > Differences
+		SyntaxColorsPage, ///< Colors > Syntax
+		TextColorsPage,   ///< Colors > Text
+		MarkerColorsPage, ///< Colors > Markers
+		DirColorsPage,    ///< Colors > Folder Compare
+		SysColorsPage,    ///< Colors > System
 		BackupPage,
 		CodepagePage,
 	};
@@ -123,6 +138,9 @@ public:
 	/** Whether a color scheme was imported while the dialog was open:
 	    the views take the colors again once it is accepted. */
 	bool colorsImported() const { return m_colorsImported; }
+	/** Whether a color was changed or a scheme imported while the dialog
+	    was open: the views take the colors again once it is accepted. */
+	bool colorsChanged() const { return m_colorsChanged || m_colorsImported; }
 	/** Whether Cancel still closes the dialog (a scheme imported leaves
 	    only OK, for tests). */
 	bool cancelEnabledForTest() const;
@@ -158,6 +176,20 @@ private:
 	void updateColorScheme();
 	void saveCurrentScheme();
 	void deleteCurrentScheme();
+	QWidget *buildMergeColorsPage();
+	QWidget *buildSyntaxColorsPage();
+	QWidget *buildTextColorsPage();
+	QWidget *buildMarkerColorsPage();
+	QWidget *buildDirColorsPage();
+	QWidget *buildSysColorsPage();
+	void loadColorPages();
+	void saveColorPages();
+	void browseColor(lm::ColorButton *button);
+	void browseSyntaxColor(int colorIndex, lm::ColorButton *button);
+	void updateTextColorButtons();
+	void updateTextColorControls();
+	void updateSysColorControls();
+	void restoreSysColorDefaults();
 	QWidget *buildBackupPage();
 	QWidget *buildCodepagePage();
 	void showCustomCodepage(int codepage);
@@ -237,6 +269,32 @@ private:
 	bool m_colorsImported = false;
 	QPushButton *m_defaultsButton = nullptr;
 	QPushButton *m_cancelButton = nullptr;
+	// Colors > Differences, Folder Compare: each button with its option
+	struct ColorBinding
+	{
+		std::string option;
+		lm::ColorButton *button;
+	};
+	QList<ColorBinding> m_mergeColorBindings;
+	QList<QPair<QCheckBox *, lm::ColorButton *>> m_mergeTextColors;
+	QList<ColorBinding> m_dirColorBindings;
+	QCheckBox *m_chkUseDirColors = nullptr;
+	// Colors > Syntax, Text and Markers edit a copy of the editor's colors,
+	// saved with OK (CPreferencesDlg::m_pSyntaxColors)
+	std::unique_ptr<SyntaxColors> m_syntaxColors;
+	QHash<int, lm::ColorButton *> m_syntaxButtons;
+	QHash<int, QCheckBox *> m_syntaxBolds;
+	QCheckBox *m_chkCustomTextColors = nullptr;
+	QList<QWidget *> m_textColorLabels;
+	QHash<int, lm::ColorButton *> m_textButtons;
+	QHash<int, lm::ColorButton *> m_markerButtons;
+	// Colors > System
+	QCheckBox *m_chkSysColorHook = nullptr;
+	QComboBox *m_cmbSysColorName = nullptr;
+	lm::ColorButton *m_btnSysColor = nullptr;
+	std::array<int, 31> m_sysColors = {};
+	QSet<int> m_customSysColors;
+	bool m_colorsChanged = false;
 	// Message Boxes
 	QTreeWidget *m_messageList;
 	// the Answer drop-down of each question, by row (null for the

@@ -4,6 +4,7 @@
 #include "OptionsDialog.h"
 
 #include "BinaryFiles.h"
+#include "ColorButton.h"
 #include "FileOps.h"
 #include "ColorSettings.h"
 #include "ImageFormats.h"
@@ -26,6 +27,7 @@
 #include <QDir>
 #include <QFocusEvent>
 #include <QFontInfo>
+#include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -46,6 +48,8 @@
 #include "OptionsMgr.h"
 #include "OptionsDef.h"
 #include "OptionsEditorSyntax.h"
+#include "OptionsSyntaxColors.h"
+#include "SyntaxColors.h"
 #include "TextDefinition.h"
 #include "charsets.h"
 
@@ -87,6 +91,34 @@ lm::WildcardDropList *patternList(QWidget *parent, const QString &fixedPatterns)
 	list->setFixedPatterns(fixedPatterns);
 	return list;
 }
+
+/** A row's label on the color pages, right-aligned before its buttons
+    (RTEXT). */
+QLabel *rowLabel(const QString &text, QWidget *parent)
+{
+	auto *label = new QLabel(text, parent);
+	label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+	return label;
+}
+
+/** A column's heading on the color pages (CTEXT). */
+QLabel *columnLabel(const QString &text, QWidget *parent)
+{
+	auto *label = new QLabel(text, parent);
+	label->setAlignment(Qt::AlignCenter);
+	return label;
+}
+
+/** A CEColor as the COLORREF the color buttons hold. */
+int colorRefOf(const CEColor &color)
+{
+	return static_cast<int>(static_cast<uint32_t>(color));
+}
+
+/** The text colors of the Text page (PropTextColors), the ones "Use
+    customized text colors" sets. */
+constexpr int kTextColorIndexes[] = { COLORINDEX_WHITESPACE, COLORINDEX_BKGND,
+	COLORINDEX_NORMALTEXT, COLORINDEX_SELBKGND, COLORINDEX_SELTEXT, COLORINDEX_SELMARGIN };
 
 /** A field for one character, as narrow as WinMerge's. */
 QLineEdit *characterField(QWidget *parent)
@@ -202,6 +234,12 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	addCategory(editor, tr("Syntax"), EditorSyntaxPage);
 	QTreeWidgetItem *colors = addCategory(nullptr, tr("Colors"), -1);
 	addCategory(colors, tr("Color Schemes"), ColorSchemesPage);
+	addCategory(colors, tr("Differences"), MergeColorsPage);
+	addCategory(colors, tr("Syntax"), SyntaxColorsPage);
+	addCategory(colors, tr("Text"), TextColorsPage);
+	addCategory(colors, tr("Markers"), MarkerColorsPage);
+	addCategory(colors, tr("Folder Compare"), DirColorsPage);
+	addCategory(colors, tr("System"), SysColorsPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	addCategory(nullptr, tr("Codepage"), CodepagePage);
 	m_categories->expandAll();
@@ -220,6 +258,12 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildEditorCompareMergePage());
 	m_pages->addWidget(buildEditorSyntaxPage());
 	m_pages->addWidget(buildColorSchemesPage());
+	m_pages->addWidget(buildMergeColorsPage());
+	m_pages->addWidget(buildSyntaxColorsPage());
+	m_pages->addWidget(buildTextColorsPage());
+	m_pages->addWidget(buildMarkerColorsPage());
+	m_pages->addWidget(buildDirColorsPage());
+	m_pages->addWidget(buildSysColorsPage());
 	m_pages->addWidget(buildBackupPage());
 	m_pages->addWidget(buildCodepagePage());
 	pageArea->addWidget(m_pages, 1);
@@ -262,8 +306,9 @@ void OptionsDialog::selectCategory(QTreeWidgetItem *item)
 	while (pageItem->childCount() > 0)
 		pageItem = pageItem->child(0);
 	m_pages->setCurrentIndex(pageItem->data(0, Qt::UserRole).toInt());
-	// the Color Schemes page is WinMerge's one without a Defaults button
-	m_defaultsButton->setVisible(m_pages->currentIndex() != ColorSchemesPage);
+	// of the Colors pages, only System has a Defaults button upstream
+	const int current = m_pages->currentIndex();
+	m_defaultsButton->setVisible(current < ColorSchemesPage || current >= SysColorsPage);
 	QString path = pageItem->text(0);
 	for (QTreeWidgetItem *parent = pageItem->parent(); parent != nullptr;
 		parent = parent->parent())
@@ -882,6 +927,10 @@ void OptionsDialog::updateColorScheme()
 	}
 	m_colorsImported = true;
 	m_cancelButton->setEnabled(false);
+	// OnColorSchemeChanged: the color pages show the scheme's colors (the
+	// other pages keep what they were left with: upstream reads every
+	// page again, an unsaved change of theirs lost)
+	loadColorPages();
 }
 
 /** OnSaveCurrentScheme: the colors in a file of the user's schemes'
@@ -931,6 +980,472 @@ void OptionsDialog::deleteCurrentScheme()
 	writeColorSchemeOptions();
 	updateColorSchemeControls();
 	updateColorScheme();
+}
+
+OptionsDialog::~OptionsDialog() = default;
+
+/** WinMerge's Colors > Differences page (PropMergeColors): each kind of
+    difference with its background, its deleted lines' and its text
+    color, the text color shown once ticked (none, the line's own colors,
+    unticked). */
+QWidget *OptionsDialog::buildMergeColorsPage()
+{
+	auto *page = new QWidget(this);
+	auto *grid = new QGridLayout(page);
+	grid->addWidget(columnLabel(tr("Background"), page), 0, 1);
+	grid->addWidget(columnLabel(tr("Deleted"), page), 0, 2);
+	grid->addWidget(columnLabel(tr("Text"), page), 0, 3, 1, 2);
+	struct Row
+	{
+		const char *label;
+		std::string background, deleted, text;
+	};
+	const Row rows[] = {
+		{ QT_TR_NOOP("Difference:"), OPT_CLR_DIFF, OPT_CLR_DIFF_DELETED, OPT_CLR_DIFF_TEXT },
+		{ QT_TR_NOOP("Selected Difference:"), OPT_CLR_SELECTED_DIFF,
+			OPT_CLR_SELECTED_DIFF_DELETED, OPT_CLR_SELECTED_DIFF_TEXT },
+		{ QT_TR_NOOP("Ignored Difference:"), OPT_CLR_TRIVIAL_DIFF,
+			OPT_CLR_TRIVIAL_DIFF_DELETED, OPT_CLR_TRIVIAL_DIFF_TEXT },
+		{ QT_TR_NOOP("Moved:"), OPT_CLR_MOVEDBLOCK, OPT_CLR_MOVEDBLOCK_DELETED,
+			OPT_CLR_MOVEDBLOCK_TEXT },
+		{ QT_TR_NOOP("Selected Moved:"), OPT_CLR_SELECTED_MOVEDBLOCK,
+			OPT_CLR_SELECTED_MOVEDBLOCK_DELETED, OPT_CLR_SELECTED_MOVEDBLOCK_TEXT },
+		{ QT_TR_NOOP("Same As Next (3 panes):"), OPT_CLR_SNP, OPT_CLR_SNP_DELETED, OPT_CLR_SNP_TEXT },
+		{ QT_TR_NOOP("Same As Next (Selected):"), OPT_CLR_SELECTED_SNP,
+			OPT_CLR_SELECTED_SNP_DELETED, OPT_CLR_SELECTED_SNP_TEXT },
+		{ QT_TR_NOOP("Word Difference:"), OPT_CLR_WORDDIFF, OPT_CLR_WORDDIFF_DELETED,
+			OPT_CLR_WORDDIFF_TEXT },
+		{ QT_TR_NOOP("Selected Word Diff:"), OPT_CLR_SELECTED_WORDDIFF,
+			OPT_CLR_SELECTED_WORDDIFF_DELETED, OPT_CLR_SELECTED_WORDDIFF_TEXT },
+	};
+	int r = 1;
+	for (const Row &row : rows)
+	{
+		grid->addWidget(rowLabel(tr(row.label), page), r, 0);
+		const auto add = [this, page, grid, r](const std::string &option, int column) {
+			auto *button = new lm::ColorButton(page);
+			button->setObjectName(QString::fromStdString(option));
+			connect(button, &QPushButton::clicked, this, [this, button]() { browseColor(button); });
+			m_mergeColorBindings.append({ option, button });
+			grid->addWidget(button, r, column, Qt::AlignCenter);
+			return button;
+		};
+		add(row.background, 1);
+		add(row.deleted, 2);
+		auto *useText = new QCheckBox(page);
+		useText->setObjectName(QString::fromStdString(row.text) + QStringLiteral("/Use"));
+		grid->addWidget(useText, r, 3, Qt::AlignRight | Qt::AlignVCenter);
+		lm::ColorButton *text = add(row.text, 4);
+		QSizePolicy policy = text->sizePolicy();
+		policy.setRetainSizeWhenHidden(true);
+		text->setSizePolicy(policy);
+		m_mergeTextColors.append({ useText, text });
+		// OnUseTextColor: black to start with, none when unticked
+		connect(useText, &QCheckBox::clicked, this, [this, useText, text]() {
+			text->setVisible(useText->isChecked());
+			text->setColorRef(useText->isChecked() ? 0 : -1);
+			m_colorsChanged = true;
+		});
+		++r;
+	}
+	grid->setColumnStretch(5, 1);
+	grid->setRowStretch(r, 1);
+	return page;
+}
+
+/** WinMerge's Colors > Syntax page (PropSyntaxColors): each kind of text
+    a language's parser tells, its color and whether it is bold. */
+QWidget *OptionsDialog::buildSyntaxColorsPage()
+{
+	auto *page = new QWidget(this);
+	auto *grid = new QGridLayout(page);
+	grid->addWidget(columnLabel(tr("Text"), page), 0, 1);
+	const std::pair<int, const char *> rows[] = {
+		{ COLORINDEX_KEYWORD, QT_TR_NOOP("Keywords:") },
+		{ COLORINDEX_FUNCNAME, QT_TR_NOOP("Function names:") },
+		{ COLORINDEX_COMMENT, QT_TR_NOOP("Comments:") },
+		{ COLORINDEX_NUMBER, QT_TR_NOOP("Numbers:") },
+		{ COLORINDEX_OPERATOR, QT_TR_NOOP("Operators:") },
+		{ COLORINDEX_STRING, QT_TR_NOOP("Strings:") },
+		{ COLORINDEX_PREPROCESSOR, QT_TR_NOOP("Preprocessor:") },
+		{ COLORINDEX_USER1, QT_TR_NOOP("User 1:") },
+		{ COLORINDEX_USER2, QT_TR_NOOP("User 2:") },
+	};
+	int r = 1;
+	for (const auto &[index, label] : rows)
+	{
+		grid->addWidget(rowLabel(tr(label), page), r, 0);
+		auto *button = new lm::ColorButton(page);
+		button->setObjectName(QStringLiteral("syntaxColor%1").arg(index));
+		connect(button, &QPushButton::clicked, this,
+			[this, colorIndex = index, button]() { browseSyntaxColor(colorIndex, button); });
+		grid->addWidget(button, r, 1, Qt::AlignCenter);
+		m_syntaxButtons.insert(index, button);
+		auto *bold = new QCheckBox(tr("Bold"), page);
+		bold->setObjectName(QStringLiteral("syntaxBold%1").arg(index));
+		connect(bold, &QCheckBox::clicked, this, [this, colorIndex = index](bool checked) {
+			m_syntaxColors->SetBold(colorIndex, checked);
+			m_colorsChanged = true;
+		});
+		grid->addWidget(bold, r, 2);
+		m_syntaxBolds.insert(index, bold);
+		++r;
+	}
+	grid->setColumnStretch(3, 1);
+	grid->setRowStretch(r, 1);
+	return page;
+}
+
+/** WinMerge's Colors > Text page (PropTextColors): the editor's text
+    colors, the system's unless "Use customized text colors" is ticked
+    (OPT_CLR_DEFAULT_TEXT_COLORING off). Ticking or unticking it puts
+    them back to their defaults. */
+QWidget *OptionsDialog::buildTextColorsPage()
+{
+	auto *page = new QWidget(this);
+	auto *grid = new QGridLayout(page);
+	m_chkCustomTextColors = new QCheckBox(tr("&Use customized text colors"), page);
+	m_chkCustomTextColors->setObjectName(QStringLiteral("customTextColors"));
+	grid->addWidget(m_chkCustomTextColors, 0, 0, 1, 4);
+	auto *background = columnLabel(tr("Background"), page);
+	auto *text = columnLabel(tr("Text"), page);
+	grid->addWidget(background, 1, 1);
+	grid->addWidget(text, 1, 2);
+	m_textColorLabels = { background, text };
+	struct Row
+	{
+		const char *label;
+		int background;
+		int text;
+	};
+	const Row rows[] = {
+		{ QT_TR_NOOP("Whitespace:"), COLORINDEX_WHITESPACE, -1 },
+		{ QT_TR_NOOP("Regular text:"), COLORINDEX_BKGND, COLORINDEX_NORMALTEXT },
+		{ QT_TR_NOOP("Selection:"), COLORINDEX_SELBKGND, COLORINDEX_SELTEXT },
+		{ QT_TR_NOOP("Margin:"), COLORINDEX_SELMARGIN, -1 },
+	};
+	int r = 2;
+	for (const Row &row : rows)
+	{
+		QLabel *label = rowLabel(tr(row.label), page);
+		grid->addWidget(label, r, 0);
+		m_textColorLabels.append(label);
+		for (const auto &[index, column] : { std::pair<int, int>{ row.background, 1 },
+				std::pair<int, int>{ row.text, 2 } })
+		{
+			if (index < 0)
+				continue;
+			auto *button = new lm::ColorButton(page);
+			button->setObjectName(QStringLiteral("textColor%1").arg(index));
+			// BrowseColorAndSave: nothing to choose while the system's
+			// colors are in use
+			connect(button, &QPushButton::clicked, this, [this, colorIndex = index, button]() {
+				if (m_chkCustomTextColors->isChecked())
+					browseSyntaxColor(colorIndex, button);
+			});
+			grid->addWidget(button, r, column, Qt::AlignCenter);
+			m_textButtons.insert(index, button);
+		}
+		++r;
+	}
+	// OnDefaultsStandardColors: the text colors back to their defaults.
+	// (Upstream sets every color of the editor to its default there, the
+	// Syntax and Markers pages' too, which those pages go on showing as
+	// they were.)
+	connect(m_chkCustomTextColors, &QCheckBox::clicked, this, [this]() {
+		const ::SyntaxColors defaults;
+		for (const int index : kTextColorIndexes)
+		{
+			m_syntaxColors->SetColor(index, defaults.GetColor(index));
+			if (lm::ColorButton *button = m_textButtons.value(index))
+				button->setColorRef(colorRefOf(defaults.GetColor(index)));
+		}
+		updateTextColorControls();
+		m_colorsChanged = true;
+	});
+	grid->setColumnStretch(3, 1);
+	grid->setRowStretch(r, 1);
+	return page;
+}
+
+/** WinMerge's Colors > Markers page (PropMarkerColors): the backgrounds
+    of the search's marker and of the Marker dialog's three. */
+QWidget *OptionsDialog::buildMarkerColorsPage()
+{
+	auto *page = new QWidget(this);
+	auto *grid = new QGridLayout(page);
+	grid->addWidget(columnLabel(tr("Background"), page), 0, 1);
+	const char *const labels[] = { QT_TR_NOOP("Search Marker:"), QT_TR_NOOP("User Defined Marker 1:"),
+		QT_TR_NOOP("User Defined Marker 2:"), QT_TR_NOOP("User Defined Marker 3:") };
+	for (int i = 0; i < 4; ++i)
+	{
+		grid->addWidget(rowLabel(tr(labels[i]), page), i + 1, 0);
+		auto *button = new lm::ColorButton(page);
+		button->setObjectName(QStringLiteral("markerColor%1").arg(i));
+		const int index = COLORINDEX_MARKERBKGND0 + i;
+		connect(button, &QPushButton::clicked, this,
+			[this, index, button]() { browseSyntaxColor(index, button); });
+		grid->addWidget(button, i + 1, 1, Qt::AlignCenter);
+		m_markerButtons.insert(index, button);
+	}
+	grid->setColumnStretch(2, 1);
+	grid->setRowStretch(5, 1);
+	return page;
+}
+
+/** WinMerge's Colors > Folder Compare page (PropDirColors): whether the
+    folder comparison colors its items, each result's background and text
+    colors, and the list's margin. */
+QWidget *OptionsDialog::buildDirColorsPage()
+{
+	auto *page = new QWidget(this);
+	auto *grid = new QGridLayout(page);
+	m_chkUseDirColors = new QCheckBox(tr("&Use folder compare colors"), page);
+	m_chkUseDirColors->setObjectName(QStringLiteral("useDirColors"));
+	connect(m_chkUseDirColors, &QCheckBox::clicked, this, [this]() { m_colorsChanged = true; });
+	grid->addWidget(m_chkUseDirColors, 0, 0, 1, 4);
+	grid->addWidget(columnLabel(tr("Background"), page), 1, 1);
+	grid->addWidget(columnLabel(tr("Text"), page), 1, 2);
+	struct Row
+	{
+		const char *label;
+		std::string background, text;
+	};
+	const Row rows[] = {
+		{ QT_TR_NOOP("Items equal:"), OPT_DIRCLR_ITEM_EQUAL, OPT_DIRCLR_ITEM_EQUAL_TEXT },
+		{ QT_TR_NOOP("Items different:"), OPT_DIRCLR_ITEM_DIFF, OPT_DIRCLR_ITEM_DIFF_TEXT },
+		{ QT_TR_NOOP("Items missing:"), OPT_DIRCLR_ITEM_NOT_EXIST_ALL,
+			OPT_DIRCLR_ITEM_NOT_EXIST_ALL_TEXT },
+		{ QT_TR_NOOP("Items filtered:"), OPT_DIRCLR_ITEM_FILTERED, OPT_DIRCLR_ITEM_FILTERED_TEXT },
+		{ QT_TR_NOOP("Margin:"), OPT_DIRCLR_MARGIN, std::string() },
+	};
+	int r = 2;
+	for (const Row &row : rows)
+	{
+		grid->addWidget(rowLabel(tr(row.label), page), r, 0);
+		for (const auto &[option, column] : { std::pair<std::string, int>{ row.background, 1 },
+				std::pair<std::string, int>{ row.text, 2 } })
+		{
+			if (option.empty())
+				continue;
+			auto *button = new lm::ColorButton(page);
+			button->setObjectName(QString::fromStdString(option));
+			connect(button, &QPushButton::clicked, this, [this, button]() { browseColor(button); });
+			grid->addWidget(button, r, column, Qt::AlignCenter);
+			m_dirColorBindings.append({ option, button });
+		}
+		++r;
+	}
+	grid->setColumnStretch(3, 1);
+	grid->setRowStretch(r, 1);
+	return page;
+}
+
+/** WinMerge's Colors > System page (PropSysColors): the system colors of
+    the colors in effect, switched on and chosen one by one. */
+QWidget *OptionsDialog::buildSysColorsPage()
+{
+	auto *page = new QWidget(this);
+	auto *grid = new QGridLayout(page);
+	m_chkSysColorHook = new QCheckBox(tr("&Use custom system colors"), page);
+	m_chkSysColorHook->setObjectName(QStringLiteral("sysColorHook"));
+	grid->addWidget(m_chkSysColorHook, 0, 0, 1, 3);
+	m_cmbSysColorName = new QComboBox(page);
+	m_cmbSysColorName->setObjectName(QStringLiteral("sysColorName"));
+	const std::pair<const char *, int> names[] = {
+		{ "COLOR_ACTIVECAPTION", 2 }, { "COLOR_INACTIVECAPTION", 3 }, { "COLOR_WINDOW", 5 },
+		{ "COLOR_WINDOWTEXT", 8 }, { "COLOR_CAPTIONTEXT", 9 }, { "COLOR_APPWORKSPACE", 12 },
+		{ "COLOR_HIGHLIGHT", 13 }, { "COLOR_HIGHLIGHTTEXT", 14 }, { "COLOR_3DFACE", 15 },
+		{ "COLOR_3DSHADOW", 16 }, { "COLOR_BTNTEXT", 18 }, { "COLOR_INACTIVECAPTIONTEXT", 19 },
+		{ "COLOR_3DHIGHLIGHT", 20 }, { "COLOR_3DDKSHADOW", 21 },
+		{ "COLOR_GRADIENTACTIVECAPTION", 27 }, { "COLOR_GRADIENTINACTIVECAPTION", 28 },
+	};
+	for (const auto &[name, index] : names)
+		m_cmbSysColorName->addItem(QString::fromLatin1(name), index);
+	grid->addWidget(m_cmbSysColorName, 1, 0);
+	m_btnSysColor = new lm::ColorButton(page);
+	m_btnSysColor->setObjectName(QStringLiteral("sysColor"));
+	grid->addWidget(m_btnSysColor, 1, 1, Qt::AlignCenter);
+	connect(m_chkSysColorHook, &QCheckBox::clicked, this, [this]() {
+		updateSysColorControls();
+		m_colorsChanged = true;
+	});
+	connect(m_cmbSysColorName, &QComboBox::currentIndexChanged, this,
+		[this]() { updateSysColorControls(); });
+	// BrowseColor: the dialog without the options' custom colors
+	connect(m_btnSysColor, &QPushButton::clicked, this, [this]() {
+		const int index = m_cmbSysColorName->currentData().toInt();
+		const QColor color = lm::chooseColor(this,
+			lm::colorFromColorRef(m_sysColors[static_cast<size_t>(index)]), false);
+		if (!color.isValid())
+			return;
+		m_sysColors[static_cast<size_t>(index)] = lm::colorRefFromColor(color);
+		m_customSysColors.insert(index);
+		m_btnSysColor->setColorRef(m_sysColors[static_cast<size_t>(index)]);
+		m_colorsChanged = true;
+	});
+	grid->setColumnStretch(2, 1);
+	grid->setRowStretch(2, 1);
+	return page;
+}
+
+/** The color pages' ReadOptions, from the options and a copy of the
+    editor's colors (also as a scheme is imported, OnColorSchemeChanged). */
+void OptionsDialog::loadColorPages()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr)
+		return;
+	if (!m_syntaxColors)
+		m_syntaxColors = std::make_unique<::SyntaxColors>();
+	Options::SyntaxColors::Load(mgr, m_syntaxColors.get());
+	for (const ColorBinding &binding : m_mergeColorBindings)
+		binding.button->setColorRef(mgr->GetInt(binding.option));
+	updateTextColorButtons();
+	for (auto it = m_syntaxButtons.cbegin(); it != m_syntaxButtons.cend(); ++it)
+	{
+		it.value()->setColorRef(colorRefOf(m_syntaxColors->GetColor(it.key())));
+		m_syntaxBolds.value(it.key())->setChecked(m_syntaxColors->GetBold(it.key()));
+	}
+	m_chkCustomTextColors->setChecked(!mgr->GetBool(OPT_CLR_DEFAULT_TEXT_COLORING));
+	for (auto it = m_textButtons.cbegin(); it != m_textButtons.cend(); ++it)
+		it.value()->setColorRef(colorRefOf(m_syntaxColors->GetColor(it.key())));
+	updateTextColorControls();
+	for (auto it = m_markerButtons.cbegin(); it != m_markerButtons.cend(); ++it)
+		it.value()->setColorRef(colorRefOf(m_syntaxColors->GetColor(it.key())));
+	m_chkUseDirColors->setChecked(mgr->GetBool(OPT_DIRCLR_USE_COLORS));
+	for (const ColorBinding &binding : m_dirColorBindings)
+		binding.button->setColorRef(mgr->GetInt(binding.option));
+	// PropSysColors::ReadOptions: the system's colors, the scheme's own
+	// where it has them
+	m_chkSysColorHook->setChecked(mgr->GetBool(OPT_SYSCOLOR_HOOK_ENABLED));
+	for (size_t i = 0; i < m_sysColors.size(); ++i)
+		m_sysColors[i] = lm::colorRefFromColor(lm::originalSystemColor(static_cast<int>(i)));
+	m_customSysColors.clear();
+	for (const auto &[index, color] : lm::systemColorRefs(
+			QString::fromStdString(mgr->GetString(OPT_SYSCOLOR_HOOK_COLORS))))
+		if (index >= 0 && index < static_cast<int>(m_sysColors.size()))
+		{
+			m_sysColors[static_cast<size_t>(index)] = color;
+			m_customSysColors.insert(index);
+		}
+	updateSysColorControls();
+}
+
+/** The color pages' WriteOptions; the editor's colors then are the copy's
+    (CPreferencesDlg::SaveOptions clones it). */
+void OptionsDialog::saveColorPages()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr || !m_syntaxColors)
+		return;
+	for (const ColorBinding &binding : m_mergeColorBindings)
+		mgr->SaveOption(binding.option, binding.button->colorRef());
+	mgr->SaveOption(OPT_CLR_DEFAULT_TEXT_COLORING, !m_chkCustomTextColors->isChecked());
+	Options::SyntaxColors::Save(mgr, m_syntaxColors.get());
+	mgr->SaveOption(OPT_DIRCLR_USE_COLORS, m_chkUseDirColors->isChecked());
+	for (const ColorBinding &binding : m_dirColorBindings)
+		mgr->SaveOption(binding.option, binding.button->colorRef());
+	// SysColorHook::Serialize: the colors set apart from the system's
+	QStringList colors;
+	for (size_t i = 0; i < m_sysColors.size(); ++i)
+	{
+		const int index = static_cast<int>(i);
+		if (m_customSysColors.contains(index)
+			|| m_sysColors[i] != lm::colorRefFromColor(lm::originalSystemColor(index)))
+			colors.append(QStringLiteral("%1:0x%2").arg(index)
+				.arg(static_cast<uint>(m_sysColors[i]), 8, 16, QLatin1Char('0')));
+	}
+	mgr->SaveOption(OPT_SYSCOLOR_HOOK_ENABLED, m_chkSysColorHook->isChecked());
+	mgr->SaveOption(OPT_SYSCOLOR_HOOK_COLORS, colors.join(QLatin1Char(',')).toStdString());
+	lm::reloadColors();
+}
+
+/** BrowseColor: the dialog on the button's color, the button the color
+    chosen. */
+void OptionsDialog::browseColor(lm::ColorButton *button)
+{
+	const QColor color = lm::chooseColor(this, lm::colorFromColorRef(button->colorRef()));
+	if (!color.isValid())
+		return;
+	button->setColorRef(lm::colorRefFromColor(color));
+	m_colorsChanged = true;
+}
+
+/** BrowseColorAndSave: the same for a color of the editor's, which the
+    copy keeps until OK. */
+void OptionsDialog::browseSyntaxColor(int colorIndex, lm::ColorButton *button)
+{
+	const QColor color = lm::chooseColor(this,
+		lm::colorFromColorRef(colorRefOf(m_syntaxColors->GetColor(colorIndex))));
+	if (!color.isValid())
+		return;
+	const int colorRef = lm::colorRefFromColor(color);
+	m_syntaxColors->SetColor(colorIndex, CEColor(static_cast<uint32_t>(colorRef)));
+	button->setColorRef(colorRef);
+	m_colorsChanged = true;
+}
+
+/** UpdateTextColorButtonsState: a text color ticked and shown when it is
+    one, unticked and hidden when none. */
+void OptionsDialog::updateTextColorButtons()
+{
+	for (const auto &[box, button] : m_mergeTextColors)
+	{
+		const bool used = button->colorRef() != -1;
+		box->setChecked(used);
+		button->setVisible(used);
+	}
+}
+
+/** EnableColorButtons: the labels as "Use customized text colors" says
+    (the buttons stay, and do nothing then). */
+void OptionsDialog::updateTextColorControls()
+{
+	for (QWidget *label : m_textColorLabels)
+		label->setEnabled(m_chkCustomTextColors->isChecked());
+}
+
+/** UpdateControls: the list and the button with the system colors on, the
+    button in the listed color's. */
+void OptionsDialog::updateSysColorControls()
+{
+	const bool enabled = m_chkSysColorHook->isChecked();
+	m_cmbSysColorName->setEnabled(enabled);
+	m_btnSysColor->setEnabled(enabled);
+	const int index = m_cmbSysColorName->currentData().toInt();
+	m_btnSysColor->setColorRef(m_sysColors[static_cast<size_t>(qBound(0, index, 30))]);
+}
+
+/** OnDefaults: the system's colors, then the system colors of the scheme
+    of the mode in effect. (Upstream takes the light mode's scheme,
+    OPT_COLOR_SCHEME, whatever the mode: in dark mode Defaults put the
+    light scheme's system colors, usually none, on a dark scheme.) */
+void OptionsDialog::restoreSysColorDefaults()
+{
+	for (size_t i = 0; i < m_sysColors.size(); ++i)
+		m_sysColors[i] = lm::colorRefFromColor(lm::originalSystemColor(static_cast<int>(i)));
+	m_customSysColors.clear();
+	bool enabled = false;
+	QString colors;
+	const QString path = lm::ColorSchemes::path(lm::colorSchemeName(lm::colorsAreDark()));
+	if (path.isEmpty() || !lm::readSchemeSystemColors(path, &enabled, &colors))
+	{
+		COptionsMgr *mgr = GetOptionsMgr();
+		enabled = mgr != nullptr && mgr->GetDefault<bool>(OPT_SYSCOLOR_HOOK_ENABLED);
+	}
+	else
+	{
+		for (const auto &[index, color] : lm::systemColorRefs(colors))
+			if (index >= 0 && index < static_cast<int>(m_sysColors.size()))
+			{
+				m_sysColors[static_cast<size_t>(index)] = color;
+				m_customSysColors.insert(index);
+			}
+	}
+	m_chkSysColorHook->setChecked(enabled);
+	updateSysColorControls();
+	m_colorsChanged = true;
 }
 
 bool OptionsDialog::cancelEnabledForTest() const
@@ -1111,6 +1626,7 @@ void OptionsDialog::load()
 	reloadColorSchemes();
 	showColorSchemes(lm::colorSchemeName(false), lm::colorSchemeName(true));
 	updateColorSchemeControls();
+	loadColorPages();
 	const int langIndex =
 		m_cmbLanguage->findData(settings.value(kLanguage).toString());
 	m_cmbLanguage->setCurrentIndex(qMax(0, langIndex));
@@ -1191,6 +1707,7 @@ void OptionsDialog::save()
 	// schemes, then the mode, which takes effect at once, unlike the
 	// language
 	writeColorSchemeOptions();
+	saveColorPages();
 	const int colorMode = m_cmbColorMode->currentIndex();
 	lm::Theme::instance()->setMode(colorMode == 0 ? lm::ThemeMode::Light
 		: colorMode == 1 ? lm::ThemeMode::Dark : lm::ThemeMode::System);
@@ -1389,6 +1906,9 @@ void OptionsDialog::restoreDefaults(int page)
 			m_syntaxList->topLevelItem(row)->setText(1, QString::fromStdString(extensions[row]));
 		break;
 	}
+	case SysColorsPage:
+		restoreSysColorDefaults();
+		break;
 	case BackupPage:
 		m_chkBackup->setChecked(true);
 		break;

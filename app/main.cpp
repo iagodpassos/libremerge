@@ -68,6 +68,7 @@
 #include "FileCompareView.h"
 #include "PopupList.h"
 #include "SubeditList.h"
+#include "ColorButton.h"
 #include "SyntaxHighlighter.h"
 #include "TextDefinition.h"
 #include "SyntaxColors.h"
@@ -679,6 +680,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestColorSchemesOpt(QStringLiteral("selftest-color-schemes"),
 		QStringLiteral("Exercise Options > Colors > Color Schemes and the views' colors from them (for testing)"));
 	parser.addOption(selftestColorSchemesOpt);
+	QCommandLineOption selftestColorPagesOpt(QStringLiteral("selftest-color-pages"),
+		QStringLiteral("Exercise the Colors pages of Options: Differences, Syntax, Text, Markers, Folder Compare and System (for testing)"));
+	parser.addOption(selftestColorPagesOpt);
 	QCommandLineOption selftestIgnoredDiffsOpt(QStringLiteral("selftest-ignored-diffs"),
 		QStringLiteral("Count the ignored differences apart in the status bar and in Go To (for testing)"));
 	parser.addOption(selftestIgnoredDiffsOpt);
@@ -1657,14 +1661,17 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
 			OptionsDialog::BinaryPage, OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
 			-1, OptionsDialog::EditorPage, OptionsDialog::EditorCompareMergePage,
 			OptionsDialog::EditorSyntaxPage, -1, OptionsDialog::ColorSchemesPage,
+			OptionsDialog::MergeColorsPage, OptionsDialog::SyntaxColorsPage,
+			OptionsDialog::TextColorsPage, OptionsDialog::MarkerColorsPage,
+			OptionsDialog::DirColorsPage, OptionsDialog::SysColorsPage,
 			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
-		bool ok = tree.size() == 16;
+		bool ok = tree.size() == 22;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1677,15 +1684,18 @@ int main(int argc, char *argv[])
 			OptionsDialog::EditorPage, OptionsDialog::EditorPage,
 			OptionsDialog::EditorCompareMergePage, OptionsDialog::EditorSyntaxPage,
 			OptionsDialog::ColorSchemesPage, OptionsDialog::ColorSchemesPage,
+			OptionsDialog::MergeColorsPage, OptionsDialog::SyntaxColorsPage,
+			OptionsDialog::TextColorsPage, OptionsDialog::MarkerColorsPage,
+			OptionsDialog::DirColorsPage, OptionsDialog::SysColorsPage,
 			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
-		for (int i = 0; ok && i < 16; ++i)
+		for (int i = 0; ok && i < 22; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
 			printf("item %d: page %d, title \"%s\"\n", i,
 				dialog.currentPageForTest(), qPrintable(dialog.windowTitle()));
 			ok = dialog.currentPageForTest() == expectedPage[i]
-				&& nested == ((i >= 1 && i <= 6) || (i >= 8 && i <= 13));
+				&& nested == ((i >= 1 && i <= 6) || (i >= 8 && i <= 19));
 		}
 
 		const auto boxes = [&dialog](OptionsDialog::Page page) {
@@ -1710,7 +1720,7 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(14); // Backup Files
+		dialog.selectCategoryForTest(20); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 
@@ -8813,6 +8823,211 @@ int main(int argc, char *argv[])
 		lm::setMessageSinkForTest({});
 		lm::setQuestionSinkForTest({});
 		printf("table menu: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestColorPagesOpt))
+	{
+		// WinMerge's Colors pages (PropMergeColors, PropSyntaxColors,
+		// PropTextColors, PropMarkerColors, PropDirColors, PropSysColors):
+		// each color shown, chosen and saved with OK, and what takes it
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		lm::Theme::instance()->setMode(lm::ThemeMode::Light);
+		settle();
+		lm::importColorScheme(lm::ColorSchemes::path(QStringLiteral("Default")));
+		lm::setColorsAreDark(false);
+		int asked = 0;
+		QColor next(10, 20, 30);
+		lm::setColorChooserForTest([&asked, &next](const QColor &) {
+			++asked;
+			return next;
+		});
+		const auto button = [](QWidget *page, const QString &name) {
+			auto *found = page->findChild<lm::ColorButton *>(name);
+			if (found == nullptr)
+				std::exit(2);
+			return found;
+		};
+		const auto box = [](QWidget *page, const QString &name) {
+			auto *found = page->findChild<QCheckBox *>(name);
+			if (found == nullptr)
+				std::exit(2);
+			return found;
+		};
+		const auto key = [](const String &option) { return QString::fromStdString(option); };
+		const auto defaultsShown = [](OptionsDialog &dialog) {
+			for (QPushButton *b : dialog.findChildren<QPushButton *>())
+				if (b->text() == OptionsDialog::tr("Defaults") && b->isVisible())
+					return true;
+			return false;
+		};
+		const auto ref = [](int r, int g, int b) { return lm::colorRefFromColor(QColor(r, g, b)); };
+
+		// each page, when shots are asked for (LIBREMERGE_SELFTEST_SHOTS)
+		const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+		if (!shots.isEmpty())
+		{
+			OptionsDialog dialog;
+			dialog.show();
+			for (int i = 13; i <= 19; ++i)
+			{
+				dialog.selectCategoryForTest(i);
+				settle();
+				dialog.grab().save(shots + QStringLiteral("/color-page-%1.png").arg(i));
+			}
+		}
+
+		{
+			OptionsDialog dialog;
+			dialog.show();
+
+			// Differences
+			dialog.selectCategoryForTest(14);
+			settle();
+			QWidget *page = dialog.pageForTest(OptionsDialog::MergeColorsPage);
+			lm::ColorButton *diff = button(page, key(OPT_CLR_DIFF));
+			lm::ColorButton *diffText = button(page, key(OPT_CLR_DIFF_TEXT));
+			QCheckBox *useDiffText = box(page, key(OPT_CLR_DIFF_TEXT) + QStringLiteral("/Use"));
+			check(page->findChildren<lm::ColorButton *>().size() == 27
+					&& diff->colorRef() == mgr->GetInt(OPT_CLR_DIFF)
+					&& useDiffText->isChecked() && diffText->isVisible() && !defaultsShown(dialog)
+					&& dialog.windowTitle().contains(OptionsDialog::tr("Differences")),
+				"Differences: 27 colors as the options have them, no Defaults");
+			diff->click();
+			useDiffText->click();
+			check(asked == 1 && diff->colorRef() == ref(10, 20, 30) && !diffText->isVisible()
+					&& diffText->colorRef() == -1,
+				"a color chosen; a text color unticked: none, hidden");
+			useDiffText->click();
+			check(diffText->isVisible() && diffText->colorRef() == 0, "ticked again: black");
+			useDiffText->click();
+
+			// Syntax
+			dialog.selectCategoryForTest(15);
+			page = dialog.pageForTest(OptionsDialog::SyntaxColorsPage);
+			lm::ColorButton *keyword = button(page, QStringLiteral("syntaxColor%1").arg(COLORINDEX_KEYWORD));
+			QCheckBox *keywordBold = box(page, QStringLiteral("syntaxBold%1").arg(COLORINDEX_KEYWORD));
+			check(page->findChildren<lm::ColorButton *>().size() == 9
+					&& keyword->colorRef() == ref(0, 0, 255) && keywordBold->isChecked() && !defaultsShown(dialog),
+				"Syntax: nine kinds of text, the keywords blue and bold");
+			next = QColor(1, 2, 3);
+			keyword->click();
+			keywordBold->click();
+
+			// Text: the system's colors until customized, ticking resets
+			// the text colors only
+			dialog.selectCategoryForTest(16);
+			page = dialog.pageForTest(OptionsDialog::TextColorsPage);
+			QCheckBox *custom = box(page, QStringLiteral("customTextColors"));
+			lm::ColorButton *background = button(page, QStringLiteral("textColor%1").arg(COLORINDEX_BKGND));
+			const int before = asked;
+			background->click();
+			check(!custom->isChecked() && asked == before && page->findChildren<lm::ColorButton *>().size() == 6,
+				"Text: the system's colors, nothing to choose then");
+			custom->click();
+			check(custom->isChecked() && keyword->colorRef() == ref(1, 2, 3),
+				"customized: the text colors reset, the syntax ones kept");
+			next = QColor(40, 50, 60);
+			background->click();
+
+			// Markers
+			dialog.selectCategoryForTest(17);
+			page = dialog.pageForTest(OptionsDialog::MarkerColorsPage);
+			check(button(page, QStringLiteral("markerColor0"))->colorRef() == ref(255, 255, 127),
+				"Markers: the search's yellow");
+			next = QColor(70, 80, 90);
+			button(page, QStringLiteral("markerColor0"))->click();
+
+			// Folder Compare
+			dialog.selectCategoryForTest(18);
+			page = dialog.pageForTest(OptionsDialog::DirColorsPage);
+			QCheckBox *useDir = box(page, QStringLiteral("useDirColors"));
+			check(useDir->isChecked() && page->findChildren<lm::ColorButton *>().size() == 9
+					&& button(page, key(OPT_DIRCLR_ITEM_DIFF))->colorRef() == mgr->GetInt(OPT_DIRCLR_ITEM_DIFF),
+				"Folder Compare: on, nine colors");
+			next = QColor(100, 110, 120);
+			button(page, key(OPT_DIRCLR_ITEM_DIFF))->click();
+			useDir->click();
+
+			// System
+			dialog.selectCategoryForTest(19);
+			page = dialog.pageForTest(OptionsDialog::SysColorsPage);
+			QCheckBox *hook = box(page, QStringLiteral("sysColorHook"));
+			auto *names = page->findChild<QComboBox *>(QStringLiteral("sysColorName"));
+			lm::ColorButton *sys = button(page, QStringLiteral("sysColor"));
+			check(!hook->isChecked() && names != nullptr && names->count() == 16 && !sys->isEnabled()
+					&& defaultsShown(dialog),
+				"System: off, sixteen colors, its Defaults button");
+			if (names == nullptr)
+				return 2;
+			hook->click();
+			names->setCurrentIndex(names->findData(COLOR_WINDOW));
+			check(sys->isEnabled() && sys->colorRef() == lm::colorRefFromColor(lm::originalSystemColor(COLOR_WINDOW)),
+				"on: the system's window color");
+			next = QColor(130, 140, 150);
+			sys->click();
+			check(dialog.colorsChanged(), "the colors changed");
+			dialog.saveForTest();
+		}
+		check(lm::diffColors().diff == QColor(10, 20, 30) && !lm::diffColors().diffText.isValid(),
+			"OK: the difference's colors, its text the line's own");
+		check(lm::syntaxColor(COLORINDEX_KEYWORD) == QColor(1, 2, 3) && !lm::syntaxBold(COLORINDEX_KEYWORD),
+			"the keywords' color, not bold");
+		check(!mgr->GetBool(OPT_CLR_DEFAULT_TEXT_COLORING) && lm::syntaxColor(COLORINDEX_BKGND) == QColor(40, 50, 60),
+			"customized text colors");
+		check(lm::markerColor(0) == QColor(70, 80, 90), "the search marker's color");
+		check(!lm::dirColors().use && lm::dirColors().diff == QColor(100, 110, 120), "the folder colors, off");
+		check(mgr->GetBool(OPT_SYSCOLOR_HOOK_ENABLED)
+				&& QString::fromStdString(mgr->GetString(OPT_SYSCOLOR_HOOK_COLORS)) == QStringLiteral("5:0x00968c82")
+				&& lm::systemColor(COLOR_WINDOW) == QColor(130, 140, 150),
+			"a system color of its own, the only one listed");
+
+		// a scheme picked shows its colors on the pages; System's Defaults
+		// take the scheme of the mode in effect
+		{
+			OptionsDialog dialog;
+			dialog.show();
+			dialog.selectCategoryForTest(13);
+			QWidget *page = dialog.pageForTest(OptionsDialog::ColorSchemesPage);
+			auto *mode = page->findChild<QComboBox *>(QStringLiteral("colorMode"));
+			if (mode == nullptr)
+				return 2;
+			mode->setCurrentIndex(1); // Dark: VS Dark
+			emit mode->activated(1);
+			QWidget *merge = dialog.pageForTest(OptionsDialog::MergeColorsPage);
+			check(button(merge, key(OPT_CLR_DIFF))->colorRef() == ref(0x37, 0x3d, 0x29)
+					&& !box(merge, key(OPT_CLR_DIFF_TEXT) + QStringLiteral("/Use"))->isChecked(),
+				"VS Dark picked: the pages show its colors");
+			dialog.selectCategoryForTest(19);
+			QWidget *system = dialog.pageForTest(OptionsDialog::SysColorsPage);
+			box(system, QStringLiteral("sysColorHook"))->click();
+			dialog.restoreDefaultsForTest();
+			auto *names = system->findChild<QComboBox *>(QStringLiteral("sysColorName"));
+			names->setCurrentIndex(names->findData(COLOR_WINDOW));
+			check(box(system, QStringLiteral("sysColorHook"))->isChecked()
+					&& button(system, QStringLiteral("sysColor"))->colorRef() == ref(0x1e, 0x1e, 0x1e),
+				"System's Defaults: VS Dark's system colors");
+			dialog.saveForTest();
+		}
+		lm::setColorChooserForTest({});
+		lm::Theme::instance()->setMode(lm::ThemeMode::System);
+		printf("ok: %d\n", ok);
 		return ok ? 0 : 1;
 	}
 

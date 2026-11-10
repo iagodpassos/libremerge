@@ -4726,6 +4726,171 @@ Useu valors entre 1 i %1.</translation>
 %1 ?</translation>
     </message>
     <message>
+        <source>Differences</source>
+        <translation>Diferències</translation>
+    </message>
+    <message>
+        <source>Text</source>
+        <translation>Text</translation>
+    </message>
+    <message>
+        <source>Markers</source>
+        <translation>Marques</translation>
+    </message>
+    <message>
+        <source>Folder Compare</source>
+        <translation>Comparació de carpetes</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>Sistema</translation>
+    </message>
+    <message>
+        <source>Background</source>
+        <translation>Fons</translation>
+    </message>
+    <message>
+        <source>Deleted</source>
+        <translation>Esborrat</translation>
+    </message>
+    <message>
+        <source>Difference:</source>
+        <translation>Diferència:</translation>
+    </message>
+    <message>
+        <source>Selected Difference:</source>
+        <translation>Diferència seleccionada:</translation>
+    </message>
+    <message>
+        <source>Ignored Difference:</source>
+        <translation>Diferència ignorada:</translation>
+    </message>
+    <message>
+        <source>Moved:</source>
+        <translation>Text mogut:</translation>
+    </message>
+    <message>
+        <source>Selected Moved:</source>
+        <translation>Text mogut seleccionat:</translation>
+    </message>
+    <message>
+        <source>Same As Next (3 panes):</source>
+        <translation>Igual que el següent (3 subfinestres):</translation>
+    </message>
+    <message>
+        <source>Same As Next (Selected):</source>
+        <translation>Igual que el següent (seleccionat):</translation>
+    </message>
+    <message>
+        <source>Word Difference:</source>
+        <translation>Paraula diferent:</translation>
+    </message>
+    <message>
+        <source>Selected Word Diff:</source>
+        <translation>Paraula diferent seleccionada:</translation>
+    </message>
+    <message>
+        <source>Keywords:</source>
+        <translation>Paraules clau:</translation>
+    </message>
+    <message>
+        <source>Function names:</source>
+        <translation>Noms de funció:</translation>
+    </message>
+    <message>
+        <source>Comments:</source>
+        <translation>Comentaris:</translation>
+    </message>
+    <message>
+        <source>Numbers:</source>
+        <translation>Nombres:</translation>
+    </message>
+    <message>
+        <source>Operators:</source>
+        <translation>Operadors:</translation>
+    </message>
+    <message>
+        <source>Strings:</source>
+        <translation>Cadenes:</translation>
+    </message>
+    <message>
+        <source>Preprocessor:</source>
+        <translation>Preprocessador:</translation>
+    </message>
+    <message>
+        <source>User 1:</source>
+        <translation>Usuari 1:</translation>
+    </message>
+    <message>
+        <source>User 2:</source>
+        <translation>Usuari 2:</translation>
+    </message>
+    <message>
+        <source>Bold</source>
+        <translation>Negreta</translation>
+    </message>
+    <message>
+        <source>&amp;Use customized text colors</source>
+        <translation>&amp;Usa colors de text personalitzats</translation>
+    </message>
+    <message>
+        <source>Whitespace:</source>
+        <translation>Espais:</translation>
+    </message>
+    <message>
+        <source>Regular text:</source>
+        <translation>Text regular:</translation>
+    </message>
+    <message>
+        <source>Selection:</source>
+        <translation>Selecció:</translation>
+    </message>
+    <message>
+        <source>Margin:</source>
+        <translation>Marge:</translation>
+    </message>
+    <message>
+        <source>Search Marker:</source>
+        <translation>Marcador de cerca:</translation>
+    </message>
+    <message>
+        <source>User Defined Marker 1:</source>
+        <translation>Marcador definit per l&apos;usuari1:</translation>
+    </message>
+    <message>
+        <source>User Defined Marker 2:</source>
+        <translation>Marcador definit per l&apos;usuari2:</translation>
+    </message>
+    <message>
+        <source>User Defined Marker 3:</source>
+        <translation>Marcador definit per l&apos;usuari3:</translation>
+    </message>
+    <message>
+        <source>&amp;Use folder compare colors</source>
+        <translation>&amp;Usa colors comparació de carpetes</translation>
+    </message>
+    <message>
+        <source>Items equal:</source>
+        <translation>Elements iguals:</translation>
+    </message>
+    <message>
+        <source>Items different:</source>
+        <translation>Elements diferents:</translation>
+    </message>
+    <message>
+        <source>Items missing:</source>
+        <translation>Elements que no existeixen en tots:</translation>
+    </message>
+    <message>
+        <source>Items filtered:</source>
+        <translation>Elements filtrats:</translation>
+    </message>
+    <message>
+        <source>&amp;Use custom system colors</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>&amp;Utilitza colors del sistema personalitzats</translation>
+    </message>
+    <message>
         <source>Language:</source>
         <translation>Idioma:</translation>
     </message>

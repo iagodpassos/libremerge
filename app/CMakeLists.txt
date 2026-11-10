@@ -48,6 +48,7 @@ qt_add_executable(LibreMerge
   SyntaxHighlighter.cpp
   Theme.cpp
   ColorSettings.cpp
+  ColorButton.cpp
   FolderCompareView.cpp
   FolderCompareDriver.cpp
   ArchiveCompare.cpp
