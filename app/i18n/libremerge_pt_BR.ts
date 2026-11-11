@@ -4457,6 +4457,18 @@ Checando identidade binária...</translation>
         <source>The status bar of a folder comparison shows the method in use; click it to switch and recompare.</source>
         <translation>A barra de status de uma comparação de pastas mostra o método em uso; clique nele para trocar e recomparar.</translation>
     </message>
+    <message>
+        <source>Archive Support</source>
+        <translation>Suporte a Arquivos Compactados</translation>
+    </message>
+    <message>
+        <source>Enable archive file support</source>
+        <translation>Habilitar suporte a arquivos compactados</translation>
+    </message>
+    <message>
+        <source>Detect archive type from file signature</source>
+        <translation>Detectar o tipo de arquivo compactado pela assinatura do arquivo</translation>
+    </message>
 </context>
 <context>
     <name>PaneSearch</name>

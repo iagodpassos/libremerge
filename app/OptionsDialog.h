@@ -108,6 +108,7 @@ public:
 		MarkerColorsPage, ///< Colors > Markers
 		DirColorsPage,    ///< Colors > Folder Compare
 		SysColorsPage,    ///< Colors > System
+		ArchivePage,      ///< Archive Support
 		BackupPage,
 		CodepagePage,
 	};
@@ -190,6 +191,7 @@ private:
 	void updateTextColorControls();
 	void updateSysColorControls();
 	void restoreSysColorDefaults();
+	QWidget *buildArchivePage();
 	QWidget *buildBackupPage();
 	QWidget *buildCodepagePage();
 	void showCustomCodepage(int codepage);
@@ -300,6 +302,9 @@ private:
 	// the Answer drop-down of each question, by row (null for the
 	// information boxes, which only answer OK)
 	QList<QComboBox *> m_messageAnswers;
+	// Archive Support
+	QCheckBox *m_chkArchiveEnable = nullptr;
+	QCheckBox *m_chkArchiveProbe = nullptr;
 	// Backup Files
 	QCheckBox *m_chkBackup;
 	// Codepage

@@ -122,10 +122,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 746 | 189 | 255 | 3 | 3 |
-| Spanish | 732 | 201 | 253 | 10 | 0 |
-| Catalan | 415 | 193 | 255 | 333 | 0 |
-| French | 748 | 208 | 237 | 3 | 0 |
+| German | 749 | 189 | 255 | 3 | 3 |
+| Spanish | 735 | 201 | 253 | 10 | 0 |
+| Catalan | 418 | 193 | 255 | 333 | 0 |
+| French | 751 | 208 | 237 | 3 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -247,6 +247,20 @@ own with Ctrl held) and ".." goes back up, as `CDirView` does. Archives
 compare with their subfolders whatever the option: going up out of an
 archive's extracted folders, which upstream's temporary path contexts
 handle, is not offered.
+
+Options > Archive Support is WinMerge's `PropArchive`. With "Enable
+archive file support" off, an archive compares as a file, as
+`IsArchiveFile` answers then; with "Detect archive type from file
+signature" on, the content decides instead of the extension, as
+Merge7z's `GuessFormat` does, so a zip named `.bin` opens as a folder
+and a text named `.zip` as a file. The signature is libarchive's, among
+the formats LibreMerge opens by extension (zip, 7z, tar, and gzip,
+bzip2, xz and zstd around a tar or a lone file), where 7-Zip probes all
+of its own. The extraction unwraps a lone inner archive by its
+signature whatever the options say, as upstream's `ShowDirDoc` turns
+the probe on around `DecompressArchive`; the extension used to decide
+it here, and a text named `.zip` alone in an archive failed the
+extraction.
 
 ## Colors and color schemes
 

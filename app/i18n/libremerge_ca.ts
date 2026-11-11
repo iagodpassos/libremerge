@@ -5166,6 +5166,18 @@ Restart required.&quot;.</translatorcomment>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Coreà (selecció automàtica)</translation>
     </message>
+    <message>
+        <source>Archive Support</source>
+        <translation>Suport d&apos;arxivament</translation>
+    </message>
+    <message>
+        <source>Enable archive file support</source>
+        <translation>Habilita el suport de fitxers d&apos;arxivament</translation>
+    </message>
+    <message>
+        <source>Detect archive type from file signature</source>
+        <translation>Detecta el tipus d&apos;arxiu a partir de la signatura del fitxer</translation>
+    </message>
 </context>
 <context>
     <name>PaneSearch</name>

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "pch.h"
 #include "ArchiveCompare.h"
 
 #include <archive.h>
@@ -7,6 +8,10 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+
+// engine
+#include "OptionsDef.h"
+#include "OptionsMgr.h"
 
 namespace
 {
@@ -152,6 +157,53 @@ bool isArchivePath(const QString &path)
 	return false;
 }
 
+bool hasArchiveSignature(const QString &path)
+{
+	if (!QFileInfo(path).isFile())
+		return false;
+	// the formats and filters behind the extensions above, and no
+	// others: a probe reads the start of any file the user points at
+	struct archive *reader = archive_read_new();
+	archive_read_support_filter_gzip(reader);
+	archive_read_support_filter_bzip2(reader);
+	archive_read_support_filter_xz(reader);
+	archive_read_support_filter_zstd(reader);
+	archive_read_support_format_zip(reader);
+	archive_read_support_format_7zip(reader);
+	archive_read_support_format_tar(reader);
+	archive_read_support_format_raw(reader);
+	bool archive = false;
+	if (archive_read_open_filename(reader,
+		QFile::encodeName(path).constData(), 10240) == ARCHIVE_OK)
+	{
+		struct archive_entry *entry = nullptr;
+		if (archive_read_next_header(reader, &entry) >= ARCHIVE_WARN)
+		{
+			// raw takes any file: it is an archive only when a
+			// compression filter came before it (log.gz)
+			archive = (archive_format(reader) & ARCHIVE_FORMAT_BASE_MASK)
+					!= ARCHIVE_FORMAT_RAW
+				|| archive_filter_count(reader) > 1;
+		}
+	}
+	archive_read_free(reader);
+	return archive;
+}
+
+bool isArchiveFile(const QString &path)
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr != nullptr && !mgr->GetBool(OPT_ARCHIVE_ENABLE))
+		return false;
+	if (QFileInfo(path).isDir())
+		return false;
+	// Merge7z::GuessFormat: with the signature probed, the extension only
+	// orders the formats tried, the content decides
+	if (mgr != nullptr && mgr->GetBool(OPT_ARCHIVE_PROBETYPE))
+		return hasArchiveSignature(path);
+	return isArchivePath(path);
+}
+
 bool extractArchive(const QString &archivePath, const QString &destDir,
 	QString *error, const std::function<bool(const QString &)> &onEntry)
 {
@@ -163,14 +215,16 @@ bool extractArchive(const QString &archivePath, const QString &destDir,
 	// WinMerge's DecompressArchive unwraps until the result stops being
 	// an archive; compressed tars are already handled in one pass by
 	// libarchive's filters, so this only fires for genuinely nested
-	// archives (a zip holding one zip, a lone inner tarball)
+	// archives (a zip holding one zip, a lone inner tarball). Upstream's
+	// ShowDirDoc turns the signature probe on around it, so the content
+	// decides here, whatever the options say
 	for (int depth = 0; depth < 5; ++depth)
 	{
 		QDir dir(destDir);
 		const QFileInfoList items = dir.entryInfoList(
 			QDir::AllEntries | QDir::NoDotAndDotDot);
 		if (items.size() != 1 || !items.at(0).isFile()
-			|| !isArchivePath(items.at(0).fileName()))
+			|| !hasArchiveSignature(items.at(0).filePath()))
 			break;
 		const QString inner = destDir + QStringLiteral("/.lm-inner-")
 			+ items.at(0).fileName();

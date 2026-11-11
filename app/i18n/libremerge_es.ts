@@ -4863,6 +4863,18 @@ Restart required.&quot;.</translatorcomment>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Coreano (selección automática)</translation>
     </message>
+    <message>
+        <source>Archive Support</source>
+        <translation>Compatibilidad con archivos</translation>
+    </message>
+    <message>
+        <source>Enable archive file support</source>
+        <translation>Habilitar compatibilidad con archivos comprimidos</translation>
+    </message>
+    <message>
+        <source>Detect archive type from file signature</source>
+        <translation>Detectar tipo de archivo por su firma</translation>
+    </message>
 </context>
 <context>
     <name>PaneSearch</name>

@@ -983,7 +983,7 @@ void MainWindow::changeEvent(QEvent *event)
 bool MainWindow::isFolderLike(const QString &path)
 {
 	const QFileInfo info(path);
-	return info.isDir() || (info.isFile() && lm::isArchivePath(path));
+	return info.isDir() || (info.isFile() && lm::isArchiveFile(path));
 }
 
 bool MainWindow::allFolderLike(const QStringList &paths)

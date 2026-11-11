@@ -316,7 +316,7 @@ void NewComparisonView::verifyPaths()
 		if (!paths[i].isEmpty() && info.exists())
 			kind[i] = info.isDir() ? Folder : File;
 		folderLike[i] = kind[i] == Folder
-			|| (kind[i] == File && lm::isArchivePath(paths[i]));
+			|| (kind[i] == File && lm::isArchiveFile(paths[i]));
 		anyExists = anyExists || kind[i] != Missing;
 	}
 	m_compareButton->setEnabled(anyExists);
@@ -635,7 +635,7 @@ void NewComparisonView::compare()
 	for (const QString &path : paths)
 	{
 		const QFileInfo info(path);
-		if (info.isDir() || (info.isFile() && lm::isArchivePath(path)))
+		if (info.isDir() || (info.isFile() && lm::isArchiveFile(path)))
 			++folderLike;
 		else if (info.isFile())
 			++plainFiles;

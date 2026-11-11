@@ -240,6 +240,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	addCategory(colors, tr("Markers"), MarkerColorsPage);
 	addCategory(colors, tr("Folder Compare"), DirColorsPage);
 	addCategory(colors, tr("System"), SysColorsPage);
+	addCategory(nullptr, tr("Archive Support"), ArchivePage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	addCategory(nullptr, tr("Codepage"), CodepagePage);
 	m_categories->expandAll();
@@ -264,6 +265,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildMarkerColorsPage());
 	m_pages->addWidget(buildDirColorsPage());
 	m_pages->addWidget(buildSysColorsPage());
+	m_pages->addWidget(buildArchivePage());
 	m_pages->addWidget(buildBackupPage());
 	m_pages->addWidget(buildCodepagePage());
 	pageArea->addWidget(m_pages, 1);
@@ -1475,6 +1477,29 @@ bool OptionsDialog::eventFilter(QObject *watched, QEvent *event)
 	return QDialog::eventFilter(watched, event);
 }
 
+/** WinMerge's Archive Support page (PropArchive): whether an archive
+    opens as a folder, and whether its content, not its extension, says
+    it is one. */
+QWidget *OptionsDialog::buildArchivePage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+
+	m_chkArchiveEnable = new QCheckBox(tr("Enable archive file support"), page);
+	m_chkArchiveEnable->setObjectName(QStringLiteral("archiveEnable"));
+	box->addWidget(m_chkArchiveEnable);
+	m_chkArchiveProbe = new QCheckBox(
+		tr("Detect archive type from file signature"), page);
+	m_chkArchiveProbe->setObjectName(QStringLiteral("archiveProbe"));
+	box->addWidget(m_chkArchiveProbe);
+	// UpdateControls: the detection only with the support on
+	connect(m_chkArchiveEnable, &QCheckBox::toggled,
+		m_chkArchiveProbe, &QWidget::setEnabled);
+
+	box->addStretch(1);
+	return page;
+}
+
 /** WinMerge's Backup Files page (PropBackups): the file compare switch;
     folder, name and the folder compare switch are not offered yet. */
 QWidget *OptionsDialog::buildBackupPage()
@@ -1666,6 +1691,9 @@ void OptionsDialog::load()
 		m_editBreakChars->setText(
 			QString::fromStdString(mgr->GetString(OPT_BREAK_SEPARATORS)));
 		updateLineDiffControls();
+		m_chkArchiveEnable->setChecked(mgr->GetBool(OPT_ARCHIVE_ENABLE));
+		m_chkArchiveProbe->setChecked(mgr->GetBool(OPT_ARCHIVE_PROBETYPE));
+		m_chkArchiveProbe->setEnabled(m_chkArchiveEnable->isChecked());
 		const int mode = mgr->GetInt(OPT_CP_DEFAULT_MODE);
 		m_radCodepage[mode >= 0 && mode < 3 ? mode : 0]->setChecked(true);
 		m_cmbCustomCodepage->setEnabled(m_radCodepage[2]->isChecked());
@@ -1761,6 +1789,8 @@ void OptionsDialog::save()
 			extensions[row] = lm::removeDuplicatePatterns(
 				m_syntaxList->topLevelItem(row)->text(1)).toStdString();
 		Options::EditorSyntax::Save(mgr, extensions);
+		mgr->SaveOption(OPT_ARCHIVE_ENABLE, m_chkArchiveEnable->isChecked());
+		mgr->SaveOption(OPT_ARCHIVE_PROBETYPE, m_chkArchiveProbe->isChecked());
 		int mode = 0;
 		for (int i = 0; i < 3; ++i)
 			if (m_radCodepage[i]->isChecked())
@@ -1908,6 +1938,13 @@ void OptionsDialog::restoreDefaults(int page)
 	}
 	case SysColorsPage:
 		restoreSysColorDefaults();
+		break;
+	case ArchivePage:
+		if (COptionsMgr *mgr = GetOptionsMgr())
+		{
+			m_chkArchiveEnable->setChecked(mgr->GetDefault<bool>(OPT_ARCHIVE_ENABLE));
+			m_chkArchiveProbe->setChecked(mgr->GetDefault<bool>(OPT_ARCHIVE_PROBETYPE));
+		}
 		break;
 	case BackupPage:
 		m_chkBackup->setChecked(true);

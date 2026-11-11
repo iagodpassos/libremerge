@@ -4864,6 +4864,18 @@ Restart required.&quot;.</translatorcomment>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Koreanisch (automatische Auswahl)</translation>
     </message>
+    <message>
+        <source>Archive Support</source>
+        <translation>Archivunterstützung</translation>
+    </message>
+    <message>
+        <source>Enable archive file support</source>
+        <translation>Archivunterstützung aktivieren</translation>
+    </message>
+    <message>
+        <source>Detect archive type from file signature</source>
+        <translation>Archivtyp aus der Dateisignatur ermitteln</translation>
+    </message>
 </context>
 <context>
     <name>PaneSearch</name>

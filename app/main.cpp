@@ -683,6 +683,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestColorPagesOpt(QStringLiteral("selftest-color-pages"),
 		QStringLiteral("Exercise the Colors pages of Options: Differences, Syntax, Text, Markers, Folder Compare and System (for testing)"));
 	parser.addOption(selftestColorPagesOpt);
+	QCommandLineOption selftestArchiveOptionsOpt(QStringLiteral("selftest-archive-options"),
+		QStringLiteral("Exercise Options > Archive Support: archives opening as folders, by extension or by signature (for testing)"));
+	parser.addOption(selftestArchiveOptionsOpt);
 	QCommandLineOption selftestIgnoredDiffsOpt(QStringLiteral("selftest-ignored-diffs"),
 		QStringLiteral("Count the ignored differences apart in the status bar and in Go To (for testing)"));
 	parser.addOption(selftestIgnoredDiffsOpt);
@@ -1661,7 +1664,7 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
 			OptionsDialog::BinaryPage, OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
@@ -1670,8 +1673,9 @@ int main(int argc, char *argv[])
 			OptionsDialog::MergeColorsPage, OptionsDialog::SyntaxColorsPage,
 			OptionsDialog::TextColorsPage, OptionsDialog::MarkerColorsPage,
 			OptionsDialog::DirColorsPage, OptionsDialog::SysColorsPage,
-			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
-		bool ok = tree.size() == 22;
+			OptionsDialog::ArchivePage, OptionsDialog::BackupPage,
+			OptionsDialog::CodepagePage };
+		bool ok = tree.size() == 23;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1687,8 +1691,9 @@ int main(int argc, char *argv[])
 			OptionsDialog::MergeColorsPage, OptionsDialog::SyntaxColorsPage,
 			OptionsDialog::TextColorsPage, OptionsDialog::MarkerColorsPage,
 			OptionsDialog::DirColorsPage, OptionsDialog::SysColorsPage,
-			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
-		for (int i = 0; ok && i < 22; ++i)
+			OptionsDialog::ArchivePage, OptionsDialog::BackupPage,
+			OptionsDialog::CodepagePage };
+		for (int i = 0; ok && i < 23; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
@@ -1720,7 +1725,7 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(20); // Backup Files
+		dialog.selectCategoryForTest(21); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 
@@ -9027,6 +9032,203 @@ int main(int argc, char *argv[])
 		}
 		lm::setColorChooserForTest({});
 		lm::Theme::instance()->setMode(lm::ThemeMode::System);
+		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestArchiveOptionsOpt))
+	{
+		// WinMerge's Archive Support page (PropArchive): its place and
+		// controls, what it saves, and IsArchiveFile following it, by
+		// extension or by signature, in the folder-or-file decision
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto put = [&dir](const char *name, const QByteArray &bytes) {
+			QFile f(dir.filePath(QString::fromLatin1(name)));
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return f.fileName();
+		};
+		// one entry of any bytes, in a zip or alone under gzip (log.gz)
+		const auto pack = [](const QString &path, bool rawGzip, const char *name,
+			const QByteArray &bytes) {
+			struct archive *a = archive_write_new();
+			if (rawGzip)
+			{
+				archive_write_set_format_raw(a);
+				archive_write_add_filter_gzip(a);
+			}
+			else
+				archive_write_set_format_zip(a);
+			bool written = archive_write_open_filename(a,
+				QFile::encodeName(path).constData()) == ARCHIVE_OK;
+			struct archive_entry *entry = archive_entry_new();
+			archive_entry_set_pathname(entry, name);
+			archive_entry_set_filetype(entry, AE_IFREG);
+			archive_entry_set_perm(entry, 0644);
+			archive_entry_set_size(entry, bytes.size());
+			written = written && archive_write_header(a, entry) == ARCHIVE_OK
+				&& archive_write_data(a, bytes.constData(), bytes.size()) == bytes.size();
+			archive_entry_free(entry);
+			written = archive_write_close(a) == ARCHIVE_OK && written;
+			archive_write_free(a);
+			if (!written)
+				std::exit(2);
+		};
+		const QString zipA = dir.filePath(QStringLiteral("a.zip"));
+		const QString zipB = dir.filePath(QStringLiteral("b.zip"));
+		const QString tgz = dir.filePath(QStringLiteral("c.tar.gz"));
+		if (!writeTestArchive(zipA, false, { { "x.txt", "left\n" } })
+			|| !writeTestArchive(zipB, false, { { "x.txt", "right\n" } })
+			|| !writeTestArchive(tgz, true, { { "x.txt", "tar\n" } }))
+			return 2;
+		QFile zipFile(zipA);
+		if (!zipFile.open(QIODevice::ReadOnly))
+			return 2;
+		const QByteArray zipBytes = zipFile.readAll();
+		zipFile.close();
+		// a zip under another name, a text under an archive's name, a
+		// single compressed file, a text and an empty file
+		const QString zipData = put("data.bin", zipBytes);
+		const QString fakeZip = put("fake.zip", "not an archive\n");
+		const QString text = put("notes.txt", "plain text\n");
+		const QString empty = put("empty.zip", QByteArray());
+		const QString gz = dir.filePath(QStringLiteral("log.gz"));
+		pack(gz, true, "log", "line\n");
+		const auto detected = [&]() {
+			QString found;
+			for (const QString &path : { zipA, tgz, gz, fakeZip, zipData, text, empty, dir.path() })
+				if (lm::isArchiveFile(path))
+					found += QFileInfo(path).fileName() + QLatin1Char(' ');
+			return found.trimmed();
+		};
+
+		// the page: after Colors > System, its two boxes, WinMerge's
+		// defaults, the detection only with the support on
+		mgr->SaveOption(OPT_ARCHIVE_ENABLE, mgr->GetDefault<bool>(OPT_ARCHIVE_ENABLE));
+		mgr->SaveOption(OPT_ARCHIVE_PROBETYPE, mgr->GetDefault<bool>(OPT_ARCHIVE_PROBETYPE));
+		{
+			OptionsDialog dialog;
+			dialog.show();
+			const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
+			check(tree.size() > 21 && tree.at(20).page == OptionsDialog::ArchivePage
+					&& tree.at(20).depth == 0 && tree.at(19).page == OptionsDialog::SysColorsPage
+					&& tree.at(21).page == OptionsDialog::BackupPage,
+				"page: Archive Support, after Colors > System");
+			dialog.selectCategoryForTest(20);
+			check(dialog.currentPageForTest() == OptionsDialog::ArchivePage
+					&& dialog.windowTitle() == OptionsDialog::tr("Options (%1)")
+						.arg(OptionsDialog::tr("Archive Support")),
+				"selected, the title names it");
+			bool defaultsShown = false;
+			for (QPushButton *b : dialog.findChildren<QPushButton *>())
+				defaultsShown = defaultsShown
+					|| (b->text() == OptionsDialog::tr("Defaults") && b->isVisible());
+			check(defaultsShown, "it has the Defaults button");
+			if (!qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS").isEmpty())
+				dialog.grab().save(qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS")
+					+ QStringLiteral("/archive-page.png"));
+			QWidget *page = dialog.pageForTest(OptionsDialog::ArchivePage);
+			auto *enable = page->findChild<QCheckBox *>(QStringLiteral("archiveEnable"));
+			auto *probe = page->findChild<QCheckBox *>(QStringLiteral("archiveProbe"));
+			if (enable == nullptr || probe == nullptr)
+				return 2;
+			check(enable->text() == OptionsDialog::tr("Enable archive file support")
+					&& probe->text() == OptionsDialog::tr("Detect archive type from file signature"),
+				"its two boxes");
+			check(enable->isChecked() && !probe->isChecked() && probe->isEnabled(),
+				"defaults: support on, detection off");
+			enable->setChecked(false);
+			check(!probe->isEnabled(), "support off: the detection disabled");
+			enable->setChecked(true);
+			check(probe->isEnabled(), "support on: the detection enabled again");
+
+			// saved with OK
+			enable->setChecked(false);
+			dialog.saveForTest();
+			check(!mgr->GetBool(OPT_ARCHIVE_ENABLE) && !mgr->GetBool(OPT_ARCHIVE_PROBETYPE),
+				"OK saves the support off");
+		}
+		{
+			OptionsDialog dialog;
+			QWidget *page = dialog.pageForTest(OptionsDialog::ArchivePage);
+			auto *enable = page->findChild<QCheckBox *>(QStringLiteral("archiveEnable"));
+			auto *probe = page->findChild<QCheckBox *>(QStringLiteral("archiveProbe"));
+			check(!enable->isChecked() && !probe->isEnabled(), "shown again: off, detection disabled");
+			dialog.selectCategoryForTest(20);
+			probe->setChecked(true);
+			dialog.restoreDefaultsForTest();
+			check(enable->isChecked() && !probe->isChecked() && probe->isEnabled(),
+				"Defaults: support on, detection off");
+			check(!mgr->GetBool(OPT_ARCHIVE_ENABLE), "Defaults alone saves nothing");
+		}
+
+		// IsArchiveFile: nothing with the support off
+		check(detected().isEmpty(), "support off: no archive at all");
+		check(!MainWindow::allFolderLike({ zipA, zipB }), "support off: two zips are files");
+		{
+			MainWindow window;
+			window.handleIncomingPaths({ zipA, zipB });
+			check(window.findChild<FolderCompareView *>() == nullptr
+					&& window.findChild<HexCompareView *>() != nullptr,
+				"support off: two zips open the binary comparison");
+		}
+		// by the extension, WinMerge's default
+		mgr->SaveOption(OPT_ARCHIVE_ENABLE, true);
+		printf("by extension: %s\n", qPrintable(detected()));
+		check(detected() == QStringLiteral("a.zip c.tar.gz log.gz fake.zip empty.zip"),
+			"by extension: the names decide");
+		check(MainWindow::allFolderLike({ zipA, zipB }), "support on: two zips are folders");
+		{
+			MainWindow window;
+			window.handleIncomingPaths({ zipA, zipB });
+			check(window.findChild<FolderCompareView *>() != nullptr,
+				"support on: two zips open the folder comparison");
+		}
+		// by the signature: the content decides
+		mgr->SaveOption(OPT_ARCHIVE_PROBETYPE, true);
+		printf("by signature: %s\n", qPrintable(detected()));
+		check(detected() == QStringLiteral("a.zip c.tar.gz log.gz data.bin"),
+			"by signature: the contents decide");
+		check(MainWindow::allFolderLike({ zipData, zipB })
+				&& !MainWindow::allFolderLike({ fakeZip, zipB }),
+			"by signature: a zip named .bin is a folder, a .zip text is not");
+
+		// the extraction unwraps a lone inner archive by its signature,
+		// as upstream's ShowDirDoc probes it whatever the options say: a
+		// zip in disguise opens, a text named .zip stays a file
+		mgr->SaveOption(OPT_ARCHIVE_PROBETYPE, false);
+		{
+			const QString outer = dir.filePath(QStringLiteral("outer.zip"));
+			const QString outerFake = dir.filePath(QStringLiteral("outer-fake.zip"));
+			pack(outer, false, "inner.bin", zipBytes);
+			pack(outerFake, false, "inner.zip", "not an archive\n");
+			const QString into = dir.filePath(QStringLiteral("U1"));
+			const QString intoFake = dir.filePath(QStringLiteral("U2"));
+			QDir().mkpath(into);
+			QDir().mkpath(intoFake);
+			QString error;
+			const bool unwrapped = lm::extractArchive(outer, into, &error)
+				&& QDir(into).entryList(QDir::Files) == QStringList{ QStringLiteral("x.txt") };
+			check(unwrapped, "a lone zip named .bin unwraps");
+			const bool kept = lm::extractArchive(outerFake, intoFake, &error)
+				&& QDir(intoFake).entryList(QDir::Files) == QStringList{ QStringLiteral("inner.zip") };
+			check(kept, "a lone text named .zip stays as it is");
+		}
+
+		mgr->SaveOption(OPT_ARCHIVE_ENABLE, true);
+		mgr->SaveOption(OPT_ARCHIVE_PROBETYPE, false);
 		printf("ok: %d\n", ok);
 		return ok ? 0 : 1;
 	}

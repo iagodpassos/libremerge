@@ -52,7 +52,7 @@ public:
 	void openArchiveComparison(const QStringList &sources);
 
 	/** A folder, or an archive standing in for one (the sides a folder
-	    comparison accepts). */
+	    comparison accepts), as Options > Archive Support says. */
 	static bool isFolderLike(const QString &path);
 	/** 2 or 3 folder-like sources: open the folder comparison. */
 	static bool allFolderLike(const QStringList &paths);

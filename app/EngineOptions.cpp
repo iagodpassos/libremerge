@@ -350,6 +350,10 @@ void installEngineOptions()
 	// This Column") run as upstream runs them, when they are
 	options.InitOption(OPT_PLUGINS_ENABLED, true);
 	loadFilters(&options);
+	// WinMerge's Archive Support page: archives open as folders, picked
+	// by their extension
+	options.InitOption(OPT_ARCHIVE_ENABLE, true);
+	options.InitOption(OPT_ARCHIVE_PROBETYPE, false);
 
 	// WinMerge's Editor page: the highlighting, and the parsers it takes
 	options.InitOption(OPT_SYNTAX_HIGHLIGHT, true);
