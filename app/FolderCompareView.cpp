@@ -620,10 +620,16 @@ bool FolderCompareView::eventFilter(QObject *watched, QEvent *event)
 	{
 		// WM_CHAR's VK_RETURN: Enter, alone or with Shift (Ctrl and Alt
 		// make it another character)
-		const auto *key = static_cast<QKeyEvent *>(event);
-		if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)
-			&& !(key->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)))
+		auto *key = static_cast<QKeyEvent *>(event);
+		if (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)
 		{
+			if (key->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))
+			{
+				// kept from the list, which would activate its item with
+				// it, and passed on up the window as before
+				key->ignore();
+				return true;
+			}
 			enterPressed();
 			return true;
 		}
