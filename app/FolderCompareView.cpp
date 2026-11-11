@@ -348,6 +348,7 @@ FolderCompareView::FolderCompareView(QWidget *parent)
 	m_tree->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	m_tree->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(m_tree, &QTreeWidget::itemActivated, this, &FolderCompareView::itemActivated);
+	m_tree->installEventFilter(this);
 	connect(m_tree, &QTreeWidget::itemSelectionChanged, this, &FolderCompareView::updateActions);
 	connect(m_tree, &QTreeWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
 		QMenu menu(this);
@@ -613,6 +614,38 @@ void FolderCompareView::keyPressEvent(QKeyEvent *event)
 	QWidget::keyPressEvent(event);
 }
 
+bool FolderCompareView::eventFilter(QObject *watched, QEvent *event)
+{
+	if (watched == m_tree && event->type() == QEvent::KeyPress)
+	{
+		// WM_CHAR's VK_RETURN: Enter, alone or with Shift (Ctrl and Alt
+		// make it another character)
+		const auto *key = static_cast<QKeyEvent *>(event);
+		if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)
+			&& !(key->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)))
+		{
+			enterPressed();
+			return true;
+		}
+	}
+	return QWidget::eventFilter(watched, event);
+}
+
+void FolderCompareView::enterPressed()
+{
+	QTreeWidgetItem *item = m_tree->currentItem(); // GetFocusedItem
+	if (item == nullptr)
+		return;
+	const bool treeMode = m_recursive && m_actTreeMode->isChecked();
+	if (treeMode && !item->data(0, RoleIsFile).toBool()
+		&& !item->data(0, RoleParentFolder).toBool())
+	{
+		item->setExpanded(!item->isExpanded());
+		return;
+	}
+	itemActivated(item, 0);
+}
+
 void FolderCompareView::updateProgress()
 {
 	if (!m_job)
@@ -821,6 +854,18 @@ void FolderCompareView::activateRowForTest(const QString &name)
 {
 	if (QTreeWidgetItem *row = findRowByName(name))
 		itemActivated(row, 0);
+}
+
+void FolderCompareView::setCurrentRowForTest(const QString &name)
+{
+	if (QTreeWidgetItem *row = findRowByName(name))
+		m_tree->setCurrentItem(row);
+}
+
+bool FolderCompareView::rowExpandedForTest(const QString &name) const
+{
+	QTreeWidgetItem *row = findRowByName(name);
+	return row != nullptr && row->isExpanded();
 }
 
 int FolderCompareView::rowCategoryForTest(const QString &name) const

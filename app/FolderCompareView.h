@@ -63,6 +63,12 @@ public:
 	bool isComparing() const { return m_job != nullptr; }
 	/** Activate a row by file name, like a double click (for tests). */
 	void activateRowForTest(const QString &name);
+	/** The list itself, for keys sent to it, and the row with the
+	    keyboard focus and whether it is expanded, by file name (for
+	    tests). */
+	QTreeWidget *treeForTest() const { return m_tree; }
+	void setCurrentRowForTest(const QString &name);
+	bool rowExpandedForTest(const QString &name) const;
 	/** The category role of a row by file name, -1 if absent (for
 	    tests). */
 	int rowCategoryForTest(const QString &name) const;
@@ -182,6 +188,9 @@ protected:
 	/** Esc stops a running comparison, like CDirView; otherwise it goes
 	    up to the window (Options > Close windows with 'Esc'). */
 	void keyPressEvent(QKeyEvent *event) override;
+	/** Enter in the list goes to enterPressed, on every platform (Qt's
+	    list activates its item with it everywhere but on macOS). */
+	bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
 	void applyTheme();
@@ -192,6 +201,9 @@ private slots:
 	void deleteSelected(const QList<int> &sides);
 
 private:
+	/** CDirView::OnChar: Enter on a folder of the tree expands or
+	    collapses it, on any other item opens the selection. */
+	void enterPressed();
 	void populate(const lm::FolderCompareResult &result);
 	void rebuildRows();
 	void setupColumns();

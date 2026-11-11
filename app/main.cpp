@@ -594,6 +594,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestOpenEnterOpt(QStringLiteral("selftest-open-enter"),
 		QStringLiteral("Press Enter in the selector's path field and verify the comparison opens (for testing)"));
 	parser.addOption(selftestOpenEnterOpt);
+	QCommandLineOption selftestFolderEnterOpt(QStringLiteral("selftest-folder-enter"),
+		QStringLiteral("Press Enter on the folder comparison's items: folders expand and collapse, files open (for testing)"));
+	parser.addOption(selftestFolderEnterOpt);
 	QCommandLineOption selftestArchiveOpt(QStringLiteral("selftest-archive"),
 		QStringLiteral("Build a zip and a tar.gz, extract both and folder-compare them (for testing)"));
 	parser.addOption(selftestArchiveOpt);
@@ -14726,6 +14729,138 @@ int main(int argc, char *argv[])
 		}
 
 		printf("ok: %d\n", ok);
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestFolderEnterOpt))
+	{
+		// CDirView::OnChar: Enter on the item with the keyboard focus, a
+		// folder of the tree expanded or collapsed, anything else opened
+		// (the selection), on macOS too, where Qt's list does not take
+		// Enter for an activation
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).path());
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 30; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto waitFor = [&settle](FolderCompareView &view)
+		{
+			for (int i = 0; i < 300 && view.isComparing(); ++i)
+				settle();
+			settle();
+		};
+		const auto press = [](FolderCompareView &view, Qt::Key key,
+			Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+		{
+			QKeyEvent down(QEvent::KeyPress, key, modifiers);
+			QCoreApplication::sendEvent(view.treeForTest(), &down);
+			QKeyEvent up(QEvent::KeyRelease, key, modifiers);
+			QCoreApplication::sendEvent(view.treeForTest(), &up);
+			QCoreApplication::processEvents();
+		};
+		const QString left = dir.filePath(QStringLiteral("left"));
+		const QString right = dir.filePath(QStringLiteral("right"));
+		write(left + QStringLiteral("/a.txt"), "same\n");
+		write(right + QStringLiteral("/a.txt"), "same\n");
+		write(left + QStringLiteral("/sub/x.txt"), "1\n");
+		write(right + QStringLiteral("/sub/x.txt"), "2\n");
+		const QStringList xPair{ left + QStringLiteral("/sub/x.txt"),
+			right + QStringLiteral("/sub/x.txt") };
+		const QString treeKey = QStringLiteral("FolderCompare/TreeView");
+		QSettings().setValue(treeKey, true);
+		{
+			FolderCompareView view;
+			QList<QStringList> opened;
+			QObject::connect(&view, &FolderCompareView::openFileComparisonRequested,
+				[&opened](const QString &l, const QString &r) { opened.append({ l, r }); });
+			view.start({ left, right });
+			waitFor(view);
+			view.setCurrentRowForTest(QStringLiteral("sub"));
+			const bool expandedAtFirst = view.rowExpandedForTest(QStringLiteral("sub"));
+			press(view, Qt::Key_Return);
+			const bool collapsed = !view.rowExpandedForTest(QStringLiteral("sub"));
+			press(view, Qt::Key_Enter, Qt::KeypadModifier);
+			check(expandedAtFirst && collapsed && view.rowExpandedForTest(QStringLiteral("sub"))
+					&& opened.isEmpty(),
+				"tree: Enter on a folder collapses it, again expands it, nothing opens");
+			view.setCurrentRowForTest(QStringLiteral("x.txt"));
+			press(view, Qt::Key_Return);
+			check(opened.size() == 1 && opened.first() == xPair,
+				"tree: Enter on a file opens its sides");
+			press(view, Qt::Key_Return, Qt::ControlModifier);
+			press(view, Qt::Key_Return, Qt::AltModifier);
+			check(opened.size() == 1, "tree: Ctrl+Enter and Alt+Enter open nothing");
+			press(view, Qt::Key_Return, Qt::ShiftModifier);
+			check(opened.size() == 2 && opened.last() == xPair, "tree: Shift+Enter opens as Enter");
+		}
+		QSettings().setValue(treeKey, false);
+		{
+			FolderCompareView view;
+			QList<QStringList> opened;
+			QObject::connect(&view, &FolderCompareView::openFileComparisonRequested,
+				[&opened](const QString &l, const QString &r) { opened.append({ l, r }); });
+			view.start({ left, right });
+			waitFor(view);
+			view.setCurrentRowForTest(QStringLiteral("x.txt"));
+			press(view, Qt::Key_Return);
+			check(opened.size() == 1 && opened.first() == xPair,
+				"flat list: Enter on a file opens its sides");
+		}
+		QSettings().remove(treeKey);
+		{
+			FolderCompareView view;
+			view.setRecursive(false);
+			view.start({ left, right });
+			waitFor(view);
+			view.setCurrentRowForTest(QStringLiteral("sub"));
+			press(view, Qt::Key_Return);
+			waitFor(view);
+			check(view.roots() == QStringList({ left + QStringLiteral("/sub"),
+					right + QStringLiteral("/sub") }),
+				"without subfolders: Enter on a folder opens it in the same window");
+			view.setCurrentRowForTest(QStringLiteral(".."));
+			press(view, Qt::Key_Return);
+			waitFor(view);
+			check(view.roots() == QStringList({ left, right }),
+				"without subfolders: Enter on \"..\" goes back up");
+		}
+		{
+			// the whole way, from the window's folder tab to a file tab
+			MainWindow window;
+			window.openFolderComparison(QStringList{ left, right });
+			auto *folder = window.findChild<FolderCompareView *>();
+			if (folder == nullptr)
+				return 2;
+			waitFor(*folder);
+			folder->setCurrentRowForTest(QStringLiteral("x.txt"));
+			press(*folder, Qt::Key_Return);
+			settle();
+			bool fileTab = false;
+			for (FileCompareView *view : window.findChildren<FileCompareView *>())
+				if (view->paths().value(0) == xPair.at(0) && view->paths().value(1) == xPair.at(1))
+					fileTab = true;
+			check(fileTab, "the window: Enter in the folder tab opens the file comparison");
+		}
 		return ok ? 0 : 1;
 	}
 
