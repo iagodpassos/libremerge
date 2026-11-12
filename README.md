@@ -4,7 +4,7 @@
 
 LibreMerge reuses the battle-tested comparison engine of [WinMerge](https://winmerge.org/) — GNU diffutils + git xdiff, folder scanning, file filters, moved-block detection, Unicode handling — and rebuilds the user interface natively with Qt 6, since the original UI is written in MFC and cannot leave Windows. If you know WinMerge, you already know LibreMerge: the layout, the colors and the workflow are intentionally the same.
 
-📦 [Releases](https://github.com/iagodpassos/libremerge/releases) · ☕ [Buy me a coffee](https://buymeacoffee.com/iagodpassos)
+📦 [Releases](https://github.com/iagodpassos/libremerge/releases) · ☕ [Buy me a coffee](https://buymeacoffee.com/iagodpassos) · 🪙 [Donate in crypto](#support)
 
 ![File comparison](docs/screenshots/file-compare-light.png)
 
@@ -143,6 +143,28 @@ Not yet: `-or`, auto-merge (`-al`, `-am`, `-ar`) and plugins; LibreMerge says so
 ## Support
 
 If LibreMerge saves you time, you can [buy me a coffee](https://buymeacoffee.com/iagodpassos). ☕
+
+You can also donate in crypto:
+
+**Bitcoin (BTC)**
+```
+bc1q6zqluhqta4lud8vmzepdfxyp87ags3yf6htfau
+```
+
+**Solana (SOL)**
+```
+FR2ncB2yHZQ1pB6KmwjWu7hsuM2hNY2xqCQC8GQjUAuP
+```
+
+**Ethereum (ETH)**
+```
+0xF82f53D4D38471b44A00D1e55e61325A1b268D48
+```
+
+**Monero (XMR)**
+```
+47JW4qR9z8RCSLBLqYiRN6hDg4QwZs1ad9XdzsziVWXD4fKyeUhCw6xdSQZ9Tp41dPbcfGGoCNuH2FaUyPGVsVJNQVBHDAb
+```
 
 ## AI-assisted development
 
