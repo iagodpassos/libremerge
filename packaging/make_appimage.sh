@@ -26,7 +26,7 @@ if [ ! -x "$QMAKE" ]; then
   echo "ERROR: no Qt at $QT_PREFIX (see packaging/linux/build_qt.sh)" >&2
   exit 1
 fi
-export VERSION="1.3.0"
+export VERSION="1.4.0"
 
 mkdir -p "$WORK"
 cd "$WORK"
