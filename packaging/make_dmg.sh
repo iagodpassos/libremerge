@@ -43,7 +43,18 @@ cmake --build "$BUILD" --target LibreMerge
 APP="$BUILD/app/LibreMerge.app"
 
 echo "==> Bundling frameworks (macdeployqt)"
-"$QT_BIN/macdeployqt" "$APP" -always-overwrite
+# the SVG and PDF image plugins: macdeployqt leaves them out unless the
+# application links QtSvg and QtPdf, which it does not (the images read
+# through the plugins). In place first, then deployed with what they need
+QT_PLUGINS="$("$QT_BIN/qmake" -query QT_INSTALL_PLUGINS 2> /dev/null || true)"
+[ -n "$QT_PLUGINS" ] || QT_PLUGINS="$(dirname "$QT_BIN")/plugins"
+mkdir -p "$APP/Contents/PlugIns/imageformats"
+extra=()
+for plugin in libqsvg.dylib libqpdf.dylib; do
+  cp -f "$QT_PLUGINS/imageformats/$plugin" "$APP/Contents/PlugIns/imageformats/"
+  extra+=("-executable=$APP/Contents/PlugIns/imageformats/$plugin")
+done
+"$QT_BIN/macdeployqt" "$APP" -always-overwrite "${extra[@]}"
 
 echo "==> Slimming the bundle (unused Qt modules)"
 FRAMEWORKS="$APP/Contents/Frameworks"
@@ -51,19 +62,27 @@ PLUGINS="$APP/Contents/PlugIns"
 # modules LibreMerge does not use, pulled in transitively via plugins
 for fw in QtVirtualKeyboard QtVirtualKeyboardQml QtVirtualKeyboardSettings \
           QtQml QtQmlMeta QtQmlModels QtQmlWorkerScript QtQuick \
-          QtPdf QtOpenGL QtNetwork; do
+          QtOpenGL; do
   rm -rf "$FRAMEWORKS/$fw.framework"
 done
 rm -rf "$PLUGINS/virtualkeyboard" "$PLUGINS/qmltooling" \
   "$PLUGINS/platforminputcontexts" "$PLUGINS/networkinformation" \
-  "$PLUGINS/tls" "$PLUGINS/imageformats/libqpdf.dylib" \
-  "$PLUGINS/iconengines/libqsvgicon.dylib"
+  "$PLUGINS/tls" "$PLUGINS/iconengines/libqsvgicon.dylib"
 rmdir "$PLUGINS/iconengines" 2> /dev/null || true
-# QtSvg and its image plugin stay: the image comparison opens .svg files
-if [ ! -f "$PLUGINS/imageformats/libqsvg.dylib" ] || [ ! -d "$FRAMEWORKS/QtSvg.framework" ]; then
-  echo "    ERROR: the SVG image plugin or QtSvg is missing from the bundle" >&2
-  exit 1
-fi
+# QtSvg and QtPdf (with the QtNetwork it links) and their image plugins
+# stay: the image comparison opens .svg and .pdf files
+for need in imageformats/libqsvg.dylib imageformats/libqpdf.dylib; do
+  if [ ! -f "$PLUGINS/$need" ]; then
+    echo "    ERROR: $need is missing from the bundle" >&2
+    exit 1
+  fi
+done
+for fw in QtSvg QtPdf QtNetwork; do
+  if [ ! -d "$FRAMEWORKS/$fw.framework" ]; then
+    echo "    ERROR: $fw.framework is missing from the bundle" >&2
+    exit 1
+  fi
+done
 
 # fail loudly if a remaining binary still wants a removed framework
 while read -r binary; do

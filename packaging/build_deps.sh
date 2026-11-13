@@ -163,15 +163,23 @@ fi
 
 # --- Qt (official universal binaries) ----------------------------------------
 # qtbase with its tools (macdeployqt) and Qt's own translations come with
-# the default archives; qtimageformats adds TIFF, WebP and the rest the
-# image comparison opens. aqt is installed with pipx (pipx install
+# the default archives (QtSvg with them, which reads SVG images);
+# qtimageformats adds TIFF, WebP and the rest the image comparison opens,
+# qtpdf the PDF image plugin. aqt is installed with pipx (pipx install
 # aqtinstall).
 if [ ! -x "$DEPS/qt/$QT_VER/macos/bin/macdeployqt" ]; then
   echo "==> Qt $QT_VER"
   # (from deps/: aqt leaves its own log in the current folder)
   (cd "$DEPS" && "${AQT:-aqt}" install-qt mac desktop "$QT_VER" clang_64 \
-    -m qtimageformats -O "$DEPS/qt" > "$DEPS/aqt-qt.log" 2>&1)
+    -m qtimageformats qtpdf -O "$DEPS/qt" > "$DEPS/aqt-qt.log" 2>&1)
   echo "    Qt ok: $(lipo -archs "$DEPS/qt/$QT_VER/macos/lib/QtCore.framework/QtCore")"
+fi
+# a Qt installed before PDF came in takes the module alone
+if [ ! -d "$DEPS/qt/$QT_VER/macos/lib/QtPdf.framework" ]; then
+  echo "==> Qt PDF $QT_VER"
+  (cd "$DEPS" && "${AQT:-aqt}" install-qt mac desktop "$QT_VER" clang_64 \
+    -m qtpdf --noarchives -O "$DEPS/qt" > "$DEPS/aqt-qtpdf.log" 2>&1)
+  echo "    Qt PDF ok: $(lipo -archs "$DEPS/qt/$QT_VER/macos/lib/QtPdf.framework/QtPdf")"
 fi
 
 echo "==> deps prontos em $DEPS"
