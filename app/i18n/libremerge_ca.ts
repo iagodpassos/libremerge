@@ -1946,6 +1946,10 @@ Potser el fitxer és només de lectura?</translation>
         <translation>El &amp;segon element de l&apos;esquerra amb el primer element de la dreta</translation>
     </message>
     <message>
+        <source>&amp;Hide Items</source>
+        <translation>&amp;Amaga els elements</translation>
+    </message>
+    <message>
         <source>Copy %1 to %2</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Copia de %1 a %2</translation>
@@ -3750,6 +3754,11 @@ Potser el fitxer és només de lectura?</translation>
     <message>
         <source>Show Rig&amp;ht Only Missing Items</source>
         <translation>Mostra només els elements que falten a la dre&amp;ta</translation>
+    </message>
+    <message>
+        <source>Show Hidd&amp;en Items</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Show Hidd&amp;en Items&quot;.</translatorcomment>
+        <translation>Mostra els elements amaga&amp;ts</translation>
     </message>
     <message>
         <source>Zoom &amp;In</source>

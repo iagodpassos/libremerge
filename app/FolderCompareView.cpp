@@ -781,6 +781,15 @@ void FolderCompareView::buildContextMenu(QMenu *menu)
 	}
 	menu->addSeparator();
 
+	// upstream's "Hide Items", after Delete and Rename, for any selection
+	// (OnUpdateHideFilenames)
+	const auto addHideItems = [this, menu]() {
+		QAction *hide = menu->addAction(tr("&Hide Items"));
+		hide->setObjectName(QStringLiteral("hideItems"));
+		hide->setEnabled(!m_tree->selectedItems().isEmpty());
+		connect(hide, &QAction::triggered, this, [this]() { hideSelectedItems(); });
+	};
+
 	if (m_sides == 2)
 	{
 		menu->addAction(m_actCopyRight);
@@ -789,6 +798,7 @@ void FolderCompareView::buildContextMenu(QMenu *menu)
 		menu->addAction(m_actDeleteLeft);
 		menu->addAction(m_actDeleteRight);
 		menu->addAction(m_actDeleteBoth);
+		addHideItems();
 		return;
 	}
 
@@ -832,6 +842,7 @@ void FolderCompareView::buildContextMenu(QMenu *menu)
 	deleteAll->setEnabled(!busy && anyAllSides);
 	connect(deleteAll, &QAction::triggered, this,
 		[this]() { deleteSelected({ 0, 1, 2 }); });
+	addHideItems();
 }
 
 void FolderCompareView::copyRowForTest(const QString &name, int sourceSide,
@@ -1013,6 +1024,10 @@ bool FolderCompareView::rowShowable(QTreeWidgetItem *row, bool treeMode,
 	using Item = lm::FolderCompareItem;
 	if (row->data(0, RoleParentFolder).toBool())
 		return true;
+	// a hidden item stays out before anything else is asked, and what is
+	// in a hidden folder with it (ViewCustomFlags::HIDDEN)
+	if (!m_hiddenSet.isEmpty() && m_hiddenSet.contains(rowRelativePath(row)))
+		return false;
 	const QVariant categoryData = row->data(0, RoleCategory);
 	if (!categoryData.isValid())
 		return insideShown; // folder node synthesized for the tree
@@ -1067,6 +1082,56 @@ bool FolderCompareView::rowShowable(QTreeWidgetItem *row, bool treeMode,
 	if (isDir)
 		return (shown && passesDisplayFilter()) || insideShown;
 	return shown && passesDisplayFilter();
+}
+
+QString FolderCompareView::rowRelativePath(const QTreeWidgetItem *row)
+{
+	const QString folder = row->data(0, RoleFolder).toString();
+	const QString name = row->data(0, RoleName).toString();
+	return folder.isEmpty() ? name : folder + QLatin1Char('/') + name;
+}
+
+void FolderCompareView::hideSelectedItems()
+{
+	// from the last selected item to the first (SelRevBegin), folders the
+	// tree made up included: each is an item of upstream's list
+	QList<QTreeWidgetItem *> rows;
+	for (QTreeWidgetItemIterator it(m_tree, QTreeWidgetItemIterator::Selected);
+		*it != nullptr; ++it)
+		if (!(*it)->data(0, RoleParentFolder).toBool())
+			rows.prepend(*it);
+	for (QTreeWidgetItem *row : rows)
+	{
+		const QString path = rowRelativePath(row);
+		if (m_hiddenSet.contains(path))
+			continue;
+		m_hiddenItems.append(path);
+		m_hiddenSet.insert(path);
+	}
+	if (!rows.isEmpty())
+		applyShowFilters();
+}
+
+void FolderCompareView::showHiddenItems()
+{
+	m_hiddenItems.clear();
+	m_hiddenSet.clear();
+	applyShowFilters();
+}
+
+void FolderCompareView::setHiddenItems(const QStringList &items)
+{
+	m_hiddenItems.clear();
+	m_hiddenSet.clear();
+	for (const QString &item : items)
+	{
+		if (m_hiddenSet.contains(item))
+			continue;
+		m_hiddenItems.append(item);
+		m_hiddenSet.insert(item);
+	}
+	if (m_tree->topLevelItemCount() > 0)
+		applyShowFilters();
 }
 
 const lm::FolderCompareItem *FolderCompareView::resultItem(
@@ -1697,6 +1762,10 @@ void FolderCompareView::compareInPlace(const QStringList &dirs)
 {
 	if (m_job)
 		return; // still comparing
+	// other folders are another comparison, with its own context and no
+	// hidden items yet (CDirDoc::InitCompare); a recompare keeps them
+	m_hiddenItems.clear();
+	m_hiddenSet.clear();
 	start(dirs);
 	emit rootsChanged();
 }

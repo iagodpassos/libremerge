@@ -1760,6 +1760,10 @@ El archivo puede ser de solo lectura.</translation>
         <translation>&amp;Segundo elemento izquierdo con primer elemento derecho</translation>
     </message>
     <message>
+        <source>&amp;Hide Items</source>
+        <translation>Ocultar ele&amp;mentos</translation>
+    </message>
+    <message>
         <source>Copy %1 to %2</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Copiar del %1 al %2</translation>
@@ -3478,6 +3482,11 @@ El archivo puede ser de solo lectura.</translation>
     <message>
         <source>Show Rig&amp;ht Only Missing Items</source>
         <translation>Mostrar solo elementos que faltan en el derec&amp;ho</translation>
+    </message>
+    <message>
+        <source>Show Hidd&amp;en Items</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Show Hidd&amp;en Items&quot;.</translatorcomment>
+        <translation>Mostrar elementos o&amp;cultos</translation>
     </message>
     <message>
         <source>Zoom &amp;In</source>

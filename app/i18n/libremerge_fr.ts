@@ -1756,6 +1756,10 @@ Le fichier est peut-être en lecture seule.</translation>
         <translation>&amp;Deuxième élément Gauche avec premier élément Droite</translation>
     </message>
     <message>
+        <source>&amp;Hide Items</source>
+        <translation>&amp;Masquer les éléments</translation>
+    </message>
+    <message>
         <source>Copy %1 to %2</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Copier de %1 vers %2</translation>
@@ -3485,6 +3489,11 @@ Le fichier est peut-être en lecture seule.</translation>
         <source>Show Rig&amp;ht Only Missing Items</source>
         <translatorcomment>After WinMerge&apos;s &quot;Show Rig&amp;ht Only Missing Items&quot;.</translatorcomment>
         <translation>Afficher les éléments manquants, [Dr&amp;oite] uniquement</translation>
+    </message>
+    <message>
+        <source>Show Hidd&amp;en Items</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Show Hidd&amp;en Items&quot;.</translatorcomment>
+        <translation>Afficher les éléments &amp;cachés</translation>
     </message>
     <message>
         <source>Zoom &amp;In</source>

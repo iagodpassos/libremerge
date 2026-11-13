@@ -76,6 +76,7 @@ run_one selftest-eol
 run_one selftest-command-line
 run_one selftest-subfolders
 run_one selftest-folder-enter
+run_one selftest-folder-hide-items
 run_one selftest-codepage
 run_one selftest-folder-selection
 run_one selftest-hex

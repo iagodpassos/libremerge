@@ -5,6 +5,8 @@
 #include <vector>
 #include <QFutureWatcher>
 #include <QHash>
+#include <QSet>
+#include <QStringList>
 #include <QTemporaryDir>
 #include <QWidget>
 #include "FolderCompareDriver.h"
@@ -109,6 +111,21 @@ public:
 	/** Whether a row, by file name, is listed (for tests). */
 	bool rowShownForTest(const QString &name) const;
 	int hiddenRowsForTest() const { return m_hiddenRows; }
+
+	// --- WinMerge's hidden items (CDiffContext::m_vCurrentlyHiddenItems):
+	// items the user took out of the list, kept out across recompares ---
+
+	/** CDirView::OnHideFilenames: the selected items leave the list, and
+	    their paths join the hidden ones. */
+	void hideSelectedItems();
+	/** CDirView::OnViewShowHiddenItems: every hidden item shows again. */
+	void showHiddenItems();
+	/** The hidden items, each by its path inside the compared folders
+	    (DIFFITEM::getItemRelativePath), in the order they were hidden. */
+	QStringList hiddenItems() const { return m_hiddenItems; }
+	/** CDirDoc::SetHiddenItems: the items to keep out of the list, as a
+	    project file lists them; set before the comparison starts. */
+	void setHiddenItems(const QStringList &items);
 	/** Copy one row between sides without the confirmation (for
 	    tests). */
 	/** What a selection of items compares (DirActions' SELECTIONTYPE): by
@@ -257,6 +274,9 @@ private:
 	void applyShowFilters();
 	bool rowShowable(QTreeWidgetItem *row, bool treeMode,
 		bool insideShown) const;
+	/** A row's path inside the compared folders, as the hidden items
+	    name it. */
+	static QString rowRelativePath(const QTreeWidgetItem *row);
 	const lm::FolderCompareItem *resultItem(const QTreeWidgetItem *row) const;
 	lm::FolderCompareItem *resultItem(const QTreeWidgetItem *row);
 	void ensureFilterBar();
@@ -272,6 +292,8 @@ private:
 	int m_rowsRemoved = 0; // rows dropped since the scan (delete ops)
 	bool m_show[ShowFilterCount] = {};
 	int m_hiddenRows = 0; // result items the View filters leave out
+	QStringList m_hiddenItems; // hidden by the user, in the order hidden
+	QSet<QString> m_hiddenSet; // the same, to look them up
 	std::vector<std::unique_ptr<QTemporaryDir>> m_tempDirs;
 	lm::FolderCompareResult m_result;
 	lm::FolderDisplayFilter m_displayFilter;

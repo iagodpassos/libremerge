@@ -631,6 +631,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolderEnterOpt(QStringLiteral("selftest-folder-enter"),
 		QStringLiteral("Press Enter on the folder comparison's items: folders expand and collapse, files open (for testing)"));
 	parser.addOption(selftestFolderEnterOpt);
+	QCommandLineOption selftestFolderHideItemsOpt(QStringLiteral("selftest-folder-hide-items"),
+		QStringLiteral("Hide items of a folder comparison, recompare, show them again (for testing)"));
+	parser.addOption(selftestFolderHideItemsOpt);
 	QCommandLineOption selftestArchiveOpt(QStringLiteral("selftest-archive"),
 		QStringLiteral("Build a zip and a tar.gz, extract both and folder-compare them (for testing)"));
 	parser.addOption(selftestArchiveOpt);
@@ -14847,6 +14850,175 @@ int main(int argc, char *argv[])
 				if (view->paths().value(0) == xPair.at(0) && view->paths().value(1) == xPair.at(1))
 					fileTab = true;
 			check(fileTab, "the window: Enter in the folder tab opens the file comparison");
+		}
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestFolderHideItemsOpt))
+	{
+		// WinMerge's Hide Items (CDirView::OnHideFilenames) and View > Show
+		// Hidden Items: the list of hidden paths of a comparison
+		// (CDiffContext::m_vCurrentlyHiddenItems), kept across recompares
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).path());
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 30; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto waitFor = [&settle](FolderCompareView &view)
+		{
+			for (int i = 0; i < 300 && view.isComparing(); ++i)
+				settle();
+			settle();
+		};
+		const auto menuAction = [](FolderCompareView &view, const QString &name) -> QAction * {
+			auto *menu = new QMenu(&view);
+			view.buildContextMenuForTest(menu);
+			return menu->findChild<QAction *>(name);
+		};
+		const QString left = dir.filePath(QStringLiteral("left"));
+		const QString middle = dir.filePath(QStringLiteral("middle"));
+		const QString right = dir.filePath(QStringLiteral("right"));
+		for (const QString &side : { left, middle, right })
+		{
+			write(side + QStringLiteral("/a.txt"), "same\n");
+			write(side + QStringLiteral("/b.txt"), side == right ? "2\n" : "1\n");
+			write(side + QStringLiteral("/sub/x.txt"), side == right ? "2\n" : "1\n");
+			write(side + QStringLiteral("/sub/y.txt"), "same\n");
+		}
+		const QString treeKey = QStringLiteral("FolderCompare/TreeView");
+		QSettings().setValue(treeKey, true);
+		{
+			FolderCompareView view;
+			view.start({ left, right });
+			waitFor(view);
+			view.selectRowsForTest({});
+			QAction *hide = menuAction(view, QStringLiteral("hideItems"));
+			check(hide != nullptr && !hide->isEnabled(),
+				"the context menu has Hide Items, off without a selection");
+			view.selectRowsForTest({ QStringLiteral("b.txt") });
+			hide = menuAction(view, QStringLiteral("hideItems"));
+			check(hide != nullptr && hide->isEnabled(), "a selection turns Hide Items on");
+			if (hide != nullptr)
+				hide->trigger();
+			check(!view.rowShownForTest(QStringLiteral("b.txt"))
+					&& view.rowShownForTest(QStringLiteral("a.txt"))
+					&& view.hiddenItems() == QStringList{ QStringLiteral("b.txt") },
+				"Hide Items takes the item out of the list and keeps its path");
+			view.selectRowsForTest({ QStringLiteral("sub") });
+			view.hideSelectedItems();
+			check(!view.rowShownForTest(QStringLiteral("sub"))
+					&& !view.rowShownForTest(QStringLiteral("x.txt"))
+					&& !view.rowShownForTest(QStringLiteral("y.txt"))
+					&& view.hiddenItems() == QStringList({ QStringLiteral("b.txt"), QStringLiteral("sub") }),
+				"a hidden folder takes what is in it along");
+			view.recompare();
+			waitFor(view);
+			check(!view.rowShownForTest(QStringLiteral("b.txt"))
+					&& !view.rowShownForTest(QStringLiteral("x.txt"))
+					&& view.rowShownForTest(QStringLiteral("a.txt"))
+					&& view.hiddenItems().size() == 2,
+				"a recompare keeps the items hidden");
+			view.showHiddenItems();
+			check(view.rowShownForTest(QStringLiteral("b.txt"))
+					&& view.rowShownForTest(QStringLiteral("x.txt"))
+					&& view.hiddenItems().isEmpty(),
+				"Show Hidden Items brings every item back");
+		}
+		{
+			FolderCompareView view;
+			view.setHiddenItems({ QStringLiteral("sub/x.txt") });
+			view.start({ left, right });
+			waitFor(view);
+			check(!view.rowShownForTest(QStringLiteral("x.txt"))
+					&& view.rowShownForTest(QStringLiteral("y.txt")),
+				"items set before the comparison stay out of its list (SetHiddenItems)");
+		}
+		QSettings().setValue(treeKey, false);
+		{
+			FolderCompareView view;
+			view.start({ left, right });
+			waitFor(view);
+			view.selectRowsForTest({ QStringLiteral("x.txt"), QStringLiteral("b.txt") });
+			view.hideSelectedItems();
+			check(!view.rowShownForTest(QStringLiteral("x.txt"))
+					&& !view.rowShownForTest(QStringLiteral("b.txt"))
+					&& view.rowShownForTest(QStringLiteral("y.txt"))
+					&& view.hiddenItems() == QStringList({ QStringLiteral("sub/x.txt"), QStringLiteral("b.txt") }),
+				"flat list: the last selected item is hidden first, by its path");
+		}
+		{
+			FolderCompareView view;
+			view.start({ left, middle, right });
+			waitFor(view);
+			view.selectRowsForTest({ QStringLiteral("b.txt") });
+			QAction *hide = menuAction(view, QStringLiteral("hideItems"));
+			if (hide != nullptr)
+				hide->trigger();
+			check(hide != nullptr && !view.rowShownForTest(QStringLiteral("b.txt")),
+				"3-way: Hide Items is in the menu too");
+		}
+		QSettings().remove(treeKey);
+		{
+			FolderCompareView view;
+			view.setRecursive(false);
+			view.start({ left, right });
+			waitFor(view);
+			view.selectRowsForTest({ QStringLiteral("a.txt") });
+			view.hideSelectedItems();
+			view.setCurrentRowForTest(QStringLiteral("sub"));
+			QKeyEvent down(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+			QCoreApplication::sendEvent(view.treeForTest(), &down);
+			waitFor(view);
+			check(view.roots().value(0) == left + QStringLiteral("/sub")
+					&& view.hiddenItems().isEmpty(),
+				"other folders in the same window start with nothing hidden");
+		}
+		{
+			// View > Show Hidden Items, there while the comparison in front
+			// hides something
+			MainWindow window;
+			window.openFolderComparison(QStringList{ left, right });
+			auto *folder = window.findChild<FolderCompareView *>();
+			auto *action = window.findChild<QAction *>(QStringLiteral("showHiddenItemsAction"));
+			if (folder == nullptr || action == nullptr)
+				return 2;
+			waitFor(*folder);
+			QMenu *viewMenu = nullptr;
+			for (QObject *object : action->associatedObjects())
+				if (auto *menu = qobject_cast<QMenu *>(object))
+					viewMenu = menu;
+			if (viewMenu == nullptr)
+				return 2;
+			emit viewMenu->aboutToShow();
+			const bool offAtFirst = !action->isEnabled();
+			folder->selectRowsForTest({ QStringLiteral("a.txt") });
+			folder->hideSelectedItems();
+			emit viewMenu->aboutToShow();
+			const bool onWhenHidden = action->isEnabled();
+			action->trigger();
+			check(offAtFirst && onWhenHidden && folder->hiddenItems().isEmpty()
+					&& folder->rowShownForTest(QStringLiteral("a.txt")),
+				"the window: View > Show Hidden Items follows the hidden items and shows them");
 		}
 		return ok ? 0 : 1;
 	}

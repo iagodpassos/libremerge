@@ -526,13 +526,23 @@ MainWindow::MainWindow(QWidget *parent)
 		tr("Show Mi&ddle Only Missing Items"));
 	addShowAction(threeWayMenu, FolderCompareView::ShowMissingRightOnly,
 		tr("Show Rig&ht Only Missing Items"));
+	viewMenu->addSeparator();
+	// CDirView::OnViewShowHiddenItems, there while items are hidden
+	QAction *showHiddenAction = viewMenu->addAction(tr("Show Hidd&en Items"));
+	showHiddenAction->setObjectName(QStringLiteral("showHiddenItemsAction"));
+	connect(showHiddenAction, &QAction::triggered, this, [folderView]() {
+		if (auto *folder = folderView())
+			folder->showHiddenItems();
+	});
 	// the checks follow the active folder comparison; the middle and
 	// 3-way items need three folders (OnUpdateOptionsShow*)
 	connect(viewMenu, &QMenu::aboutToShow, this,
-		[folderView, showActions, threeWayMenu]() {
+		[folderView, showActions, threeWayMenu, showHiddenAction]() {
 			FolderCompareView *folder = folderView();
 			const bool threeWay = folder != nullptr && folder->sideCount() == 3;
 			threeWayMenu->setEnabled(threeWay);
+			showHiddenAction->setEnabled(folder != nullptr
+				&& !folder->hiddenItems().isEmpty());
 			for (QAction *action : showActions)
 			{
 				const auto filter = static_cast<FolderCompareView::ShowFilter>(

@@ -1622,6 +1622,10 @@ O arquivo pode ser somente leitura.</translation>
         <translation>&amp;Segundo à Esquerda com o Primeiro à Direita</translation>
     </message>
     <message>
+        <source>&amp;Hide Items</source>
+        <translation>&amp;Ocultar Itens</translation>
+    </message>
+    <message>
         <source>Copy %1 to %2</source>
         <translation>Copiar %1 para %2</translation>
     </message>
@@ -3150,6 +3154,11 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>Show Rig&amp;ht Only Missing Items</source>
         <translation>Mostrar Só Itens &amp;Ausentes à Direita</translation>
+    </message>
+    <message>
+        <source>Show Hidd&amp;en Items</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Show Hidd&amp;en Items&quot;.</translatorcomment>
+        <translation>Mostrar Itens Oc&amp;ultados</translation>
     </message>
     <message>
         <source>Zoom &amp;In</source>

@@ -1756,6 +1756,10 @@ Patches sind nicht betroffen.</translation>
         <translation>Zweites Objekt links mit erstem Objekt rechts</translation>
     </message>
     <message>
+        <source>&amp;Hide Items</source>
+        <translation>Objekte v&amp;erstecken</translation>
+    </message>
+    <message>
         <source>Copy %1 to %2</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Kopieren: %1 nach %2</translation>
@@ -3458,6 +3462,10 @@ Patches sind nicht betroffen.</translation>
     <message>
         <source>Show Rig&amp;ht Only Missing Items</source>
         <translation>Fe&amp;hlende Objekte rechts anzeigen</translation>
+    </message>
+    <message>
+        <source>Show Hidd&amp;en Items</source>
+        <translation>Verstec&amp;kte Objekte anzeigen</translation>
     </message>
     <message>
         <source>Zoom &amp;In</source>
