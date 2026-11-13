@@ -3364,19 +3364,15 @@ int main(int argc, char *argv[])
 			// the dialog is modal: tick the box and press a button from
 			// inside its event loop
 			const auto answerDialog = [&window](bool tick, QDialogButtonBox::StandardButton button) {
-				QTimer::singleShot(0, &window, [&window, tick, button]() {
-					auto *dialog = window.findChild<OptionsDialog *>();
-					auto *buttons = dialog != nullptr
-						? dialog->findChild<QDialogButtonBox *>() : nullptr;
-					if (buttons == nullptr)
-					{
-						printf("no Options dialog to answer\n");
-						std::exit(3);
-					}
+				answerDialogForTest(&window, [&window]() -> QWidget * {
+					return window.findChild<OptionsDialog *>();
+				}, [tick, button](QWidget *found) {
+					auto *dialog = static_cast<OptionsDialog *>(found);
+					auto *buttons = dialog->findChild<QDialogButtonBox *>();
 					dialog->pageForTest(OptionsDialog::ComparePage)->findChild<QCheckBox *>(
 						QStringLiteral("filterComments"))->setChecked(tick);
 					buttons->button(button)->click();
-				});
+				}, "Options dialog");
 				QMetaObject::invokeMethod(&window, "showOptions");
 			};
 
@@ -3863,19 +3859,15 @@ int main(int argc, char *argv[])
 		const auto withDialog = [&window](const Edit &edit,
 			QDialogButtonBox::StandardButton pressed)
 		{
-			QTimer::singleShot(0, &window, [&window, edit, pressed]() {
-				auto *dialog = window.findChild<FiltersDialog *>();
-				auto *buttons = dialog != nullptr
-					? dialog->findChild<QDialogButtonBox *>() : nullptr;
-				if (buttons == nullptr)
-				{
-					printf("no Filters dialog to answer\n");
-					std::exit(3);
-				}
+			answerDialogForTest(&window, [&window]() -> QWidget * {
+				return window.findChild<FiltersDialog *>();
+			}, [edit, pressed](QWidget *found) {
+				auto *dialog = static_cast<FiltersDialog *>(found);
+				auto *buttons = dialog->findChild<QDialogButtonBox *>();
 				if (edit)
 					edit(dialog);
 				buttons->button(pressed)->click();
-			});
+			}, "Filters dialog");
 			QMetaObject::invokeMethod(&window, "showFilters");
 		};
 		const auto lineList = [](FiltersDialog *dialog) {
@@ -4832,20 +4824,17 @@ int main(int argc, char *argv[])
 		chosen.clear();
 		const auto asking = [&host](std::function<void(FilterConditionDialog *)> body, bool accept)
 		{
-			QTimer::singleShot(0, &host, [&host, body, accept]() {
-				auto *dialog = host.findChild<FilterConditionDialog *>();
-				if (dialog == nullptr)
-				{
-					printf("no Filter Condition dialog\n");
-					std::exit(3);
-				}
+			answerDialogForTest(&host, [&host]() -> QWidget * {
+				return host.findChild<FilterConditionDialog *>();
+			}, [body, accept](QWidget *found) {
+				auto *dialog = static_cast<FilterConditionDialog *>(found);
 				if (body)
 					body(dialog);
 				if (accept)
 					dialog->accept();
 				else
 					dialog->reject();
-			});
+			}, "Filter Condition dialog");
 		};
 		const auto part = [](FilterConditionDialog *dialog, const char *name) {
 			return dialog->findChild<QWidget *>(QLatin1String(name));
@@ -5534,17 +5523,13 @@ int main(int argc, char *argv[])
 			// answer the Filter Condition dialog an item opens
 			const auto answer = [&view](const QString &value)
 			{
-				QTimer::singleShot(0, &view, [&view, value]() {
-					auto *dialog = view.findChild<FilterConditionDialog *>();
-					if (dialog == nullptr)
-					{
-						printf("no Filter Condition dialog to answer\n");
-						std::exit(3);
-					}
+				answerDialogForTest(&view, [&view]() -> QWidget * {
+					return view.findChild<FilterConditionDialog *>();
+				}, [value](QWidget *dialog) {
 					dialog->findChild<QComboBox *>(QStringLiteral("conditionValue1"))
 						->setEditText(value);
 					dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
-				});
+				}, "Filter Condition dialog");
 			};
 
 			// Name: one item that asks; the bar comes up with the filter,
@@ -5593,13 +5578,9 @@ int main(int argc, char *argv[])
 				if (!view.buildHeaderMenu(&popup, 2) || popup.actions().isEmpty())
 					return QStringLiteral("(no menu)");
 				QString state;
-				QTimer::singleShot(0, &view, [&]() {
-					auto *dialog = view.findChild<ComparisonResultFilterDialog *>();
-					if (dialog == nullptr)
-					{
-						printf("no Filter by Comparison Result dialog to answer\n");
-						std::exit(3);
-					}
+				answerDialogForTest(&view, [&view]() -> QWidget * {
+					return view.findChild<ComparisonResultFilterDialog *>();
+				}, [&](QWidget *dialog) {
 					QStringList visible;
 					for (const QCheckBox *box : dialog->findChildren<QCheckBox *>())
 						if (box->isVisibleTo(dialog))
@@ -5620,7 +5601,7 @@ int main(int argc, char *argv[])
 						dialog->findChild<QCheckBox *>(box)->setChecked(true);
 					shoot(dialog, "result-2way");
 					okButton->click();
-				});
+				}, "Filter by Comparison Result dialog");
 				popup.actions().constLast()->trigger();
 				settle();
 				return state;
@@ -5830,20 +5811,16 @@ int main(int argc, char *argv[])
 				QMenu popup;
 				if (!view.buildHeaderMenu(&popup, 2) || popup.actions().isEmpty())
 					return QStringList{ QStringLiteral("(no menu)") };
-				QTimer::singleShot(0, &view, [&view, &boxesShown, &shoot, box]() {
-					auto *dialog = view.findChild<ComparisonResultFilterDialog *>();
-					if (dialog == nullptr)
-					{
-						printf("no Filter by Comparison Result dialog to answer\n");
-						std::exit(3);
-					}
+				answerDialogForTest(&view, [&view]() -> QWidget * {
+					return view.findChild<ComparisonResultFilterDialog *>();
+				}, [&boxesShown, &shoot, box](QWidget *dialog) {
 					boxesShown = 0;
 					for (const QCheckBox *candidate : dialog->findChildren<QCheckBox *>())
 						boxesShown += candidate->isVisibleTo(dialog) ? 1 : 0;
 					dialog->findChild<QCheckBox *>(QLatin1String(box))->setChecked(true);
 					shoot(dialog, "result-3way");
 					dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
-				});
+				}, "Filter by Comparison Result dialog");
 				popup.actions().constLast()->trigger();
 				settle();
 				return shownOf(view, names);
@@ -6890,20 +6867,16 @@ int main(int argc, char *argv[])
 			// --- the items that ask: the Filter Condition dialog ---
 			const auto answer = [&host](const QString &value, QString *lhs = nullptr)
 			{
-				QTimer::singleShot(0, &host, [&host, value, lhs]() {
-					auto *dialog = host.findChild<FilterConditionDialog *>();
-					if (dialog == nullptr)
-					{
-						printf("no Filter Condition dialog to answer\n");
-						std::exit(3);
-					}
+				answerDialogForTest(&host, [&host]() -> QWidget * {
+					return host.findChild<FilterConditionDialog *>();
+				}, [value, lhs](QWidget *dialog) {
 					if (lhs != nullptr)
 						*lhs = dialog->findChild<QLabel *>(QStringLiteral("conditionLhs"))->text();
 					if (!value.isEmpty())
 						dialog->findChild<QComboBox *>(QStringLiteral("conditionValue1"))
 							->setEditText(value);
 					dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
-				});
+				}, "Filter Condition dialog");
 			};
 			answer(QStringLiteral("x"));
 			const QString byText = made(Menu::LineRange);
@@ -6942,13 +6915,9 @@ int main(int argc, char *argv[])
 			QStringList found;
 			const auto range = [&](const QString &start, const QString &end)
 			{
-				QTimer::singleShot(0, &host, [&host, &found, &shoot, start, end]() {
-					auto *dialog = host.findChild<MatchInsideDialog *>();
-					if (dialog == nullptr)
-					{
-						printf("no Match Inside/Outside dialog to answer\n");
-						std::exit(3);
-					}
+				answerDialogForTest(&host, [&host]() -> QWidget * {
+					return host.findChild<MatchInsideDialog *>();
+				}, [&found, &shoot, start, end](QWidget *dialog) {
 					auto *first = dialog->findChild<FileFilterCombo *>(
 						QStringLiteral("matchInsideStart"));
 					auto *second = dialog->findChild<FileFilterCombo *>(
@@ -6961,7 +6930,7 @@ int main(int argc, char *argv[])
 					}
 					shoot(dialog, "range");
 					dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
-				});
+				}, "Match Inside/Outside dialog");
 			};
 			range(QStringLiteral("BEGIN"), QStringLiteral("le:@cs Line = \"END\""));
 			const QString inside = made(Menu::MatchInside, errors);
@@ -6990,10 +6959,10 @@ int main(int argc, char *argv[])
 			bool menuShown = false;
 			bool menuBack = false;
 			QString fieldAfter;
-			QTimer::singleShot(0, &host, [&]() {
-				auto *dialog = host.findChild<MatchInsideDialog *>();
-				auto *button = dialog != nullptr
-					? dialog->findChild<QToolButton *>(QStringLiteral("matchInsideStartMenu")) : nullptr;
+			answerDialogForTest(&host, [&host]() -> QWidget * {
+				return host.findChild<MatchInsideDialog *>();
+			}, [&](QWidget *dialog) {
+				auto *button = dialog->findChild<QToolButton *>(QStringLiteral("matchInsideStartMenu"));
 				if (button == nullptr)
 				{
 					printf("no Match Inside/Outside dialog with its \"=\" button\n");
@@ -7027,7 +6996,7 @@ int main(int argc, char *argv[])
 				menuBack = menuBack && shows == 1; // (a condition does not bring it back)
 				fieldAfter = field->mask();
 				dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Cancel)->click();
-			});
+			}, "Match Inside/Outside dialog");
 			const QString cancelledRange = made(Menu::MatchInside, errors);
 			printf("  the field after its menu: %s\n", qPrintable(fieldAfter));
 			check(menuShown && menuBack
@@ -7356,18 +7325,14 @@ int main(int argc, char *argv[])
 			// filter with AND, and the bar comes up with it applied
 			const auto answer = [&view](const QString &value, QString *lhs)
 			{
-				QTimer::singleShot(0, &view, [&view, value, lhs]() {
-					auto *dialog = view.findChild<FilterConditionDialog *>();
-					if (dialog == nullptr)
-					{
-						printf("no Filter Condition dialog to answer\n");
-						std::exit(3);
-					}
+				answerDialogForTest(&view, [&view]() -> QWidget * {
+					return view.findChild<FilterConditionDialog *>();
+				}, [value, lhs](QWidget *dialog) {
 					*lhs = dialog->findChild<QLabel *>(QStringLiteral("conditionLhs"))->text();
 					dialog->findChild<QComboBox *>(QStringLiteral("conditionValue1"))
 						->setEditText(value);
 					dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
-				});
+				}, "Filter Condition dialog");
 			};
 			view.toggleDisplayFilterBar(); // (closed: the menu's item brings it back)
 			settle();
