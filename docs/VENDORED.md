@@ -122,10 +122,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 787 | 194 | 255 | 3 | 3 |
-| Spanish | 772 | 207 | 253 | 10 | 0 |
-| Catalan | 448 | 203 | 255 | 336 | 0 |
-| French | 786 | 216 | 237 | 3 | 0 |
+| German | 799 | 197 | 258 | 3 | 3 |
+| Spanish | 783 | 211 | 256 | 10 | 0 |
+| Catalan | 456 | 206 | 258 | 340 | 0 |
+| French | 798 | 219 | 240 | 3 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -161,6 +161,10 @@ says so in a comment:
   `CMergeApp::LoadAndOpenProjectFile`) leaves "Ignore Missing Trailing
   EOL" and "Ignore Line Breaks" out of both, so what the menu or the
   project said of them never reached the comparison.
+- A custom temp folder (Options > System) that is left empty, or cannot
+  be made, leaves the system's in use. Upstream (`CMergeApp::SetupTempPath`)
+  joins this run's folder to the empty path, a folder relative to
+  wherever the application runs from.
 - Load Project on the selection screen takes the project's paths as
   Open Project does: its `%VAR%` variables expanded, a relative path made
   one in the project file's folder. Upstream (`COpenView::OnLoadProject`)

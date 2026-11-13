@@ -1352,6 +1352,13 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
     </message>
 </context>
 <context>
+    <name>FileOps</name>
+    <message>
+        <source>Failed to execute external editor: %1</source>
+        <translation>No s&apos;ha pogut executar l&apos;editor extern: %1</translation>
+    </message>
+</context>
+<context>
     <name>FilepathEdit</name>
     <message>
         <source>Copy</source>
@@ -1979,10 +1986,26 @@ Potser el fitxer és només de lectura?</translation>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>la dreta</translation>
     </message>
+    <message numerus="yes">
+        <source>Copy %n item(s) (%1)? Overwritten files are deleted.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>
+            <numerusform>Voleu copiar %n element (%1)? Els fitxers sobreescrits se suprimiran.</numerusform>
+            <numerusform>Voleu copiar %n elements (%1)? Els fitxers sobreescrits se suprimiran.</numerusform>
+        </translation>
+    </message>
     <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n item(s) could not be deleted.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>
+            <numerusform>No s&apos;ha pogut suprimir %n element.</numerusform>
+            <numerusform>No s&apos;han pogut suprimir %n elements.</numerusform>
+        </translation>
     </message>
     <message numerus="yes">
         <source>Copy %n item(s) (%1)? Overwritten files go to the Trash.</source>
@@ -2006,6 +2029,14 @@ Potser el fitxer és només de lectura?</translation>
         <translation>
             <numerusform>Voleu moure %n element a la Paperera?</numerusform>
             <numerusform>Voleu moure %n elements a la Paperera?</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Permanently delete %n item(s)?</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>
+            <numerusform>Voleu suprimir permanentment %n element?</numerusform>
+            <numerusform>Voleu suprimir permanentment %n elements?</numerusform>
         </translation>
     </message>
     <message numerus="yes">
@@ -5284,6 +5315,75 @@ Useu valors entre 1 i %1.</translation>
     <message>
         <source>Hidden Items</source>
         <translation>Elements ocults</translation>
+    </message>
+    <message>
+        <source>&amp;Use Recycle Bin</source>
+        <translation>&amp;Desa els fitxers suprimits a la Paperera de reciclatge</translation>
+    </message>
+    <message>
+        <source>&amp;External editor:</source>
+        <translation>&amp;Editor extern:</translation>
+    </message>
+    <message>
+        <source>&amp;Browse...</source>
+        <translation>&amp;Navega...</translation>
+    </message>
+    <message>
+        <source>Parameters:
+$file: Current file path
+$linenum: Current cursor line number</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Parameters:
+$file: Current file path
+$linenum: Current cursor line number&quot;.</translatorcomment>
+        <translation>Podeu indicar els següents paràmetres al camí:
+$file: Camí del fitxer actual
+$linenum: Línia de la posició actual del cursor</translation>
+    </message>
+    <message>
+        <source>&amp;Store user data in:</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Desa les dades d&apos;&amp;usuari a:</translation>
+    </message>
+    <message>
+        <source>Application Support folder</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Carpeta Application Support</translation>
+    </message>
+    <message>
+        <source>Configuration folder</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Carpeta de configuració</translation>
+    </message>
+    <message>
+        <source>Documents folder</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Carpeta Documents</translation>
+    </message>
+    <message>
+        <source>&amp;Filter folder:</source>
+        <translation>&amp;Carpeta de filtres:</translation>
+    </message>
+    <message>
+        <source>B&amp;rowse...</source>
+        <translation>Na&amp;vega...</translation>
+    </message>
+    <message>
+        <source>Temporary files folder</source>
+        <translation>Carpeta temporal</translation>
+    </message>
+    <message>
+        <source>S&amp;ystem temp folder</source>
+        <translatorcomment>After WinMerge&apos;s &quot;S&amp;ystem temp folder&quot;.</translatorcomment>
+        <translation>Carpeta temporal del s&amp;istema</translation>
+    </message>
+    <message>
+        <source>C&amp;ustom folder:</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;ustom folder:&quot;.</translatorcomment>
+        <translation>Directori &amp;personalitzat:</translation>
+    </message>
+    <message>
+        <source>Br&amp;owse...</source>
+        <translation>N&amp;avega...</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

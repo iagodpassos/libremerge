@@ -1592,9 +1592,12 @@ void FolderCompareView::copySelected(int sourceSide, int targetSide)
 
 	const QString direction = sideName(sourceSide)
 		+ QString::fromUtf8(" \xE2\x86\x92 ") + sideName(targetSide);
-	if (lm::question(this, tr("LibreMerge"),
-		tr("Copy %n item(s) (%1)? Overwritten files go to the Trash.", nullptr,
-			rows.size()).arg(direction)) != QMessageBox::Yes)
+	// what is written over goes to the Trash, or is gone, as Options >
+	// System's "Use Recycle Bin" says
+	const QString question = lm::useRecycleBin()
+		? tr("Copy %n item(s) (%1)? Overwritten files go to the Trash.", nullptr, rows.size())
+		: tr("Copy %n item(s) (%1)? Overwritten files are deleted.", nullptr, rows.size());
+	if (lm::question(this, tr("LibreMerge"), question.arg(direction)) != QMessageBox::Yes)
 		return;
 
 	copyRows(rows, sourceSide, targetSide);
@@ -1633,8 +1636,9 @@ void FolderCompareView::deleteSelected(const QList<int> &sides)
 	if (rows.isEmpty())
 		return;
 
-	if (lm::question(this, tr("LibreMerge"),
-		tr("Move %n item(s) to the Trash?", nullptr, rows.size())) != QMessageBox::Yes)
+	if (lm::question(this, tr("LibreMerge"), lm::useRecycleBin()
+			? tr("Move %n item(s) to the Trash?", nullptr, rows.size())
+			: tr("Permanently delete %n item(s)?", nullptr, rows.size())) != QMessageBox::Yes)
 		return;
 
 	deleteRows(rows, sides);
@@ -1643,6 +1647,8 @@ void FolderCompareView::deleteSelected(const QList<int> &sides)
 void FolderCompareView::deleteRows(const QList<QTreeWidgetItem *> &rows,
 	const QList<int> &sides)
 {
+	// to the Trash (FOF_ALLOWUNDO), or gone, as Options > System says
+	const bool trash = lm::useRecycleBin();
 	int failures = 0;
 	for (QTreeWidgetItem *row : rows)
 	{
@@ -1650,7 +1656,11 @@ void FolderCompareView::deleteRows(const QList<QTreeWidgetItem *> &rows,
 		for (const int side : sides)
 		{
 			const QString path = sidePath(row, side);
-			if (!path.isEmpty() && !QFile::moveToTrash(path))
+			if (path.isEmpty())
+				continue;
+			const bool gone = trash ? QFile::moveToTrash(path)
+				: QFileInfo(path).isDir() ? QDir(path).removeRecursively() : QFile::remove(path);
+			if (!gone)
 				ok = false;
 		}
 		if (!ok)
@@ -1658,8 +1668,9 @@ void FolderCompareView::deleteRows(const QList<QTreeWidgetItem *> &rows,
 		updateRowFromDisk(row);
 	}
 	if (failures > 0)
-		lm::warning(this, tr("LibreMerge"),
-			tr("%n item(s) could not be moved to the Trash.", nullptr, failures));
+		lm::warning(this, tr("LibreMerge"), trash
+			? tr("%n item(s) could not be moved to the Trash.", nullptr, failures)
+			: tr("%n item(s) could not be deleted.", nullptr, failures));
 	updateActions();
 }
 

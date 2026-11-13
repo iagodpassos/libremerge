@@ -16,6 +16,8 @@
 #include <QDialogButtonBox>
 #include <QHeaderView>
 #include <QRadioButton>
+#include <QStandardPaths>
+#include <QTemporaryFile>
 #include <QKeyEvent>
 #include <QFocusEvent>
 #include <QFontMetricsF>
@@ -478,6 +480,13 @@ int main(int argc, char *argv[])
 
 	lm::installEngineOptions();
 	lm::installFileFilters();
+	// this run's temp folder (CMergeApp::SetupTempPath), gone with it, and
+	// those of runs that ended without removing theirs (ExitInstance)
+	lm::setupTempPath();
+	struct TempFolderCleanup
+	{
+		~TempFolderCleanup() { lm::cleanupTempPath(); }
+	} tempFolderCleanup;
 	lm::SetImageCompareHook(&compareImageFiles);
 	// the line expressions of a prediffer read a file as a table by the
 	// Compare > Table options, as upstream's MakeTablePropertiesByFileName
@@ -633,6 +642,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolderEnterOpt(QStringLiteral("selftest-folder-enter"),
 		QStringLiteral("Press Enter on the folder comparison's items: folders expand and collapse, files open (for testing)"));
 	parser.addOption(selftestFolderEnterOpt);
+	QCommandLineOption selftestSystemPageOpt(QStringLiteral("selftest-system-page"),
+		QStringLiteral("Options > System: the Trash, the external editor, the user data, filter and temp folders (for testing)"));
+	parser.addOption(selftestSystemPageOpt);
 	QCommandLineOption selftestProjectOpt(QStringLiteral("selftest-project"),
 		QStringLiteral("Read, write, open, load and save WinMerge project files (for testing)"));
 	parser.addOption(selftestProjectOpt);
@@ -1712,7 +1724,7 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
 			OptionsDialog::BinaryPage, OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
@@ -1721,9 +1733,9 @@ int main(int argc, char *argv[])
 			OptionsDialog::MergeColorsPage, OptionsDialog::SyntaxColorsPage,
 			OptionsDialog::TextColorsPage, OptionsDialog::MarkerColorsPage,
 			OptionsDialog::DirColorsPage, OptionsDialog::SysColorsPage,
-			OptionsDialog::ArchivePage, OptionsDialog::ProjectPage, OptionsDialog::BackupPage,
-			OptionsDialog::CodepagePage };
-		bool ok = tree.size() == 24;
+			OptionsDialog::ArchivePage, OptionsDialog::ProjectPage, OptionsDialog::SystemPage,
+			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
+		bool ok = tree.size() == 25;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1739,9 +1751,9 @@ int main(int argc, char *argv[])
 			OptionsDialog::MergeColorsPage, OptionsDialog::SyntaxColorsPage,
 			OptionsDialog::TextColorsPage, OptionsDialog::MarkerColorsPage,
 			OptionsDialog::DirColorsPage, OptionsDialog::SysColorsPage,
-			OptionsDialog::ArchivePage, OptionsDialog::ProjectPage, OptionsDialog::BackupPage,
-			OptionsDialog::CodepagePage };
-		for (int i = 0; ok && i < 24; ++i)
+			OptionsDialog::ArchivePage, OptionsDialog::ProjectPage, OptionsDialog::SystemPage,
+			OptionsDialog::BackupPage, OptionsDialog::CodepagePage };
+		for (int i = 0; ok && i < 25; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
@@ -1773,7 +1785,7 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(22); // Backup Files
+		dialog.selectCategoryForTest(23); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 
@@ -14858,6 +14870,202 @@ int main(int argc, char *argv[])
 				if (view->paths().value(0) == xPair.at(0) && view->paths().value(1) == xPair.at(1))
 					fileTab = true;
 			check(fileTab, "the window: Enter in the folder tab opens the file comparison");
+		}
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestSystemPageOpt))
+	{
+		// WinMerge's System page (PropRegistry) and what each of its
+		// settings does
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).path());
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		const QString root = dir.path();
+		{
+			OptionsDialog dialog;
+			const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
+			int at = -1;
+			for (int i = 0; i < tree.size(); ++i)
+				if (tree.at(i).page == OptionsDialog::SystemPage)
+					at = i;
+			check(at > 0 && tree.at(at - 1).page == OptionsDialog::ProjectPage
+					&& tree.at(at + 1).page == OptionsDialog::BackupPage && tree.at(at).depth == 0,
+				"the page: System, after Project");
+			dialog.selectCategoryForTest(at);
+			if (!qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS").isEmpty())
+				dialog.grab().save(qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS")
+					+ QStringLiteral("/system-page.png"));
+			QWidget *page = dialog.pageForTest(OptionsDialog::SystemPage);
+			auto *trash = page->findChild<QCheckBox *>(QStringLiteral("useRecycleBin"));
+			auto *editor = page->findChild<QLineEdit *>(QStringLiteral("externalEditor"));
+			auto *location = page->findChild<QComboBox *>(QStringLiteral("userDataLocation"));
+			auto *filters = page->findChild<QLineEdit *>(QStringLiteral("filterFolder"));
+			auto *systemTemp = page->findChild<QRadioButton *>(QStringLiteral("systemTempFolder"));
+			auto *customTemp = page->findChild<QRadioButton *>(QStringLiteral("customTempFolder"));
+			auto *temp = page->findChild<QLineEdit *>(QStringLiteral("tempFolder"));
+			if (trash == nullptr || editor == nullptr || location == nullptr || filters == nullptr
+				|| systemTemp == nullptr || customTemp == nullptr || temp == nullptr)
+				return 2;
+			check(trash->isChecked() && editor->text() == lm::defaultExternalEditor()
+					&& location->currentIndex() == 0 && location->count() == 2
+					&& filters->text().isEmpty() && systemTemp->isChecked() && temp->text().isEmpty()
+					&& !editor->toolTip().isEmpty(),
+				"defaults: the Trash, the platform's editor, the application's folder, the system temp");
+			trash->setChecked(false);
+			editor->setText(QStringLiteral("  myeditor -n$linenum $file  "));
+			location->setCurrentIndex(1);
+			filters->setText(root + QStringLiteral("/filters"));
+			customTemp->setChecked(true);
+			temp->setText(root + QStringLiteral("/temp"));
+			dialog.saveForTest();
+			check(!mgr->GetBool(OPT_USE_RECYCLE_BIN)
+					&& mgr->GetString(OPT_EXT_EDITOR_CMD) == "myeditor -n$linenum $file"
+					&& mgr->GetInt(OPT_USERDATA_LOCATION) == 1
+					&& QString::fromStdString(mgr->GetString(OPT_FILTER_USERPATH)) == root + QStringLiteral("/filters")
+					&& !mgr->GetBool(OPT_USE_SYSTEM_TEMP_PATH)
+					&& QString::fromStdString(mgr->GetString(OPT_CUSTOM_TEMP_PATH)) == root + QStringLiteral("/temp"),
+				"OK saves them, the editor trimmed");
+			editor->setText(QString());
+			dialog.saveForTest();
+			check(QString::fromStdString(mgr->GetString(OPT_EXT_EDITOR_CMD)) == lm::defaultExternalEditor(),
+				"an empty editor is the default again");
+			mgr->SaveOption(OPT_EXT_EDITOR_CMD, std::string("myeditor -n$linenum $file"));
+		}
+		{
+			OptionsDialog shown;
+			QWidget *page = shown.pageForTest(OptionsDialog::SystemPage);
+			auto *trash = page->findChild<QCheckBox *>(QStringLiteral("useRecycleBin"));
+			auto *location = page->findChild<QComboBox *>(QStringLiteral("userDataLocation"));
+			auto *customTemp = page->findChild<QRadioButton *>(QStringLiteral("customTempFolder"));
+			const bool showsThem = !trash->isChecked() && location->currentIndex() == 1
+				&& customTemp->isChecked();
+			const QList<OptionsDialog::CategoryInfo> tree = shown.categoriesForTest();
+			for (int i = 0; i < tree.size(); ++i)
+				if (tree.at(i).page == OptionsDialog::SystemPage)
+					shown.selectCategoryForTest(i);
+			shown.restoreDefaultsForTest();
+			check(showsThem && trash->isChecked() && location->currentIndex() == 0
+					&& !customTemp->isChecked() && !mgr->GetBool(OPT_USE_RECYCLE_BIN),
+				"shown again, and Defaults restores the page without saving");
+		}
+
+		// the external editor (OpenFileToExternalEditor)
+		{
+			const QString file = QStringLiteral("/a b/c.txt");
+			check(lm::externalEditorCommand(file, 12) == QStringList({ QStringLiteral("myeditor"),
+					QStringLiteral("-n12"), file }),
+				"editor: $linenum and $file in their places, the path one argument");
+			mgr->Set(OPT_EXT_EDITOR_CMD, std::string("ed"));
+			check(lm::externalEditorCommand(file, 1) == QStringList({ QStringLiteral("ed"), file }),
+				"editor: the file at the end without $file");
+			qputenv("LM_EDITOR_TEST", "/opt/my ed");
+			mgr->Set(OPT_EXT_EDITOR_CMD, std::string("\"%LM_EDITOR_TEST%\" --line $linenum"));
+			check(lm::externalEditorCommand(file, 7) == QStringList({ QStringLiteral("/opt/my ed"),
+					QStringLiteral("--line"), QStringLiteral("7"), file }),
+				"editor: %VAR% expanded");
+			QStringList started;
+			lm::setExternalEditorForTest([&started](const QStringList &command) {
+				started = command;
+				return true;
+			});
+			check(lm::openInExternalEditor(nullptr, file, 3) && started.value(0) == QStringLiteral("/opt/my ed"),
+				"editor: the command starts");
+			lm::setExternalEditorForTest({});
+		}
+
+		// the Trash: off, a delete and a write over are gone for good
+		{
+			write(root + QStringLiteral("/L/x.txt"), "1\n");
+			write(root + QStringLiteral("/R/x.txt"), "2\n");
+			write(root + QStringLiteral("/src.txt"), "new\n");
+			write(root + QStringLiteral("/dst.txt"), "old\n");
+			check(!lm::useRecycleBin() && lm::copyRecursively(root + QStringLiteral("/src.txt"),
+					root + QStringLiteral("/dst.txt")),
+				"Trash off: a copy writes over");
+			QFile copied(root + QStringLiteral("/dst.txt"));
+			check(copied.open(QIODevice::ReadOnly) && copied.readAll() == "new\n",
+				"Trash off: the file written over holds the new text");
+			FolderCompareView view;
+			view.start({ root + QStringLiteral("/L"), root + QStringLiteral("/R") });
+			for (int i = 0; i < 300 && view.isComparing(); ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+			view.deleteRowForTest(QStringLiteral("x.txt"), { 0 });
+			check(!QFileInfo::exists(root + QStringLiteral("/L/x.txt"))
+					&& QFileInfo::exists(root + QStringLiteral("/R/x.txt")),
+				"Trash off: a delete removes the side for good");
+		}
+
+		// the temp folder: this run's own, in the custom folder
+		{
+			const QString atStart = lm::tempPath();
+			check(QFileInfo(atStart).isDir() && QFileInfo(atStart).fileName()
+					== QStringLiteral("LibreMerge_TEMP_%1").arg(QCoreApplication::applicationPid()),
+				"temp: a folder of this run's own at startup");
+			lm::setupTempPath();
+			const QString custom = lm::tempPath();
+			check(custom == root + QStringLiteral("/temp/LibreMerge_TEMP_%1").arg(QCoreApplication::applicationPid())
+					&& QFileInfo(custom).isDir(),
+				"temp: the custom folder");
+			QTemporaryFile probe(lm::tempPath() + QStringLiteral("/lm_XXXXXX"));
+			check(probe.open() && probe.fileName().startsWith(custom), "temp: files go there");
+			probe.close();
+			const QString orphan = root + QStringLiteral("/temp/LibreMerge_TEMP_99999999");
+			QDir().mkpath(orphan);
+			lm::cleanupTempPath();
+			check(!QFileInfo::exists(custom) && !QFileInfo::exists(atStart) && !QFileInfo::exists(orphan),
+				"temp: this run's folders go as it ends, and those of runs that are gone");
+			mgr->Set(OPT_USE_SYSTEM_TEMP_PATH, true);
+			lm::setupTempPath();
+		}
+
+		// where user data goes, and the filter folder
+		{
+			const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+			// (by the organization's name, LibreMerge's own but in a selftest)
+			const QString own = documents + QLatin1Char('/') + QCoreApplication::organizationName();
+			check(lm::userDataFolder(QStringLiteral("Filters"), 1)
+					== QDir::cleanPath(own + QStringLiteral("/Filters"))
+					&& lm::ColorSchemes::privateFolder()
+						== QDir::cleanPath(own + QStringLiteral("/ColorSchemes"))
+					&& lm::ColorSchemes::folders().size() == 3,
+				"Documents: new color schemes there, both folders read");
+			check(lm::userFiltersDir() == root + QStringLiteral("/filters"),
+				"the filter folder picked takes new filters");
+			write(root + QStringLiteral("/filters/Picked.flt"),
+				"name: Picked\ndesc: picked folder\ndef: include\nf: \\.txt$\n");
+			lm::reloadFilterFiles();
+			check(!lm::globalFileFilter()->GetFileFilterPath("Picked").empty(),
+				"and its filters are read as the Options are accepted");
+			mgr->Set(OPT_FILTER_USERPATH, std::string());
+			check(lm::userFiltersDir() == lm::userDataFolder(QStringLiteral("Filters"), 1),
+				"without one, the folder user data goes to");
+			mgr->Set(OPT_USERDATA_LOCATION, 0);
+			check(lm::userFiltersDir() == lm::userDataFolder(QStringLiteral("Filters"), 0)
+					&& lm::ColorSchemes::privateFolder()
+						== lm::userDataFolder(QStringLiteral("ColorSchemes"), 0),
+				"the application's folder: as before");
+			lm::reloadFilterFiles();
 		}
 		return ok ? 0 : 1;
 	}

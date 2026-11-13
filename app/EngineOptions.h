@@ -118,6 +118,30 @@ void setCompareMethodForTest(int method);
 /** Set it for this run only, unsaved (the command line's -m). */
 void useCompareMethod(int method);
 
+// --- WinMerge's Options > System ---
+
+/** "Use Recycle Bin" (OPT_USE_RECYCLE_BIN): what a folder comparison
+    deletes or writes over goes to the Trash, else it is gone. */
+bool useRecycleBin();
+/** The external editor's default (OPT_EXT_EDITOR_CMD, upstream's
+    Notepad): the platform's own way to open a text file in an editor. */
+QString defaultExternalEditor();
+/** CMergeApp::SetupTempPath: the temporary files of this run go to a
+    folder of its own, in the system's temp folder or the custom one
+    (OPT_USE_SYSTEM_TEMP_PATH, OPT_CUSTOM_TEMP_PATH), made now. At
+    startup and as the Options dialog is accepted. */
+void setupTempPath();
+/** That folder; the system's before setupTempPath ran. */
+QString tempPath();
+/** As the application ends: this run's temp folders go, and those runs
+    that are no longer running left behind (CleanupWMtemp). */
+void cleanupTempPath();
+/** Where a folder of user data goes, as "Store user data in" says
+    (OPT_USERDATA_LOCATION): the application's data folder (0) or the
+    Documents folder (1), its name added. */
+QString userDataFolder(const QString &name, int location);
+int userDataLocation();
+
 /** WinMerge's OPT_CMP_INCLUDE_SUBDIRS ("Include subfolders" on the
     selection screen, on by default): a folder comparison takes the
     subfolders in. */

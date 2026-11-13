@@ -110,6 +110,7 @@ public:
 		SysColorsPage,    ///< Colors > System
 		ArchivePage,      ///< Archive Support
 		ProjectPage,      ///< Project
+		SystemPage,       ///< System
 		BackupPage,
 		CodepagePage,
 	};
@@ -194,6 +195,7 @@ private:
 	void restoreSysColorDefaults();
 	QWidget *buildArchivePage();
 	QWidget *buildProjectPage();
+	QWidget *buildSystemPage();
 	QWidget *buildBackupPage();
 	QWidget *buildCodepagePage();
 	void showCustomCodepage(int codepage);
@@ -310,6 +312,14 @@ private:
 	// Project: a row for each item, a check box column for Open, Load and
 	// Save
 	QTreeWidget *m_projectList = nullptr;
+	// System
+	QCheckBox *m_chkUseRecycleBin = nullptr;
+	QLineEdit *m_editExternalEditor = nullptr;
+	QComboBox *m_cmbUserDataLocation = nullptr;
+	QLineEdit *m_editFilterFolder = nullptr;
+	QRadioButton *m_radSystemTempFolder = nullptr;
+	QRadioButton *m_radCustomTempFolder = nullptr;
+	QLineEdit *m_editTempFolder = nullptr;
 	// Backup Files
 	QCheckBox *m_chkBackup;
 	// Codepage

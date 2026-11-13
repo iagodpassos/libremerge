@@ -1021,7 +1021,10 @@ void TableCompareView::suggestIgnoreEol()
 
 bool TableCompareView::runDiff(QString *error)
 {
+	// in the temp folder of Options > System
 	QTemporaryFile temp[3];
+	for (QTemporaryFile &file : temp)
+		file.setFileTemplate(lm::tempPath() + QStringLiteral("/lm_XXXXXX"));
 	PathContext paths;
 	paths.SetSize(m_paneCount);
 	for (int i = 0; i < m_paneCount; ++i)

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "pch.h"
 #include "FileFilters.h"
+#include "EngineOptions.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -126,29 +127,60 @@ QString sharedFiltersDir()
 	return QDir::cleanPath(candidates.first());
 }
 
+/** Options > System's "Filter folder" (OPT_FILTER_USERPATH), empty when
+    none was picked. */
+static QString chosenFiltersDir()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr != nullptr
+		? QDir::cleanPath(QString::fromStdString(mgr->GetString(OPT_FILTER_USERPATH)).trimmed())
+		: QString();
+}
+
 QString userFiltersDir()
 {
 	if (!userDirOverride().isEmpty())
 		return userDirOverride();
-	// next to the settings, as WinMerge keeps them under its AppData
-	// folder: ~/Library/Application Support/LibreMerge/Filters on macOS,
-	// ~/.config/LibreMerge/Filters elsewhere
-#ifdef Q_OS_MACOS
-	const QString base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
-#else
-	const QString base = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
-#endif
-	return QDir(base).filePath(QCoreApplication::organizationName() + QStringLiteral("/Filters"));
+	// FileFiltersDlg's GetUserPath: the folder picked, else the one where
+	// user data goes, the application's (next to the settings) or
+	// Documents
+	const QString chosen = chosenFiltersDir();
+	if (!chosen.isEmpty() && chosen != QLatin1String("."))
+		return chosen;
+	return userDataFolder(QStringLiteral("Filters"), userDataLocation());
 }
 
 void loadFilterFiles(FileFilterHelper *helper)
 {
 	helper->GetManager()->DeleteAllFilters();
 	const String pattern = String(_T("*")) + FileFilterExt;
-	// the shipped ones first, as upstream reads its program folder first
-	for (const QString &dir : { sharedFiltersDir(), userFiltersDir() })
+	// LoadAllFileFilters: the shipped ones first, as upstream reads its
+	// program folder first, then the application's data folder, the
+	// Documents one and the one picked, each once
+	QStringList dirs{ sharedFiltersDir() };
+	if (!userDirOverride().isEmpty())
+		dirs.append(userDirOverride());
+	else
+	{
+		dirs.append(userDataFolder(QStringLiteral("Filters"), 0));
+		dirs.append(userDataFolder(QStringLiteral("Filters"), 1));
+		const QString chosen = chosenFiltersDir();
+		if (!chosen.isEmpty() && chosen != QLatin1String("."))
+			dirs.append(chosen);
+	}
+	dirs.removeDuplicates();
+	for (const QString &dir : dirs)
 		if (!dir.isEmpty() && QFileInfo(dir).isDir())
 			helper->LoadFileFilterDirPattern(QDir::toNativeSeparators(dir).toStdString(), pattern);
+}
+
+void reloadFilterFiles()
+{
+	// the global filter, its mask kept (CMainFrame::OnOptions sets the
+	// user filter path)
+	FileFilterHelper &global = globalFilter();
+	loadFilterFiles(&global);
+	global.SetMaskOrExpression(global.GetMaskOrExpression());
 }
 
 void setFiltersDirsForTest(const QString &shared, const QString &user)

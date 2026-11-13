@@ -1126,6 +1126,13 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     </message>
 </context>
 <context>
+    <name>FileOps</name>
+    <message>
+        <source>Failed to execute external editor: %1</source>
+        <translation>Falha ao executar o editor externo: %1</translation>
+    </message>
+</context>
+<context>
     <name>FilepathEdit</name>
     <message>
         <source>Copy</source>
@@ -1649,6 +1656,13 @@ O arquivo pode ser somente leitura.</translation>
         <source>right</source>
         <translation>direita</translation>
     </message>
+    <message numerus="yes">
+        <source>%n item(s) could not be deleted.</source>
+        <translation>
+            <numerusform>%n item não pôde ser excluído.</numerusform>
+            <numerusform>%n itens não puderam ser excluídos.</numerusform>
+        </translation>
+    </message>
     <message>
         <source>Cancel</source>
         <translation>Cancelar</translation>
@@ -1681,6 +1695,13 @@ O arquivo pode ser somente leitura.</translation>
         <source>Cancelled — partial results. </source>
         <translation>Cancelado — resultados parciais. </translation>
     </message>
+    <message numerus="yes">
+        <source>Copy %n item(s) (%1)? Overwritten files are deleted.</source>
+        <translation>
+            <numerusform>Copiar %n item (%1)? Arquivos sobrescritos são excluídos.</numerusform>
+            <numerusform>Copiar %n itens (%1)? Arquivos sobrescritos são excluídos.</numerusform>
+        </translation>
+    </message>
     <message>
         <source>LibreMerge</source>
         <translation>LibreMerge</translation>
@@ -1704,6 +1725,13 @@ O arquivo pode ser somente leitura.</translation>
         <translation>
             <numerusform>Mover %n item para a Lixeira?</numerusform>
             <numerusform>Mover %n itens para a Lixeira?</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Permanently delete %n item(s)?</source>
+        <translation>
+            <numerusform>Excluir permanentemente %n item?</numerusform>
+            <numerusform>Excluir permanentemente %n itens?</numerusform>
         </translation>
     </message>
     <message numerus="yes">
@@ -4443,6 +4471,66 @@ Checando identidade binária...</translation>
     <message>
         <source>Hidden Items</source>
         <translation>Itens Ocultados</translation>
+    </message>
+    <message>
+        <source>&amp;Use Recycle Bin</source>
+        <translation>&amp;Usar a Lixeira</translation>
+    </message>
+    <message>
+        <source>&amp;External editor:</source>
+        <translation>&amp;Editor externo:</translation>
+    </message>
+    <message>
+        <source>&amp;Browse...</source>
+        <translation>&amp;Navegar...</translation>
+    </message>
+    <message>
+        <source>Parameters:
+$file: Current file path
+$linenum: Current cursor line number</source>
+        <translation>Parâmetros:
+$file: Caminho do arquivo atual
+$linenum: Número da linha atual do cursor</translation>
+    </message>
+    <message>
+        <source>&amp;Store user data in:</source>
+        <translation>Armazenar dado&amp;s do usuário em:</translation>
+    </message>
+    <message>
+        <source>Application Support folder</source>
+        <translation>Pasta Application Support</translation>
+    </message>
+    <message>
+        <source>Configuration folder</source>
+        <translation>Pasta de configuração</translation>
+    </message>
+    <message>
+        <source>Documents folder</source>
+        <translation>Pasta Documentos</translation>
+    </message>
+    <message>
+        <source>&amp;Filter folder:</source>
+        <translation>Pasta de &amp;filtros:</translation>
+    </message>
+    <message>
+        <source>B&amp;rowse...</source>
+        <translation>N&amp;avegar...</translation>
+    </message>
+    <message>
+        <source>Temporary files folder</source>
+        <translation>Pasta de arquivos temporários</translation>
+    </message>
+    <message>
+        <source>S&amp;ystem temp folder</source>
+        <translation>Pasta temp do sis&amp;tema</translation>
+    </message>
+    <message>
+        <source>C&amp;ustom folder:</source>
+        <translation>Pasta &amp;personalizada:</translation>
+    </message>
+    <message>
+        <source>Br&amp;owse...</source>
+        <translation>Na&amp;vegar...</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

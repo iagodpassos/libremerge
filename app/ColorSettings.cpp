@@ -2,6 +2,7 @@
 #include "pch.h"
 
 #include "ColorSettings.h"
+#include "EngineOptions.h"
 
 #include "Theme.h"
 
@@ -473,14 +474,17 @@ QStringList folders()
 	const QString beside = QDir::cleanPath(appDir.filePath(QStringLiteral("ColorSchemes")));
 	list.append(QFileInfo(installed).isDir() || !QFileInfo(beside).isDir() ? installed : beside);
 #endif
-	list.append(privateFolder());
+	// GetColorSchemesFolders: then the application's data folder and the
+	// Documents one, whichever user data goes to
+	list.append(userDataFolder(QStringLiteral("ColorSchemes"), 0));
+	list.append(userDataFolder(QStringLiteral("ColorSchemes"), 1));
 	return list;
 }
 
 QString privateFolder()
 {
-	return QDir::cleanPath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
-		+ QStringLiteral("/ColorSchemes"));
+	// GetPrivateColorSchemesFolder: as "Store user data in" says
+	return userDataFolder(QStringLiteral("ColorSchemes"), userDataLocation());
 }
 
 bool isPrivatePath(const QString &path)

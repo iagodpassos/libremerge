@@ -1921,7 +1921,7 @@ void MainWindow::openSelfComparison(const QString &path,
 	class SnapshotOwner : public QObject
 	{
 	public:
-		QTemporaryDir dir;
+		QTemporaryDir dir{ lm::tempPath() + QStringLiteral("/snapshot-XXXXXX") };
 	};
 	auto owner = std::make_unique<SnapshotOwner>();
 	const QString copy = owner->dir.filePath(QFileInfo(path).fileName());
@@ -2108,7 +2108,7 @@ void MainWindow::openArchiveComparison(const QStringList &sources)
 		progress.setLabelText(tr("Extracting %1\xE2\x80\xA6")
 			.arg(QFileInfo(source).fileName()));
 		auto dir = std::make_unique<QTemporaryDir>(
-			QDir::tempPath() + QStringLiteral("/libremerge-archive-XXXXXX"));
+			lm::tempPath() + QStringLiteral("/libremerge-archive-XXXXXX"));
 		if (!dir->isValid())
 		{
 			lm::warning(this, tr("LibreMerge"),
@@ -2200,6 +2200,9 @@ void MainWindow::showOptions()
 		// the default codepage, the word break characters, then every
 		// merge document's options again
 		lm::initSyntaxParserFactories();
+		// the temp folder and the filter folder of Options > System
+		lm::setupTempPath();
+		lm::reloadFilterFiles();
 		lm::updateCodepageModule();
 		lm::updateBreakChars();
 		// a color changed or a color scheme imported: the palette and every

@@ -15,8 +15,11 @@
 #include <QFileInfo>
 #include <QLocale>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QStringList>
 #include <QVariant>
+#include <cerrno>
+#include <signal.h>
 
 #include "DiffWrapper.h"
 #include "FilterList.h"
@@ -27,6 +30,7 @@
 #include "OptionsDef.h"
 #include "OptionsEditorSyntax.h"
 #include "OptionsProject.h"
+#include "Environment.h"
 #include "options_global.h"
 #include "UnicodeString.h"
 #include "charsets.h"
@@ -360,6 +364,15 @@ void installEngineOptions()
 	// file dialogs start in (OptionsInit)
 	Options::Project::Init(&options);
 	options.InitOption(OPT_PROJECTS_PATH, String());
+	// the System page: the Trash, the external editor (the platform's
+	// default text editor for upstream's Notepad), where user data goes,
+	// the filter folder and the temp folder (OptionsInit)
+	options.InitOption(OPT_USE_RECYCLE_BIN, true);
+	options.InitOption(OPT_EXT_EDITOR_CMD, defaultExternalEditor().toStdString());
+	options.InitOption(OPT_USERDATA_LOCATION, 0);
+	options.InitOption(OPT_FILTER_USERPATH, String());
+	options.InitOption(OPT_USE_SYSTEM_TEMP_PATH, true);
+	options.InitOption(OPT_CUSTOM_TEMP_PATH, String());
 
 	// WinMerge's Editor page: the highlighting, and the parsers it takes
 	options.InitOption(OPT_SYNTAX_HIGHLIGHT, true);
@@ -586,6 +599,117 @@ void useCompareMethod(int method)
 {
 	if (COptionsMgr *mgr = GetOptionsMgr())
 		mgr->Set(OPT_CMP_METHOD, method);
+}
+
+bool useRecycleBin()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr == nullptr || mgr->GetBool(OPT_USE_RECYCLE_BIN);
+}
+
+QString defaultExternalEditor()
+{
+#ifdef Q_OS_MACOS
+	// the default text editor (TextEdit unless another was picked)
+	return QStringLiteral("/usr/bin/open -t");
+#else
+	return QStringLiteral("xdg-open");
+#endif
+}
+
+namespace
+{
+
+// upstream's TempFolderPrefix ("WinMerge_TEMP_"), named for this one
+const QString kTempFolderPrefix = QStringLiteral("LibreMerge_TEMP_");
+
+/** The temp folders this run made, the one in use last. */
+QStringList &tempFolders()
+{
+	static QStringList folders;
+	return folders;
+}
+
+} // namespace
+
+void setupTempPath()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	QString base = QDir::tempPath();
+	if (mgr != nullptr && !mgr->GetBool(OPT_USE_SYSTEM_TEMP_PATH))
+	{
+		// a custom folder that is not given, or cannot be made, leaves the
+		// system's (upstream would make a relative folder of nothing)
+		const QString custom = QString::fromStdString(mgr->GetString(OPT_CUSTOM_TEMP_PATH)).trimmed();
+		if (!custom.isEmpty() && QDir().mkpath(custom))
+			base = custom;
+	}
+	const QString folder = QDir::cleanPath(QDir(base).filePath(
+		kTempFolderPrefix + QString::number(QCoreApplication::applicationPid())));
+	QDir().mkpath(folder);
+	env::SetTemporaryPath(QDir::toNativeSeparators(folder).toStdString());
+	tempFolders().removeAll(folder);
+	tempFolders().append(folder);
+}
+
+QString tempPath()
+{
+	return tempFolders().isEmpty() ? QDir::tempPath() : tempFolders().last();
+}
+
+void cleanupTempPath()
+{
+	QStringList parents;
+	for (const QString &folder : tempFolders())
+	{
+		QDir(folder).removeRecursively();
+		parents.append(QFileInfo(folder).absolutePath());
+	}
+	tempFolders().clear();
+	// what runs that ended without it left behind (CleanupWMtemp: a run
+	// whose process is gone)
+	parents.removeDuplicates();
+	for (const QString &parent : parents)
+	{
+		const QFileInfoList left = QDir(parent).entryInfoList(
+			{ kTempFolderPrefix + QLatin1Char('*') }, QDir::Dirs | QDir::NoDotAndDotDot);
+		for (const QFileInfo &folder : left)
+		{
+			bool number = false;
+			const qint64 pid = folder.fileName().mid(kTempFolderPrefix.size()).toLongLong(&number);
+			if (number && pid > 0 && kill(static_cast<pid_t>(pid), 0) != 0 && errno != EPERM)
+				QDir(folder.absoluteFilePath()).removeRecursively();
+		}
+	}
+}
+
+int userDataLocation()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr != nullptr ? mgr->GetInt(OPT_USERDATA_LOCATION) : 0;
+}
+
+QString userDataFolder(const QString &name, int location)
+{
+	if (location == 1)
+		// upstream's Documents\WinMerge\<name>
+		return QDir::cleanPath(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+			+ QLatin1Char('/') + QCoreApplication::organizationName() + QLatin1Char('/') + name);
+	// the application's own data folder, as each kind of data has had it
+	if (name == QLatin1String("Filters"))
+	{
+		// next to the settings: ~/Library/Application Support/LibreMerge
+		// on macOS, ~/.config/LibreMerge elsewhere
+#ifdef Q_OS_MACOS
+		const QString base = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+#else
+		const QString base = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
+#endif
+		return QDir::cleanPath(base + QLatin1Char('/') + QCoreApplication::organizationName()
+			+ QLatin1Char('/') + name);
+	}
+	return QDir::cleanPath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+		+ QLatin1Char('/') + name);
 }
 
 QStringList useOptions(const QList<std::pair<QString, QString>> &options)

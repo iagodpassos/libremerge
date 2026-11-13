@@ -4,7 +4,6 @@
 
 #include <stdexcept>
 #include <QCheckBox>
-#include <QDesktopServices>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
@@ -17,7 +16,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
-#include <QProcess>
 #include <QPushButton>
 #include <QSettings>
 #include <QShortcut>
@@ -25,7 +23,6 @@
 #include <QTabWidget>
 #include <QToolButton>
 #include <QTreeWidget>
-#include <QUrl>
 #include <QVBoxLayout>
 
 #include "EngineOptions.h"
@@ -35,6 +32,7 @@
 #include "FileFilterMenu.h"
 #include "FileFilterMgr.h"
 #include "FileFilters.h"
+#include "FileOps.h"
 #include "ItemCheckStyle.h"
 #include "MessageBoxes.h"
 
@@ -594,12 +592,9 @@ void FiltersDialog::editFileFilter(const QString &path)
 		editorStandIn()(path);
 		return;
 	}
-#ifdef Q_OS_MACOS
-	// the default text editor: a .flt file has no application of its own
-	QProcess::startDetached(QStringLiteral("/usr/bin/open"), { QStringLiteral("-t"), path });
-#else
-	QDesktopServices::openUrl(QUrl::fromLocalFile(path));
-#endif
+	// FileFiltersDlg::EditFileFilter: the external editor of Options >
+	// System, the platform's text editor by default
+	lm::openInExternalEditor(this, path);
 }
 
 void FiltersDialog::deleteSelectedFileFilter()

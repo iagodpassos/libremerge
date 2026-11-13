@@ -28,6 +28,7 @@
 #include <QFocusEvent>
 #include <QFontInfo>
 #include <QGridLayout>
+#include <QFileDialog>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -243,6 +244,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	addCategory(colors, tr("System"), SysColorsPage);
 	addCategory(nullptr, tr("Archive Support"), ArchivePage);
 	addCategory(nullptr, tr("Project"), ProjectPage);
+	addCategory(nullptr, tr("System"), SystemPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	addCategory(nullptr, tr("Codepage"), CodepagePage);
 	m_categories->expandAll();
@@ -269,6 +271,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildSysColorsPage());
 	m_pages->addWidget(buildArchivePage());
 	m_pages->addWidget(buildProjectPage());
+	m_pages->addWidget(buildSystemPage());
 	m_pages->addWidget(buildBackupPage());
 	m_pages->addWidget(buildCodepagePage());
 	pageArea->addWidget(m_pages, 1);
@@ -1565,6 +1568,114 @@ static void showProjectSettings(QTreeWidget *list, const Options::Project::Setti
 	}
 }
 
+/** WinMerge's System page (PropRegistry): the Trash, the external editor,
+    where user data goes, the filter folder and the temp folder. */
+QWidget *OptionsDialog::buildSystemPage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+	m_chkUseRecycleBin = new QCheckBox(tr("&Use Recycle Bin"), page);
+	m_chkUseRecycleBin->setObjectName(QStringLiteral("useRecycleBin"));
+	box->addWidget(m_chkUseRecycleBin);
+
+	// a field and its Browse button, under a label naming the field
+	const auto fieldRow = [page, box](const QString &label, QLineEdit *&edit,
+			const char *name, const QString &browse) {
+		auto *caption = new QLabel(label, page);
+		box->addWidget(caption);
+		auto *row = new QHBoxLayout;
+		edit = new QLineEdit(page);
+		edit->setObjectName(QLatin1String(name));
+		caption->setBuddy(edit);
+		row->addWidget(edit, 1);
+		auto *button = new QPushButton(browse, page);
+		row->addWidget(button);
+		box->addLayout(row);
+		return button;
+	};
+
+	QPushButton *browseEditor = fieldRow(tr("&External editor:"), m_editExternalEditor,
+		"externalEditor", tr("&Browse..."));
+	m_editExternalEditor->setToolTip(tr("Parameters:\n"
+		"$file: Current file path\n"
+		"$linenum: Current cursor line number"));
+	connect(browseEditor, &QPushButton::clicked, this, [this]() {
+		// any program; on macOS an application opens the file through open
+		QString path = QFileDialog::getOpenFileName(this, QString(),
+			QFileInfo(m_editExternalEditor->text()).absolutePath());
+		if (path.isEmpty())
+			return;
+#ifdef Q_OS_MACOS
+		if (path.endsWith(QLatin1String(".app"), Qt::CaseInsensitive))
+			path = QStringLiteral("/usr/bin/open -a \"%1\"").arg(path);
+#endif
+		m_editExternalEditor->setText(path);
+	});
+
+	auto *storeLabel = new QLabel(tr("&Store user data in:"), page);
+	box->addWidget(storeLabel);
+	m_cmbUserDataLocation = new QComboBox(page);
+	m_cmbUserDataLocation->setObjectName(QStringLiteral("userDataLocation"));
+	storeLabel->setBuddy(m_cmbUserDataLocation);
+	// upstream's "AppData (Roaming) folder" is where each platform keeps
+	// the application's data; each item shows its folders
+#ifdef Q_OS_MACOS
+	m_cmbUserDataLocation->addItem(tr("Application Support folder"));
+#else
+	m_cmbUserDataLocation->addItem(tr("Configuration folder"));
+#endif
+	m_cmbUserDataLocation->addItem(tr("Documents folder"));
+	for (int location = 0; location < 2; ++location)
+		m_cmbUserDataLocation->setItemData(location, QDir::toNativeSeparators(
+			lm::userDataFolder(QStringLiteral("Filters"), location)) + QLatin1Char('\n')
+			+ QDir::toNativeSeparators(lm::userDataFolder(QStringLiteral("ColorSchemes"), location)),
+			Qt::ToolTipRole);
+	const auto showLocation = [this]() {
+		m_cmbUserDataLocation->setToolTip(m_cmbUserDataLocation->currentData(Qt::ToolTipRole).toString());
+	};
+	connect(m_cmbUserDataLocation, &QComboBox::currentIndexChanged, this, showLocation);
+	// as wide as the fields, as upstream lays it out
+	auto *storeRow = new QHBoxLayout;
+	storeRow->addWidget(m_cmbUserDataLocation, 1);
+	storeRow->addSpacing(browseEditor->sizeHint().width() + storeRow->spacing());
+	box->addLayout(storeRow);
+
+	QPushButton *browseFilters = fieldRow(tr("&Filter folder:"), m_editFilterFolder,
+		"filterFolder", tr("B&rowse..."));
+	connect(browseFilters, &QPushButton::clicked, this, [this]() {
+		const QString path = QFileDialog::getExistingDirectory(this, tr("Open"),
+			m_editFilterFolder->text());
+		if (!path.isEmpty())
+			m_editFilterFolder->setText(QDir::toNativeSeparators(path));
+	});
+
+	auto *tempGroup = new QGroupBox(tr("Temporary files folder"), page);
+	auto *tempLayout = new QVBoxLayout(tempGroup);
+	m_radSystemTempFolder = new QRadioButton(tr("S&ystem temp folder"), tempGroup);
+	m_radSystemTempFolder->setObjectName(QStringLiteral("systemTempFolder"));
+	m_radCustomTempFolder = new QRadioButton(tr("C&ustom folder:"), tempGroup);
+	m_radCustomTempFolder->setObjectName(QStringLiteral("customTempFolder"));
+	tempLayout->addWidget(m_radSystemTempFolder);
+	tempLayout->addWidget(m_radCustomTempFolder);
+	auto *tempRow = new QHBoxLayout;
+	tempRow->addSpacing(20);
+	m_editTempFolder = new QLineEdit(tempGroup);
+	m_editTempFolder->setObjectName(QStringLiteral("tempFolder"));
+	tempRow->addWidget(m_editTempFolder, 1);
+	auto *browseTemp = new QPushButton(tr("Br&owse..."), tempGroup);
+	tempRow->addWidget(browseTemp);
+	tempLayout->addLayout(tempRow);
+	connect(browseTemp, &QPushButton::clicked, this, [this]() {
+		const QString path = QFileDialog::getExistingDirectory(this, QString(),
+			m_editTempFolder->text());
+		if (!path.isEmpty())
+			m_editTempFolder->setText(QDir::toNativeSeparators(path));
+	});
+	box->addWidget(tempGroup);
+	box->addStretch(1);
+	return page;
+}
+
 /** WinMerge's Backup Files page (PropBackups): the file compare switch;
     folder, name and the folder compare switch are not offered yet. */
 QWidget *OptionsDialog::buildBackupPage()
@@ -1762,6 +1873,15 @@ void OptionsDialog::load()
 		Options::Project::Settings project;
 		Options::Project::Load(mgr, project);
 		showProjectSettings(m_projectList, project);
+		// System (PropRegistry's bindings)
+		m_chkUseRecycleBin->setChecked(mgr->GetBool(OPT_USE_RECYCLE_BIN));
+		m_editExternalEditor->setText(QString::fromStdString(mgr->GetString(OPT_EXT_EDITOR_CMD)));
+		m_cmbUserDataLocation->setCurrentIndex(qBound(0, mgr->GetInt(OPT_USERDATA_LOCATION), 1));
+		m_cmbUserDataLocation->setToolTip(m_cmbUserDataLocation->currentData(Qt::ToolTipRole).toString());
+		m_editFilterFolder->setText(QString::fromStdString(mgr->GetString(OPT_FILTER_USERPATH)));
+		(mgr->GetBool(OPT_USE_SYSTEM_TEMP_PATH) ? m_radSystemTempFolder : m_radCustomTempFolder)
+			->setChecked(true);
+		m_editTempFolder->setText(QString::fromStdString(mgr->GetString(OPT_CUSTOM_TEMP_PATH)));
 		const int mode = mgr->GetInt(OPT_CP_DEFAULT_MODE);
 		m_radCodepage[mode >= 0 && mode < 3 ? mode : 0]->setChecked(true);
 		m_cmbCustomCodepage->setEnabled(m_radCodepage[2]->isChecked());
@@ -1871,6 +1991,17 @@ void OptionsDialog::save()
 				project[operation][index] = item->checkState(operation + 1) == Qt::Checked;
 		}
 		Options::Project::Save(mgr, project);
+		// System (PropRegistry::WriteOptions): the fields trimmed, an empty
+		// editor its default again
+		mgr->SaveOption(OPT_USE_RECYCLE_BIN, m_chkUseRecycleBin->isChecked());
+		QString editor = m_editExternalEditor->text().trimmed();
+		if (editor.isEmpty())
+			editor = QString::fromStdString(mgr->GetDefault<String>(OPT_EXT_EDITOR_CMD));
+		mgr->SaveOption(OPT_EXT_EDITOR_CMD, editor.toStdString());
+		mgr->SaveOption(OPT_USERDATA_LOCATION, m_cmbUserDataLocation->currentIndex());
+		mgr->SaveOption(OPT_FILTER_USERPATH, m_editFilterFolder->text().trimmed().toStdString());
+		mgr->SaveOption(OPT_USE_SYSTEM_TEMP_PATH, m_radSystemTempFolder->isChecked());
+		mgr->SaveOption(OPT_CUSTOM_TEMP_PATH, m_editTempFolder->text().trimmed().toStdString());
 		int mode = 0;
 		for (int i = 0; i < 3; ++i)
 			if (m_radCodepage[i]->isChecked())
@@ -2037,6 +2168,19 @@ void OptionsDialog::restoreDefaults(int page)
 						static_cast<Options::Project::Operation>(operation),
 						static_cast<Options::Project::Item>(item));
 			showProjectSettings(m_projectList, project);
+		}
+		break;
+	case SystemPage:
+		if (COptionsMgr *mgr = GetOptionsMgr())
+		{
+			// PropRegistry::OnDefaults
+			m_chkUseRecycleBin->setChecked(mgr->GetDefault<bool>(OPT_USE_RECYCLE_BIN));
+			m_editExternalEditor->setText(QString::fromStdString(mgr->GetDefault<String>(OPT_EXT_EDITOR_CMD)));
+			m_cmbUserDataLocation->setCurrentIndex(mgr->GetDefault<int>(OPT_USERDATA_LOCATION));
+			m_editFilterFolder->setText(QString::fromStdString(mgr->GetDefault<String>(OPT_FILTER_USERPATH)));
+			(mgr->GetDefault<bool>(OPT_USE_SYSTEM_TEMP_PATH) ? m_radSystemTempFolder
+				: m_radCustomTempFolder)->setChecked(true);
+			m_editTempFolder->setText(QString::fromStdString(mgr->GetDefault<String>(OPT_CUSTOM_TEMP_PATH)));
 		}
 		break;
 	case BackupPage:

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "FilepathEdit.h"
+#include "EngineOptions.h"
 
 #include <QAction>
 #include <QApplication>
@@ -437,7 +438,7 @@ void FilepathEdit::openClipboard()
 	const QImage image = m_clipboardImages ? QApplication::clipboard()->image() : QImage();
 	if (m_clipboardImages && image.isNull())
 		return;
-	auto file = std::make_shared<QTemporaryFile>(QDir::tempPath()
+	auto file = std::make_shared<QTemporaryFile>(lm::tempPath()
 		+ (m_clipboardImages ? QStringLiteral("/CLPXXXXXX.png") : QStringLiteral("/CLPXXXXXX.txt")));
 	if (!file->open())
 		return;

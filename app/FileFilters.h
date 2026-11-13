@@ -28,9 +28,13 @@ namespace lm
 void installFileFilters();
 
 /** The folder of the preset filters shipped with the application, and
-    the user's own, where New and Install put theirs. */
+    the user's own, where New and Install put theirs: Options > System's
+    filter folder, else the one user data goes to. */
 QString sharedFiltersDir();
 QString userFiltersDir();
+/** The global filter's presets read again from every filter folder, as
+    the Options dialog is accepted; its mask stays. */
+void reloadFilterFiles();
 /** Other folders for both, an empty one meaning the usual place, and
     the presets read again (for tests). */
 void setFiltersDirsForTest(const QString &shared, const QString &user);

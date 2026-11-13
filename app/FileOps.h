@@ -55,4 +55,16 @@ QString askSaveAsPath(QWidget *parent, const QString &title,
 /** For tests: answer the Save As dialog with this instead. */
 void setSaveAsPathForTest(std::function<QString(const QString &start)> answer);
 
+/** CMergeApp::OpenFileToExternalEditor: the file opens in the editor of
+    Options > System, its %VAR% variables expanded, $linenum the line and
+    $file the file (put at the end when the command does not say where);
+    an error box when it cannot start. */
+bool openInExternalEditor(QWidget *parent, const QString &file, int line = 1);
+/** The command it would start (for tests): the program and its
+    arguments. */
+QStringList externalEditorCommand(const QString &file, int line);
+/** Start nothing, hand the command here instead (for tests); an empty
+    function starts it again. */
+void setExternalEditorForTest(std::function<bool(const QStringList &command)> run);
+
 } // namespace lm

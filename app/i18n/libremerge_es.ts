@@ -1190,6 +1190,13 @@ Desactive el filtro de visualización o ajuste la configuración del filtro para
     </message>
 </context>
 <context>
+    <name>FileOps</name>
+    <message>
+        <source>Failed to execute external editor: %1</source>
+        <translation>Error al ejecutar editor externo %1</translation>
+    </message>
+</context>
+<context>
     <name>FilepathEdit</name>
     <message>
         <source>Copy</source>
@@ -1793,10 +1800,26 @@ El archivo puede ser de solo lectura.</translation>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>derecho</translation>
     </message>
+    <message numerus="yes">
+        <source>Copy %n item(s) (%1)? Overwritten files are deleted.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>
+            <numerusform>¿Copiar %n elemento (%1)? Los archivos sobrescritos se eliminarán.</numerusform>
+            <numerusform>¿Copiar %n elementos (%1)? Los archivos sobrescritos se eliminarán.</numerusform>
+        </translation>
+    </message>
     <message>
         <source>LibreMerge</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>LibreMerge</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n item(s) could not be deleted.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>
+            <numerusform>No se ha podido eliminar %n elemento.</numerusform>
+            <numerusform>No se han podido eliminar %n elementos.</numerusform>
+        </translation>
     </message>
     <message numerus="yes">
         <source>Copy %n item(s) (%1)? Overwritten files go to the Trash.</source>
@@ -1820,6 +1843,14 @@ El archivo puede ser de solo lectura.</translation>
         <translation>
             <numerusform>¿Mover %n elemento a la Papelera?</numerusform>
             <numerusform>¿Mover %n elementos a la Papelera?</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Permanently delete %n item(s)?</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>
+            <numerusform>¿Eliminar permanentemente %n elemento?</numerusform>
+            <numerusform>¿Eliminar permanentemente %n elementos?</numerusform>
         </translation>
     </message>
     <message numerus="yes">
@@ -4974,6 +5005,70 @@ Por favor, use valores entre 1 y %1.</translation>
     <message>
         <source>Hidden Items</source>
         <translation>Elementos ocultos</translation>
+    </message>
+    <message>
+        <source>&amp;Use Recycle Bin</source>
+        <translation>&amp;Usar la Papelera de reciclaje</translation>
+    </message>
+    <message>
+        <source>&amp;External editor:</source>
+        <translation>&amp;Editor externo:</translation>
+    </message>
+    <message>
+        <source>&amp;Browse...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Browse...&quot;.</translatorcomment>
+        <translation>E&amp;xaminar...</translation>
+    </message>
+    <message>
+        <source>Parameters:
+$file: Current file path
+$linenum: Current cursor line number</source>
+        <translation>Parámetros:
+$file: nombre de la ruta del archivo actual
+$linenum: número de línea de la posición actual del cursor</translation>
+    </message>
+    <message>
+        <source>&amp;Store user data in:</source>
+        <translation>Guardar dato&amp;s de usuario en:</translation>
+    </message>
+    <message>
+        <source>Application Support folder</source>
+        <translatorcomment>After WinMerge&apos;s &quot;AppData (Roaming) folder&quot;.</translatorcomment>
+        <translation>Carpeta Application Support</translation>
+    </message>
+    <message>
+        <source>Configuration folder</source>
+        <translatorcomment>After WinMerge&apos;s &quot;AppData (Roaming) folder&quot;.</translatorcomment>
+        <translation>Carpeta de configuración</translation>
+    </message>
+    <message>
+        <source>Documents folder</source>
+        <translation>Carpeta Documentos</translation>
+    </message>
+    <message>
+        <source>&amp;Filter folder:</source>
+        <translation>Carpeta de &amp;filtros:</translation>
+    </message>
+    <message>
+        <source>B&amp;rowse...</source>
+        <translation>Examina&amp;r...</translation>
+    </message>
+    <message>
+        <source>Temporary files folder</source>
+        <translation>Carpeta de archivos temporales</translation>
+    </message>
+    <message>
+        <source>S&amp;ystem temp folder</source>
+        <translation>Carpeta temporal del s&amp;istema</translation>
+    </message>
+    <message>
+        <source>C&amp;ustom folder:</source>
+        <translation>Carpeta &amp;personalizada:</translation>
+    </message>
+    <message>
+        <source>Br&amp;owse...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Br&amp;owse...&quot;.</translatorcomment>
+        <translation>Exa&amp;minar...</translation>
     </message>
     <message>
         <source>Create backup files for:</source>
