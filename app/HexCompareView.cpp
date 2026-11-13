@@ -319,6 +319,11 @@ void HexCompareView::setReadOnlySides(const QList<bool> &readOnly)
 		m_panes[i]->setReadOnly(readOnly.value(i, false));
 }
 
+bool HexCompareView::isSideReadOnly(int side) const
+{
+	return side >= 0 && side < m_paneCount && m_panes[side]->isReadOnly();
+}
+
 bool HexCompareView::isModified() const
 {
 	for (int i = 0; i < m_paneCount; ++i)

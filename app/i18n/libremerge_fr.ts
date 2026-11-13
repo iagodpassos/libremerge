@@ -3344,8 +3344,21 @@ Le fichier est peut-être en lecture seule.</translation>
         <translation>&amp;Ouvrir...</translation>
     </message>
     <message>
+        <source>Open Pro&amp;ject...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Open Pro&amp;ject...\tCtrl+J&quot;.</translatorcomment>
+        <translation>Ouvrir un pro&amp;jet...</translation>
+    </message>
+    <message>
+        <source>Sa&amp;ve Project...</source>
+        <translation>Enre&amp;gistrer le projet...</translation>
+    </message>
+    <message>
         <source>Recent F&amp;iles or Folders</source>
         <translation>F&amp;ichiers (ou dossiers) récents</translation>
+    </message>
+    <message>
+        <source>Recent Projects</source>
+        <translation>Projets récents</translation>
     </message>
     <message>
         <source>(empty)</source>
@@ -4030,6 +4043,19 @@ Vérification de l&apos;identité binaire...</translation>
         <translation>&amp;Inclure les sous-dossiers</translation>
     </message>
     <message>
+        <source>Sa&amp;ve Project...</source>
+        <translation>Enre&amp;gistrer le projet...</translation>
+    </message>
+    <message>
+        <source>Open Pro&amp;ject...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Open Pro&amp;ject...\tCtrl+J&quot;.</translatorcomment>
+        <translation>Ouvrir un pro&amp;jet...</translation>
+    </message>
+    <message>
+        <source>&amp;Load Project...</source>
+        <translation>Charger &amp;un projet...</translation>
+    </message>
+    <message>
         <source>Compare As</source>
         <translatorcomment>After WinMerge&apos;s &quot;Co&amp;mpare As&quot;.</translatorcomment>
         <translation>Comparer en tant que</translation>
@@ -4177,6 +4203,37 @@ Vérification de l&apos;identité binaire...</translation>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Impossible de mélanger fichiers et dossiers : sélectionnez deux ou trois fichiers, ou bien deux ou trois dossiers ou archives.</translation>
     </message>
+    <message>
+        <source>WinMerge Project Files (*.WinMerge)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;WinMerge Project Files (*.WinMerge)|*.WinMerge||&quot;.</translatorcomment>
+        <translation>Fichiers de projet WinMerge (*.WinMerge)</translation>
+    </message>
+    <message>
+        <source>Project file loaded.</source>
+        <translation>Fichier de projet chargé.</translation>
+    </message>
+    <message>
+        <source>Unknown error saving project file.</source>
+        <translation>Erreur indéterminée lors de l&apos;enregistrement du projet.</translation>
+    </message>
+    <message>
+        <source>Project file saved.</source>
+        <translation>Fichier de projet enregistré.</translation>
+    </message>
+    <message>
+        <source>Cannot open file
+%1
+
+%2</source>
+        <translation>Impossible d&apos;ouvrir le fichier
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <source>Unknown error opening project file.</source>
+        <translation>Erreur indéterminée lors de l&apos;ouverture du projet.</translation>
+    </message>
 </context>
 <context>
     <name>OptionsDialog</name>
@@ -4284,6 +4341,14 @@ Vérification de l&apos;identité binaire...</translation>
     <message>
         <source>&amp;Character Set...</source>
         <translation>En&amp;codage...</translation>
+    </message>
+    <message>
+        <source>File Filters</source>
+        <translation>Filtres de fichier</translation>
+    </message>
+    <message>
+        <source>Load</source>
+        <translation>Charger</translation>
     </message>
     <message>
         <source>Codepage</source>
@@ -4673,6 +4738,10 @@ Vérification de l&apos;identité binaire...</translation>
         <translation>Langue :</translation>
     </message>
     <message>
+        <source>Project</source>
+        <translation>Projet</translation>
+    </message>
+    <message>
         <source>Language changes take effect after restarting LibreMerge.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Le changement de langue prend effet au redémarrage de LibreMerge.</translation>
@@ -4866,6 +4935,34 @@ Vérification de l&apos;identité binaire...</translation>
     <message>
         <source>W&amp;ord break characters:</source>
         <translation>Caractères de coupure de m&amp;ot :</translation>
+    </message>
+    <message>
+        <source>Items saved to or restored from the project file:</source>
+        <translation>Éléments enregistrés ou restaurés à partir du fichier de projet :</translation>
+    </message>
+    <message>
+        <source>Item</source>
+        <translation>Élément</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Ouvrir</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>Enregistrer</translation>
+    </message>
+    <message>
+        <source>Include Subfolders</source>
+        <translation>Inclure les sous-dossiers</translation>
+    </message>
+    <message>
+        <source>Compare Options</source>
+        <translation>Préférences de comparaison</translation>
+    </message>
+    <message>
+        <source>Hidden Items</source>
+        <translation>Éléments cachés</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

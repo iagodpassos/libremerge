@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
 #include <QStringList>
 #include <QWidget>
 
@@ -37,9 +38,56 @@ public:
 		/** The window picked from the Compare button's arrow (COpenView's
 		    OnCompare with ID_MERGE_COMPARE_*), Automatic for Compare. */
 		lm::CommandLine::WindowType windowType = lm::CommandLine::WindowType::Automatic;
+		/** The items a folder comparison keeps out of its list, as a
+		    project loaded here or the comparison saved from says
+		    (OpenFolderParams). */
+		QStringList hiddenItems;
+	};
+
+	/** What a comparison hands to the screen for File > Save Project
+	    (CMainFrame::OnSaveProject fills a COpenDoc with it). */
+	struct Prefill
+	{
+		QStringList paths;
+		QList<bool> readOnly;
+		QStringList descriptions;
+		bool recursive = true;
+		QString filter;
+		/** 1 text, 2 table, 3 binary, 4 image; -1 when none. */
+		int windowType = -1;
+		QChar tableDelimiter = QLatin1Char(',');
+		QChar tableQuote = QLatin1Char('"');
+		bool tableAllowNewlines = false;
+		QStringList hiddenItems;
 	};
 
 	explicit NewComparisonView(QWidget *parent = nullptr);
+
+	/** Fill the screen with a comparison's paths and settings, to save
+	    them as a project. */
+	void prefill(const Prefill &state);
+	/** COpenView::OnLoadProject: the first comparison of a project file
+	    fills the screen, its items as Options > Project's Load column
+	    says. */
+	void loadProject();
+	/** COpenView::OnSaveProject: the screen saved as a project file, its
+	    items as the Save column says. */
+	void saveProject();
+	/** COpenView::AskProjectFileName: the project file to open or to save,
+	    picked in the folder of the last one (OPT_PROJECTS_PATH); empty
+	    when cancelled. */
+	static QString askProjectFileName(QWidget *parent, bool open);
+	/** Answer that question without a dialog (for tests); an empty
+	    function shows the dialog again. */
+	static void setProjectFileNameForTest(std::function<QString(bool open)> answer);
+	/** The paths and read-only checks in the fields, and what the screen
+	    keeps for a project (for tests). */
+	QStringList pathsForTest() const;
+	QList<bool> readOnlyForTest() const;
+	bool includeSubfoldersForTest() const;
+	QStringList hiddenItemsForTest() const { return m_hiddenItems; }
+	int windowTypeForTest() const { return m_windowType; }
+	int ignoreWhiteForTest() const { return m_ignoreWhite; }
 
 	/** Fill the first empty slots with the given paths. */
 	void addPaths(const QStringList &paths);
@@ -76,6 +124,9 @@ public:
 
 signals:
 	void compareRequested(const NewComparisonView::Request &request);
+	/** Compare with a project file as the first path and nothing more:
+	    the project opens (COpenView::OnCompare). */
+	void openProjectRequested(const QString &path);
 	void cancelled();
 
 protected:
@@ -106,6 +157,9 @@ private:
 	/** The screen's compare options saved as the options in use
 	    (COpenView::OnCompare). */
 	void saveCompareOptions() const;
+	/** A project file as the first path with no second one, which
+	    Compare opens (UpdateButtonStatesThread's bProject). */
+	bool projectInFirstField() const;
 	struct Slot
 	{
 		QComboBox *path;
@@ -137,6 +191,15 @@ private:
 	// COpenView's compare options (m_nIgnoreWhite...): the saved ones as
 	// the screen opens, changed from the Options button's arrow, saved as
 	// Compare runs
+	// COpenDoc's values for a project, from one loaded here or the
+	// comparison it was saved from: kept for the next save, the hidden
+	// items handed to the folder comparison too
+	QString m_descriptions[3];
+	int m_windowType = -1;
+	QChar m_tableDelimiter = QLatin1Char(',');
+	QChar m_tableQuote = QLatin1Char('"');
+	bool m_tableAllowNewlines = false;
+	QStringList m_hiddenItems;
 	int m_ignoreWhite = 0;
 	bool m_ignoreBlankLines = false;
 	bool m_ignoreCase = false;

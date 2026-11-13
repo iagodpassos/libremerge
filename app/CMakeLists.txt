@@ -54,6 +54,7 @@ qt_add_executable(LibreMerge
   ArchiveCompare.cpp
   AboutDialog.cpp
   ProjectLinks.cpp
+  ProjectFile.cpp
   StarPrompt.cpp
   DesktopIntegration.cpp
   FileOps.cpp

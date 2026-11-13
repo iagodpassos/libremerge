@@ -47,6 +47,7 @@
 #include "BinaryFiles.h"
 #include "ImageFormats.h"
 #include "MessageBoxes.h"
+#include "ProjectFile.h"
 #include "OptionsDialog.h"
 #include "AboutDialog.h"
 #include "ArchiveCompare.h"
@@ -62,6 +63,7 @@
 // engine
 #include "OptionsMgr.h"
 #include "OptionsDef.h"
+#include "OptionsProject.h"
 
 namespace
 {
@@ -76,6 +78,37 @@ QString displayName(const QString &path)
 		trimmed.chop(1);
 	const QString name = QFileInfo(trimmed).fileName();
 	return name.isEmpty() ? trimmed : name;
+}
+
+/** MFC's AbbreviateName, as its recent file list shows a path in a menu:
+    whole up to 30 characters, else its root, "..." and as much of its end
+    as fits, at least the file's name. */
+QString abbreviatedProjectPath(const QString &path)
+{
+	constexpr int kMax = 30;
+	const QString native = QDir::toNativeSeparators(path);
+	if (native.size() <= kMax)
+		return native;
+	const QChar separator = QDir::separator();
+	const int nameAt = native.lastIndexOf(separator) + 1;
+	const int rootEnd = native.indexOf(separator) + 1;
+	const QString root = native.left(rootEnd);
+	const QString ellipsis = QStringLiteral("...") + separator;
+	QString tail = native.mid(nameAt);
+	if (root.size() + ellipsis.size() + tail.size() > kMax)
+		return tail;
+	for (int at = nameAt - 1; at > rootEnd - 1;)
+	{
+		const int previous = native.lastIndexOf(separator, at - 1);
+		if (previous < rootEnd - 1)
+			break;
+		const QString longer = native.mid(previous + 1);
+		if (root.size() + ellipsis.size() + longer.size() > kMax)
+			break;
+		tail = longer;
+		at = previous;
+	}
+	return root + ellipsis + tail;
 }
 
 /** macOS moves menu-bar actions into the application menu by role, and
@@ -224,9 +257,55 @@ MainWindow::MainWindow(QWidget *parent)
 		[this]() { openBlankComparison(); });
 	addMenuAction(fileMenu, tr("&Open..."), QKeySequence::Open,
 		[this]() { newComparison(); });
+	// WinMerge's project files: Open Project (Ctrl+J), Save Project, and
+	// the recent projects right in the menu, as MFC lists them
+	fileMenu->addSeparator();
+	addMenuAction(fileMenu, tr("Open Pro&ject..."), QKeySequence(Qt::CTRL | Qt::Key_J),
+		[this]() { openProject(); })->setObjectName(QStringLiteral("openProjectAction"));
+	addMenuAction(fileMenu, tr("Sa&ve Project..."), QKeySequence(),
+		[this]() { saveProject(); })->setObjectName(QStringLiteral("saveProjectAction"));
+	fileMenu->addSeparator();
 	// WinMerge's File > Recent Files or Folders: each entry is a whole
 	// comparison, rebuilt from settings every time the menu opens
 	QMenu *recentMenu = fileMenu->addMenu(tr("Recent F&iles or Folders"));
+	// the recent projects go between the separator and that menu, built
+	// again as the File menu opens (CRecentFileList::UpdateMenu): "Recent
+	// Projects" grayed while there are none
+	auto projectActions = std::make_shared<QList<QPointer<QAction>>>();
+	connect(fileMenu, &QMenu::aboutToShow, this,
+		[this, fileMenu, recentMenu, projectActions]() {
+			for (const QPointer<QAction> &action : *projectActions)
+				delete action.data();
+			projectActions->clear();
+			QAction *before = recentMenu->menuAction();
+			const QStringList projects = recentProjects();
+			if (projects.isEmpty())
+			{
+				auto *none = new QAction(tr("Recent Projects"), fileMenu);
+				none->setEnabled(false);
+				none->setMenuRole(QAction::NoRole);
+				fileMenu->insertAction(before, none);
+				projectActions->append(none);
+			}
+			for (int i = 0; i < projects.size(); ++i)
+			{
+				const QString &project = projects.at(i);
+				// MFC's numbering: &1 to &9, 1&0, then plain numbers
+				const QString number = i < 9 ? QStringLiteral("&%1").arg(i + 1)
+					: i == 9 ? QStringLiteral("1&0") : QString::number(i + 1);
+				auto *action = new QAction(number + QLatin1Char(' ')
+					+ abbreviatedProjectPath(project).replace(QLatin1Char('&'),
+						QStringLiteral("&&")), fileMenu);
+				action->setToolTip(QDir::toNativeSeparators(project));
+				action->setObjectName(QStringLiteral("recentProject%1").arg(i + 1));
+				// a file called "about" must not move to the application menu
+				action->setMenuRole(QAction::NoRole);
+				connect(action, &QAction::triggered, this,
+					[this, project]() { openProjectFile(project); });
+				fileMenu->insertAction(before, action);
+				projectActions->append(action);
+			}
+		});
 	connect(recentMenu, &QMenu::aboutToShow, this, [this, recentMenu]() {
 		recentMenu->clear();
 		const QStringList entries = QSettings()
@@ -285,6 +364,10 @@ MainWindow::MainWindow(QWidget *parent)
 				if (!hex->saveModified(&error) && !error.isEmpty())
 					lm::warning(this, tr("LibreMerge"), tr("Could not save:\n%1").arg(error));
 			}
+			// on the selection screen, Save saves it as a project
+			// (COpenView's ID_FILE_SAVE)
+			else if (auto *selector = qobject_cast<NewComparisonView *>(m_tabs->currentWidget()))
+				selector->saveProject();
 		});
 	// WinMerge's File > Reload (Ctrl+F5). With the Command key that is
 	// macOS's VoiceOver switch, so Reload takes the platform's own Cmd+R
@@ -1477,6 +1560,8 @@ void MainWindow::openFromCommandLine(const lm::CommandLine &cmd)
 	}
 	else if (paths.size() == 1 && cmd.selfCompare)
 		openSelfComparison(paths.first());
+	else if (paths.size() == 1 && lm::ProjectFile::isProjectFile(paths.first()))
+		openProjectFile(paths.first());
 	else if (!paths.isEmpty())
 		openSelector(paths);
 	else if (cmd.newCompare)
@@ -1940,7 +2025,8 @@ void MainWindow::openFolderComparison(const QString &leftDir, const QString &rig
 	openFolderComparison(QStringList{ leftDir, rightDir });
 }
 
-void MainWindow::openFolderComparison(const QStringList &dirs, std::optional<bool> recursive)
+void MainWindow::openFolderComparison(const QStringList &dirs, std::optional<bool> recursive,
+	const QStringList &hiddenItems)
 {
 	for (const QString &dir : dirs)
 		if (!QFileInfo(dir).isDir())
@@ -1992,6 +2078,9 @@ void MainWindow::openFolderComparison(const QStringList &dirs, std::optional<boo
 	const int index = m_tabs->addTab(view, QString());
 	m_tabs->setCurrentIndex(index);
 	rememberComparison(dirs);
+	// what a project or the selection screen keeps out of the list
+	// (OpenFolderParams::m_hiddenItems, CDirDoc::SetHiddenItems)
+	view->setHiddenItems(hiddenItems);
 	view->start(dirs);
 	nameTab();
 }
@@ -2252,6 +2341,239 @@ void MainWindow::reopenComparison(const QStringList &paths)
 		openFileComparison(paths);
 }
 
+namespace
+{
+const QString kRecentProjectsKey = QStringLiteral("RecentProjects/List");
+// MFC's recent file list holds OPT_MRU_MAX names, 15 by default
+constexpr int kRecentProjectsMax = 15;
+}
+
+QStringList MainWindow::recentProjects()
+{
+	return QSettings().value(kRecentProjectsKey).toStringList();
+}
+
+void MainWindow::rememberProject(const QString &path)
+{
+	// on top, once
+	const QString absolute = QFileInfo(path).absoluteFilePath();
+	QStringList projects = recentProjects();
+	projects.removeAll(absolute);
+	projects.prepend(absolute);
+	while (projects.size() > kRecentProjectsMax)
+		projects.removeLast();
+	QSettings().setValue(kRecentProjectsKey, projects);
+}
+
+void MainWindow::openProject()
+{
+	const QString path = NewComparisonView::askProjectFileName(this, true);
+	if (!path.isEmpty())
+		openProjectFile(path);
+}
+
+bool MainWindow::openProjectFile(const QString &path)
+{
+	if (path.isEmpty())
+		return false;
+	lm::ProjectFile project;
+	QString error;
+	if (!project.read(path, &error))
+	{
+		// CMergeApp::LoadProjectFile
+		lm::showError(this, NewComparisonView::tr("Cannot open file\n%1\n\n%2")
+			.arg(QDir::toNativeSeparators(path),
+				NewComparisonView::tr("Unknown error opening project file.") + error));
+		return false;
+	}
+	COptionsMgr *mgr = GetOptionsMgr();
+	using Options::Project::Item;
+	const auto open = [mgr](Item what) {
+		return Options::Project::Get(mgr, Options::Project::Operation::Open, what);
+	};
+	for (const lm::ProjectFileItem &item : project.items)
+	{
+		QStringList paths = item.paths();
+		for (QString &side : paths)
+			side = lm::ProjectFile::resolvePath(side, path);
+		const bool threeWay = paths.size() == 3;
+		QList<bool> readOnly{ item.leftReadOnly };
+		QStringList descriptions{ item.leftDesc.value_or(QString()) };
+		if (threeWay)
+		{
+			readOnly << item.middleReadOnly << item.rightReadOnly;
+			descriptions << item.middleDesc.value_or(QString()) << item.rightDesc.value_or(QString());
+		}
+		else
+		{
+			readOnly << item.rightReadOnly;
+			descriptions << item.rightDesc.value_or(QString());
+		}
+		// the filter for this run (the global filter, unsaved)
+		if (open(Item::FileFilter) && item.filter.has_value())
+			lm::useFileFilterMask(item.filter->trimmed());
+		bool recursive = lm::includeSubfolders();
+		if (open(Item::IncludeSubfolders) && item.subfolders.has_value())
+			recursive = *item.subfolders > 0;
+		if (mgr != nullptr)
+			mgr->Set(OPT_CMP_INCLUDE_SUBDIRS, recursive);
+		// the compare options for this run too; upstream leaves "Ignore
+		// Missing Trailing EOL" and "Ignore Line Breaks" out here, so a
+		// project's never took effect: corrected
+		if (mgr != nullptr && open(Item::CompareOptions))
+		{
+			if (item.ignoreWhite.has_value())
+				mgr->Set(OPT_CMP_IGNORE_WHITESPACE, *item.ignoreWhite);
+			if (item.ignoreBlankLines.has_value())
+				mgr->Set(OPT_CMP_IGNORE_BLANKLINES, *item.ignoreBlankLines);
+			if (item.ignoreCase.has_value())
+				mgr->Set(OPT_CMP_IGNORE_CASE, *item.ignoreCase);
+			if (item.ignoreEol.has_value())
+				mgr->Set(OPT_CMP_IGNORE_EOL, *item.ignoreEol);
+			if (item.ignoreNumbers.has_value())
+				mgr->Set(OPT_CMP_IGNORE_NUMBERS, *item.ignoreNumbers);
+			if (item.ignoreCodepage.has_value())
+				mgr->Set(OPT_CMP_IGNORE_CODEPAGE, *item.ignoreCodepage);
+			if (item.ignoreMissingTrailingEol.has_value())
+				mgr->Set(OPT_CMP_IGNORE_MISSING_TRAILING_EOL, *item.ignoreMissingTrailingEol);
+			if (item.ignoreLineBreaks.has_value())
+				mgr->Set(OPT_CMP_IGNORE_LINE_BREAKS, *item.ignoreLineBreaks);
+			if (item.filterCommentsLines.has_value())
+				mgr->Set(OPT_CMP_FILTER_COMMENTLINES, *item.filterCommentsLines);
+			if (item.compareMethod.has_value())
+				mgr->Set(OPT_CMP_METHOD, *item.compareMethod);
+		}
+		const QStringList hidden = open(Item::HiddenItems) ? item.hiddenItems : QStringList();
+
+		// the sides open as the command line's would, kept out of the
+		// recent comparisons (FFILEOPEN_PROJECT | FFILEOPEN_NOMRU), a table
+		// with the project's layout (OpenTableFileParams)
+		lm::CommandLine opening;
+		opening.leftFlags = lm::CommandLine::NoMru;
+		const int windowType = item.windowType.value_or(0);
+		if (windowType == 2)
+		{
+			opening.tableDelimiter = item.tableDelimiter.value_or(QLatin1Char(','));
+			opening.tableQuote = item.tableQuote.value_or(QLatin1Char('"'));
+			opening.tableAllowNewlinesInQuotes = item.tableAllowNewLinesInQuotes.value_or(true);
+		}
+		const lm::CommandLine *const outer = m_openingCommandLine;
+		m_openingCommandLine = &opening;
+		QWidget *const before = m_tabs->currentWidget();
+		const int count = m_tabs->count();
+		// fewer than two paths, or one that is not there: a selection
+		// screen of its own with them (DoFileOrFolderOpen's COpenDoc)
+		bool missing = false;
+		for (const QString &side : paths)
+			missing = missing || (!side.isEmpty() && !side.contains(QStringLiteral("://"))
+				&& !QFileInfo::exists(side));
+		if (paths.size() < 2 || missing)
+		{
+			NewComparisonView::Prefill state;
+			state.paths = paths;
+			state.readOnly = readOnly;
+			state.recursive = recursive;
+			state.filter = lm::fileFilterMask();
+			NewComparisonView *selector = createSelectorTab();
+			selector->prefill(state);
+			selector->focusFirstField();
+		}
+		else
+		{
+			switch (windowType)
+			{
+			case 1:
+				openFileComparison(paths, readOnly, true);
+				break;
+			case 2:
+				openTableComparison(paths);
+				break;
+			case 3:
+				openHexComparison(paths, readOnly);
+				break;
+			case 4:
+				openImageComparison(paths, readOnly);
+				break;
+			default: // and 5, the web page LibreMerge does not compare
+				if (allFolderLike(paths))
+					openFolderComparison(paths, recursive, hidden);
+				else
+					openFileComparison(paths, readOnly);
+				break;
+			}
+		}
+		m_openingCommandLine = outer;
+		QWidget *page = m_tabs->currentWidget();
+		if (page != nullptr && !(page == before && m_tabs->count() == count))
+			describeSides(page, descriptions);
+	}
+	rememberProject(path);
+	return true;
+}
+
+void MainWindow::saveProject()
+{
+	// CMainFrame::OnSaveProject: the comparison in front fills a screen of
+	// its own; anything else leaves it blank
+	NewComparisonView::Prefill state;
+	state.recursive = lm::includeSubfolders();
+	state.filter = lm::fileFilterMask();
+	bool fromComparison = true;
+	QWidget *page = m_tabs->currentWidget();
+	const auto takeSides = [&state](const QStringList &paths, auto *view) {
+		state.paths = paths;
+		for (int side = 0; side < paths.size(); ++side)
+			state.descriptions.append(view->sideDescription(side));
+	};
+	if (auto *file = qobject_cast<FileCompareView *>(page))
+	{
+		takeSides(file->paths(), file);
+		for (int side = 0; side < state.paths.size(); ++side)
+			state.readOnly.append(file->isSideReadOnly(side));
+		state.windowType = 1;
+	}
+	else if (auto *table = qobject_cast<TableCompareView *>(page))
+	{
+		takeSides(table->paths(), table);
+		state.windowType = 2;
+		const lm::TableProps props = table->tableProps();
+		if (!props.delimiter.isNull())
+			state.tableDelimiter = props.delimiter;
+		state.tableQuote = props.quote;
+		state.tableAllowNewlines = props.allowNewlinesInQuotes;
+	}
+	else if (auto *hex = qobject_cast<HexCompareView *>(page))
+	{
+		takeSides(hex->paths(), hex);
+		for (int side = 0; side < state.paths.size(); ++side)
+			state.readOnly.append(hex->isSideReadOnly(side));
+		state.windowType = 3;
+	}
+	else if (auto *image = qobject_cast<ImageCompareView *>(page))
+	{
+		takeSides(image->paths(), image);
+		for (int side = 0; side < state.paths.size(); ++side)
+			state.readOnly.append(image->isSideReadOnly(side));
+		state.windowType = 4;
+	}
+	else if (auto *folder = qobject_cast<FolderCompareView *>(page))
+	{
+		// the folders with their trailing separator, the comparison's own
+		// subfolders, filter and hidden items
+		for (const QString &root : folder->roots())
+			state.paths.append(root.endsWith(QLatin1Char('/')) ? root : root + QLatin1Char('/'));
+		state.recursive = folder->isRecursive();
+		state.filter = folder->fileFilter();
+		state.hiddenItems = folder->hiddenItems();
+	}
+	else
+		fromComparison = false;
+	NewComparisonView *selector = createSelectorTab();
+	if (fromComparison)
+		selector->prefill(state);
+	selector->focusFirstField();
+}
+
 void MainWindow::openSelector(const QStringList &paths)
 {
 	// reuse an existing selector tab if one is open
@@ -2265,8 +2587,14 @@ void MainWindow::openSelector(const QStringList &paths)
 		}
 	}
 
-	auto *selector = new NewComparisonView(this);
+	NewComparisonView *selector = createSelectorTab();
 	selector->addPaths(paths);
+	selector->focusFirstField();
+}
+
+NewComparisonView *MainWindow::createSelectorTab()
+{
+	auto *selector = new NewComparisonView(this);
 	// Cancel closes the screen even when it is the last tab, leaving the
 	// window empty, like COpenView::OnCancel (ID_FILE_CLOSE)
 	const auto closeSelectorLater = [this, guard = QPointer(selector)]() {
@@ -2315,7 +2643,7 @@ void MainWindow::openSelector(const QStringList &paths)
 						break;
 					default:
 						if (request.folders)
-							openFolderComparison(selected);
+							openFolderComparison(selected, std::nullopt, request.hiddenItems);
 						else
 							openFileComparison(selected, readOnly);
 						break;
@@ -2329,10 +2657,15 @@ void MainWindow::openSelector(const QStringList &paths)
 						closeTab(index);
 				});
 		});
+	// a project file as the only path: it opens (deferred as above)
+	connect(selector, &NewComparisonView::openProjectRequested, this,
+		[this](const QString &path) {
+			QTimer::singleShot(0, this, [this, path]() { openProjectFile(path); });
+		});
 	connect(selector, &NewComparisonView::cancelled, this, closeSelectorLater);
 	const int index = m_tabs->addTab(selector, tr("Select Files or Folders"));
 	m_tabs->setCurrentIndex(index);
-	selector->focusFirstField();
+	return selector;
 }
 
 void MainWindow::gotoFirstDifference()
@@ -2345,6 +2678,15 @@ void MainWindow::handleIncomingPaths(const QStringList &paths)
 {
 	if (paths.isEmpty())
 		return;
+
+	// a project file alone opens, as CMainFrame::OnDropFiles does with one
+	if (paths.size() == 1 && lm::ProjectFile::isProjectFile(paths.first())
+		&& QFileInfo(paths.first()).isFile())
+	{
+		openProjectFile(paths.first());
+		closeStartupPlaceholder();
+		return;
+	}
 
 	// a selector tab that is open collects the drops
 	for (int i = 0; i < m_tabs->count(); ++i)

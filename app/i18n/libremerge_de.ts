@@ -3334,9 +3334,22 @@ Patches sind nicht betroffen.</translation>
         <translation>&amp;Öffnen...</translation>
     </message>
     <message>
+        <source>Open Pro&amp;ject...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Open Pro&amp;ject...\tCtrl+J&quot;.</translatorcomment>
+        <translation>Pro&amp;jekt öffnen...</translation>
+    </message>
+    <message>
+        <source>Sa&amp;ve Project...</source>
+        <translation>P&amp;rojekt speichern...</translation>
+    </message>
+    <message>
         <source>Recent F&amp;iles or Folders</source>
         <translatorcomment>Changed in a native speaker&apos;s review; WinMerge&apos;s is &quot;Kürzlich&amp;e Dateien oder Ordner&quot;.</translatorcomment>
         <translation>&amp;Kürzlich verwendet</translation>
+    </message>
+    <message>
+        <source>Recent Projects</source>
+        <translation>Kürzliche Projekte</translation>
     </message>
     <message>
         <source>(empty)</source>
@@ -4035,6 +4048,19 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <translation>&amp;Unterordner einbeziehen</translation>
     </message>
     <message>
+        <source>Sa&amp;ve Project...</source>
+        <translation>P&amp;rojekt speichern...</translation>
+    </message>
+    <message>
+        <source>Open Pro&amp;ject...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Open Pro&amp;ject...\tCtrl+J&quot;.</translatorcomment>
+        <translation>Pro&amp;jekt öffnen...</translation>
+    </message>
+    <message>
+        <source>&amp;Load Project...</source>
+        <translation>Projekt &amp;laden...</translation>
+    </message>
+    <message>
         <source>Compare As</source>
         <translatorcomment>After WinMerge&apos;s &quot;Co&amp;mpare As&quot;.</translatorcomment>
         <translation>Vergleichen als</translation>
@@ -4180,6 +4206,37 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Das Mischen von Dateien und Ordnern wird nicht unterstützt: Wählen Sie zwei oder drei Dateien oder zwei oder drei Ordner bzw. Archive aus.</translation>
     </message>
+    <message>
+        <source>WinMerge Project Files (*.WinMerge)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;WinMerge Project Files (*.WinMerge)|*.WinMerge||&quot;.</translatorcomment>
+        <translation>WinMerge-Projektdatei (*.WinMerge)</translation>
+    </message>
+    <message>
+        <source>Project file loaded.</source>
+        <translation>Projektdatei erfolgreich geladen.</translation>
+    </message>
+    <message>
+        <source>Unknown error saving project file.</source>
+        <translation>Unbekannter Fehler beim Versuch, die Projektdatei zu speichern.</translation>
+    </message>
+    <message>
+        <source>Project file saved.</source>
+        <translation>Projektdatei erfolgreich gespeichert.</translation>
+    </message>
+    <message>
+        <source>Cannot open file
+%1
+
+%2</source>
+        <translation>Kann Datei nicht öffnen
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <source>Unknown error opening project file.</source>
+        <translation>Unbekannter Fehler beim Versuch, die Projektdatei zu öffnen.</translation>
+    </message>
 </context>
 <context>
     <name>OptionsDialog</name>
@@ -4288,6 +4345,14 @@ Die binäre Übereinstimmung wird geprüft...</translation>
     <message>
         <source>&amp;Character Set...</source>
         <translation>&amp;Zeichensatz...</translation>
+    </message>
+    <message>
+        <source>File Filters</source>
+        <translation>Dateifilter</translation>
+    </message>
+    <message>
+        <source>Load</source>
+        <translation>Laden</translation>
     </message>
     <message>
         <source>Codepage</source>
@@ -4683,6 +4748,10 @@ löschen?</translation>
         <translation>Sprache:</translation>
     </message>
     <message>
+        <source>Project</source>
+        <translation>Projekt</translation>
+    </message>
+    <message>
         <source>Language changes take effect after restarting LibreMerge.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Sprachänderungen werden nach einem Neustart von LibreMerge wirksam.</translation>
@@ -4877,6 +4946,34 @@ Drücken Sie &apos;Zurücksetzen&apos;, um alle Meldungen wieder sichtbar zu sch
     <message>
         <source>W&amp;ord break characters:</source>
         <translation>W&amp;ortumbruchzeichen:</translation>
+    </message>
+    <message>
+        <source>Items saved to or restored from the project file:</source>
+        <translation>In der Projektdatei gespeicherte oder aus ihr wiederhergestellte Elemente:</translation>
+    </message>
+    <message>
+        <source>Item</source>
+        <translation>Objekt</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Öffnen</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>Speichern</translation>
+    </message>
+    <message>
+        <source>Include Subfolders</source>
+        <translation>Unterordner einbeziehen</translation>
+    </message>
+    <message>
+        <source>Compare Options</source>
+        <translation>Vergleichseinstellungen</translation>
+    </message>
+    <message>
+        <source>Hidden Items</source>
+        <translation>Ausgeblendete Objekte</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

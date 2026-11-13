@@ -19,7 +19,7 @@ LibreMerge vendors the comparison engine of **WinMerge**.
 | `engine/Externals/xdiff/` | `Externals/xdiff/` | git's xdiff (histogram/patience algorithms) |
 | `engine/Src/CompareEngines/` | `Src/CompareEngines/` | Folder-compare methods (byte, binary, time/size, existence, quick) |
 | `engine/Src/FilterEngine/` | `Src/FilterEngine/` | Filter expression language (re2c lexer, lemon parser) |
-| `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect`, `TableProps` (the table layout `DiffWrapper` takes), `TreeSitterParser` (Tree-sitter highlighting and comment detection), `OptionsEditorSyntax` (the extensions of each file type, Options > Editor > Syntax), `OptionsDiffColors`, `OptionsDirColors`, `OptionsSyntaxColors` and `OptionsCustomColors` (the color options a color scheme fills) |
+| `engine/Src/*.{cpp,h}` | `Src/*.{cpp,h}` | Diff orchestration: `DiffWrapper`, `DiffList`, `DirScan`, `DiffContext`, `FolderCmp`, `DirTravel`, moved-block detection, `stringdiffs`, file/line/substitution filters, `codepage_detect`, `TableProps` (the table layout `DiffWrapper` takes), `TreeSitterParser` (Tree-sitter highlighting and comment detection), `OptionsEditorSyntax` (the extensions of each file type, Options > Editor > Syntax), `OptionsProject` (what a project file brings in and keeps, Options > Project), `OptionsDiffColors`, `OptionsDirColors`, `OptionsSyntaxColors` and `OptionsCustomColors` (the color options a color scheme fills) |
 | `engine/Src/Common/` | `Src/Common/` | Portable utilities: `unicoder`, `UnicodeString`, `UniFile`, `paths`, `OptionsMgr`/`IniOptionsMgr`, `charsets`, `TempFile` support |
 | `tests/` | `Testing/GoogleTest/` | Upstream unit tests for the engine + `TestData/` |
 | `engine/Externals/crystaledit/editlib/` | `Externals/crystaledit/editlib/` | The editor's language definitions (`TextDefinition`), its built-in parsers and `SyntaxColors` (the editor's colors and their defaults) |
@@ -122,10 +122,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 768 | 191 | 255 | 3 | 3 |
-| Spanish | 753 | 204 | 253 | 10 | 0 |
-| Catalan | 429 | 200 | 255 | 336 | 0 |
-| French | 767 | 213 | 237 | 3 | 0 |
+| German | 787 | 194 | 255 | 3 | 3 |
+| Spanish | 772 | 207 | 253 | 10 | 0 |
+| Catalan | 448 | 203 | 255 | 336 | 0 |
+| French | 786 | 216 | 237 | 3 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -156,9 +156,16 @@ code. Where that code has an evident slip, the rewrite corrects it and
 says so in a comment:
 
 - Compare on the selection screen saves all of the compare options of
-  the Options button's arrow. Upstream (`COpenView::OnCompare`) leaves
-  "Ignore Missing Trailing EOL" and "Ignore Line Breaks" out, so what its
-  menu said of them never reached the comparison.
+  the Options button's arrow, and opening a project takes all of the
+  project's. Upstream (`COpenView::OnCompare`,
+  `CMergeApp::LoadAndOpenProjectFile`) leaves "Ignore Missing Trailing
+  EOL" and "Ignore Line Breaks" out of both, so what the menu or the
+  project said of them never reached the comparison.
+- Load Project on the selection screen takes the project's paths as
+  Open Project does: its `%VAR%` variables expanded, a relative path made
+  one in the project file's folder. Upstream (`COpenView::OnLoadProject`)
+  puts them in the fields as written, so a relative path compared against
+  the current folder instead of the project's.
 - A change of Options > Editor > "Highlight syntax" colors each file by the
   types it opened with (`SetTextTypesByFileType`: a file whose extension
   gives none takes another pane's, XML by a declaration on the first
@@ -318,6 +325,11 @@ and its numbers (`DrawMargin`), the folder items by result
 - **7-Zip `Rar*` codecs**: unRAR license restriction is GPL-incompatible (archive support will use libarchive, without RAR).
 - **winwebdiff**: depends on WebView2 (proprietary, Windows-only).
 - `*.vcxitems` / `*.sln`: Visual Studio build files, replaced by CMake.
+- `Src/ProjectFile.{cpp,h}`: written again in `app/ProjectFile.*` over Qt's
+  XML stream classes, with upstream's elements in upstream's order and its
+  rules for what is written. The unpacker and prediffer elements are left
+  out, and so is the Plugins row of Options > Project (`OptionsProject`
+  keeps its settings): the plugins are COM (see `FileTransform.cpp`).
 
 ## Local modification policy
 

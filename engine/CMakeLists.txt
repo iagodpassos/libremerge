@@ -56,6 +56,7 @@ set(L1_SOURCES
 set(L2_SOURCES
   Src/CompareOptions.cpp
   Src/OptionsEditorSyntax.cpp
+  Src/OptionsProject.cpp
   Src/OptionsDiffColors.cpp
   Src/OptionsDirColors.cpp
   Src/OptionsSyntaxColors.cpp

@@ -48,6 +48,7 @@
 #include "OptionsMgr.h"
 #include "OptionsDef.h"
 #include "OptionsEditorSyntax.h"
+#include "OptionsProject.h"
 #include "OptionsSyntaxColors.h"
 #include "SyntaxColors.h"
 #include "TextDefinition.h"
@@ -241,6 +242,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	addCategory(colors, tr("Folder Compare"), DirColorsPage);
 	addCategory(colors, tr("System"), SysColorsPage);
 	addCategory(nullptr, tr("Archive Support"), ArchivePage);
+	addCategory(nullptr, tr("Project"), ProjectPage);
 	addCategory(nullptr, tr("Backup Files"), BackupPage);
 	addCategory(nullptr, tr("Codepage"), CodepagePage);
 	m_categories->expandAll();
@@ -266,6 +268,7 @@ OptionsDialog::OptionsDialog(QWidget *parent)
 	m_pages->addWidget(buildDirColorsPage());
 	m_pages->addWidget(buildSysColorsPage());
 	m_pages->addWidget(buildArchivePage());
+	m_pages->addWidget(buildProjectPage());
 	m_pages->addWidget(buildBackupPage());
 	m_pages->addWidget(buildCodepagePage());
 	pageArea->addWidget(m_pages, 1);
@@ -1500,6 +1503,68 @@ QWidget *OptionsDialog::buildArchivePage()
 	return page;
 }
 
+/** WinMerge's Project page (PropProject): which items of a project file
+    opening it (Open), loading it into the selection screen (Load) and
+    saving one (Save) take, a column of check boxes each. Upstream's
+    Plugins row is left out: LibreMerge runs no plugins. */
+QWidget *OptionsDialog::buildProjectPage()
+{
+	auto *page = new QWidget(this);
+	auto *box = new QVBoxLayout(page);
+	box->addWidget(new QLabel(tr("Items saved to or restored from the project file:"), page));
+	m_projectList = new QTreeWidget(page);
+	m_projectList->setObjectName(QStringLiteral("projectList"));
+	m_projectList->setRootIsDecorated(false);
+	m_projectList->setSelectionMode(QAbstractItemView::SingleSelection);
+	m_projectList->setAllColumnsShowFocus(true);
+	m_projectList->setHeaderLabels({ tr("Item"), tr("Open"), tr("Load"), tr("Save") });
+	m_projectList->header()->setSectionsClickable(false);
+	m_projectList->header()->setStretchLastSection(false);
+	const struct { const char *text; Options::Project::Item item; } rows[] = {
+		{ QT_TR_NOOP("File Filters"), Options::Project::Item::FileFilter },
+		{ QT_TR_NOOP("Include Subfolders"), Options::Project::Item::IncludeSubfolders },
+		{ QT_TR_NOOP("Compare Options"), Options::Project::Item::CompareOptions },
+		{ QT_TR_NOOP("Hidden Items"), Options::Project::Item::HiddenItems },
+	};
+	for (const auto &row : rows)
+	{
+		auto *item = new QTreeWidgetItem(m_projectList, { tr(row.text) });
+		item->setData(0, Qt::UserRole, static_cast<int>(row.item));
+		item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+		for (int column = 1; column <= Options::Project::OperationCount; ++column)
+			item->setCheckState(column, Qt::Unchecked);
+	}
+	lm::ensureItemCheckBoxes(m_projectList);
+	// upstream's widths: 150 points for the items, 50 for each operation
+	const int point = qMax(1, logicalDpiX());
+	m_projectList->setColumnWidth(0, 150 * point / 72);
+	for (int column = 1; column <= Options::Project::OperationCount; ++column)
+		m_projectList->setColumnWidth(column, qMax(50 * point / 72,
+			m_projectList->header()->sectionSizeHint(column)));
+	// as tall as its rows, as upstream's list is
+	m_projectList->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	m_projectList->setFixedHeight(m_projectList->header()->sizeHint().height()
+		+ m_projectList->sizeHintForRow(0) * m_projectList->topLevelItemCount()
+		+ 2 * m_projectList->frameWidth() + 2);
+	box->addWidget(m_projectList);
+	box->addStretch(1);
+	return page;
+}
+
+/** The Project page's check boxes and the settings (PropProject's
+    DoDataExchange). */
+static void showProjectSettings(QTreeWidget *list, const Options::Project::Settings settings)
+{
+	for (int row = 0; row < list->topLevelItemCount(); ++row)
+	{
+		QTreeWidgetItem *item = list->topLevelItem(row);
+		const int index = item->data(0, Qt::UserRole).toInt();
+		for (int operation = 0; operation < Options::Project::OperationCount; ++operation)
+			item->setCheckState(operation + 1,
+				settings[operation][index] ? Qt::Checked : Qt::Unchecked);
+	}
+}
+
 /** WinMerge's Backup Files page (PropBackups): the file compare switch;
     folder, name and the folder compare switch are not offered yet. */
 QWidget *OptionsDialog::buildBackupPage()
@@ -1694,6 +1759,9 @@ void OptionsDialog::load()
 		m_chkArchiveEnable->setChecked(mgr->GetBool(OPT_ARCHIVE_ENABLE));
 		m_chkArchiveProbe->setChecked(mgr->GetBool(OPT_ARCHIVE_PROBETYPE));
 		m_chkArchiveProbe->setEnabled(m_chkArchiveEnable->isChecked());
+		Options::Project::Settings project;
+		Options::Project::Load(mgr, project);
+		showProjectSettings(m_projectList, project);
 		const int mode = mgr->GetInt(OPT_CP_DEFAULT_MODE);
 		m_radCodepage[mode >= 0 && mode < 3 ? mode : 0]->setChecked(true);
 		m_cmbCustomCodepage->setEnabled(m_radCodepage[2]->isChecked());
@@ -1791,6 +1859,18 @@ void OptionsDialog::save()
 		Options::EditorSyntax::Save(mgr, extensions);
 		mgr->SaveOption(OPT_ARCHIVE_ENABLE, m_chkArchiveEnable->isChecked());
 		mgr->SaveOption(OPT_ARCHIVE_PROBETYPE, m_chkArchiveProbe->isChecked());
+		// the Project page's checks, over the saved settings (the Plugins
+		// ones keep theirs)
+		Options::Project::Settings project;
+		Options::Project::Load(mgr, project);
+		for (int row = 0; row < m_projectList->topLevelItemCount(); ++row)
+		{
+			const QTreeWidgetItem *item = m_projectList->topLevelItem(row);
+			const int index = item->data(0, Qt::UserRole).toInt();
+			for (int operation = 0; operation < Options::Project::OperationCount; ++operation)
+				project[operation][index] = item->checkState(operation + 1) == Qt::Checked;
+		}
+		Options::Project::Save(mgr, project);
 		int mode = 0;
 		for (int i = 0; i < 3; ++i)
 			if (m_radCodepage[i]->isChecked())
@@ -1944,6 +2024,19 @@ void OptionsDialog::restoreDefaults(int page)
 		{
 			m_chkArchiveEnable->setChecked(mgr->GetDefault<bool>(OPT_ARCHIVE_ENABLE));
 			m_chkArchiveProbe->setChecked(mgr->GetDefault<bool>(OPT_ARCHIVE_PROBETYPE));
+		}
+		break;
+	case ProjectPage:
+		if (COptionsMgr *mgr = GetOptionsMgr())
+		{
+			// PropProject::OnDefaults
+			Options::Project::Settings project;
+			for (int operation = 0; operation < Options::Project::OperationCount; ++operation)
+				for (int item = 0; item < Options::Project::ItemCount; ++item)
+					project[operation][item] = Options::Project::GetDefault(mgr,
+						static_cast<Options::Project::Operation>(operation),
+						static_cast<Options::Project::Item>(item));
+			showProjectSettings(m_projectList, project);
 		}
 		break;
 	case BackupPage:

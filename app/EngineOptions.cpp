@@ -26,6 +26,7 @@
 #include "OptionsMgr.h"
 #include "OptionsDef.h"
 #include "OptionsEditorSyntax.h"
+#include "OptionsProject.h"
 #include "options_global.h"
 #include "UnicodeString.h"
 #include "charsets.h"
@@ -354,6 +355,11 @@ void installEngineOptions()
 	// by their extension
 	options.InitOption(OPT_ARCHIVE_ENABLE, true);
 	options.InitOption(OPT_ARCHIVE_PROBETYPE, false);
+	// the Project page: what a project file brings in as it opens or loads
+	// and what saving one keeps, all of it by default; and the folder its
+	// file dialogs start in (OptionsInit)
+	Options::Project::Init(&options);
+	options.InitOption(OPT_PROJECTS_PATH, String());
 
 	// WinMerge's Editor page: the highlighting, and the parsers it takes
 	options.InitOption(OPT_SYNTAX_HIGHLIGHT, true);

@@ -3626,8 +3626,21 @@ Potser el fitxer és només de lectura?</translation>
         <translation>&amp;Obre...</translation>
     </message>
     <message>
+        <source>Open Pro&amp;ject...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Open Pro&amp;ject...\tCtrl+J&quot;.</translatorcomment>
+        <translation>Obre un pro&amp;jecte...</translation>
+    </message>
+    <message>
+        <source>Sa&amp;ve Project...</source>
+        <translation>Desa el p&amp;rojecte...</translation>
+    </message>
+    <message>
         <source>Recent F&amp;iles or Folders</source>
         <translation>Fitxers i &amp;carpetes recents</translation>
+    </message>
+    <message>
+        <source>Recent Projects</source>
+        <translation>Projectes recents</translation>
     </message>
     <message>
         <source>(empty)</source>
@@ -4325,6 +4338,19 @@ S&apos;està comprovant la identitat binària...</translation>
         <translation>&amp;Inclou-hi les subcarpetes</translation>
     </message>
     <message>
+        <source>Sa&amp;ve Project...</source>
+        <translation>Desa el p&amp;rojecte...</translation>
+    </message>
+    <message>
+        <source>Open Pro&amp;ject...</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Open Pro&amp;ject...\tCtrl+J&quot;.</translatorcomment>
+        <translation>Obre un pro&amp;jecte...</translation>
+    </message>
+    <message>
+        <source>&amp;Load Project...</source>
+        <translation>Carrega un pr&amp;ojecte...</translation>
+    </message>
+    <message>
         <source>Compare As</source>
         <translatorcomment>After WinMerge&apos;s &quot;Co&amp;mpare As&quot;.</translatorcomment>
         <translation>Compara com</translation>
@@ -4477,6 +4503,37 @@ S&apos;està comprovant la identitat binària...</translation>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>No es poden barrejar fitxers i carpetes: seleccioneu dos o tres fitxers, o bé dues o tres carpetes o arxius.</translation>
     </message>
+    <message>
+        <source>WinMerge Project Files (*.WinMerge)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;WinMerge Project Files (*.WinMerge)|*.WinMerge||&quot;.</translatorcomment>
+        <translation>Fitxers de projecte del WinMerge (*.WinMerge)</translation>
+    </message>
+    <message>
+        <source>Project file loaded.</source>
+        <translation>El fitxer de projecte s&apos;ha carregat correctament.</translation>
+    </message>
+    <message>
+        <source>Unknown error saving project file.</source>
+        <translation>S&apos;ha produït un error desconegut en intentar desar un fitxer de projecte.</translation>
+    </message>
+    <message>
+        <source>Project file saved.</source>
+        <translation>El fitxer de projecte s&apos;ha desat correctament.</translation>
+    </message>
+    <message>
+        <source>Cannot open file
+%1
+
+%2</source>
+        <translation>No es pot obrir el fitxer
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <source>Unknown error opening project file.</source>
+        <translation>S&apos;ha produït un error desconegut en intentar obrir un fitxer de projecte.</translation>
+    </message>
 </context>
 <context>
     <name>OptionsDialog</name>
@@ -4587,6 +4644,14 @@ S&apos;està comprovant la identitat binària...</translation>
         <source>&amp;Character Set...</source>
         <translatorcomment>After WinMerge&apos;s &quot;Taula de codificació de caràcters...&quot;.</translatorcomment>
         <translation>Taula de &amp;codificació de caràcters...</translation>
+    </message>
+    <message>
+        <source>File Filters</source>
+        <translation>Filtres de fitxer</translation>
+    </message>
+    <message>
+        <source>Load</source>
+        <translation>Carrega</translation>
     </message>
     <message>
         <source>Codepage</source>
@@ -4989,6 +5054,10 @@ Useu valors entre 1 i %1.</translation>
         <translation>Idioma:</translation>
     </message>
     <message>
+        <source>Project</source>
+        <translation>Projecte</translation>
+    </message>
+    <message>
         <source>Language changes take effect after restarting LibreMerge.</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>El canvi d&apos;idioma s&apos;aplica en reiniciar el LibreMerge.</translation>
@@ -5187,6 +5256,34 @@ Useu valors entre 1 i %1.</translation>
     <message>
         <source>W&amp;ord break characters:</source>
         <translation>Caràcters de separació de paraules:</translation>
+    </message>
+    <message>
+        <source>Items saved to or restored from the project file:</source>
+        <translation>Elements desats a o restaurats del fitxer de projecte:</translation>
+    </message>
+    <message>
+        <source>Item</source>
+        <translation>Element</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Obre</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>Desa</translation>
+    </message>
+    <message>
+        <source>Include Subfolders</source>
+        <translation>Inclou les subcarpetes</translation>
+    </message>
+    <message>
+        <source>Compare Options</source>
+        <translation>Opcions de comparació</translation>
+    </message>
+    <message>
+        <source>Hidden Items</source>
+        <translation>Elements ocults</translation>
     </message>
     <message>
         <source>Create backup files for:</source>

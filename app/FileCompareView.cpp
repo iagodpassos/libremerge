@@ -2258,6 +2258,13 @@ void FileCompareView::setSideDescription(int side, const QString &description)
 	setSideCaption(side, description);
 }
 
+QString FileCompareView::sideDescription(int side) const
+{
+	if (side < 0 || side >= m_paneCount || !m_sides[side].described)
+		return QString();
+	return m_sides[side].caption;
+}
+
 /** Whether loadSide would take the file: it opens, and it is text. */
 bool FileCompareView::canLoad(const QString &path, QString *error)
 {

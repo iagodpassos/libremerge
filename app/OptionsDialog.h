@@ -109,6 +109,7 @@ public:
 		DirColorsPage,    ///< Colors > Folder Compare
 		SysColorsPage,    ///< Colors > System
 		ArchivePage,      ///< Archive Support
+		ProjectPage,      ///< Project
 		BackupPage,
 		CodepagePage,
 	};
@@ -192,6 +193,7 @@ private:
 	void updateSysColorControls();
 	void restoreSysColorDefaults();
 	QWidget *buildArchivePage();
+	QWidget *buildProjectPage();
 	QWidget *buildBackupPage();
 	QWidget *buildCodepagePage();
 	void showCustomCodepage(int codepage);
@@ -305,6 +307,9 @@ private:
 	// Archive Support
 	QCheckBox *m_chkArchiveEnable = nullptr;
 	QCheckBox *m_chkArchiveProbe = nullptr;
+	// Project: a row for each item, a check box column for Open, Load and
+	// Save
+	QTreeWidget *m_projectList = nullptr;
 	// Backup Files
 	QCheckBox *m_chkBackup;
 	// Codepage

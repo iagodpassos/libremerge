@@ -17,6 +17,7 @@ class QTabWidget;
 class QTimer;
 class FileCompareView;
 class FolderCompareView;
+class NewComparisonView;
 
 class MainWindow : public QMainWindow
 {
@@ -45,7 +46,8 @@ public:
 	    their subfolders or not; by default as "Include subfolders" says
 	    (OpenFolderParams::m_bRecurse). */
 	void openFolderComparison(const QStringList &dirs,
-		std::optional<bool> recursive = std::nullopt);
+		std::optional<bool> recursive = std::nullopt,
+		const QStringList &hiddenItems = {});
 	/** Two or three sides, each a folder or an archive: archives are
 	    extracted to temp folders and the lot opens as a folder
 	    comparison (WinMerge's DecompressArchive flow). */
@@ -65,6 +67,18 @@ public:
 	    Compare's arrow if any. */
 	void openSelfComparison(const QString &path,
 		lm::CommandLine::WindowType windowType = lm::CommandLine::WindowType::Automatic);
+
+	/** CMergeApp::LoadAndOpenProjectFile: every comparison of a project
+	    file opens, its items taken as Options > Project's Open column
+	    says, and the file joins File's recent projects. False when it
+	    cannot be read. */
+	bool openProjectFile(const QString &path);
+	/** File > Save Project (CMainFrame::OnSaveProject): a selection
+	    screen of its own with the comparison in front, its paths and
+	    settings, to save as a project from. */
+	void saveProject();
+	/** The recent projects of the File menu, the last opened first. */
+	static QStringList recentProjects();
 
 	/** CMergeApp::ParseArgsAndDoOpen: what the command line opens and
 	    how (its paths, descriptions, read-only sides, window type,
@@ -127,6 +141,8 @@ protected:
 
 private slots:
 	void newComparison();
+	/** File > Open Project (CMainFrame::OnFileOpenProject). */
+	void openProject();
 	void showOptions();
 	void showFilters();
 	void closeTab(int index);
@@ -170,6 +186,10 @@ private:
 	void closeWhenIdle();
 	/** Reopen a recent comparison (folders or files). */
 	void reopenComparison(const QStringList &paths);
+	/** A selection screen in a tab of its own, hooked up to the window. */
+	NewComparisonView *createSelectorTab();
+	/** CMergeApp::AddToRecentProjectsMRU. */
+	void rememberProject(const QString &path);
 
 	QTabWidget *m_tabs;
 	// the tabs in MDI's Z order: the most recently current first

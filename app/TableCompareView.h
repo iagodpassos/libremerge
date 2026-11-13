@@ -60,6 +60,14 @@ public:
 	/** WinMerge's file description (strDesc): the tab title shows it
 	    instead of the file name, as "Original File" in a self-compare. */
 	void setSideDescription(int side, const QString &description);
+	QString sideDescription(int side) const
+	{
+		return side >= 0 && side < 3 ? m_descriptions[side] : QString();
+	}
+	/** How the left file reads as a table: its delimiter, quote and
+	    whether a quoted cell runs over lines (the buffer's
+	    GetFieldDelimiter and the others). */
+	lm::TableProps tableProps() const { return m_sides[0].props; }
 	/** WinMerge's ChangeFile, which the path bar calls: save what was
 	    changed (after asking), then open the files again with another
 	    one on one side. */

@@ -318,6 +318,9 @@ public:
 	    title show it instead of the file name, as "Original File" in a
 	    self-compare. */
 	void setSideDescription(int side, const QString &description);
+	/** The description given to a side, empty when none was
+	    (IMergeDoc::GetDescription). */
+	QString sideDescription(int side) const;
 	/** WinMerge's ChangeFile, which the path bar and a dropped file call:
 	    save what was changed (after asking), then open the files again
 	    with another one in one pane. */

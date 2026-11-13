@@ -54,6 +54,11 @@ public:
 	    title show it instead of the file name, as "Original File" in a
 	    self-compare. */
 	void setSideDescription(int side, const QString &description);
+	QString sideDescription(int side) const
+	{
+		return side >= 0 && side < 3 ? m_descriptions[side] : QString();
+	}
+	bool isSideReadOnly(int side) const;
 	/** Where a pane is saved in place of its file (the command line's
 	    -o); the pane goes on with that file once saved. */
 	void setSaveAsPath(const QString &path) { m_saveAsPath = path; }

@@ -3048,6 +3048,18 @@ O arquivo pode ser somente leitura.</translation>
         <translation>&amp;Abrir...</translation>
     </message>
     <message>
+        <source>Open Pro&amp;ject...</source>
+        <translation>Abrir Pro&amp;jeto...</translation>
+    </message>
+    <message>
+        <source>Sa&amp;ve Project...</source>
+        <translation>Sal&amp;var Projeto...</translation>
+    </message>
+    <message>
+        <source>Recent Projects</source>
+        <translation>Projetos Recentes</translation>
+    </message>
+    <message>
         <source>(empty)</source>
         <translation>(vazio)</translation>
     </message>
@@ -3692,6 +3704,18 @@ Checando identidade binária...</translation>
         <translation>&amp;Incluir subpastas</translation>
     </message>
     <message>
+        <source>Sa&amp;ve Project...</source>
+        <translation>Sal&amp;var Projeto...</translation>
+    </message>
+    <message>
+        <source>Open Pro&amp;ject...</source>
+        <translation>Abrir Pro&amp;jeto...</translation>
+    </message>
+    <message>
+        <source>&amp;Load Project...</source>
+        <translation>&amp;Carregar Projeto...</translation>
+    </message>
+    <message>
         <source>Compare As</source>
         <translation>Comparar Como</translation>
     </message>
@@ -3830,6 +3854,36 @@ Checando identidade binária...</translation>
     <message>
         <source>Mixing files and folders is not supported: select two or three files, or two or three folders or archives.</source>
         <translation>Misturar arquivos e pastas não é suportado: selecione dois ou três arquivos, ou duas ou três pastas ou arquivos compactados.</translation>
+    </message>
+    <message>
+        <source>WinMerge Project Files (*.WinMerge)</source>
+        <translation>Arquivos de Projeto do WinMerge (*.WinMerge)</translation>
+    </message>
+    <message>
+        <source>Project file loaded.</source>
+        <translation>Arquivo de projeto carregado.</translation>
+    </message>
+    <message>
+        <source>Unknown error saving project file.</source>
+        <translation>Erro desconhecido ao salvar o arquivo de projeto.</translation>
+    </message>
+    <message>
+        <source>Project file saved.</source>
+        <translation>Arquivo de projeto salvo.</translation>
+    </message>
+    <message>
+        <source>Cannot open file
+%1
+
+%2</source>
+        <translation>Não foi possível abrir o arquivo
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <source>Unknown error opening project file.</source>
+        <translation>Erro desconhecido ao abrir o arquivo de projeto.</translation>
     </message>
 </context>
 <context>
@@ -4199,6 +4253,10 @@ Checando identidade binária...</translation>
         <translation>Espaços em branco</translation>
     </message>
     <message>
+        <source>Project</source>
+        <translation>Projeto</translation>
+    </message>
+    <message>
         <source>CSV</source>
         <translation>CSV</translation>
     </message>
@@ -4359,6 +4417,34 @@ Checando identidade binária...</translation>
         <translation>C&amp;aracteres de quebra de palavra:</translation>
     </message>
     <message>
+        <source>Items saved to or restored from the project file:</source>
+        <translation>Itens salvos no ou restaurados do arquivo de projeto:</translation>
+    </message>
+    <message>
+        <source>Item</source>
+        <translation>Item</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Abrir</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>Salvar</translation>
+    </message>
+    <message>
+        <source>Include Subfolders</source>
+        <translation>Incluir Subpastas</translation>
+    </message>
+    <message>
+        <source>Compare Options</source>
+        <translation>Opções de Comparação</translation>
+    </message>
+    <message>
+        <source>Hidden Items</source>
+        <translation>Itens Ocultados</translation>
+    </message>
+    <message>
         <source>Create backup files for:</source>
         <translation>Criar arquivos de backup para:</translation>
     </message>
@@ -4513,6 +4599,14 @@ Checando identidade binária...</translation>
     <message>
         <source>&amp;Character Set...</source>
         <translation>C&amp;onjunto de Caracteres...</translation>
+    </message>
+    <message>
+        <source>File Filters</source>
+        <translation>Filtros de Arquivo</translation>
+    </message>
+    <message>
+        <source>Load</source>
+        <translation>Carregar</translation>
     </message>
     <message>
         <source>Codepage</source>

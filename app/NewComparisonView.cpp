@@ -8,8 +8,11 @@
 #include "FileFilters.h"
 #include "OptionsDialog.h"
 #include "StarPrompt.h"
+#include "MessageBoxes.h"
+#include "ProjectFile.h"
 #include "OptionsDef.h"
 #include "OptionsMgr.h"
+#include "OptionsProject.h"
 
 #include <QAbstractItemView>
 #include <QActionGroup>
@@ -241,6 +244,33 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 
 	auto *buttons = new QGridLayout;
 	buttons->setColumnStretch(0, 1);
+	// upstream's Save Project split button: the button saves the screen as
+	// a project file, its arrow opens one (File > Open Project) or loads
+	// one into the screen (IDR_POPUP_PROJECT)
+	auto *saveProjectButton = new QToolButton(content);
+	saveProjectButton->setText(tr("Sa&ve Project..."));
+	saveProjectButton->setObjectName(QStringLiteral("saveProject"));
+	saveProjectButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+	saveProjectButton->setPopupMode(QToolButton::MenuButtonPopup);
+	connect(saveProjectButton, &QToolButton::clicked, this, &NewComparisonView::saveProject);
+	auto *projectMenu = new QMenu(saveProjectButton);
+	projectMenu->setObjectName(QStringLiteral("projectMenu"));
+	// the shortcut is File > Open Project's, shown here as upstream's
+	// "\tCtrl+J"
+	QAction *openProject = projectMenu->addAction(tr("Open Pro&ject...") + QLatin1Char('\t')
+		+ QKeySequence(Qt::CTRL | Qt::Key_J).toString(QKeySequence::NativeText));
+	openProject->setObjectName(QStringLiteral("openProject"));
+	connect(openProject, &QAction::triggered, this, [this]() {
+		QMetaObject::invokeMethod(window(), "openProject");
+	});
+	QAction *loadProject = projectMenu->addAction(tr("&Load Project..."));
+	loadProject->setObjectName(QStringLiteral("loadProject"));
+	connect(loadProject, &QAction::triggered, this, &NewComparisonView::loadProject);
+	QAction *saveProject = projectMenu->addAction(tr("Sa&ve Project..."));
+	saveProject->setObjectName(QStringLiteral("saveProjectItem"));
+	connect(saveProject, &QAction::triggered, this, &NewComparisonView::saveProject);
+	saveProjectButton->setMenu(projectMenu);
+	buttons->addWidget(saveProjectButton, 0, 0, Qt::AlignLeft);
 	auto *compareButton = new QPushButton(tr("Compare"), content);
 	compareButton->setDefault(true);
 	m_compareButton = compareButton;
@@ -492,6 +522,15 @@ void NewComparisonView::verifyPaths()
 	{
 		setCompareEnabled(true);
 		showFilterGroup(true, true);
+		return;
+	}
+	// a project file to open: Compare opens it, nothing else is asked of
+	// the paths (bProject)
+	if (projectInFirstField())
+	{
+		setCompareEnabled(true);
+		showFilterGroup(true, false);
+		setHint(prompt, false);
 		return;
 	}
 
@@ -781,6 +820,13 @@ void NewComparisonView::compareAs(lm::CommandLine::WindowType windowType)
 		return;
 	m_compareArmed = true;
 	QTimer::singleShot(0, this, [this]() { m_compareArmed = false; });
+	// a project file as the first path, alone: it opens, in whatever
+	// window was picked (LoadAndOpenProjectFile)
+	if (projectInFirstField())
+	{
+		emit openProjectRequested(m_slots[0].path->currentText().trimmed());
+		return;
+	}
 
 	QStringList paths;
 	QList<bool> readOnly;
@@ -859,5 +905,279 @@ void NewComparisonView::compareAs(lm::CommandLine::WindowType windowType)
 	request.paths = paths;
 	request.readOnly = readOnly;
 	request.folders = folders;
+	request.hiddenItems = m_hiddenItems;
 	emit compareRequested(request);
+}
+
+bool NewComparisonView::projectInFirstField() const
+{
+	const QString first = m_slots[0].path->currentText().trimmed();
+	return !first.isEmpty() && m_slots[1].path->currentText().trimmed().isEmpty()
+		&& lm::ProjectFile::isProjectFile(first);
+}
+
+namespace
+{
+
+std::function<QString(bool)> &projectFileNameForTest()
+{
+	static std::function<QString(bool)> answer;
+	return answer;
+}
+
+} // namespace
+
+void NewComparisonView::setProjectFileNameForTest(std::function<QString(bool open)> answer)
+{
+	projectFileNameForTest() = std::move(answer);
+}
+
+QString NewComparisonView::askProjectFileName(QWidget *parent, bool open)
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	QString fileName;
+	if (projectFileNameForTest())
+		fileName = projectFileNameForTest()(open);
+	else
+	{
+		const QString folder = mgr != nullptr
+			? QString::fromStdString(mgr->GetString(OPT_PROJECTS_PATH)) : QString();
+		const QString filter = tr("WinMerge Project Files (*.WinMerge)");
+		if (open)
+			fileName = QFileDialog::getOpenFileName(parent, QString(), folder, filter);
+		else
+		{
+			// a name typed without the extension takes it
+			QFileDialog dialog(parent, QString(), folder, filter);
+			dialog.setAcceptMode(QFileDialog::AcceptSave);
+			dialog.setDefaultSuffix(lm::ProjectFile::extension());
+			if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty())
+				fileName = dialog.selectedFiles().first();
+		}
+	}
+	if (fileName.isEmpty())
+		return QString();
+	// its folder is where the next one is looked for
+	if (mgr != nullptr)
+		mgr->SaveOption(OPT_PROJECTS_PATH, QFileInfo(fileName).absolutePath().toStdString());
+	return fileName;
+}
+
+void NewComparisonView::loadProject()
+{
+	const QString fileName = askProjectFileName(this, true);
+	if (fileName.isEmpty())
+		return;
+	lm::ProjectFile project;
+	QString error;
+	if (!project.read(fileName, &error))
+	{
+		// CMergeApp::LoadProjectFile
+		lm::showError(this, tr("Cannot open file\n%1\n\n%2").arg(QDir::toNativeSeparators(fileName),
+			tr("Unknown error opening project file.") + error));
+		return;
+	}
+	if (project.items.isEmpty())
+		return;
+	const lm::ProjectFileItem &item = project.items.first();
+	COptionsMgr *mgr = GetOptionsMgr();
+	using Options::Project::Item;
+	const auto load = [mgr](Item what) {
+		return Options::Project::Get(mgr, Options::Project::Operation::Load, what);
+	};
+
+	// the paths as opening the project takes them; upstream leaves them as
+	// written here, so a relative one compared against the current folder
+	// instead of the project's: corrected
+	QStringList paths = item.paths();
+	for (QString &path : paths)
+		path = lm::ProjectFile::resolvePath(path, fileName);
+	bool recurse = m_includeSubfolders->isChecked();
+	if (item.subfolders.has_value())
+		recurse = *item.subfolders == 1; // GetPaths
+	if (load(Item::IncludeSubfolders))
+		m_includeSubfolders->setChecked(recurse);
+	const bool threeWay = paths.size() == 3;
+	const bool readOnly[3] = {
+		item.leftReadOnly,
+		threeWay ? item.middleReadOnly : item.rightReadOnly,
+		threeWay && item.rightReadOnly,
+	};
+	for (int i = 0; i < 3; ++i)
+	{
+		m_slots[i].path->setCurrentText(i < 2 || threeWay ? paths.value(i) : QString());
+		m_slots[i].readOnly->setChecked(readOnly[i]);
+	}
+	if (load(Item::FileFilter) && item.filter.has_value())
+		m_filterCombo->setMask(*item.filter, false);
+	// the window and the table's layout come in whatever the page says
+	if (item.windowType.has_value())
+		m_windowType = *item.windowType;
+	if (item.tableDelimiter.has_value())
+		m_tableDelimiter = *item.tableDelimiter;
+	if (item.tableQuote.has_value())
+		m_tableQuote = *item.tableQuote;
+	if (item.tableAllowNewLinesInQuotes.has_value())
+		m_tableAllowNewlines = *item.tableAllowNewLinesInQuotes;
+	if (load(Item::CompareOptions))
+	{
+		m_ignoreWhite = item.ignoreWhite.value_or(m_ignoreWhite);
+		m_ignoreBlankLines = item.ignoreBlankLines.value_or(m_ignoreBlankLines);
+		m_ignoreCase = item.ignoreCase.value_or(m_ignoreCase);
+		m_ignoreEol = item.ignoreEol.value_or(m_ignoreEol);
+		m_ignoreNumbers = item.ignoreNumbers.value_or(m_ignoreNumbers);
+		m_ignoreCodepage = item.ignoreCodepage.value_or(m_ignoreCodepage);
+		m_ignoreMissingTrailingEol = item.ignoreMissingTrailingEol.value_or(m_ignoreMissingTrailingEol);
+		m_ignoreLineBreaks = item.ignoreLineBreaks.value_or(m_ignoreLineBreaks);
+		m_filterCommentsLines = item.filterCommentsLines.value_or(m_filterCommentsLines);
+		m_compareMethod = item.compareMethod.value_or(m_compareMethod);
+	}
+	if (load(Item::HiddenItems) && !item.hiddenItems.isEmpty())
+		m_hiddenItems = item.hiddenItems;
+	verifyPaths();
+	lm::showInformation(this, tr("Project file loaded."));
+}
+
+void NewComparisonView::saveProject()
+{
+	const QString fileName = askProjectFileName(this, false);
+	if (fileName.isEmpty())
+		return;
+	COptionsMgr *mgr = GetOptionsMgr();
+	using Options::Project::Item;
+	const auto save = [mgr](Item what) {
+		return Options::Project::Get(mgr, Options::Project::Operation::Save, what);
+	};
+	lm::ProjectFileItem item;
+	item.saveFilter = save(Item::FileFilter);
+	item.saveSubfolders = save(Item::IncludeSubfolders);
+	item.saveCompareOptions = save(Item::CompareOptions);
+	item.saveHiddenItems = save(Item::HiddenItems);
+
+	QString path[3];
+	for (int i = 0; i < 3; ++i)
+		path[i] = m_slots[i].path->currentText().trimmed();
+	if (!path[0].isEmpty())
+	{
+		item.left = path[0];
+		item.hasLeft = true;
+		item.leftReadOnly = m_slots[0].readOnly->isChecked();
+	}
+	if (!m_descriptions[0].isEmpty())
+		item.leftDesc = m_descriptions[0];
+	if (path[2].isEmpty())
+	{
+		if (!path[1].isEmpty())
+		{
+			item.right = path[1];
+			item.hasRight = true;
+			item.rightReadOnly = m_slots[1].readOnly->isChecked();
+		}
+		if (!m_descriptions[1].isEmpty())
+			item.rightDesc = m_descriptions[1];
+	}
+	else
+	{
+		if (!path[1].isEmpty())
+		{
+			item.middle = path[1];
+			item.hasMiddle = true;
+			item.middleReadOnly = m_slots[1].readOnly->isChecked();
+		}
+		item.right = path[2];
+		item.hasRight = true;
+		item.rightReadOnly = m_slots[2].readOnly->isChecked();
+		if (!m_descriptions[1].isEmpty())
+			item.middleDesc = m_descriptions[1];
+		if (!m_descriptions[2].isEmpty())
+			item.rightDesc = m_descriptions[2];
+	}
+	QString filter = m_filterCombo->mask();
+	if (item.saveFilter && !filter.isEmpty())
+	{
+		// without the prefix of a filter's name
+		const QString prefix = QStringLiteral("[F] ");
+		if (filter.startsWith(prefix))
+			filter.remove(0, prefix.length());
+		while (!filter.isEmpty() && filter.front().isSpace())
+			filter.remove(0, 1);
+		item.filter = filter;
+	}
+	if (item.saveSubfolders)
+		item.subfolders = m_includeSubfolders->isChecked() ? 1 : 0;
+	if (m_windowType != -1)
+		item.windowType = m_windowType;
+	if (m_windowType == 2) // table
+	{
+		item.tableDelimiter = m_tableDelimiter;
+		item.tableQuote = m_tableQuote;
+		item.tableAllowNewLinesInQuotes = m_tableAllowNewlines;
+	}
+	if (item.saveCompareOptions)
+	{
+		item.ignoreWhite = m_ignoreWhite;
+		item.ignoreBlankLines = m_ignoreBlankLines;
+		item.ignoreCase = m_ignoreCase;
+		item.ignoreEol = m_ignoreEol;
+		item.ignoreNumbers = m_ignoreNumbers;
+		item.ignoreCodepage = m_ignoreCodepage;
+		item.ignoreMissingTrailingEol = m_ignoreMissingTrailingEol;
+		item.ignoreLineBreaks = m_ignoreLineBreaks;
+		item.filterCommentsLines = m_filterCommentsLines;
+		item.compareMethod = m_compareMethod;
+	}
+	if (item.saveHiddenItems)
+		item.hiddenItems = m_hiddenItems;
+
+	lm::ProjectFile project;
+	project.items.append(item);
+	QString error;
+	if (!project.save(fileName, &error))
+	{
+		// CMergeApp::SaveProjectFile
+		lm::showError(this, tr("Cannot open file\n%1\n\n%2").arg(QDir::toNativeSeparators(fileName),
+			tr("Unknown error saving project file.") + error));
+		return;
+	}
+	lm::showInformation(this, tr("Project file saved."));
+}
+
+void NewComparisonView::prefill(const Prefill &state)
+{
+	for (int i = 0; i < 3; ++i)
+	{
+		m_slots[i].path->setCurrentText(state.paths.value(i));
+		m_slots[i].readOnly->setChecked(state.readOnly.value(i, false));
+		m_descriptions[i] = state.descriptions.value(i);
+	}
+	// the comparison's own, over the saved option (FFILEOPEN_PROJECT)
+	m_includeSubfolders->setChecked(state.recursive);
+	m_filterCombo->setMask(state.filter, false);
+	m_windowType = state.windowType;
+	m_tableDelimiter = state.tableDelimiter;
+	m_tableQuote = state.tableQuote;
+	m_tableAllowNewlines = state.tableAllowNewlines;
+	m_hiddenItems = state.hiddenItems;
+	verifyPaths();
+}
+
+QStringList NewComparisonView::pathsForTest() const
+{
+	QStringList paths;
+	for (const Slot &slot : m_slots)
+		paths.append(slot.path->currentText());
+	return paths;
+}
+
+QList<bool> NewComparisonView::readOnlyForTest() const
+{
+	QList<bool> readOnly;
+	for (const Slot &slot : m_slots)
+		readOnly.append(slot.readOnly->isChecked());
+	return readOnly;
+}
+
+bool NewComparisonView::includeSubfoldersForTest() const
+{
+	return m_includeSubfolders->isChecked();
 }

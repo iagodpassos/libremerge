@@ -111,6 +111,8 @@
 #include "StarPrompt.h"
 #include "ItemCheckStyle.h"
 #include "OptionsDialog.h"
+#include "OptionsProject.h"
+#include "ProjectFile.h"
 #include "Theme.h"
 #ifdef LM_HAVE_PORTAL
 #include "PortalAppearance.h"
@@ -631,6 +633,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolderEnterOpt(QStringLiteral("selftest-folder-enter"),
 		QStringLiteral("Press Enter on the folder comparison's items: folders expand and collapse, files open (for testing)"));
 	parser.addOption(selftestFolderEnterOpt);
+	QCommandLineOption selftestProjectOpt(QStringLiteral("selftest-project"),
+		QStringLiteral("Read, write, open, load and save WinMerge project files (for testing)"));
+	parser.addOption(selftestProjectOpt);
 	QCommandLineOption selftestSelectorArrowsOpt(QStringLiteral("selftest-selector-arrows"),
 		QStringLiteral("Use the arrows of the selection screen's Options and Compare buttons (for testing)"));
 	parser.addOption(selftestSelectorArrowsOpt);
@@ -1707,7 +1712,7 @@ int main(int argc, char *argv[])
 		// Nothing is saved: the dialog is never accepted.
 		OptionsDialog dialog;
 		const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
-		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0 };
+		const int depths[] = { 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 };
 		const int pages[] = { OptionsDialog::GeneralPage, -1,
 			OptionsDialog::ComparePage, OptionsDialog::FolderPage, OptionsDialog::TablePage,
 			OptionsDialog::BinaryPage, OptionsDialog::ImagePage, OptionsDialog::MessageBoxesPage,
@@ -1716,9 +1721,9 @@ int main(int argc, char *argv[])
 			OptionsDialog::MergeColorsPage, OptionsDialog::SyntaxColorsPage,
 			OptionsDialog::TextColorsPage, OptionsDialog::MarkerColorsPage,
 			OptionsDialog::DirColorsPage, OptionsDialog::SysColorsPage,
-			OptionsDialog::ArchivePage, OptionsDialog::BackupPage,
+			OptionsDialog::ArchivePage, OptionsDialog::ProjectPage, OptionsDialog::BackupPage,
 			OptionsDialog::CodepagePage };
-		bool ok = tree.size() == 23;
+		bool ok = tree.size() == 24;
 		for (int i = 0; ok && i < tree.size(); ++i)
 			ok = tree.at(i).depth == depths[i] && tree.at(i).page == pages[i];
 		printf("tree: %s\n", ok ? "ok" : "wrong");
@@ -1734,9 +1739,9 @@ int main(int argc, char *argv[])
 			OptionsDialog::MergeColorsPage, OptionsDialog::SyntaxColorsPage,
 			OptionsDialog::TextColorsPage, OptionsDialog::MarkerColorsPage,
 			OptionsDialog::DirColorsPage, OptionsDialog::SysColorsPage,
-			OptionsDialog::ArchivePage, OptionsDialog::BackupPage,
+			OptionsDialog::ArchivePage, OptionsDialog::ProjectPage, OptionsDialog::BackupPage,
 			OptionsDialog::CodepagePage };
-		for (int i = 0; ok && i < 23; ++i)
+		for (int i = 0; ok && i < 24; ++i)
 		{
 			dialog.selectCategoryForTest(i);
 			const bool nested = dialog.windowTitle().contains(QStringLiteral(" > "));
@@ -1768,7 +1773,7 @@ int main(int argc, char *argv[])
 			"Automatically verify paths in the \"Select Files or Folders\" screen");
 		for (QCheckBox *box : boxes(OptionsDialog::GeneralPage))
 			ok = ok && box->isChecked() == (box->text() == verifyPaths);
-		dialog.selectCategoryForTest(21); // Backup Files
+		dialog.selectCategoryForTest(22); // Backup Files
 		dialog.restoreDefaultsForTest();
 		ok = ok && boxes(OptionsDialog::BackupPage).first()->isChecked();
 
@@ -9120,7 +9125,7 @@ int main(int argc, char *argv[])
 			const QList<OptionsDialog::CategoryInfo> tree = dialog.categoriesForTest();
 			check(tree.size() > 21 && tree.at(20).page == OptionsDialog::ArchivePage
 					&& tree.at(20).depth == 0 && tree.at(19).page == OptionsDialog::SysColorsPage
-					&& tree.at(21).page == OptionsDialog::BackupPage,
+					&& tree.at(21).page == OptionsDialog::ProjectPage,
 				"page: Archive Support, after Colors > System");
 			dialog.selectCategoryForTest(20);
 			check(dialog.currentPageForTest() == OptionsDialog::ArchivePage
@@ -14853,6 +14858,395 @@ int main(int argc, char *argv[])
 				if (view->paths().value(0) == xPair.at(0) && view->paths().value(1) == xPair.at(1))
 					fileTab = true;
 			check(fileTab, "the window: Enter in the folder tab opens the file comparison");
+		}
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestProjectOpt))
+	{
+		// WinMerge's project files (ProjectFile), opened from File > Open
+		// Project, the command line, a drop and the selection screen
+		// (LoadAndOpenProjectFile), loaded into and saved from that screen
+		// (COpenView::OnLoadProject, OnSaveProject), with Options > Project
+		// saying which items they take
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).path());
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 30; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto waitFor = [&settle](FolderCompareView *view)
+		{
+			for (int i = 0; view != nullptr && i < 300 && view->isComparing(); ++i)
+				settle();
+			settle();
+		};
+		const auto readText = [](const QString &path) {
+			QFile f(path);
+			return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()) : QString();
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		using Operation = Options::Project::Operation;
+		using ProjectItem = Options::Project::Item;
+		const auto allOn = [mgr]() {
+			Options::Project::Settings settings;
+			for (auto &operation : settings)
+				for (bool &item : operation)
+					item = true;
+			Options::Project::Save(mgr, settings);
+		};
+		allOn();
+		const QString root = dir.path();
+		write(root + QStringLiteral("/a.txt"), "one\ntwo\n");
+		write(root + QStringLiteral("/b.txt"), "one\nTWO\n");
+		write(root + QStringLiteral("/t1.csv"), "a;b\n1;2\n");
+		write(root + QStringLiteral("/t2.csv"), "a;b\n1;3\n");
+		write(root + QStringLiteral("/L/same.txt"), "x\n");
+		write(root + QStringLiteral("/R/same.txt"), "x\n");
+		write(root + QStringLiteral("/L/b.txt"), "1\n");
+		write(root + QStringLiteral("/R/b.txt"), "2\n");
+		write(root + QStringLiteral("/L/sub/c.txt"), "1\n");
+		write(root + QStringLiteral("/R/sub/c.txt"), "2\n");
+		qputenv("LM_PROJECT_TEST", root.toUtf8());
+
+		// a project as WinMerge writes it: CRLF, tabs, an unpacker
+		// LibreMerge has no use for, a relative path and a variable
+		const QString textProject = root + QStringLiteral("/text.WinMerge");
+		write(textProject,
+			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project>\r\n\t<paths>\r\n"
+			"\t\t<left>a.txt</left>\r\n\t\t<right>%LM_PROJECT_TEST%/b.txt</right>\r\n"
+			"\t\t<left-desc>Mine</left-desc>\r\n\t\t<filter>*.txt</filter>\r\n"
+			"\t\t<subfolders>0</subfolders>\r\n\t\t<left-readonly>1</left-readonly>\r\n"
+			"\t\t<right-readonly>0</right-readonly>\r\n\t\t<unpacker>Foo</unpacker>\r\n"
+			"\t\t<white-spaces>2</white-spaces>\r\n\t\t<ignore-case>1</ignore-case>\r\n"
+			"\t\t<compare-method>1</compare-method>\r\n\t</paths>\r\n</project>\r\n");
+		{
+			lm::ProjectFile project;
+			QString error;
+			const bool read = project.read(textProject, &error);
+			const lm::ProjectFileItem item = project.items.value(0);
+			check(read && project.items.size() == 1 && item.left == QStringLiteral("a.txt")
+					&& item.right == QStringLiteral("%LM_PROJECT_TEST%/b.txt")
+					&& item.paths().size() == 2 && item.leftDesc == QStringLiteral("Mine")
+					&& item.filter == QStringLiteral("*.txt") && item.subfolders == 0
+					&& item.leftReadOnly && !item.rightReadOnly && item.ignoreWhite == 2
+					&& item.ignoreCase == true && !item.ignoreBlankLines.has_value()
+					&& item.compareMethod == 1 && !item.windowType.has_value(),
+				"read: WinMerge's file, each value there or not");
+			check(lm::ProjectFile::resolvePath(item.left, textProject) == root + QStringLiteral("/a.txt")
+					&& lm::ProjectFile::resolvePath(item.right, textProject) == root + QStringLiteral("/b.txt"),
+				"a relative path is the project folder's, a %VAR% expanded");
+			lm::ProjectFile broken;
+			write(root + QStringLiteral("/broken.WinMerge"), "<project><paths><left>x</paths>");
+			check(!broken.read(root + QStringLiteral("/broken.WinMerge"), &error) && !error.isEmpty(),
+				"read: a file that is no XML says why");
+			check(lm::ProjectFile::isProjectFile(QStringLiteral("/x/y.winmerge"))
+					&& !lm::ProjectFile::isProjectFile(QStringLiteral("/x/y.xml")),
+				"a project file by its extension, in any case");
+		}
+		{
+			// written as upstream writes it, and read back the same
+			lm::ProjectFile project;
+			lm::ProjectFileItem item;
+			item.left = QStringLiteral("/l");
+			item.middle = QStringLiteral("/m & n");
+			item.right = QStringLiteral("/r");
+			item.hasLeft = item.hasMiddle = item.hasRight = true;
+			item.middleReadOnly = true;
+			item.rightDesc = QStringLiteral("Theirs");
+			item.filter = QStringLiteral("*.cpp;*.h");
+			item.subfolders = 1;
+			item.windowType = 2;
+			item.tableDelimiter = QLatin1Char('\t');
+			item.ignoreLineBreaks = true;
+			item.hiddenItems = { QStringLiteral("sub/x.txt"), QStringLiteral("y") };
+			project.items.append(item);
+			const QString saved = root + QStringLiteral("/saved.WinMerge");
+			QString error;
+			const bool wrote = project.save(saved, &error);
+			const QString text = readText(saved);
+			lm::ProjectFile back;
+			const bool read = back.read(saved, &error);
+			const lm::ProjectFileItem again = back.items.value(0);
+			check(wrote && text.startsWith(QStringLiteral("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project>\n\t<paths>\n\t\t<left>/l</left>"))
+					&& text.indexOf(QStringLiteral("<subfolders>1")) < text.indexOf(QStringLiteral("<left-readonly>0"))
+					&& text.indexOf(QStringLiteral("<window-type>2")) < text.indexOf(QStringLiteral("<white-spaces>0"))
+					&& text.indexOf(QStringLiteral("<compare-method>0")) < text.indexOf(QStringLiteral("<hidden-list>"))
+					&& text.contains(QStringLiteral("<middle-readonly>1"))
+					&& text.contains(QStringLiteral("<table-quote>&quot;</table-quote>")),
+				"save: upstream's elements, in upstream's order");
+			check(read && again.paths() == QStringList({ QStringLiteral("/l"), QStringLiteral("/m & n"), QStringLiteral("/r") })
+					&& again.middleReadOnly && again.rightDesc == QStringLiteral("Theirs")
+					&& again.filter == QStringLiteral("*.cpp;*.h") && again.subfolders == 1
+					&& again.tableDelimiter == QLatin1Char('\t') && again.ignoreLineBreaks == true
+					&& again.ignoreCase == false && again.hiddenItems == item.hiddenItems,
+				"save: what is written reads back");
+		}
+
+		{
+			// File > Open Project, LoadAndOpenProjectFile
+			MainWindow window;
+			const bool opened = window.openProjectFile(textProject);
+			settle();
+			auto *file = qobject_cast<FileCompareView *>(window.findChild<QTabWidget *>()->currentWidget());
+			check(opened && file != nullptr
+					&& file->paths() == QStringList({ root + QStringLiteral("/a.txt"), root + QStringLiteral("/b.txt") })
+					&& file->isSideReadOnly(0) && !file->isSideReadOnly(1)
+					&& file->sideDescription(0) == QStringLiteral("Mine"),
+				"open: the files, the read-only side and the description");
+			check(mgr->GetInt(OPT_CMP_IGNORE_WHITESPACE) == 2 && mgr->GetBool(OPT_CMP_IGNORE_CASE)
+					&& mgr->GetInt(OPT_CMP_METHOD) == 1 && lm::fileFilterMask() == QStringLiteral("*.txt")
+					&& !lm::includeSubfolders(),
+				"open: the project's options and filter for this run");
+			check(MainWindow::recentProjects().value(0) == QFileInfo(textProject).absoluteFilePath(),
+				"open: the project joins the recent projects");
+			auto *openAction = window.findChild<QAction *>(QStringLiteral("openProjectAction"));
+			QMenu *fileMenu = nullptr;
+			if (openAction != nullptr)
+				for (QObject *object : openAction->associatedObjects())
+					if (auto *menu = qobject_cast<QMenu *>(object))
+						fileMenu = menu;
+			if (fileMenu == nullptr)
+				return 2;
+			emit fileMenu->aboutToShow();
+			QAction *recent = fileMenu->findChild<QAction *>(QStringLiteral("recentProject1"));
+			check(openAction->shortcut() == QKeySequence(Qt::CTRL | Qt::Key_J)
+					&& recent != nullptr && recent->text().startsWith(QStringLiteral("&1 "))
+					&& recent->text().endsWith(QStringLiteral("text.WinMerge")),
+				"File: Open Project, Ctrl+J, and the recent project in the menu");
+			mgr->Set(OPT_CMP_IGNORE_WHITESPACE, 0);
+			mgr->Set(OPT_CMP_IGNORE_CASE, false);
+			mgr->Set(OPT_CMP_METHOD, 0);
+			mgr->Set(OPT_CMP_INCLUDE_SUBDIRS, true);
+			lm::useFileFilterMask(QStringLiteral("*.*"));
+		}
+		{
+			// a folder project: its subfolders and hidden items; a table one
+			const QString folderProject = root + QStringLiteral("/folders.WinMerge");
+			write(folderProject,
+				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project>\n\t<paths>\n"
+				"\t\t<left>L</left>\n\t\t<right>R</right>\n\t\t<subfolders>0</subfolders>\n"
+				"\t\t<hidden-list>\n\t\t\t<hidden-item>b.txt</hidden-item>\n\t\t</hidden-list>\n"
+				"\t</paths>\n\t<paths>\n\t\t<left>t1.csv</left>\n\t\t<right>t2.csv</right>\n"
+				"\t\t<window-type>2</window-type>\n\t\t<table-delimiter>;</table-delimiter>\n"
+				"\t</paths>\n</project>\n");
+			MainWindow window;
+			window.openProjectFile(folderProject);
+			auto *folder = window.findChild<FolderCompareView *>();
+			waitFor(folder);
+			check(folder != nullptr && !folder->isRecursive()
+					&& folder->hiddenItems() == QStringList{ QStringLiteral("b.txt") }
+					&& !folder->rowShownForTest(QStringLiteral("b.txt"))
+					&& folder->rowShownForTest(QStringLiteral("same.txt")),
+				"open: a folder comparison without subfolders, its hidden item out");
+			auto *table = window.findChild<TableCompareView *>();
+			check(table != nullptr && table->tableProps().delimiter == QLatin1Char(';'),
+				"open: every comparison of the file, a table by its delimiter");
+			mgr->Set(OPT_CMP_INCLUDE_SUBDIRS, true);
+
+			// Options > Project: what opening takes
+			Options::Project::Settings settings;
+			Options::Project::Load(mgr, settings);
+			settings[static_cast<int>(Operation::Open)][static_cast<int>(ProjectItem::HiddenItems)] = false;
+			settings[static_cast<int>(Operation::Open)][static_cast<int>(ProjectItem::IncludeSubfolders)] = false;
+			Options::Project::Save(mgr, settings);
+			MainWindow other;
+			other.openProjectFile(folderProject);
+			auto *again = other.findChild<FolderCompareView *>();
+			waitFor(again);
+			check(again != nullptr && again->isRecursive() && again->hiddenItems().isEmpty(),
+				"Open column off: the hidden items and subfolders stay out");
+			allOn();
+
+			// a path that is not there: a selection screen with the paths
+			const QString lostProject = root + QStringLiteral("/lost.WinMerge");
+			write(lostProject,
+				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project>\n\t<paths>\n"
+				"\t\t<left>a.txt</left>\n\t\t<right>gone.txt</right>\n"
+				"\t\t<right-readonly>1</right-readonly>\n\t</paths>\n</project>\n");
+			MainWindow lost;
+			lost.openProjectFile(lostProject);
+			settle();
+			auto *screen = qobject_cast<NewComparisonView *>(lost.findChild<QTabWidget *>()->currentWidget());
+			check(screen != nullptr && lost.findChild<FileCompareView *>() == nullptr
+					&& screen->pathsForTest().value(1) == root + QStringLiteral("/gone.txt")
+					&& screen->readOnlyForTest().value(1),
+				"open: a missing path leaves the comparison to a selection screen");
+		}
+		{
+			// the command line, a drop and the selection screen open it too
+			MainWindow window;
+			lm::CommandLine cmd = lm::CommandLine::parse({ textProject });
+			window.openFromCommandLine(cmd);
+			settle();
+			const int fromCommandLine = window.findChildren<FileCompareView *>().size();
+			window.handleIncomingPaths({ textProject });
+			settle();
+			const int fromDrop = window.findChildren<FileCompareView *>().size();
+			window.openSelector({ textProject });
+			settle();
+			auto *selector = window.findChild<NewComparisonView *>();
+			if (selector == nullptr)
+				return 2;
+			selector->verifyPathsForTest();
+			const bool enabled = selector->compareEnabledForTest();
+			QPushButton *compare = nullptr;
+			for (QPushButton *candidate : selector->findChildren<QPushButton *>())
+				if (candidate->text() == NewComparisonView::tr("Compare"))
+					compare = candidate;
+			if (compare == nullptr)
+				return 2;
+			compare->click();
+			settle();
+			const int fromSelector = window.findChildren<FileCompareView *>().size();
+			check(fromCommandLine == 1 && fromDrop == 2 && enabled && fromSelector == 3,
+				"the command line, a drop and Compare on the screen open the project");
+			mgr->Set(OPT_CMP_IGNORE_WHITESPACE, 0);
+			mgr->Set(OPT_CMP_IGNORE_CASE, false);
+			mgr->Set(OPT_CMP_METHOD, 0);
+			mgr->Set(OPT_CMP_INCLUDE_SUBDIRS, true);
+			lm::useFileFilterMask(QStringLiteral("*.*"));
+		}
+		{
+			// the selection screen: Load Project and Save Project
+			MainWindow window;
+			window.openSelector({});
+			settle();
+			auto *selector = window.findChild<NewComparisonView *>();
+			if (selector == nullptr)
+				return 2;
+			check(selector->findChild<QToolButton *>(QStringLiteral("saveProject")) != nullptr
+					&& selector->findChild<QAction *>(QStringLiteral("loadProject")) != nullptr
+					&& selector->findChild<QAction *>(QStringLiteral("openProject")) != nullptr,
+				"the screen: Save Project, its arrow with Open and Load Project");
+			NewComparisonView::setProjectFileNameForTest([&textProject](bool) { return textProject; });
+			selector->loadProject();
+			check(selector->pathsForTest() == QStringList({ root + QStringLiteral("/a.txt"),
+						root + QStringLiteral("/b.txt"), QString() })
+					&& selector->readOnlyForTest() == QList<bool>({ true, false, false })
+					&& !selector->includeSubfoldersForTest() && selector->ignoreWhiteForTest() == 2
+					&& selector->filterFieldForTest()->mask() == QStringLiteral("*.txt")
+					&& mgr->GetInt(OPT_CMP_IGNORE_WHITESPACE) == 0,
+				"Load: the fields and the screen's options, nothing in use yet");
+			const QString out = root + QStringLiteral("/out.WinMerge");
+			NewComparisonView::setProjectFileNameForTest([&out](bool) { return out; });
+			selector->saveProject();
+			lm::ProjectFile saved;
+			QString error;
+			saved.read(out, &error);
+			const lm::ProjectFileItem item = saved.items.value(0);
+			check(item.paths() == QStringList({ root + QStringLiteral("/a.txt"), root + QStringLiteral("/b.txt") })
+					&& item.leftReadOnly && item.subfolders == 0 && item.ignoreWhite == 2
+					&& item.filter == QStringLiteral("*.txt"),
+				"Save: the screen as a project file");
+			Options::Project::Settings settings;
+			Options::Project::Load(mgr, settings);
+			settings[static_cast<int>(Operation::Save)][static_cast<int>(ProjectItem::CompareOptions)] = false;
+			Options::Project::Save(mgr, settings);
+			selector->saveProject();
+			lm::ProjectFile without;
+			without.read(out, &error);
+			check(!without.items.value(0).ignoreWhite.has_value()
+					&& !readText(out).contains(QStringLiteral("white-spaces")),
+				"Save column off: the compare options stay out of the file");
+			allOn();
+			NewComparisonView::setProjectFileNameForTest({});
+		}
+		{
+			// File > Save Project from a folder comparison and from a file
+			MainWindow window;
+			window.openFolderComparison({ root + QStringLiteral("/L"), root + QStringLiteral("/R") });
+			auto *folder = window.findChild<FolderCompareView *>();
+			waitFor(folder);
+			if (folder == nullptr)
+				return 2;
+			folder->selectRowsForTest({ QStringLiteral("b.txt") });
+			folder->hideSelectedItems();
+			window.saveProject();
+			settle();
+			auto *selector = qobject_cast<NewComparisonView *>(window.findChild<QTabWidget *>()->currentWidget());
+			check(selector != nullptr
+					&& selector->pathsForTest().value(0) == root + QStringLiteral("/L/")
+					&& selector->hiddenItemsForTest() == QStringList{ QStringLiteral("b.txt") }
+					&& selector->windowTypeForTest() == -1,
+				"Save Project: a folder comparison's folders and hidden items");
+			window.openFileComparison({ root + QStringLiteral("/a.txt"), root + QStringLiteral("/b.txt") },
+				{ false, true });
+			settle();
+			window.saveProject();
+			settle();
+			auto *fromFile = qobject_cast<NewComparisonView *>(window.findChild<QTabWidget *>()->currentWidget());
+			check(fromFile != nullptr && fromFile != selector && fromFile->windowTypeForTest() == 1
+					&& fromFile->readOnlyForTest().value(1),
+				"Save Project: a text comparison, its window and read-only side");
+			if (!qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS").isEmpty())
+			{
+				window.resize(1100, 720);
+				window.show();
+				settle();
+				window.grab().save(qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS")
+					+ QStringLiteral("/project-selector.png"));
+			}
+		}
+		{
+			// Options > Project
+			OptionsDialog dialog;
+			auto *list = dialog.pageForTest(OptionsDialog::ProjectPage)
+				->findChild<QTreeWidget *>(QStringLiteral("projectList"));
+			if (list == nullptr)
+				return 2;
+			bool allChecked = list->topLevelItemCount() == 4 && list->columnCount() == 4;
+			for (int row = 0; row < list->topLevelItemCount(); ++row)
+				for (int column = 1; column <= 3; ++column)
+					allChecked = allChecked && list->topLevelItem(row)->checkState(column) == Qt::Checked;
+			check(allChecked && list->topLevelItem(0)->text(0) == OptionsDialog::tr("File Filters")
+					&& list->headerItem()->text(2) == OptionsDialog::tr("Load"),
+				"the page: four items (no plugins), Open, Load and Save, all on");
+			list->topLevelItem(0)->setCheckState(1, Qt::Unchecked);
+			dialog.saveForTest();
+			check(!Options::Project::Get(mgr, Operation::Open, ProjectItem::FileFilter)
+					&& Options::Project::Get(mgr, Operation::Load, ProjectItem::FileFilter)
+					&& Options::Project::Get(mgr, Operation::Open, ProjectItem::Plugin),
+				"OK saves the checks, the plugins' kept");
+			OptionsDialog shown;
+			auto *again = shown.pageForTest(OptionsDialog::ProjectPage)
+				->findChild<QTreeWidget *>(QStringLiteral("projectList"));
+			const bool showsIt = again->topLevelItem(0)->checkState(1) == Qt::Unchecked;
+			const QList<OptionsDialog::CategoryInfo> tree = shown.categoriesForTest();
+			int at = -1;
+			for (int i = 0; i < tree.size(); ++i)
+				if (tree.at(i).page == OptionsDialog::ProjectPage)
+					at = i;
+			shown.selectCategoryForTest(at);
+			if (!qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS").isEmpty())
+				shown.grab().save(qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS")
+					+ QStringLiteral("/project-page.png"));
+			shown.restoreDefaultsForTest();
+			check(showsIt && again->topLevelItem(0)->checkState(1) == Qt::Checked
+					&& !Options::Project::Get(mgr, Operation::Open, ProjectItem::FileFilter),
+				"shown again, and Defaults checks it without saving");
+			allOn();
 		}
 		return ok ? 0 : 1;
 	}

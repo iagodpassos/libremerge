@@ -670,6 +670,11 @@ void ImageCompareView::setReadOnlySides(const QList<bool> &readOnly)
 		m_buffer->SetReadOnly(i, readOnly.at(i));
 }
 
+bool ImageCompareView::isSideReadOnly(int side) const
+{
+	return side >= 0 && side < m_paneCount && m_buffer->GetReadOnly(side);
+}
+
 bool ImageCompareView::savePane(int pane, QString *error)
 {
 	if (!m_buffer->IsModified(pane) || m_buffer->GetReadOnly(pane))

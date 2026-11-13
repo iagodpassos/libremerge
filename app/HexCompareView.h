@@ -38,6 +38,11 @@ public:
 	int paneCount() const { return m_paneCount; }
 	QString tabTitle() const;
 	void setSideDescription(int side, const QString &description);
+	QString sideDescription(int side) const
+	{
+		return side >= 0 && side < 3 ? m_descriptions[side] : QString();
+	}
+	bool isSideReadOnly(int side) const;
 	void setReadOnlySides(const QList<bool> &readOnly);
 	/** Where a pane is saved in place of its file (the command line's
 	    -o); the pane goes on with that file once saved. */
