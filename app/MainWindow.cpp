@@ -1827,8 +1827,10 @@ void MainWindow::setSavePromptForTest(std::function<int()> answer)
 
 /** WinMerge's DoSelfCompare: one file against a snapshot of itself taken
     now, the copy read-only on the left as "Original File", the file
-    itself editable on the right. The recent list keeps the file alone. */
-void MainWindow::openSelfComparison(const QString &path)
+    itself editable on the right. The recent list keeps the file alone.
+    The window is the one picked from Compare's arrow, if any. */
+void MainWindow::openSelfComparison(const QString &path,
+	lm::CommandLine::WindowType windowType)
 {
 	// keeps the snapshot as long as the comparison it belongs to
 	class SnapshotOwner : public QObject
@@ -1845,7 +1847,28 @@ void MainWindow::openSelfComparison(const QString &path)
 		return;
 	}
 	const int before = m_tabs->count();
-	openFileComparison({ copy, path }, { true, false });
+	const QStringList pair{ copy, path };
+	switch (windowType)
+	{
+	case lm::CommandLine::WindowType::Text:
+		openFileComparison(pair, { true, false }, true);
+		break;
+	case lm::CommandLine::WindowType::Table:
+		openTableComparison(pair);
+		break;
+	case lm::CommandLine::WindowType::Binary:
+		openHexComparison(pair, { true, false });
+		break;
+	case lm::CommandLine::WindowType::Image:
+		openImageComparison(pair, { true, false });
+		break;
+	case lm::CommandLine::WindowType::Folder:
+		openArchiveComparison(pair);
+		break;
+	default:
+		openFileComparison(pair, { true, false });
+		break;
+	}
 	if (m_tabs->count() == before)
 		return;
 	QWidget *page = m_tabs->currentWidget();
@@ -2115,6 +2138,11 @@ void MainWindow::applyDiffOptions()
 	// refreshed (CDirDoc::RefreshOptions only updates the display), and so
 	// do images
 	rescanFileComparisons();
+	// and the selection screens take the compare options as they are now
+	// (COpenDoc::RefreshOptions)
+	for (int i = 0; i < m_tabs->count(); ++i)
+		if (auto *selector = qobject_cast<NewComparisonView *>(m_tabs->widget(i)))
+			selector->refreshOptions();
 }
 
 void MainWindow::rescanFileComparisons()
@@ -2255,21 +2283,43 @@ void MainWindow::openSelector(const QStringList &paths)
 	// already queued close delete the path field while its key handling is
 	// still on the stack (the archive x folder crash of cb41cac's CI run)
 	connect(selector, &NewComparisonView::compareRequested, this,
-		[this, guard = QPointer(selector)](const QStringList &selected,
-			const QList<bool> &readOnly, bool folders) {
-			QTimer::singleShot(0, this,
-				[this, guard, selected, readOnly, folders]() {
+		[this, guard = QPointer(selector)](const NewComparisonView::Request &request) {
+			QTimer::singleShot(0, this, [this, guard, request]() {
+					using WindowType = lm::CommandLine::WindowType;
+					const QStringList &selected = request.paths;
+					const QList<bool> &readOnly = request.readOnly;
 					// one file alone: WinMerge's self-compare, which
 					// leaves the selection open whatever the option
 					if (selected.size() == 1)
 					{
-						openSelfComparison(selected.first());
+						openSelfComparison(selected.first(), request.windowType);
 						return;
 					}
-					if (folders)
-						openFolderComparison(selected);
-					else
-						openFileComparison(selected, readOnly);
+					// a window picked from Compare's arrow (DoFileOpen)
+					switch (request.windowType)
+					{
+					case WindowType::Text:
+						openFileComparison(selected, readOnly, true);
+						break;
+					case WindowType::Table:
+						openTableComparison(selected);
+						break;
+					case WindowType::Binary:
+						openHexComparison(selected, readOnly);
+						break;
+					case WindowType::Image:
+						openImageComparison(selected, readOnly);
+						break;
+					case WindowType::Folder:
+						openArchiveComparison(selected);
+						break;
+					default:
+						if (request.folders)
+							openFolderComparison(selected);
+						else
+							openFileComparison(selected, readOnly);
+						break;
+					}
 					// WinMerge's OPT_CLOSE_WITH_OK, off by default: the
 					// selection stays open for the next comparison
 					if (!OptionsDialog::closeSelectorOnCompare())

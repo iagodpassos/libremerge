@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "pch.h"
 #include "NewComparisonView.h"
 #include "ArchiveCompare.h"
 #include "FileFilterCombo.h"
@@ -7,8 +8,11 @@
 #include "FileFilters.h"
 #include "OptionsDialog.h"
 #include "StarPrompt.h"
+#include "OptionsDef.h"
+#include "OptionsMgr.h"
 
 #include <QAbstractItemView>
+#include <QActionGroup>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QCompleter>
@@ -97,10 +101,19 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 		"<span style=\"font-size:34px;font-weight:800;color:#d97c00\">Merge</span>"), content);
 	header->addWidget(wordmark, 0, 0, 2, 1, Qt::AlignLeft | Qt::AlignTop);
 	header->setColumnStretch(1, 1);
-	auto *optionsButton = new QPushButton(tr("Options..."), content);
-	connect(optionsButton, &QPushButton::clicked, this, [this]() {
+	// a split button, as upstream's IDC_OPTIONS: the button opens the
+	// Options, its arrow the compare options this screen compares with
+	auto *optionsButton = new QToolButton(content);
+	optionsButton->setText(tr("Options..."));
+	optionsButton->setObjectName(QStringLiteral("selectorOptions"));
+	optionsButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+	optionsButton->setPopupMode(QToolButton::MenuButtonPopup);
+	connect(optionsButton, &QToolButton::clicked, this, [this]() {
 		QMetaObject::invokeMethod(window(), "showOptions");
 	});
+	m_diffOptionsMenu = new QMenu(optionsButton);
+	buildDiffOptionsMenu();
+	optionsButton->setMenu(m_diffOptionsMenu);
 	header->addWidget(optionsButton, 0, 2);
 	layout->addLayout(header);
 	layout->addSpacing(10);
@@ -252,7 +265,27 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 				compare();
 		});
 	}
-	buttons->addWidget(compareButton, 0, 1);
+	// upstream's Compare is a split button: its arrow opens the files in
+	// a window of choice. Compare keeps its look of the default button,
+	// the arrow sits right next to it
+	auto *compareRow = new QHBoxLayout;
+	compareRow->setSpacing(0);
+	compareRow->addWidget(compareButton);
+	m_compareAsButton = new QToolButton(content);
+	m_compareAsButton->setObjectName(QStringLiteral("compareAs"));
+	m_compareAsButton->setArrowType(Qt::DownArrow);
+	m_compareAsButton->setToolTip(tr("Compare As"));
+	m_compareAsButton->setFixedHeight(compareButton->sizeHint().height());
+	m_compareAsMenu = new QMenu(m_compareAsButton);
+	buildCompareAsMenu();
+	// the menu drops from the arrow (a menu set on the button would add
+	// Qt's own indicator to the arrow)
+	connect(m_compareAsButton, &QToolButton::clicked, this, [this]() {
+		m_compareAsMenu->exec(m_compareAsButton->mapToGlobal(
+			QPoint(0, m_compareAsButton->height())));
+	});
+	compareRow->addWidget(m_compareAsButton);
+	buttons->addLayout(compareRow, 0, 1);
 	auto *cancelButton = new QPushButton(tr("Cancel"), content);
 	connect(cancelButton, &QPushButton::clicked, this, &NewComparisonView::cancelled);
 	buttons->addWidget(cancelButton, 0, 2);
@@ -286,6 +319,164 @@ NewComparisonView::NewComparisonView(QWidget *parent)
 		connect(slot.path, &QComboBox::editTextChanged,
 			m_verifyTimer, qOverload<>(&QTimer::start));
 	verifyPaths();
+	// the compare options as saved (COpenView::OnInitialUpdate)
+	refreshOptions();
+}
+
+void NewComparisonView::refreshOptions()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr)
+		return;
+	m_ignoreWhite = mgr->GetInt(OPT_CMP_IGNORE_WHITESPACE);
+	m_ignoreBlankLines = mgr->GetBool(OPT_CMP_IGNORE_BLANKLINES);
+	m_ignoreCase = mgr->GetBool(OPT_CMP_IGNORE_CASE);
+	m_ignoreEol = mgr->GetBool(OPT_CMP_IGNORE_EOL);
+	m_ignoreNumbers = mgr->GetBool(OPT_CMP_IGNORE_NUMBERS);
+	m_ignoreCodepage = mgr->GetBool(OPT_CMP_IGNORE_CODEPAGE);
+	m_filterCommentsLines = mgr->GetBool(OPT_CMP_FILTER_COMMENTLINES);
+	m_ignoreMissingTrailingEol = mgr->GetBool(OPT_CMP_IGNORE_MISSING_TRAILING_EOL);
+	m_ignoreLineBreaks = mgr->GetBool(OPT_CMP_IGNORE_LINE_BREAKS);
+	m_compareMethod = mgr->GetInt(OPT_CMP_METHOD);
+}
+
+void NewComparisonView::saveCompareOptions() const
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	if (mgr == nullptr)
+		return;
+	mgr->SaveOption(OPT_CMP_IGNORE_WHITESPACE, m_ignoreWhite);
+	mgr->SaveOption(OPT_CMP_IGNORE_BLANKLINES, m_ignoreBlankLines);
+	mgr->SaveOption(OPT_CMP_IGNORE_CASE, m_ignoreCase);
+	mgr->SaveOption(OPT_CMP_IGNORE_EOL, m_ignoreEol);
+	mgr->SaveOption(OPT_CMP_IGNORE_NUMBERS, m_ignoreNumbers);
+	mgr->SaveOption(OPT_CMP_IGNORE_CODEPAGE, m_ignoreCodepage);
+	mgr->SaveOption(OPT_CMP_FILTER_COMMENTLINES, m_filterCommentsLines);
+	// upstream leaves these two out here, so what its menu says of them
+	// never reached the comparison: corrected
+	mgr->SaveOption(OPT_CMP_IGNORE_MISSING_TRAILING_EOL, m_ignoreMissingTrailingEol);
+	mgr->SaveOption(OPT_CMP_IGNORE_LINE_BREAKS, m_ignoreLineBreaks);
+	mgr->SaveOption(OPT_CMP_METHOD, m_compareMethod);
+}
+
+void NewComparisonView::buildDiffOptionsMenu()
+{
+	QMenu *menu = m_diffOptionsMenu;
+	menu->setObjectName(QStringLiteral("diffOptionsMenu"));
+	// W&hitespaces, three choices (OnDiffWhitespace)
+	QMenu *whitespaces = menu->addMenu(tr("W&hitespaces"));
+	auto *whiteGroup = new QActionGroup(whitespaces);
+	const char *const whiteTexts[] = {
+		QT_TR_NOOP("Com&pare"), QT_TR_NOOP("I&gnore Changes"), QT_TR_NOOP("Ig&nore All"),
+	};
+	QList<QAction *> whiteActions;
+	for (int value = 0; value < 3; ++value)
+	{
+		QAction *action = whitespaces->addAction(tr(whiteTexts[value]));
+		action->setObjectName(QStringLiteral("diffWhitespace%1").arg(value));
+		action->setCheckable(true);
+		whiteGroup->addAction(action);
+		connect(action, &QAction::triggered, this, [this, value]() { m_ignoreWhite = value; });
+		whiteActions.append(action);
+	}
+	// the toggles, each of a member of the screen's own
+	struct Toggle { const char *text; const char *name; bool NewComparisonView::*member; };
+	const Toggle toggles[] = {
+		{ QT_TR_NOOP("Ignore Blan&k Lines"), "diffIgnoreBlankLines", &NewComparisonView::m_ignoreBlankLines },
+		{ QT_TR_NOOP("Ignore &Case"), "diffIgnoreCase", &NewComparisonView::m_ignoreCase },
+		{ QT_TR_NOOP("Igno&re EOL Differences (Windows/Unix/Mac)"), "diffIgnoreEol", &NewComparisonView::m_ignoreEol },
+		{ QT_TR_NOOP("Ignore Codepage &Differences"), "diffIgnoreCodepage", &NewComparisonView::m_ignoreCodepage },
+		{ QT_TR_NOOP("Ignore Num&bers"), "diffIgnoreNumbers", &NewComparisonView::m_ignoreNumbers },
+		{ QT_TR_NOOP("Ignore C&omment Differences"), "diffIgnoreComments", &NewComparisonView::m_filterCommentsLines },
+		{ QT_TR_NOOP("Ignore &Missing Trailing EOL"), "diffIgnoreMissingTrailingEol", &NewComparisonView::m_ignoreMissingTrailingEol },
+		{ QT_TR_NOOP("Ignore Line &Breaks (Treat as Spaces)"), "diffIgnoreLineBreaks", &NewComparisonView::m_ignoreLineBreaks },
+	};
+	QList<QPair<QAction *, bool NewComparisonView::*>> toggleActions;
+	for (const Toggle &toggle : toggles)
+	{
+		QAction *action = menu->addAction(tr(toggle.text));
+		action->setObjectName(QLatin1String(toggle.name));
+		action->setCheckable(true);
+		bool NewComparisonView::*member = toggle.member;
+		connect(action, &QAction::triggered, this, [this, member](bool on) { this->*member = on; });
+		toggleActions.append({ action, member });
+	}
+	menu->addSeparator();
+	// &Compare Method, the seven of OnCompareMethod
+	QMenu *methods = menu->addMenu(tr("&Compare Method"));
+	auto *methodGroup = new QActionGroup(methods);
+	QList<QAction *> methodActions;
+	for (int method = 0; method < lm::kCompareMethodCount; ++method)
+	{
+		QAction *action = methods->addAction(lm::compareMethodName(method));
+		action->setObjectName(QStringLiteral("diffCompareMethod%1").arg(method));
+		action->setCheckable(true);
+		methodGroup->addAction(action);
+		connect(action, &QAction::triggered, this, [this, method]() { m_compareMethod = method; });
+		methodActions.append(action);
+	}
+	// the checks show the screen's options as the menu opens
+	// (OnUpdateDiff*, OnUpdateCompareMethod)
+	connect(menu, &QMenu::aboutToShow, this,
+		[this, whiteActions, toggleActions, methodActions]() {
+			for (int value = 0; value < whiteActions.size(); ++value)
+				whiteActions.at(value)->setChecked(value == m_ignoreWhite);
+			for (const auto &toggle : toggleActions)
+				toggle.first->setChecked(this->*toggle.second);
+			for (int method = 0; method < methodActions.size(); ++method)
+				methodActions.at(method)->setChecked(method == m_compareMethod);
+		});
+}
+
+void NewComparisonView::buildCompareAsMenu()
+{
+	using WindowType = lm::CommandLine::WindowType;
+	m_compareAsMenu->setObjectName(QStringLiteral("compareAsMenu"));
+	// upstream's &Webpage is left out: LibreMerge compares no web pages
+	const struct { const char *text; const char *name; WindowType type; } windows[] = {
+		{ QT_TR_NOOP("&Text"), "compareAsText", WindowType::Text },
+		{ QT_TR_NOOP("T&able"), "compareAsTable", WindowType::Table },
+		{ QT_TR_NOOP("&Binary"), "compareAsBinary", WindowType::Binary },
+		{ QT_TR_NOOP("&Image"), "compareAsImage", WindowType::Image },
+		{ QT_TR_NOOP("A&rchive"), "compareAsArchive", WindowType::Folder },
+	};
+	QList<QAction *> actions;
+	for (const auto &window : windows)
+	{
+		QAction *action = m_compareAsMenu->addAction(tr(window.text));
+		action->setObjectName(QLatin1String(window.name));
+		const WindowType type = window.type;
+		connect(action, &QAction::triggered, this, [this, type]() { compareAs(type); });
+		actions.append(action);
+	}
+	connect(m_compareAsMenu, &QMenu::aboutToShow, this, [this, actions]() {
+		const bool files = filesToCompareAs();
+		for (QAction *action : actions)
+			action->setEnabled(files);
+	});
+}
+
+bool NewComparisonView::filesToCompareAs() const
+{
+	// every path given is a file (archives included), as the paths' check
+	// enables the unpacker field upstream (bIsaFileCompare)
+	bool any = false;
+	for (const Slot &slot : m_slots)
+	{
+		const QString path = slot.path->currentText().trimmed();
+		if (path.isEmpty())
+			continue;
+		if (!QFileInfo(path).isFile())
+			return false;
+		any = true;
+	}
+	return any;
+}
+
+void NewComparisonView::setCompareEnabled(bool enabled)
+{
+	m_compareButton->setEnabled(enabled);
+	m_compareAsButton->setEnabled(enabled);
 }
 
 /** WinMerge's check of the open dialog's paths (UpdateButtonStatesThread):
@@ -299,7 +490,7 @@ void NewComparisonView::verifyPaths()
 	const QString prompt = tr("Select two (or three) folders/files to compare.");
 	if (!OptionsDialog::verifyOpenPaths())
 	{
-		m_compareButton->setEnabled(true);
+		setCompareEnabled(true);
 		showFilterGroup(true, true);
 		return;
 	}
@@ -319,7 +510,7 @@ void NewComparisonView::verifyPaths()
 			|| (kind[i] == File && lm::isArchiveFile(paths[i]));
 		anyExists = anyExists || kind[i] != Missing;
 	}
-	m_compareButton->setEnabled(anyExists);
+	setCompareEnabled(anyExists);
 	// the filter group (OnUpdateStatus): shown for a folder comparison,
 	// or while no path says it is a file comparison; usable once a folder
 	// or an archive is among the paths
@@ -569,8 +760,9 @@ void NewComparisonView::rememberPaths(const QStringList &paths)
 	settings.setValue(kHistoryKey, mru);
 }
 
-void NewComparisonView::compare()
+void NewComparisonView::compareAs(lm::CommandLine::WindowType windowType)
 {
+	const bool chosenWindow = windowType != lm::CommandLine::WindowType::Automatic;
 	// one Enter can land here twice: QLineEdit emits returnPressed and then
 	// ignores the key (for a dialog's default button), the key propagates
 	// to the editable combo, which hands it back to the line edit for a
@@ -585,7 +777,7 @@ void NewComparisonView::compare()
 	// default button
 	if (m_verifyTimer->isActive())
 		verifyPaths();
-	if (!m_compareButton->isEnabled())
+	if (!m_compareButton->isEnabled() || (chosenWindow && !filesToCompareAs()))
 		return;
 	m_compareArmed = true;
 	QTimer::singleShot(0, this, [this]() { m_compareArmed = false; });
@@ -608,8 +800,11 @@ void NewComparisonView::compare()
 		paths.append(path);
 		readOnly.append(m_slots[i].readOnly->isChecked());
 	}
+	Request request;
+	request.windowType = windowType;
 	// the first path alone: WinMerge's self-compare for a file (a folder
-	// alone does nothing there), without touching the path history
+	// alone does nothing there), in the window picked too, without
+	// touching the path history
 	if (paths.size() == 1 && !m_slots[0].path->currentText().trimmed().isEmpty())
 	{
 		const QFileInfo info(paths.first());
@@ -617,7 +812,9 @@ void NewComparisonView::compare()
 		{
 			applyFileFilter();
 			lm::saveIncludeSubfolders(m_includeSubfolders->isChecked());
-			emit compareRequested(paths, readOnly, false);
+			request.paths = paths;
+			request.readOnly = readOnly;
+			emit compareRequested(request);
 		}
 		else if (!info.exists())
 			setHint(tr("Path does not exist: %1").arg(paths.first()), true);
@@ -630,12 +827,13 @@ void NewComparisonView::compare()
 	}
 
 	// archives count as folders: they extract and compare as such, alone
-	// or against real folders, like WinMerge
+	// or against real folders, like WinMerge; in a window picked from the
+	// arrow, they are files like any other
 	int plainFiles = 0, folderLike = 0;
 	for (const QString &path : paths)
 	{
 		const QFileInfo info(path);
-		if (info.isDir() || (info.isFile() && lm::isArchiveFile(path)))
+		if (info.isDir() || (!chosenWindow && info.isFile() && lm::isArchiveFile(path)))
 			++folderLike;
 		else if (info.isFile())
 			++plainFiles;
@@ -655,5 +853,11 @@ void NewComparisonView::compare()
 	rememberPaths(paths);
 	applyFileFilter();
 	lm::saveIncludeSubfolders(m_includeSubfolders->isChecked());
-	emit compareRequested(paths, readOnly, folders);
+	// the options of the Options button's arrow are the ones in use from
+	// now on
+	saveCompareOptions();
+	request.paths = paths;
+	request.readOnly = readOnly;
+	request.folders = folders;
+	emit compareRequested(request);
 }

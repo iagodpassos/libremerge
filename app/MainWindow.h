@@ -61,8 +61,10 @@ public:
 	    pre-filling dropped/opened paths. */
 	void openSelector(const QStringList &paths = {});
 	/** One file against a snapshot of itself, WinMerge's self-compare
-	    (what Compare does with a single file). */
-	void openSelfComparison(const QString &path);
+	    (what Compare does with a single file), in the window picked from
+	    Compare's arrow if any. */
+	void openSelfComparison(const QString &path,
+		lm::CommandLine::WindowType windowType = lm::CommandLine::WindowType::Automatic);
 
 	/** CMergeApp::ParseArgsAndDoOpen: what the command line opens and
 	    how (its paths, descriptions, read-only sides, window type,

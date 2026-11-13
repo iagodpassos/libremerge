@@ -3692,8 +3692,84 @@ Checando identidade binária...</translation>
         <translation>&amp;Incluir subpastas</translation>
     </message>
     <message>
+        <source>Compare As</source>
+        <translation>Comparar Como</translation>
+    </message>
+    <message>
         <source>Select two (or three) folders/files to compare.</source>
         <translation>Selecione duas (ou três) pastas/arquivos para comparar.</translation>
+    </message>
+    <message>
+        <source>W&amp;hitespaces</source>
+        <translation>E&amp;spaços em branco</translation>
+    </message>
+    <message>
+        <source>Com&amp;pare</source>
+        <translation>Com&amp;parar</translation>
+    </message>
+    <message>
+        <source>I&amp;gnore Changes</source>
+        <translation>I&amp;gnorar Alterações</translation>
+    </message>
+    <message>
+        <source>Ig&amp;nore All</source>
+        <translation>Ig&amp;norar Tudo</translation>
+    </message>
+    <message>
+        <source>Ignore Blan&amp;k Lines</source>
+        <translation>Ignorar &amp;Linhas em Branco</translation>
+    </message>
+    <message>
+        <source>Ignore &amp;Case</source>
+        <translation>Ignorar &amp;Maiúsculas/Minúsculas</translation>
+    </message>
+    <message>
+        <source>Igno&amp;re EOL Differences (Windows/Unix/Mac)</source>
+        <translation>Igno&amp;rar Diferenças de Caractere de Final de Linha (Windows/Unix/Mac)</translation>
+    </message>
+    <message>
+        <source>Ignore Codepage &amp;Differences</source>
+        <translation>Ignorar &amp;Diferenças de Página de Código</translation>
+    </message>
+    <message>
+        <source>Ignore Num&amp;bers</source>
+        <translation>Ignorar &amp;Números</translation>
+    </message>
+    <message>
+        <source>Ignore C&amp;omment Differences</source>
+        <translation>Ignorar D&amp;iferenças de Comentário</translation>
+    </message>
+    <message>
+        <source>Ignore &amp;Missing Trailing EOL</source>
+        <translation>Ignorar &amp;Falta do Caracter EOL no Final</translation>
+    </message>
+    <message>
+        <source>Ignore Line &amp;Breaks (Treat as Spaces)</source>
+        <translation>Ignorar Que&amp;bras de Linha (Tratar como Espaços)</translation>
+    </message>
+    <message>
+        <source>&amp;Compare Method</source>
+        <translation>Método de &amp;Comparação</translation>
+    </message>
+    <message>
+        <source>&amp;Text</source>
+        <translation>&amp;Texto</translation>
+    </message>
+    <message>
+        <source>T&amp;able</source>
+        <translation>T&amp;abela</translation>
+    </message>
+    <message>
+        <source>&amp;Binary</source>
+        <translation>&amp;Binário</translation>
+    </message>
+    <message>
+        <source>&amp;Image</source>
+        <translation>&amp;Imagem</translation>
+    </message>
+    <message>
+        <source>A&amp;rchive</source>
+        <translation>A&amp;rquivo Compactado</translation>
     </message>
     <message>
         <source>Both paths are invalid!</source>

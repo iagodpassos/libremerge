@@ -122,10 +122,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 751 | 189 | 255 | 3 | 3 |
-| Spanish | 736 | 202 | 253 | 10 | 0 |
-| Catalan | 419 | 194 | 255 | 333 | 0 |
-| French | 752 | 209 | 237 | 3 | 0 |
+| German | 768 | 191 | 255 | 3 | 3 |
+| Spanish | 753 | 204 | 253 | 10 | 0 |
+| Catalan | 429 | 200 | 255 | 336 | 0 |
+| French | 767 | 213 | 237 | 3 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says
@@ -155,6 +155,10 @@ Parts of WinMerge's editor are written again in `app/`, after upstream's
 code. Where that code has an evident slip, the rewrite corrects it and
 says so in a comment:
 
+- Compare on the selection screen saves all of the compare options of
+  the Options button's arrow. Upstream (`COpenView::OnCompare`) leaves
+  "Ignore Missing Trailing EOL" and "Ignore Line Breaks" out, so what its
+  menu said of them never reached the comparison.
 - A change of Options > Editor > "Highlight syntax" colors each file by the
   types it opened with (`SetTextTypesByFileType`: a file whose extension
   gives none takes another pane's, XML by a declaration on the first

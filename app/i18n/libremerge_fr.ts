@@ -4030,8 +4030,88 @@ Vérification de l&apos;identité binaire...</translation>
         <translation>&amp;Inclure les sous-dossiers</translation>
     </message>
     <message>
+        <source>Compare As</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Co&amp;mpare As&quot;.</translatorcomment>
+        <translation>Comparer en tant que</translation>
+    </message>
+    <message>
         <source>Select two (or three) folders/files to compare.</source>
         <translation>Sélectionnez deux (ou trois) dossiers/fichiers à comparer.</translation>
+    </message>
+    <message>
+        <source>W&amp;hitespaces</source>
+        <translation>Caractères d&apos;&amp;espacement</translation>
+    </message>
+    <message>
+        <source>Com&amp;pare</source>
+        <translation>Com&amp;parer</translation>
+    </message>
+    <message>
+        <source>I&amp;gnore Changes</source>
+        <translation>I&amp;gnorer les changements</translation>
+    </message>
+    <message>
+        <source>Ig&amp;nore All</source>
+        <translation>Ig&amp;norer tout</translation>
+    </message>
+    <message>
+        <source>Ignore Blan&amp;k Lines</source>
+        <translation>Ignorer les lignes &amp;vides</translation>
+    </message>
+    <message>
+        <source>Ignore &amp;Case</source>
+        <translation>Ignorer la &amp;casse</translation>
+    </message>
+    <message>
+        <source>Igno&amp;re EOL Differences (Windows/Unix/Mac)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Igno&amp;re EOL Differences (Windows/Unix/Mac)&quot;.</translatorcomment>
+        <translation>Ignorer les différences d&apos;EO&amp;L (Windows/Unix/Mac)</translation>
+    </message>
+    <message>
+        <source>Ignore Codepage &amp;Differences</source>
+        <translation>Ignorer les &amp;différences de page de code</translation>
+    </message>
+    <message>
+        <source>Ignore Num&amp;bers</source>
+        <translation>Ignorer les nom&amp;bres</translation>
+    </message>
+    <message>
+        <source>Ignore C&amp;omment Differences</source>
+        <translation>Ignorer les différences de c&amp;ommentaire</translation>
+    </message>
+    <message>
+        <source>Ignore &amp;Missing Trailing EOL</source>
+        <translation>Ignorer les EOL de fin &amp;manquants</translation>
+    </message>
+    <message>
+        <source>Ignore Line &amp;Breaks (Treat as Spaces)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Ignore Line &amp;Breaks (Treat as Spaces)&quot;.</translatorcomment>
+        <translation>Ignorer les &amp;sauts de ligne (traiter comme des espaces)</translation>
+    </message>
+    <message>
+        <source>&amp;Compare Method</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Compare Method&quot;.</translatorcomment>
+        <translation>Mé&amp;thode de comparaison</translation>
+    </message>
+    <message>
+        <source>&amp;Text</source>
+        <translation>&amp;Texte</translation>
+    </message>
+    <message>
+        <source>T&amp;able</source>
+        <translation>T&amp;ableau</translation>
+    </message>
+    <message>
+        <source>&amp;Binary</source>
+        <translation>&amp;Binaire</translation>
+    </message>
+    <message>
+        <source>&amp;Image</source>
+        <translation>&amp;Image</translation>
+    </message>
+    <message>
+        <source>A&amp;rchive</source>
+        <translation>A&amp;rchive</translation>
     </message>
     <message>
         <source>Both paths are invalid!</source>

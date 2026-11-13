@@ -4,11 +4,14 @@
 #include <QStringList>
 #include <QWidget>
 
+#include "CommandLine.h"
+
 class FileFilterCombo;
 class FileFilterMenu;
 class QComboBox;
 class QCheckBox;
 class QLabel;
+class QMenu;
 class QPushButton;
 class QTimer;
 class QToolButton;
@@ -24,6 +27,18 @@ class NewComparisonView : public QWidget
 {
 	Q_OBJECT
 public:
+	/** What Compare asks the window to open. */
+	struct Request
+	{
+		QStringList paths;
+		QList<bool> readOnly;
+		/** Folders or archives, compared as folders. */
+		bool folders = false;
+		/** The window picked from the Compare button's arrow (COpenView's
+		    OnCompare with ID_MERGE_COMPARE_*), Automatic for Compare. */
+		lm::CommandLine::WindowType windowType = lm::CommandLine::WindowType::Automatic;
+	};
+
 	explicit NewComparisonView(QWidget *parent = nullptr);
 
 	/** Fill the first empty slots with the given paths. */
@@ -48,10 +63,19 @@ public:
 	FileFilterCombo *filterFieldForTest() const { return m_filterCombo; }
 	QString hintForTest() const;
 	bool compareEnabledForTest() const;
+	/** The menus of the Options and the Compare buttons' arrows, their
+	    items named (for tests). */
+	QMenu *diffOptionsMenuForTest() const { return m_diffOptionsMenu; }
+	QMenu *compareAsMenuForTest() const { return m_compareAsMenu; }
+	QToolButton *compareAsButtonForTest() const { return m_compareAsButton; }
+
+	/** COpenDoc::RefreshOptions (COpenView::OnUpdate): the compare options
+	    of the Options button's arrow take the saved values again, as the
+	    Options dialog is accepted. */
+	void refreshOptions();
 
 signals:
-	void compareRequested(const QStringList &paths, const QList<bool> &readOnly,
-		bool folders);
+	void compareRequested(const NewComparisonView::Request &request);
 	void cancelled();
 
 protected:
@@ -62,9 +86,26 @@ protected:
 	bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
-	void compare();
+	void compare() { compareAs(lm::CommandLine::WindowType::Automatic); }
 
 private:
+	/** COpenView::OnCompare: Compare, or one of the windows of its
+	    arrow. */
+	void compareAs(lm::CommandLine::WindowType windowType);
+	/** The menu of the Options button's arrow
+	    (IDR_POPUP_PROJECT_DIFF_OPTIONS), its checks following the
+	    screen's own compare options. */
+	void buildDiffOptionsMenu();
+	/** The menu of the Compare button's arrow (IDR_POPUP_COMPARE). */
+	void buildCompareAsMenu();
+	/** COpenView::OnUpdateCompare: the windows of the arrow are for
+	    files. */
+	bool filesToCompareAs() const;
+	/** Compare and its arrow go together. */
+	void setCompareEnabled(bool enabled);
+	/** The screen's compare options saved as the options in use
+	    (COpenView::OnCompare). */
+	void saveCompareOptions() const;
 	struct Slot
 	{
 		QComboBox *path;
@@ -90,6 +131,22 @@ private:
 	FileFilterMenu *m_filterMenu = nullptr;
 	QLabel *m_hint;
 	QPushButton *m_compareButton = nullptr;
+	QToolButton *m_compareAsButton = nullptr; // Compare's arrow
+	QMenu *m_compareAsMenu = nullptr;
+	QMenu *m_diffOptionsMenu = nullptr; // the Options button's arrow
+	// COpenView's compare options (m_nIgnoreWhite...): the saved ones as
+	// the screen opens, changed from the Options button's arrow, saved as
+	// Compare runs
+	int m_ignoreWhite = 0;
+	bool m_ignoreBlankLines = false;
+	bool m_ignoreCase = false;
+	bool m_ignoreEol = false;
+	bool m_ignoreNumbers = false;
+	bool m_ignoreCodepage = false;
+	bool m_filterCommentsLines = false;
+	bool m_ignoreMissingTrailingEol = false;
+	bool m_ignoreLineBreaks = false;
+	int m_compareMethod = 0;
 	QTimer *m_verifyTimer = nullptr; // coalesces typing into one check
 	bool m_compareArmed = false; // a compare already ran this cycle
 };

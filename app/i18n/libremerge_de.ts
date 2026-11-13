@@ -4035,8 +4035,86 @@ Die binäre Übereinstimmung wird geprüft...</translation>
         <translation>&amp;Unterordner einbeziehen</translation>
     </message>
     <message>
+        <source>Compare As</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Co&amp;mpare As&quot;.</translatorcomment>
+        <translation>Vergleichen als</translation>
+    </message>
+    <message>
         <source>Select two (or three) folders/files to compare.</source>
         <translation>Wählen Sie zwei (oder drei) Dateien oder Ordner zum Vergleichen aus.</translation>
+    </message>
+    <message>
+        <source>W&amp;hitespaces</source>
+        <translation>&amp;Leerzeichen</translation>
+    </message>
+    <message>
+        <source>Com&amp;pare</source>
+        <translation>&amp;Vergleichen</translation>
+    </message>
+    <message>
+        <source>I&amp;gnore Changes</source>
+        <translation>Änderung &amp;ignorieren</translation>
+    </message>
+    <message>
+        <source>Ig&amp;nore All</source>
+        <translation>&amp;Alle ignorieren</translation>
+    </message>
+    <message>
+        <source>Ignore Blan&amp;k Lines</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Ignore Blan&amp;k Lines&quot;.</translatorcomment>
+        <translation>Leerzeilen &amp;ignorieren</translation>
+    </message>
+    <message>
+        <source>Ignore &amp;Case</source>
+        <translation>&amp;Groß-/Kleinschreibung ignorieren</translation>
+    </message>
+    <message>
+        <source>Igno&amp;re EOL Differences (Windows/Unix/Mac)</source>
+        <translation>&amp;Zeilenumbruchunterschiede (Windows/Unix/Mac) ignorieren</translation>
+    </message>
+    <message>
+        <source>Ignore Codepage &amp;Differences</source>
+        <translation>&amp;Codeseiten-Unterschiede ignorieren</translation>
+    </message>
+    <message>
+        <source>Ignore Num&amp;bers</source>
+        <translation>&amp;Nummern ignorieren</translation>
+    </message>
+    <message>
+        <source>Ignore C&amp;omment Differences</source>
+        <translation>&amp;Kommentarunterschiede ignorieren</translation>
+    </message>
+    <message>
+        <source>Ignore &amp;Missing Trailing EOL</source>
+        <translation>&amp;Fehlende abschließende EOL ignorieren</translation>
+    </message>
+    <message>
+        <source>Ignore Line &amp;Breaks (Treat as Spaces)</source>
+        <translation>Zeilen&amp;umbrüche ignorieren (als Leerzeichen behandeln)</translation>
+    </message>
+    <message>
+        <source>&amp;Compare Method</source>
+        <translation>Vergleichs&amp;methode</translation>
+    </message>
+    <message>
+        <source>&amp;Text</source>
+        <translation>&amp;Text</translation>
+    </message>
+    <message>
+        <source>T&amp;able</source>
+        <translation>T&amp;abelle</translation>
+    </message>
+    <message>
+        <source>&amp;Binary</source>
+        <translation>&amp;Binär</translation>
+    </message>
+    <message>
+        <source>&amp;Image</source>
+        <translation>Bil&amp;d</translation>
+    </message>
+    <message>
+        <source>A&amp;rchive</source>
+        <translation>A&amp;rchiv</translation>
     </message>
     <message>
         <source>Both paths are invalid!</source>

@@ -4325,8 +4325,93 @@ S&apos;està comprovant la identitat binària...</translation>
         <translation>&amp;Inclou-hi les subcarpetes</translation>
     </message>
     <message>
+        <source>Compare As</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Co&amp;mpare As&quot;.</translatorcomment>
+        <translation>Compara com</translation>
+    </message>
+    <message>
         <source>Select two (or three) folders/files to compare.</source>
         <translation>Selecciona dos (o tres) directoris o dos (o tres) fitxers per a comparar.</translation>
+    </message>
+    <message>
+        <source>W&amp;hitespaces</source>
+        <translatorcomment>After WinMerge&apos;s &quot;W&amp;hitespaces&quot;.</translatorcomment>
+        <translation>&amp;Espais</translation>
+    </message>
+    <message>
+        <source>Com&amp;pare</source>
+        <translation>Co&amp;mpara&apos;ls</translation>
+    </message>
+    <message>
+        <source>I&amp;gnore Changes</source>
+        <translation>&amp;Ignora&apos;n els canvis</translation>
+    </message>
+    <message>
+        <source>Ig&amp;nore All</source>
+        <translation>I&amp;gnora&apos;ls tots</translation>
+    </message>
+    <message>
+        <source>Ignore Blan&amp;k Lines</source>
+        <translation>&amp;Ignora les línies en blanc</translation>
+    </message>
+    <message>
+        <source>Ignore &amp;Case</source>
+        <translation>Ignora &amp;majúscules/minúscules</translation>
+    </message>
+    <message>
+        <source>Igno&amp;re EOL Differences (Windows/Unix/Mac)</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Igno&amp;re EOL Differences (Windows/Unix/Mac)&quot;.</translatorcomment>
+        <translation>Ignora les diferències de &amp;salts de línia (Windows/Unix/Mac)</translation>
+    </message>
+    <message>
+        <source>Ignore Codepage &amp;Differences</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Ignore Codepage &amp;Differences&quot;.</translatorcomment>
+        <translation>Ignora les diferències de co&amp;dificació de caràcters</translation>
+    </message>
+    <message>
+        <source>Ignore Num&amp;bers</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Ignore Num&amp;bers&quot;.</translatorcomment>
+        <translation>Ignora els &amp;nombres</translation>
+    </message>
+    <message>
+        <source>Ignore C&amp;omment Differences</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Ignore C&amp;omment Differences&quot;.</translatorcomment>
+        <translation>Ignora les diferències en els c&amp;omentaris</translation>
+    </message>
+    <message>
+        <source>Ignore &amp;Missing Trailing EOL</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Ignora el salt de línia que falti al &amp;final del fitxer</translation>
+    </message>
+    <message>
+        <source>Ignore Line &amp;Breaks (Treat as Spaces)</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>Ignora els salts de línia (&amp;tracta&apos;ls com a espais)</translation>
+    </message>
+    <message>
+        <source>&amp;Compare Method</source>
+        <translation>Mètode de &amp;comparació</translation>
+    </message>
+    <message>
+        <source>&amp;Text</source>
+        <translation>&amp;Text</translation>
+    </message>
+    <message>
+        <source>T&amp;able</source>
+        <translation>T&amp;aula</translation>
+    </message>
+    <message>
+        <source>&amp;Binary</source>
+        <translation>&amp;Binari</translation>
+    </message>
+    <message>
+        <source>&amp;Image</source>
+        <translation>&amp;Imatge</translation>
+    </message>
+    <message>
+        <source>A&amp;rchive</source>
+        <translatorcomment>WinMerge&apos;s catalog leaves this text in English: translated for LibreMerge.</translatorcomment>
+        <translation>A&amp;rxiu</translation>
     </message>
     <message>
         <source>Both paths are invalid!</source>

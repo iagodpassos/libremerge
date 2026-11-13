@@ -631,6 +631,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolderEnterOpt(QStringLiteral("selftest-folder-enter"),
 		QStringLiteral("Press Enter on the folder comparison's items: folders expand and collapse, files open (for testing)"));
 	parser.addOption(selftestFolderEnterOpt);
+	QCommandLineOption selftestSelectorArrowsOpt(QStringLiteral("selftest-selector-arrows"),
+		QStringLiteral("Use the arrows of the selection screen's Options and Compare buttons (for testing)"));
+	parser.addOption(selftestSelectorArrowsOpt);
 	QCommandLineOption selftestFolderHideItemsOpt(QStringLiteral("selftest-folder-hide-items"),
 		QStringLiteral("Hide items of a folder comparison, recompare, show them again (for testing)"));
 	parser.addOption(selftestFolderHideItemsOpt);
@@ -14850,6 +14853,194 @@ int main(int argc, char *argv[])
 				if (view->paths().value(0) == xPair.at(0) && view->paths().value(1) == xPair.at(1))
 					fileTab = true;
 			check(fileTab, "the window: Enter in the folder tab opens the file comparison");
+		}
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestSelectorArrowsOpt))
+	{
+		// COpenView's split buttons: Options (its arrow, the compare options
+		// the screen compares with, IDR_POPUP_PROJECT_DIFF_OPTIONS) and
+		// Compare (its arrow, the window to open the files in,
+		// IDR_POPUP_COMPARE)
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).path());
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 30; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		const QString a = dir.filePath(QStringLiteral("a.csv"));
+		const QString b = dir.filePath(QStringLiteral("b.csv"));
+		write(a, "id,name\n1,apple\n");
+		write(b, "id,name\n1,APPLE\n");
+		const QString zipA = dir.filePath(QStringLiteral("a.zip"));
+		const QString zipB = dir.filePath(QStringLiteral("b.zip"));
+		if (!writeTestArchive(zipA, false, { { "x.txt", "left\n" } })
+			|| !writeTestArchive(zipB, false, { { "x.txt", "right\n" } }))
+			return 2;
+		QSettings().setValue(QStringLiteral("General/VerifyOpenPaths"), true);
+		const auto action = [](QMenu *menu, const char *name) {
+			return menu != nullptr ? menu->findChild<QAction *>(QLatin1String(name)) : nullptr;
+		};
+		const auto setPaths = [&settle](NewComparisonView *selector, const QStringList &paths) {
+			const QList<QComboBox *> fields = selector->findChildren<QComboBox *>();
+			int slot = 0;
+			for (QComboBox *field : fields)
+			{
+				if (field->objectName() == QStringLiteral("folderFilter"))
+					continue;
+				field->setCurrentText(slot < paths.size() ? paths.at(slot) : QString());
+				++slot;
+			}
+			selector->verifyPathsForTest();
+			settle();
+		};
+		const auto tabsOf = [](MainWindow &window, const char *className) {
+			int count = 0;
+			for (QWidget *page : window.findChildren<QWidget *>())
+				if (QLatin1String(page->metaObject()->className()) == QLatin1String(className))
+					++count;
+			return count;
+		};
+
+		// the saved options at hand, the arrow's choices compared with
+		mgr->SaveOption(OPT_CMP_IGNORE_WHITESPACE, 0);
+		mgr->SaveOption(OPT_CMP_IGNORE_CASE, false);
+		mgr->SaveOption(OPT_CMP_IGNORE_MISSING_TRAILING_EOL, false);
+		mgr->SaveOption(OPT_CMP_IGNORE_LINE_BREAKS, false);
+		mgr->SaveOption(OPT_CMP_METHOD, 0);
+		{
+			MainWindow window;
+			window.openSelector({});
+			settle();
+			auto *selector = window.findChild<NewComparisonView *>();
+			QMenu *options = selector != nullptr ? selector->diffOptionsMenuForTest() : nullptr;
+			if (options == nullptr)
+				return 2;
+			auto *button = selector->findChild<QToolButton *>(QStringLiteral("selectorOptions"));
+			check(button != nullptr && button->popupMode() == QToolButton::MenuButtonPopup
+					&& button->menu() == options,
+				"Options is a split button, its arrow the compare options");
+			emit options->aboutToShow();
+			QAction *compareWhite = action(options, "diffWhitespace0");
+			QAction *ignoreCase = action(options, "diffIgnoreCase");
+			QAction *trailingEol = action(options, "diffIgnoreMissingTrailingEol");
+			QAction *lineBreaks = action(options, "diffIgnoreLineBreaks");
+			QAction *quick = action(options, "diffCompareMethod1");
+			if (compareWhite == nullptr || ignoreCase == nullptr || trailingEol == nullptr
+				|| lineBreaks == nullptr || quick == nullptr)
+				return 2;
+			check(compareWhite->isChecked() && !ignoreCase->isChecked()
+					&& action(options, "diffCompareMethod0")->isChecked()
+					&& options->actions().size() == 11,
+				"the arrow's menu shows the saved options");
+			action(options, "diffWhitespace2")->trigger();
+			ignoreCase->trigger();
+			trailingEol->trigger();
+			lineBreaks->trigger();
+			quick->trigger();
+			emit options->aboutToShow();
+			check(action(options, "diffWhitespace2")->isChecked() && !compareWhite->isChecked()
+					&& ignoreCase->isChecked() && quick->isChecked()
+					&& !mgr->GetBool(OPT_CMP_IGNORE_CASE) && mgr->GetInt(OPT_CMP_METHOD) == 0,
+				"a choice changes the screen's options, not yet the ones in use");
+			setPaths(selector, { a, b });
+			const int fileTabs = tabsOf(window, "FileCompareView") + tabsOf(window, "TableCompareView");
+			QPushButton *compare = nullptr;
+			for (QPushButton *candidate : selector->findChildren<QPushButton *>())
+				if (candidate->text() == NewComparisonView::tr("Compare"))
+					compare = candidate;
+			if (compare == nullptr)
+				return 2;
+			compare->click();
+			settle();
+			check(tabsOf(window, "FileCompareView") + tabsOf(window, "TableCompareView") == fileTabs + 1
+					&& mgr->GetInt(OPT_CMP_IGNORE_WHITESPACE) == 2 && mgr->GetBool(OPT_CMP_IGNORE_CASE)
+					&& mgr->GetBool(OPT_CMP_IGNORE_MISSING_TRAILING_EOL)
+					&& mgr->GetBool(OPT_CMP_IGNORE_LINE_BREAKS) && mgr->GetInt(OPT_CMP_METHOD) == 1,
+				"Compare saves the screen's options, the two upstream forgets included");
+			// the Options dialog accepted: the screen takes them again
+			mgr->SaveOption(OPT_CMP_IGNORE_CASE, false);
+			window.applyDiffOptions();
+			emit options->aboutToShow();
+			check(!ignoreCase->isChecked(), "the Options dialog's OK refreshes the screen's options");
+		}
+		mgr->SaveOption(OPT_CMP_IGNORE_WHITESPACE, 0);
+		mgr->SaveOption(OPT_CMP_IGNORE_MISSING_TRAILING_EOL, false);
+		mgr->SaveOption(OPT_CMP_IGNORE_LINE_BREAKS, false);
+		mgr->SaveOption(OPT_CMP_METHOD, 0);
+
+		{
+			MainWindow window;
+			window.openSelector({});
+			settle();
+			auto *selector = window.findChild<NewComparisonView *>();
+			QMenu *as = selector != nullptr ? selector->compareAsMenuForTest() : nullptr;
+			QToolButton *arrow = selector != nullptr ? selector->compareAsButtonForTest() : nullptr;
+			if (as == nullptr || arrow == nullptr)
+				return 2;
+			setPaths(selector, {});
+			check(!arrow->isEnabled(), "no path: Compare's arrow is off with Compare");
+			setPaths(selector, { dir.path(), dir.path() });
+			emit as->aboutToShow();
+			check(arrow->isEnabled() && !action(as, "compareAsText")->isEnabled()
+					&& action(as, "compareAsWebpage") == nullptr && as->actions().size() == 5,
+				"folders: the windows of the arrow are for files");
+			setPaths(selector, { a, b });
+			emit as->aboutToShow();
+			check(action(as, "compareAsText")->isEnabled() && action(as, "compareAsArchive")->isEnabled(),
+				"files: every window of the arrow");
+			const int texts = tabsOf(window, "FileCompareView");
+			action(as, "compareAsText")->trigger();
+			settle();
+			check(tabsOf(window, "FileCompareView") == texts + 1,
+				"Text: two CSV files open as text");
+			const int hexes = tabsOf(window, "HexCompareView");
+			action(as, "compareAsBinary")->trigger();
+			settle();
+			check(tabsOf(window, "HexCompareView") == hexes + 1, "Binary: the files open in the binary window");
+			const int tables = tabsOf(window, "TableCompareView");
+			action(as, "compareAsTable")->trigger();
+			settle();
+			check(tabsOf(window, "TableCompareView") == tables + 1, "Table: the files open as a table");
+			setPaths(selector, { zipA, zipB });
+			emit as->aboutToShow();
+			const int folders = tabsOf(window, "FolderCompareView");
+			action(as, "compareAsArchive")->trigger();
+			for (int i = 0; i < 20; ++i)
+				settle();
+			check(tabsOf(window, "FolderCompareView") == folders + 1,
+				"Archive: two archives open as a folder comparison");
+			setPaths(selector, { a });
+			emit as->aboutToShow();
+			const int hexesAlone = tabsOf(window, "HexCompareView");
+			action(as, "compareAsBinary")->trigger();
+			settle();
+			auto *hex = qobject_cast<HexCompareView *>(window.findChild<QTabWidget *>()->currentWidget());
+			check(tabsOf(window, "HexCompareView") == hexesAlone + 1 && hex != nullptr,
+				"one file: the self-compare in the window picked");
 		}
 		return ok ? 0 : 1;
 	}
