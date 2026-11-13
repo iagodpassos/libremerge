@@ -16,6 +16,11 @@
 #include <QDialogButtonBox>
 #include <QHeaderView>
 #include <QRadioButton>
+#include <QImageReader>
+#include <QPageSize>
+#include <QPainter>
+#include <QPdfWriter>
+#include <QImageWriter>
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QKeyEvent>
@@ -642,6 +647,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolderEnterOpt(QStringLiteral("selftest-folder-enter"),
 		QStringLiteral("Press Enter on the folder comparison's items: folders expand and collapse, files open (for testing)"));
 	parser.addOption(selftestFolderEnterOpt);
+	QCommandLineOption selftestImageSvgOpt(QStringLiteral("selftest-image-svg"),
+		QStringLiteral("Compare two SVG images, save one as PNG, see *.svg in the Image page's drop-down (for testing)"));
+	parser.addOption(selftestImageSvgOpt);
 	QCommandLineOption selftestExternalEditorOpt(QStringLiteral("selftest-external-editor"),
 		QStringLiteral("Open > With External Editor in the file, table and folder windows (for testing)"));
 	parser.addOption(selftestExternalEditorOpt);
@@ -9727,7 +9735,8 @@ int main(int argc, char *argv[])
 				dialog.pageForTest(OptionsDialog::ImagePage)->findChild<lm::WildcardDropList *>() };
 			check(!fields.contains(nullptr)
 					&& fields.at(1)->fixedPatterns() == lm::defaultBinaryFilePatterns()
-					&& fields.at(2)->fixedPatterns() == lm::defaultImageFilePatterns(),
+					// (the Image page's adds SVG and PDF, as upstream's 64-bit build)
+					&& fields.at(2)->fixedPatterns().startsWith(lm::defaultImageFilePatterns()),
 				"the Table, Binary and Image pattern fields");
 		}
 
@@ -14874,6 +14883,101 @@ int main(int argc, char *argv[])
 					fileTab = true;
 			check(fileTab, "the window: Enter in the folder tab opens the file comparison");
 		}
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestImageSvgOpt))
+	{
+		// SVG and PDF in the image comparison, as WinMerge's 64-bit build
+		// takes them: through the ImgConverter (Qt's image plugins for them
+		// here), drawn at Image > Vector Image Scaling, saved back only as
+		// another format
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto svg = [](const QString &path, const char *color) {
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(QByteArray("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"30\">"
+				"<rect x=\"0\" y=\"0\" width=\"40\" height=\"30\" fill=\"white\"/>"
+				"<rect x=\"5\" y=\"5\" width=\"10\" height=\"10\" fill=\"") + color + "\"/></svg>");
+		};
+		QSettings().remove(QStringLiteral("ImageCompare/VectorImageZoomRatio"));
+		const QString a = dir.filePath(QStringLiteral("a.svg"));
+		const QString b = dir.filePath(QStringLiteral("b.svg"));
+		svg(a, "red");
+		svg(b, "blue");
+		check(QImageReader::supportedImageFormats().contains("svg"),
+			"Qt reads SVG (its image plugin is there)");
+		{
+			ImageCompareView view;
+			QString error;
+			const bool compared = view.compare(a, b, &error);
+			check(compared && view.diffCount() > 0 && view.imageSizeForTest(0) == QSize(40, 30),
+				"two SVG files compare as images, at their own size");
+			if (!compared)
+				printf("    %s\n", qPrintable(error));
+			view.setVectorImageZoomRatio(2.0f);
+			check(view.imageSizeForTest(0) == QSize(80, 60) && view.imageSizeForTest(1) == QSize(80, 60)
+					&& qFuzzyCompare(view.vectorImageZoomRatio(), 2.0f),
+				"Vector Image Scaling draws them again, at 200%");
+			view.copyAllFrom(0, 1);
+			const QString png = dir.filePath(QStringLiteral("b.png"));
+			lm::setSaveAsPathForTest([&png](const QString &) { return png; });
+			error.clear();
+			const bool saved = view.saveModified(&error);
+			lm::setSaveAsPathForTest({});
+			check(saved && !view.isModified() && QImageReader(png).format() == "png"
+					&& QImageReader(png).size() == QSize(80, 60),
+				"an SVG edited saves as PNG, through Save As");
+		}
+		{
+			ImageCompareView again;
+			QString error;
+			again.compare(a, b, &error);
+			check(again.imageSizeForTest(0) == QSize(80, 60),
+				"the scaling is kept for the next comparison");
+			again.setVectorImageZoomRatio(1.0f);
+		}
+		// a PDF's pages are the image's, where Qt reads PDF
+		if (QImageReader::supportedImageFormats().contains("pdf"))
+		{
+			const auto pdf = [](const QString &path, const QColor &second) {
+				QPdfWriter writer(path);
+				writer.setPageSize(QPageSize(QSizeF(60, 40), QPageSize::Point));
+				writer.setResolution(72);
+				QPainter painter(&writer);
+				painter.fillRect(QRect(0, 0, 60, 40), Qt::white);
+				painter.fillRect(QRect(5, 5, 10, 10), Qt::black);
+				writer.newPage();
+				painter.fillRect(QRect(0, 0, 60, 40), Qt::white);
+				painter.fillRect(QRect(5, 5, 10, 10), second);
+			};
+			const QString pa = dir.filePath(QStringLiteral("a.pdf"));
+			const QString pb = dir.filePath(QStringLiteral("b.pdf"));
+			pdf(pa, Qt::red);
+			pdf(pb, Qt::blue);
+			ImageCompareView view;
+			QString error;
+			const bool compared = view.compare(pa, pb, &error);
+			check(compared && view.pageCountForTest(0) == 2 && view.pageCountForTest(1) == 2,
+				"two PDF files compare page by page");
+		}
+		else
+			printf("PDF: no image plugin for it here, not compared\n");
+		OptionsDialog dialog;
+		auto *patterns = dialog.pageForTest(OptionsDialog::ImagePage)
+			->findChild<lm::WildcardDropList *>();
+		check(patterns != nullptr && patterns->fixedPatterns().contains(QStringLiteral("*.svg"))
+				&& !lm::defaultImageFilePatterns().contains(QStringLiteral("*.svg")),
+			"the Image page's drop-down offers *.svg, the defaults leave it out");
 		return ok ? 0 : 1;
 	}
 

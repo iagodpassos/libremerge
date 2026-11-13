@@ -19,7 +19,8 @@
 # the bundle carries one ICU instead of two.
 #
 # What LibreMerge uses: qtbase (Core, Gui, Widgets, Concurrent, DBus, the
-# xcb and Wayland platforms) and qtimageformats. No GTK theme: the
+# xcb and Wayland platforms), qtimageformats and qtsvg (the SVG image
+# plugin the image comparison opens .svg files with). No GTK theme: the
 # AppImage has never carried one, and with it GTK itself would come in.
 # Qt's own strings (dialog buttons, text-field menus) are compiled from
 # qttranslations with bookworm's lrelease: the .ts format has not changed.
@@ -33,6 +34,7 @@ BASE="https://download.qt.io/official_releases/qt/${QT_VER%.*}/$QT_VER/submodule
 declare -A SHA256=(
   [qtbase]="a951bd163c7b80fc6b8c88d7668fb56abf91c152373e13c10666763238131307"
   [qtimageformats]="0943132b5db8de6b6a7f1d162682173e8763c7ed94e80fd39113292845f67762"
+  [qtsvg]="e4ab39534ec97987b1b9b60ef7f4d3253d5912a69f8c713a01753174a4029331"
   [qttranslations]="85929c0c30d6f273f23bd879bb69803ea17b010ab73cab2f8abf95357f6f6bbb"
 )
 
@@ -65,7 +67,7 @@ JOBS="${QT_JOBS:-$(( MEM_GB < $(nproc) ? MEM_GB : $(nproc) ))}"
 
 WORK="$(mktemp -d)"
 cd "$WORK"
-for module in qtbase qtimageformats qttranslations; do
+for module in qtbase qtimageformats qtsvg qttranslations; do
   tarball="$module-everywhere-src-$QT_VER.tar.xz"
   curl -fsSL -o "$tarball" "$BASE/$tarball"
   echo "${SHA256[$module]}  $tarball" | sha256sum -c --quiet
@@ -96,6 +98,12 @@ cmake --install qtbase-build > /dev/null
   -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF > /dev/null
 cmake --build qtimageformats-build --parallel "$JOBS"
 cmake --install qtimageformats-build > /dev/null
+
+"$PREFIX/bin/qt-cmake" -S "qtsvg-everywhere-src-$QT_VER" \
+  -B qtsvg-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF > /dev/null
+cmake --build qtsvg-build --parallel "$JOBS"
+cmake --install qtsvg-build > /dev/null
 
 mkdir -p "$PREFIX/translations"
 for ts in "qttranslations-everywhere-src-$QT_VER"/translations/qtbase_*.ts; do

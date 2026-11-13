@@ -30,6 +30,7 @@
 #include <QGridLayout>
 #include <QFileDialog>
 #include <QGroupBox>
+#include <QImageReader>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -555,13 +556,18 @@ QWidget *OptionsDialog::buildBinaryPage()
     WIC Decoder" picks a Windows decoder (Qt's decode the images here),
     and "OCR result" shapes the text of upstream's command comparing the
     text Windows' OCR reads in the images, a command LibreMerge does not
-    have. The drop-down also leaves out the PDF, SVG and Windows metafile
-    patterns upstream adds there, kinds the image comparison cannot open. */
+    have. The drop-down offers PDF and SVG, as upstream's 64-bit build adds
+    them there (OnDropDownPatterns), when Qt's image plugins for them are
+    there; not its Windows metafiles, which no decoder here reads. */
 QWidget *OptionsDialog::buildImagePage()
 {
 	auto *page = new QWidget(this);
 	auto *box = new QVBoxLayout(page);
-	m_cmbImagePatterns = patternList(page, lm::defaultImageFilePatterns());
+	QString patterns = lm::defaultImageFilePatterns();
+	for (const char *vector : { "pdf", "svg" })
+		if (QImageReader::supportedImageFormats().contains(vector))
+			patterns += QStringLiteral(";*.") + QLatin1String(vector);
+	m_cmbImagePatterns = patternList(page, patterns);
 	addLabeled(box, tr("Image file &patterns:"), m_cmbImagePatterns);
 	m_chkImageInFolderCompare = new QCheckBox(
 		tr("&Enable image compare in folder compare"), page);

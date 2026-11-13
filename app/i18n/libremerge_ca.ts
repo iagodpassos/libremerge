@@ -4006,6 +4006,10 @@ Potser el fitxer és només de lectura?</translation>
         <translation>Selecció de rectangle</translation>
     </message>
     <message>
+        <source>&amp;Vector Image Scaling</source>
+        <translation>Escala de la imatge &amp;vectorial</translation>
+    </message>
+    <message>
         <source>&amp;Previous Page</source>
         <translation>&amp;Pàgina anterior</translation>
     </message>

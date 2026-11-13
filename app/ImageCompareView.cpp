@@ -518,6 +518,9 @@ void ImageCompareView::loadSettings()
 		settings.value(QStringLiteral("OverlayAlpha"), 30).toInt() / 100.0);
 	m_draggingMode = settings.value(QStringLiteral("DraggingMode"), DragMove).toInt();
 	m_zoom = settings.value(QStringLiteral("Zoom"), 1000).toInt() / 1000.0;
+	// OPT_CMP_IMG_VECTOR_IMAGE_ZOOM_RATIO, in thousandths (1 to 8000)
+	m_buffer->SetVectorImageZoomRatio(qBound(1,
+		settings.value(QStringLiteral("VectorImageZoomRatio"), 1000).toInt(), 8000) / 1000.0f);
 	settings.endGroup();
 	for (int i = 0; i < 3; ++i)
 		m_panes[i]->setZoom(m_zoom);
@@ -547,6 +550,8 @@ void ImageCompareView::saveSettings()
 	settings.setValue(QStringLiteral("DraggingMode"), m_draggingMode);
 	settings.setValue(QStringLiteral("Zoom"),
 		static_cast<int>(m_zoom * 1000));
+	settings.setValue(QStringLiteral("VectorImageZoomRatio"),
+		static_cast<int>(m_buffer->GetVectorImageZoomRatio() * 1000));
 	settings.endGroup();
 }
 
@@ -927,6 +932,29 @@ int ImageCompareView::maxPageCount() const
 void ImageCompareView::setShowDifferences(bool show)
 {
 	m_buffer->SetShowDifferences(show);
+	saveSettings();
+	afterBufferChange();
+}
+
+QSize ImageCompareView::imageSizeForTest(int pane) const
+{
+	return QSize(m_buffer->GetImageWidth(pane), m_buffer->GetImageHeight(pane));
+}
+
+int ImageCompareView::pageCountForTest(int pane) const
+{
+	return m_buffer->GetPageCount(pane);
+}
+
+float ImageCompareView::vectorImageZoomRatio() const
+{
+	return m_buffer->GetVectorImageZoomRatio();
+}
+
+void ImageCompareView::setVectorImageZoomRatio(float ratio)
+{
+	// the SVG and PDF panes drawn again at it, and compared again
+	m_buffer->SetVectorImageZoomRatio(ratio);
 	saveSettings();
 	afterBufferChange();
 }

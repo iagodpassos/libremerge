@@ -3741,6 +3741,11 @@ Le fichier est peut-être en lecture seule.</translation>
         <translation>Sélection rectangulaire</translation>
     </message>
     <message>
+        <source>&amp;Vector Image Scaling</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Vector Image Scaling&quot;.</translatorcomment>
+        <translation>Mise à l&apos;échelle de l&apos;image &amp;vectorielle</translation>
+    </message>
+    <message>
         <source>&amp;Previous Page</source>
         <translation>Page &amp;précédente</translation>
     </message>

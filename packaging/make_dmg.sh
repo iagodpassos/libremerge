@@ -51,14 +51,19 @@ PLUGINS="$APP/Contents/PlugIns"
 # modules LibreMerge does not use, pulled in transitively via plugins
 for fw in QtVirtualKeyboard QtVirtualKeyboardQml QtVirtualKeyboardSettings \
           QtQml QtQmlMeta QtQmlModels QtQmlWorkerScript QtQuick \
-          QtPdf QtSvg QtOpenGL QtNetwork; do
+          QtPdf QtOpenGL QtNetwork; do
   rm -rf "$FRAMEWORKS/$fw.framework"
 done
 rm -rf "$PLUGINS/virtualkeyboard" "$PLUGINS/qmltooling" \
   "$PLUGINS/platforminputcontexts" "$PLUGINS/networkinformation" \
   "$PLUGINS/tls" "$PLUGINS/imageformats/libqpdf.dylib" \
-  "$PLUGINS/imageformats/libqsvg.dylib" "$PLUGINS/iconengines/libqsvgicon.dylib"
+  "$PLUGINS/iconengines/libqsvgicon.dylib"
 rmdir "$PLUGINS/iconengines" 2> /dev/null || true
+# QtSvg and its image plugin stay: the image comparison opens .svg files
+if [ ! -f "$PLUGINS/imageformats/libqsvg.dylib" ] || [ ! -d "$FRAMEWORKS/QtSvg.framework" ]; then
+  echo "    ERROR: the SVG image plugin or QtSvg is missing from the bundle" >&2
+  exit 1
+fi
 
 # fail loudly if a remaining binary still wants a removed framework
 while read -r binary; do

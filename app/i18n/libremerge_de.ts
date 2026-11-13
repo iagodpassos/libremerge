@@ -3725,6 +3725,11 @@ Patches sind nicht betroffen.</translation>
         <translation>Rechteck auswählen</translation>
     </message>
     <message>
+        <source>&amp;Vector Image Scaling</source>
+        <translatorcomment>After WinMerge&apos;s &quot;&amp;Vector Image Scaling&quot;.</translatorcomment>
+        <translation>Vektorbild-&amp;Skalierung</translation>
+    </message>
+    <message>
         <source>&amp;Previous Page</source>
         <translation>&amp;Vorherige Seite</translation>
     </message>

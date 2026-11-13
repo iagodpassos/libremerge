@@ -124,6 +124,13 @@ export EXTRA_PLATFORM_PLUGINS="libqwayland.so;libqoffscreen.so"
 # no platform theme, as with Debian's Qt: Qt loads the desktop portal's
 # only inside Flatpak and Snap, or when QT_QPA_PLATFORMTHEME asks for it
 rm -rf AppDir/usr/plugins/platformthemes
+# the image comparison opens .svg files through Qt's SVG image plugin,
+# which needs qtsvg in the Qt prefix (build_qt.sh builds it since then):
+# a Qt built without it fails here, not at a user's first .svg
+if [ ! -f AppDir/usr/plugins/imageformats/libqsvg.so ]; then
+  echo "ERROR: no SVG image plugin; rebuild Qt with packaging/linux/build_qt.sh" >&2
+  exit 1
+fi
 
 # Qt's own strings (dialog buttons, text-field context menus) come from
 # qtbase_<lang>.qm, which build_qt.sh compiles into the Qt prefix; the

@@ -36,6 +36,13 @@ scanlines and produce the same diffs; format support follows Qt's decoders
 instead of FreeImage's (writing GIF and multi-page files back is not
 supported, unlike WinMerge).
 
+`ImgConverter.hpp`, which upstream's 64-bit build draws PDF and SVG files
+with (Windows.Data.Pdf, Direct2D) and its EMF/WMF through GDI+, is written
+again over Qt's image plugins for PDF and SVG: as upstream, the plain
+decoder leaves those files to it, a PDF's pages are the image's pages and
+both are drawn at Image > Vector Image Scaling. Windows metafiles have no
+reader here.
+
 ## Tree-sitter grammars
 
 WinMerge colors files through Tree-sitter too, in the order its highlight
@@ -122,10 +129,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 802 | 202 | 258 | 3 | 3 |
-| Spanish | 788 | 214 | 256 | 10 | 0 |
-| Catalan | 461 | 209 | 258 | 340 | 0 |
-| French | 800 | 225 | 240 | 3 | 0 |
+| German | 802 | 203 | 258 | 3 | 3 |
+| Spanish | 789 | 214 | 256 | 10 | 0 |
+| Catalan | 462 | 209 | 258 | 340 | 0 |
+| French | 800 | 226 | 240 | 3 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says

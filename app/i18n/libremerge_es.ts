@@ -3734,6 +3734,10 @@ El archivo puede ser de solo lectura.</translation>
         <translation>Selección rectangular</translation>
     </message>
     <message>
+        <source>&amp;Vector Image Scaling</source>
+        <translation>Escalado &amp;vectorial de imagen</translation>
+    </message>
+    <message>
         <source>&amp;Previous Page</source>
         <translation>&amp;Página anterior</translation>
     </message>

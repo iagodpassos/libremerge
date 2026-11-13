@@ -73,6 +73,10 @@ public:
 	void editActivePanePath();
 	FilepathEdit *headerForTest(int pane) const { return m_headers[pane]; }
 	int activePaneForTest() const { return m_activePane; }
+	/** A pane's image size and page count, as the buffer has them (for
+	    tests). */
+	QSize imageSizeForTest(int pane) const;
+	int pageCountForTest(int pane) const;
 	bool saveModified(QString *error);
 	void setReadOnlySides(const QList<bool> &readOnly);
 
@@ -124,6 +128,10 @@ public:
 	int maxPageCount() const;
 	void setShowDifferences(bool show);
 	void setBlockSize(int size);
+	/** Image > Vector Image Scaling (SetVectorImageZoomRatio): the zoom
+	    SVG and PDF files are drawn at, 1 for their own size. */
+	float vectorImageZoomRatio() const;
+	void setVectorImageZoomRatio(float ratio);
 	void setColorDistanceThreshold(double threshold);
 	void setInsertionDeletionMode(int mode);
 	void setOverlayMode(int mode);

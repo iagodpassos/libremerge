@@ -114,6 +114,11 @@ public:
 		// an untitled pane has no file: nothing to read (and no warning)
 		if (filename.empty())
 			return false;
+		// vector files are the ImgConverter's, as upstream's FreeImage
+		// reads neither: drawn there at the vector image zoom
+		const QString suffix = QFileInfo(QString::fromStdWString(filename)).suffix().toLower();
+		if (suffix == QLatin1String("svg") || suffix == QLatin1String("pdf"))
+			return false;
 		QImageReader reader(QString::fromStdWString(filename));
 		reader.setAutoTransform(false);
 		QImage img = reader.read();
@@ -121,6 +126,11 @@ public:
 			return false;
 		image_ = img;
 		formatHint_ = reader.format();
+		// a plugin may not name the format it read (SVG's does not): the
+		// file's extension says it then, so that the file is not taken for
+		// one made in memory
+		if (formatHint_.isEmpty())
+			formatHint_ = QFileInfo(QString::fromStdWString(filename)).suffix().toLower().toLatin1();
 		metadata_.clear();
 		const char *orientation = exifOrientationString(reader.transformation());
 		if (orientation)
@@ -132,6 +142,11 @@ public:
 	{
 		if (formatHint_.isEmpty())
 			return true; // in-memory image, can be written as PNG etc.
+		// a vector file is drawn into pixels as it reads (SVG, PDF): those
+		// pixels do not go back into it, as upstream's WIC cannot write
+		// them either; Save As offers PNG
+		if (formatHint_ == "svg" || formatHint_ == "svgz" || formatHint_ == "pdf")
+			return false;
 		return QImageWriter::supportedImageFormats().contains(formatHint_);
 	}
 
@@ -304,6 +319,10 @@ public:
 	{
 		close();
 		if (filename.empty())
+			return false;
+		// a PDF's pages are the ImgConverter's, drawn at the vector zoom
+		const QString suffix = QFileInfo(QString::fromStdWString(filename)).suffix().toLower();
+		if (suffix == QLatin1String("svg") || suffix == QLatin1String("pdf"))
 			return false;
 		QImageReader reader(QString::fromStdWString(filename));
 		if (!reader.canRead())

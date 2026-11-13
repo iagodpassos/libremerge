@@ -980,6 +980,26 @@ MainWindow::MainWindow(QWidget *parent)
 			if (auto *image = imageView()) image->setDraggingMode(mode);
 		});
 	}
+	// how SVG and PDF files are drawn (OnImgVectorImageScaling): from 800%
+	// down to 25%, each step half the one above
+	QMenu *vectorMenu = imageMenu->addMenu(tr("&Vector Image Scaling"));
+	auto *vectorGroup = new QActionGroup(this);
+	const struct { const char *text; int percent; } scalings[] = {
+		{ "&800%", 800 }, { "&400%", 400 }, { "&200%", 200 }, { "&100%", 100 },
+		{ "&50%", 50 }, { "25%", 25 },
+	};
+	for (const auto &scaling : scalings)
+	{
+		QAction *action = vectorMenu->addAction(QLatin1String(scaling.text));
+		action->setObjectName(QStringLiteral("vectorImageScaling%1").arg(scaling.percent));
+		action->setCheckable(true);
+		action->setData(scaling.percent);
+		vectorGroup->addAction(action);
+		connect(action, &QAction::triggered, this, [imageView, percent = scaling.percent]() {
+			if (auto *image = imageView())
+				image->setVectorImageZoomRatio(percent / 100.0f);
+		});
+	}
 	imageMenu->addSeparator();
 	QAction *actPrevPage = imageMenu->addAction(tr("&Previous Page"));
 	connect(actPrevPage, &QAction::triggered, this, [imageView]() {
@@ -1026,6 +1046,9 @@ MainWindow::MainWindow(QWidget *parent)
 				== image->insertionDeletionMode());
 		for (QAction *action : overlayGroup->actions())
 			action->setChecked(action->data().toInt() == image->overlayMode());
+		for (QAction *action : vectorGroup->actions())
+			action->setChecked(action->data().toInt()
+				== qRound(image->vectorImageZoomRatio() * 100));
 		for (QAction *action : draggingGroup->actions())
 			action->setChecked(action->data().toInt() == image->draggingMode());
 		actPrevPage->setEnabled(image->maxPageCount() > 1);
