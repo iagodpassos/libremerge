@@ -174,19 +174,60 @@ QString rawValue(const QString &value, const lm::TableProps &props, bool quoted)
 	return quote + inner + quote;
 }
 
-/** The editor of a cell: a line, or lines for a cell that has line
-    breaks (a quoted cell may, with "Allow newlines in quotes"). */
+/** A cell as the editor shows it: its text as the line has it, quotes
+    and all, upstream's table being its text (line breaks as "\n"). */
+QString rawCellText(const QString &line, const lm::TableProps &props, int column);
+
+/** A row's text parted into rows where a line break ends one: outside a
+    quote, or at any line break when quotes do not hold them (as the file
+    reads, JoinLinesForTableEditingMode). */
+QStringList splitRecords(const QString &text, const lm::TableProps &props)
+{
+	const bool joinLines = props.allowNewlinesInQuotes && !props.quote.isNull();
+	QStringList records;
+	QString current;
+	bool quoted = false;
+	for (const QChar c : text)
+	{
+		if (!props.quote.isNull() && c == props.quote)
+			quoted = !quoted;
+		if (c == QLatin1Char('\n') && !(joinLines && quoted))
+		{
+			records.append(current);
+			current.clear();
+			continue;
+		}
+		current.append(c);
+	}
+	records.append(current);
+	return records;
+}
+
+/** The role a cell's edit comes in with a join: a list of its text and
+    -1 (Backspace at its start) or 1 (Delete at its end). */
+constexpr int kJoinEditRole = Qt::UserRole + 2;
+
+/** The editor of a cell: upstream's table is its text editor, where a
+    line break or the delimiter typed parts the row or the cell, and
+    Backspace and Delete at a cell's ends join it to the one before or
+    after. Enter ends the edit, as in a grid; Shift+Enter and Alt+Enter
+    type the line break. */
 class CellDelegate : public QStyledItemDelegate
 {
 public:
 	using QStyledItemDelegate::QStyledItemDelegate;
 
-	QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
-		const QModelIndex &index) const override
+	QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &,
+		const QModelIndex &) const override
 	{
-		if (index.data(Qt::EditRole).toString().contains(QLatin1Char('\n')))
-			return new QPlainTextEdit(parent);
-		return QStyledItemDelegate::createEditor(parent, option, index);
+		auto *editor = new QPlainTextEdit(parent);
+		editor->setObjectName(QStringLiteral("cellEditor"));
+		editor->setFrameShape(QFrame::NoFrame);
+		editor->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+		editor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+		editor->setLineWrapMode(QPlainTextEdit::NoWrap);
+		editor->installEventFilter(const_cast<CellDelegate *>(this));
+		return editor;
 	}
 
 	void setEditorData(QWidget *editor, const QModelIndex &index) const override
@@ -194,6 +235,7 @@ public:
 		if (auto *text = qobject_cast<QPlainTextEdit *>(editor))
 		{
 			text->setPlainText(index.data(Qt::EditRole).toString());
+			text->moveCursor(QTextCursor::End);
 			return;
 		}
 		QStyledItemDelegate::setEditorData(editor, index);
@@ -204,10 +246,49 @@ public:
 	{
 		if (auto *text = qobject_cast<QPlainTextEdit *>(editor))
 		{
-			model->setData(index, text->toPlainText(), Qt::EditRole);
+			const int join = text->property("lmJoin").toInt();
+			if (join != 0)
+				model->setData(index, QVariantList{ text->toPlainText(), join }, kJoinEditRole);
+			else
+				model->setData(index, text->toPlainText(), Qt::EditRole);
 			return;
 		}
 		QStyledItemDelegate::setModelData(editor, model, index);
+	}
+
+protected:
+	bool eventFilter(QObject *object, QEvent *event) override
+	{
+		auto *text = qobject_cast<QPlainTextEdit *>(object);
+		if (text != nullptr && event->type() == QEvent::KeyPress)
+		{
+			auto *key = static_cast<QKeyEvent *>(event);
+			const QTextCursor cursor = text->textCursor();
+			const bool enter = key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter;
+			if (enter && (key->modifiers() & (Qt::ShiftModifier | Qt::AltModifier)))
+			{
+				text->insertPlainText(QStringLiteral("\n"));
+				return true;
+			}
+			if (enter)
+			{
+				emit commitData(text);
+				emit closeEditor(text, QAbstractItemDelegate::NoHint);
+				return true;
+			}
+			const bool atStart = !cursor.hasSelection() && cursor.position() == 0;
+			const bool atEnd = !cursor.hasSelection()
+				&& cursor.position() == text->document()->characterCount() - 1;
+			if ((key->key() == Qt::Key_Backspace && atStart)
+				|| (key->key() == Qt::Key_Delete && atEnd))
+			{
+				text->setProperty("lmJoin", key->key() == Qt::Key_Backspace ? -1 : 1);
+				emit commitData(text);
+				emit closeEditor(text, QAbstractItemDelegate::NoHint);
+				return true;
+			}
+		}
+		return QStyledItemDelegate::eventFilter(object, event);
 	}
 };
 
@@ -289,6 +370,12 @@ QString displayText(const QString &cell)
 	text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
 	text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
 	return text;
+}
+
+QString rawCellText(const QString &line, const lm::TableProps &props, int column)
+{
+	const auto [start, end] = rawCellSpan(line, props, column);
+	return start < 0 ? QString() : displayText(line.mid(start, end - start));
 }
 
 int rawCellCount(const QString &line, const lm::TableProps &props)
@@ -485,6 +572,15 @@ public:
 			return {};
 		const int real = m_view->m_viewToReal[m_side].at(viewRow);
 
+		// the editor takes the cell as its line has it (upstream's table is
+		// its text): quotes and all
+		if (role == Qt::EditRole)
+		{
+			const auto &lines = m_view->m_sides[m_side].rawLines;
+			return real >= 0 && real < lines.size()
+				? rawCellText(lines.at(real), m_view->m_sides[m_side].props, index.column())
+				: QString();
+		}
 		if (role == Qt::DisplayRole || role == Qt::EditRole)
 		{
 			if (real < 0)
@@ -541,7 +637,7 @@ public:
 
 	bool setData(const QModelIndex &index, const QVariant &value, int role) override
 	{
-		if (role != Qt::EditRole || !index.isValid())
+		if ((role != Qt::EditRole && role != kJoinEditRole) || !index.isValid())
 			return false;
 		// once the editor has let go: the edit compares the tables again,
 		// and so resets this model
@@ -549,9 +645,11 @@ public:
 		const int side = m_side;
 		const int row = index.row();
 		const int column = index.column();
-		const QString text = value.toString();
-		QTimer::singleShot(0, view, [view, side, row, column, text]() {
-			view->editCell(side, row, column, text);
+		const QString text = role == kJoinEditRole ? value.toList().value(0).toString()
+			: value.toString();
+		const int join = role == kJoinEditRole ? value.toList().value(1).toInt() : 0;
+		QTimer::singleShot(0, view, [view, side, row, column, text, join]() {
+			view->editCell(side, row, column, text, join);
 		});
 		return true;
 	}
@@ -2090,7 +2188,8 @@ void TableCompareView::focusNextPane()
 	m_tables[(activeSide() + 1) % m_paneCount]->setFocus();
 }
 
-void TableCompareView::editCell(int side, int modelRow, int column, const QString &text)
+void TableCompareView::editCell(int side, int modelRow, int column, const QString &text,
+	int join)
 {
 	if (side < 0 || side >= m_paneCount || column < 0)
 		return;
@@ -2098,25 +2197,41 @@ void TableCompareView::editCell(int side, int modelRow, int column, const QStrin
 	if (viewRow < 0)
 		return;
 	Side &s = m_sides[side];
-	int real = m_viewToReal[side].value(viewRow, -1);
-	// a line break typed in a cell goes as the file writes its own
-	QString value = text;
-	value.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
-	value.replace(QLatin1Char('\n'), s.eol);
+	const int real = m_viewToReal[side].value(viewRow, -1);
+	// upstream's table is its text: what is typed goes into the line as it
+	// is, a delimiter outside quotes parting the cell, a line break outside
+	// them the row; Backspace at a cell's start and Delete at its end take
+	// the delimiter or the line break there, joining (worked on with "\n"
+	// for every line break, the file's own written back)
+	const QString value = displayText(text);
+	int first = real;      // the first row the edit rewrites
+	int count = 1;         // how many rows it rewrites
+	int focusColumn = column;
+	QString edited;
 	if (real >= 0 && real < s.rawLines.size())
 	{
-		if (displayText(s.cells[real].value(column)) == displayText(value))
-			return;
-		const QString &line = s.rawLines.at(real);
-		const auto [start, end] = rawCellSpan(line, s.props, column);
-		const bool quoted = start >= 0 && start < end && !s.props.quote.isNull()
-			&& line.at(start) == s.props.quote;
-		UndoEntry entry = captureEntry(side, viewRow);
-		entry.realRow = real;
-		entry.column = column;
-		pushUndo(entry);
-		s.rawLines[real] = withCell(line, s.props, column, rawValue(value, s.props, quoted));
-		s.cells[real] = splitRow(s.rawLines.at(real), s.props);
+		edited = withCell(displayText(s.rawLines.at(real)), s.props, column, value);
+		const auto [start, end] = rawCellSpan(edited, s.props, column);
+		if (join < 0 && column > 0 && start > 0)
+		{
+			edited.remove(start - 1, 1);
+			focusColumn = column - 1;
+		}
+		else if (join < 0 && column == 0 && real > 0)
+		{
+			const QString previous = displayText(s.rawLines.at(real - 1));
+			focusColumn = rawCellCount(previous, s.props) - 1;
+			edited.prepend(previous);
+			first = real - 1;
+			count = 2;
+		}
+		else if (join > 0 && end >= 0 && end < edited.size())
+			edited.remove(end, 1);
+		else if (join > 0 && real + 1 < s.rawLines.size())
+		{
+			edited.append(displayText(s.rawLines.at(real + 1)));
+			count = 2;
+		}
 	}
 	else
 	{
@@ -2124,19 +2239,37 @@ void TableCompareView::editCell(int side, int modelRow, int column, const QStrin
 		// the side's rows that come after it
 		if (value.isEmpty())
 			return;
-		int insertAt = 0;
+		first = 0;
 		for (int v = 0; v < viewRow; ++v)
 			if (m_viewToReal[side].value(v, -1) >= 0)
-				++insertAt;
-		UndoEntry entry = captureEntry(side, viewRow);
-		entry.realRow = insertAt;
-		entry.column = column;
-		pushUndo(entry);
-		const QString line = withCell(QString(), s.props, column, rawValue(value, s.props, false));
-		s.rawLines.insert(insertAt, line);
-		s.rowEols.insert(insertAt, s.eol);
-		s.cells.insert(s.cells.begin() + insertAt, splitRow(line, s.props));
-		real = insertAt;
+				++first;
+		count = 0;
+		edited = withCell(QString(), s.props, column, value);
+	}
+	QStringList records = splitRecords(edited, s.props);
+	for (QString &record : records)
+		record.replace(QLatin1Char('\n'), s.eol); // a quote's line breaks
+	if (count == 1 && records.size() == 1 && records.first() == s.rawLines.at(first))
+		return;
+
+	UndoEntry entry = captureEntry(side, viewRow);
+	entry.realRow = first;
+	entry.column = focusColumn;
+	pushUndo(entry);
+	// the rows written keep the ending the last one replaced had, the ones
+	// made between take the file's
+	const QString lastEol = count > 0 ? s.rowEols.value(first + count - 1, s.eol) : s.eol;
+	for (int i = 0; i < count; ++i)
+	{
+		s.rawLines.removeAt(first);
+		s.rowEols.removeAt(first);
+		s.cells.erase(s.cells.begin() + first);
+	}
+	for (int i = 0; i < records.size(); ++i)
+	{
+		s.rawLines.insert(first + i, records.at(i));
+		s.rowEols.insert(first + i, i == records.size() - 1 ? lastEol : s.eol);
+		s.cells.insert(s.cells.begin() + first + i, splitRow(records.at(i), s.props));
 	}
 	setSideModified(side, true);
 	// FlushAndRescan: the tables are compared again with the edit
@@ -2145,7 +2278,7 @@ void TableCompareView::editCell(int side, int modelRow, int column, const QStrin
 	rebuildModel();
 	m_current = -1;
 	updateStatus();
-	showCell(side, real, column);
+	showCell(side, first, qMax(0, focusColumn));
 }
 
 void TableCompareView::showCell(int side, int realRow, int column)

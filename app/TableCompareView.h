@@ -130,11 +130,14 @@ public:
 	    one's by default, in the editor of Options > System, at the line
 	    its current row starts on. */
 	void openWithExternalEditor(int side = -1);
-	/** Upstream's typing in its table: a cell of a grid's row takes a new
-	    value, only that cell of the line written anew (a row a side does
-	    not have becomes one of its file), into the undo history, and the
-	    tables are compared again. */
-	void editCell(int side, int modelRow, int column, const QString &text);
+	/** Upstream's typing in its table, which is its text: a cell of a
+	    grid's row takes the text typed as the line has it, quotes and all
+	    (a row a side does not have becomes one of its file). A delimiter
+	    outside quotes parts the cell, a line break outside them the row;
+	    join -1 takes the delimiter or line break before the cell (Backspace
+	    at its start), 1 the one after it (Delete at its end). Into the undo
+	    history, and the tables are compared again. */
+	void editCell(int side, int modelRow, int column, const QString &text, int join = 0);
 	/** The Copy All commands: "Copy all differences to other file?"
 	    first, as upstream's table view (its text view) asks. */
 	void copyAllToRight();

@@ -14635,8 +14635,14 @@ int main(int argc, char *argv[])
 			settle();
 			// (view row 1 is the apple's, the header's being row 0)
 			check(!view.diffRowsForTest().contains(1), "the apple rows agree before the edit");
-			// a cell of a row the two share: its line keeps the quotes it had
-			view.editCell(1, 0, 2, QStringLiteral("red; round"));
+			// the editor takes a cell as its line has it, quotes and all
+			check(view.tableForTest(1)->model()->index(0, 2).data(Qt::EditRole).toString()
+					== QStringLiteral("\"red, round\"")
+					&& view.tableForTest(1)->model()->index(0, 2).data().toString()
+						== QStringLiteral("red, round"),
+				"the editor shows a cell as its line has it, the grid its value");
+			// a cell of a row the two share, its quotes typed with it
+			view.editCell(1, 0, 2, QStringLiteral("\"red; round\""));
 			printf("  the edited line: %s\n", qPrintable(view.shownRowsForTest(1).value(0)));
 			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,apple,\"red; round\"")
 					&& view.diffRowsForTest().contains(1) && view.isModified(),
@@ -14649,12 +14655,22 @@ int main(int argc, char *argv[])
 			view.redo();
 			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,apple,\"red; round\""),
 				"and Redo makes it again");
-			// a value with the delimiter and the quote is quoted, its quotes doubled
-			view.editCell(0, 1, 2, QStringLiteral("say \"hi\", ok"));
+			// the delimiter typed parts the cell, as in upstream's text
+			view.editCell(0, 1, 2, QStringLiteral("yel,low"));
+			check(view.shownRowsForTest(0).value(1) == QStringLiteral("2,banana,yel,low")
+					&& view.tableForTest(0)->model()->index(1, 3).data().toString() == QStringLiteral("low"),
+				"a delimiter typed parts the cell in two");
+			// Backspace at a cell's start takes the delimiter before it
+			view.editCell(0, 1, 3, QStringLiteral("low"), -1);
+			check(view.shownRowsForTest(0).value(1) == QStringLiteral("2,banana,yellow")
+					&& view.tableForTest(0)->currentIndex().column() == 2,
+				"Backspace at a cell's start joins it to the one before");
+			// within quotes the delimiter and the quote stay the cell's
+			view.editCell(0, 1, 2, QStringLiteral("\"say \"\"hi\"\", ok\""));
 			check(view.shownRowsForTest(0).value(1) == QStringLiteral("2,banana,\"say \"\"hi\"\", ok\"")
 					&& view.tableForTest(0)->model()->index(1, 2).data().toString()
 						== QStringLiteral("say \"hi\", ok"),
-				"a value that needs it is quoted, as the grid shows it unquoted");
+				"within quotes the delimiter stays in its cell, the grid shows it unquoted");
 			// a cell past the end of the line: the cells before it come empty
 			view.editCell(0, 1, 4, QStringLiteral("x"));
 			check(view.shownRowsForTest(0).value(1).endsWith(QStringLiteral(",,x")),
@@ -14674,7 +14690,7 @@ int main(int argc, char *argv[])
 				"Save writes the edited lines");
 		}
 
-		// a line break in a quoted cell, with "Allow newlines in quotes"
+		// line breaks: outside quotes they part the row, within them they stay
 		write(left, "id,text\n1,one\n");
 		write(right, "id,text\n1,one\n");
 		{
@@ -14683,12 +14699,69 @@ int main(int argc, char *argv[])
 			if (!view.compare(left, right, &error))
 				return 2;
 			view.editCell(1, 0, 1, QStringLiteral("first\nsecond"));
+			check(view.shownRowsForTest(1) == QStringList({ QStringLiteral("1,first"), QStringLiteral("second") }),
+				"a line break typed outside quotes parts the row in two");
+			// Delete at the end of a row's last cell takes the line break
+			view.editCell(1, 0, 1, QStringLiteral("first"), 1);
+			check(view.shownRowsForTest(1) == QStringList({ QStringLiteral("1,firstsecond") }),
+				"Delete at a row's end joins the row after it");
+			view.undo();
+			// Backspace at a row's first cell takes the line break before it
+			const int second = view.shownRowsForTest(1).indexOf(QStringLiteral("second"));
+			view.editCell(1, second, 0, QStringLiteral("second"), -1);
+			check(view.shownRowsForTest(1) == QStringList({ QStringLiteral("1,firstsecond") }),
+				"Backspace at a row's start joins it to the row before");
+			view.editCell(1, 0, 1, QStringLiteral("\"first\nsecond\""));
 			check(view.tableForTest(1)->model()->rowCount() == 1
 					&& view.tableForTest(1)->model()->index(0, 1).data().toString()
 						== QStringLiteral("first\nsecond")
 					&& view.saveModified(&error)
 					&& read(right) == "id,text\n1,\"first\nsecond\"\n",
-				"a line break typed in a cell keeps the row one, its cell quoted");
+				"a line break within quotes keeps the row one");
+		}
+
+		// the cell's editor: Shift+Enter types a line break, Enter ends the
+		// edit, Delete at the end joins the next cell
+		write(left, "id,a,b\n1,x,y\n");
+		write(right, "id,a,b\n1,x,y\n");
+		{
+			TableCompareView view;
+			QString error;
+			if (!view.compare(left, right, &error))
+				return 2;
+			view.resize(900, 400);
+			view.show();
+			settle();
+			QTableView *grid = view.tableForTest(1);
+			const auto press = [](QWidget *target, int key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+				QKeyEvent down(QEvent::KeyPress, key, modifiers);
+				QCoreApplication::sendEvent(target, &down);
+			};
+			grid->setCurrentIndex(grid->model()->index(0, 1));
+			grid->edit(grid->model()->index(0, 1));
+			settle();
+			auto *editor = grid->findChild<QPlainTextEdit *>(QStringLiteral("cellEditor"));
+			if (editor == nullptr)
+				return 2;
+			press(editor, Qt::Key_Return, Qt::ShiftModifier);
+			const bool lineBreak = editor->toPlainText() == QStringLiteral("x\n");
+			editor->setPlainText(QStringLiteral("x"));
+			editor->moveCursor(QTextCursor::End);
+			press(editor, Qt::Key_Delete);
+			settle();
+			check(lineBreak && view.shownRowsForTest(1).value(0) == QStringLiteral("1,xy"),
+				"the editor: Shift+Enter types a line break, Delete at its end joins the next cell");
+			grid->setCurrentIndex(grid->model()->index(0, 1));
+			grid->edit(grid->model()->index(0, 1));
+			settle();
+			editor = grid->findChild<QPlainTextEdit *>(QStringLiteral("cellEditor"));
+			if (editor == nullptr)
+				return 2;
+			editor->setPlainText(QStringLiteral("z"));
+			press(editor, Qt::Key_Return);
+			settle();
+			check(view.shownRowsForTest(1).value(0) == QStringLiteral("1,z"),
+				"the editor: Enter ends the edit");
 		}
 
 		// the copies of the selected cells
