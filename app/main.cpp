@@ -339,6 +339,40 @@ int runCommandLine(const lm::CommandLine &cmd)
 	return status;
 }
 
+/** For tests: answer a modal dialog from inside its own event loop. The
+    dialog is looked for every 10 ms (find) and answered once it is
+    visible and an event loop has started since this call, the dialog's
+    exec(). A zero timer posted before opening it assumes the first
+    events are handled in that loop, which load can prove wrong: it fired
+    once before the dialog was there. Gives up after 20 s, with what. */
+void answerDialogForTest(QObject *context, std::function<QWidget *()> find,
+	std::function<void(QWidget *)> answer, const char *what)
+{
+	const int levelBefore = QThread::currentThread()->loopLevel();
+	auto *poll = new QTimer(context);
+	poll->setInterval(10);
+	QElapsedTimer waited;
+	waited.start();
+	QObject::connect(poll, &QTimer::timeout, context,
+		[poll, find, answer, what, levelBefore, waited]() {
+			QWidget *dialog = find();
+			if (dialog != nullptr && dialog->isVisible()
+				&& QThread::currentThread()->loopLevel() > levelBefore)
+			{
+				poll->stop();
+				poll->deleteLater();
+				answer(dialog);
+				return;
+			}
+			if (waited.elapsed() > 20000)
+			{
+				printf("no %s to answer\n", what);
+				std::exit(3);
+			}
+		});
+	poll->start();
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -4219,13 +4253,9 @@ int main(int argc, char *argv[])
 			const auto tested = [&](const QString &maskText, const QString &name, bool folder) {
 				type(mask, maskText);
 				QString result;
-				QTimer::singleShot(0, &dialog, [&]() {
-					auto *test = dialog.findChild<QDialog *>(QStringLiteral("testFilterDialog"));
-					if (test == nullptr)
-					{
-						printf("no Test Filter dialog\n");
-						std::exit(3);
-					}
+				answerDialogForTest(&dialog, [&dialog]() -> QWidget * {
+					return dialog.findChild<QDialog *>(QStringLiteral("testFilterDialog"));
+				}, [&](QWidget *test) {
 					test->findChild<QLineEdit *>(QStringLiteral("testFilterText"))->setText(name);
 					test->findChild<QCheckBox *>(QStringLiteral("testFilterIsFolder"))
 						->setChecked(folder);
@@ -4233,8 +4263,8 @@ int main(int argc, char *argv[])
 					result = test->findChild<QLabel *>(QStringLiteral("testFilterName"))->text()
 						+ QStringLiteral(" -> ") + test->findChild<QPlainTextEdit *>(
 							QStringLiteral("testFilterResults"))->toPlainText();
-					test->reject();
-				});
+					static_cast<QDialog *>(test)->reject();
+				}, "Test Filter dialog");
 				click(&dialog, "testFileFilter");
 				return result;
 			};
@@ -4440,20 +4470,15 @@ int main(int argc, char *argv[])
 			const auto answering = [&window](const QString &maskText,
 				QDialogButtonBox::StandardButton pressed)
 			{
-				QTimer::singleShot(0, &window, [&window, maskText, pressed]() {
-					auto *dialog = window.findChild<FiltersDialog *>();
-					auto *buttons = dialog != nullptr
-						? dialog->findChild<QDialogButtonBox *>() : nullptr;
-					if (buttons == nullptr)
-					{
-						printf("no Filters dialog to answer\n");
-						std::exit(3);
-					}
+				answerDialogForTest(&window, [&window]() -> QWidget * {
+					return window.findChild<FiltersDialog *>();
+				}, [maskText, pressed](QWidget *found) {
+					auto *dialog = static_cast<FiltersDialog *>(found);
 					dialog->showPage(FiltersDialog::FileFiltersPage);
 					dialog->findChild<FileFilterCombo *>(QStringLiteral("fileFilterMask"))
 						->setEditText(maskText);
-					buttons->button(pressed)->click();
-				});
+					dialog->findChild<QDialogButtonBox *>()->button(pressed)->click();
+				}, "Filters dialog");
 			};
 
 			// a click on the pane opens the dialog; a folder comparison in
@@ -4586,18 +4611,15 @@ int main(int argc, char *argv[])
 			selector->addPaths({ left, right });
 			selector->verifyPathsForTest();
 			const bool selectUsable = select->isEnabled();
-			QTimer::singleShot(0, &window, [&window]() {
-				auto *dialog = window.findChild<FiltersDialog *>();
-				if (dialog == nullptr)
-				{
-					printf("no Filters dialog to answer\n");
-					std::exit(3);
-				}
+			answerDialogForTest(&window, [&window]() -> QWidget * {
+				return window.findChild<FiltersDialog *>();
+			}, [](QWidget *found) {
+				auto *dialog = static_cast<FiltersDialog *>(found);
 				dialog->showPage(FiltersDialog::FileFiltersPage);
 				dialog->findChild<FileFilterCombo *>(QStringLiteral("fileFilterMask"))
 					->setEditText(QStringLiteral("*.md"));
 				dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();
-			});
+			}, "Filters dialog");
 			select->click();
 			settle();
 			check(selectNeedsFolder && selectUsable && field->mask() == QStringLiteral("*.md")
