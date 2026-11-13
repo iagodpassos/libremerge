@@ -86,6 +86,7 @@
 #include "Settings.h"
 #include "ImageCompareView.h"
 #include "ImageFormats.h"
+#include "ImageWriters.hpp"
 #include "BinaryFiles.h"
 #include "HexCompareView.h"
 #include "HexView.h"
@@ -647,6 +648,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolderEnterOpt(QStringLiteral("selftest-folder-enter"),
 		QStringLiteral("Press Enter on the folder comparison's items: folders expand and collapse, files open (for testing)"));
 	parser.addOption(selftestFolderEnterOpt);
+	QCommandLineOption selftestImageMultipageOpt(QStringLiteral("selftest-image-multipage"),
+		QStringLiteral("Write, compare, edit and save back an animated GIF and a multi-page TIFF (for testing)"));
+	parser.addOption(selftestImageMultipageOpt);
 	QCommandLineOption selftestImageSvgOpt(QStringLiteral("selftest-image-svg"),
 		QStringLiteral("Compare two SVG images, save one as PNG, see *.svg in the Image page's drop-down (for testing)"));
 	parser.addOption(selftestImageSvgOpt);
@@ -14882,6 +14886,175 @@ int main(int argc, char *argv[])
 				if (view->paths().value(0) == xPair.at(0) && view->paths().value(1) == xPair.at(1))
 					fileTab = true;
 			check(fileTab, "the window: Enter in the folder tab opens the file comparison");
+		}
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestImageMultipageOpt))
+	{
+		// WinMerge saves an image comparison's pages back into their file
+		// (FreeImage's multi-page bitmaps): an animated GIF with its delays
+		// and looping, a multi-page TIFF. Qt writes neither; LibreMerge's
+		// encoders do, and Qt's own decoders read what they wrote
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto frame = [](const QColor &background, const QColor &box, bool hole) {
+			QImage image(24, 16, QImage::Format_ARGB32);
+			image.fill(background);
+			for (int y = 4; y < 10; ++y)
+				for (int x = 4; x < 12; ++x)
+					image.setPixel(x, y, box.rgba());
+			if (hole)
+				for (int x = 0; x < 3; ++x)
+					image.setPixel(x, 15, qRgba(0, 0, 0, 0));
+			return image;
+		};
+		const auto readAll = [](const QString &path, QList<int> *delays, int *loop) {
+			QList<QImage> pages;
+			QImageReader reader(path);
+			const int count = reader.imageCount();
+			for (int i = 0; i < count; ++i)
+			{
+				// (TIFF's reader stays on its page: go to the next one)
+				if (i > 0)
+					reader.jumpToImage(i);
+				const QImage page = reader.read();
+				if (page.isNull())
+					break;
+				pages.append(page.convertToFormat(QImage::Format_ARGB32));
+				if (delays != nullptr)
+					delays->append(reader.nextImageDelay());
+			}
+			if (loop != nullptr)
+				*loop = reader.loopCount();
+			return pages;
+		};
+		const auto same = [](const QImage &x, const QImage &y) {
+			if (x.size() != y.size())
+				return false;
+			for (int row = 0; row < x.height(); ++row)
+				for (int col = 0; col < x.width(); ++col)
+				{
+					const QRgb p = x.pixel(col, row), q = y.pixel(col, row);
+					if (qAlpha(p) < 128 && qAlpha(q) < 128)
+						continue; // transparent both
+					if (p != q)
+						return false;
+				}
+			return true;
+		};
+		const QList<QImage> aFrames = { frame(Qt::white, Qt::red, false),
+			frame(Qt::white, Qt::green, true), frame(Qt::yellow, Qt::blue, false) };
+		QList<QImage> bFrames = aFrames;
+		bFrames[1] = frame(Qt::white, Qt::magenta, true);
+		const QString aGif = dir.filePath(QStringLiteral("a.gif"));
+		const QString bGif = dir.filePath(QStringLiteral("b.gif"));
+		check(lm_imgwrite::writeGif(aGif, aFrames, { 100, 200, 300 }, -1)
+				&& lm_imgwrite::writeGif(bGif, bFrames, { 100, 200, 300 }, -1),
+			"GIF: an animation is written");
+		{
+			QList<int> delays;
+			int loop = 0;
+			const QList<QImage> back = readAll(aGif, &delays, &loop);
+			bool frames = back.size() == 3;
+			for (int i = 0; frames && i < 3; ++i)
+				frames = same(back.at(i), aFrames.at(i));
+			check(frames && delays == QList<int>({ 100, 200, 300 }) && loop == -1,
+				"GIF: Qt reads its frames, delays and looping back");
+		}
+		{
+			// more colors than a table holds: the nearest of a median cut
+			QImage gradient(64, 64, QImage::Format_ARGB32);
+			for (int y = 0; y < 64; ++y)
+				for (int x = 0; x < 64; ++x)
+					gradient.setPixel(x, y, qRgb(x * 4, y * 4, (x + y) * 2));
+			const QString path = dir.filePath(QStringLiteral("gradient.gif"));
+			lm_imgwrite::writeGif(path, { gradient }, { 0 }, 0);
+			const QImage back = QImage(path).convertToFormat(QImage::Format_ARGB32);
+			int worst = 0;
+			for (int y = 0; y < 64 && !back.isNull(); ++y)
+				for (int x = 0; x < 64; ++x)
+				{
+					const QRgb p = gradient.pixel(x, y), q = back.pixel(x, y);
+					worst = std::max({ worst, std::abs(qRed(p) - qRed(q)),
+						std::abs(qGreen(p) - qGreen(q)), std::abs(qBlue(p) - qBlue(q)) });
+				}
+			check(!back.isNull() && back.size() == QSize(64, 64) && worst <= 24,
+				"GIF: 4096 colors reduced to 256, each near its own");
+		}
+		{
+			ImageCompareView view;
+			QString error;
+			const bool compared = view.compare(aGif, bGif, &error);
+			check(compared && view.pageCountForTest(0) == 3 && view.pageCountForTest(1) == 3,
+				"GIF: two animations compare frame by frame");
+			view.nextPage();
+			view.copyAllFrom(0, 1);
+			bool asked = false;
+			lm::setSaveAsPathForTest([&asked](const QString &) { asked = true; return QString(); });
+			error.clear();
+			const bool saved = view.saveModified(&error);
+			lm::setSaveAsPathForTest({});
+			QList<int> delays;
+			int loop = 0;
+			const QList<QImage> back = readAll(bGif, &delays, &loop);
+			check(saved && !asked && back.size() == 3 && same(back.value(1), aFrames.at(1))
+					&& same(back.value(0), bFrames.at(0)) && same(back.value(2), bFrames.at(2))
+					&& delays == QList<int>({ 100, 200, 300 }) && loop == -1,
+				"GIF: a frame edited saves into the animation, delays and looping kept");
+		}
+		{
+			// a still GIF stays a GIF
+			const QString one = dir.filePath(QStringLiteral("one.gif"));
+			const QString two = dir.filePath(QStringLiteral("two.gif"));
+			lm_imgwrite::writeGif(one, { aFrames.at(0) }, { 0 }, 0);
+			lm_imgwrite::writeGif(two, { bFrames.at(2) }, { 0 }, 0);
+			ImageCompareView view;
+			QString error;
+			view.compare(one, two, &error);
+			view.copyAllFrom(0, 1);
+			bool asked = false;
+			lm::setSaveAsPathForTest([&asked](const QString &) { asked = true; return QString(); });
+			const bool saved = view.saveModified(&error);
+			lm::setSaveAsPathForTest({});
+			check(saved && !asked && QImageReader(two).format() == "gif"
+					&& same(QImage(two).convertToFormat(QImage::Format_ARGB32), aFrames.at(0)),
+				"GIF: a still one saves as GIF, without Save As");
+		}
+		{
+			QImage seeThrough = frame(Qt::white, Qt::cyan, false);
+			seeThrough.setPixel(0, 0, qRgba(10, 20, 30, 128));
+			const QList<QImage> aPages = { frame(Qt::white, Qt::red, false), seeThrough };
+			QList<QImage> bPages = aPages;
+			bPages[1] = frame(Qt::white, Qt::black, false);
+			const QString aTif = dir.filePath(QStringLiteral("a.tif"));
+			const QString bTif = dir.filePath(QStringLiteral("b.tiff"));
+			check(lm_imgwrite::writeTiff(aTif, aPages) && lm_imgwrite::writeTiff(bTif, bPages),
+				"TIFF: pages are written");
+			const QList<QImage> back = readAll(aTif, nullptr, nullptr);
+			check(back.size() == 2 && back.value(0) == aPages.at(0).convertToFormat(QImage::Format_ARGB32)
+					&& back.value(1).pixel(0, 0) == qRgba(10, 20, 30, 128)
+					&& back.value(1).pixel(5, 5) == QColor(Qt::cyan).rgba(),
+				"TIFF: Qt reads its pages back, transparency too");
+			ImageCompareView view;
+			QString error;
+			const bool compared = view.compare(aTif, bTif, &error);
+			check(compared && view.pageCountForTest(1) == 2, "TIFF: two of them compare page by page");
+			view.nextPage();
+			view.copyAllFrom(0, 1);
+			error.clear();
+			const bool saved = view.saveModified(&error);
+			const QList<QImage> saved2 = readAll(bTif, nullptr, nullptr);
+			check(saved && saved2.size() == 2 && saved2.value(1).pixel(5, 5) == QColor(Qt::cyan).rgba()
+					&& saved2.value(0) == bPages.at(0).convertToFormat(QImage::Format_ARGB32),
+				"TIFF: a page edited saves into the file, the others as they were");
 		}
 		return ok ? 0 : 1;
 	}

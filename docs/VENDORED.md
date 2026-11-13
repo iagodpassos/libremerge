@@ -33,8 +33,13 @@ The WinIMerge image wrapper (`image.hpp`, FreeImagePlus-based) and
 is unmaintained as a system package — Homebrew deprecates it in 2027 over
 open CVEs). The vendored algorithm headers therefore run on identical BGRA
 scanlines and produce the same diffs; format support follows Qt's decoders
-instead of FreeImage's (writing GIF and multi-page files back is not
-supported, unlike WinMerge).
+instead of FreeImage's. What FreeImage writes and Qt does not, GIF and
+multi-page TIFF, `engine/ports/imgmerge/ImageWriters.hpp` writes: an
+animated GIF with its frames' delays and its looping (a color table per
+frame, a median cut when a frame has more than 256 colors), a TIFF page
+by page (8-bit RGB or RGBA, Deflate). As FreeImage does with a frame
+edited, the pages keep their delays; unlike it, a TIFF of another depth
+(1-bit, 16-bit) is written back in 8 bits per channel.
 
 `ImgConverter.hpp`, which upstream's 64-bit build draws PDF and SVG files
 with (Windows.Data.Pdf, Direct2D) and its EMF/WMF through GDI+, is written

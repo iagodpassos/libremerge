@@ -15,6 +15,7 @@
 #include <QImageReader>
 #include <QImageWriter>
 #include <QPainter>
+#include "ImageWriters.hpp"
 #include <QTransform>
 #include <QFileInfo>
 #include <QString>
@@ -147,12 +148,19 @@ public:
 		// them either; Save As offers PNG
 		if (formatHint_ == "svg" || formatHint_ == "svgz" || formatHint_ == "pdf")
 			return false;
+		if (formatHint_ == "gif")
+			return true; // (ImageWriters.hpp)
 		return QImageWriter::supportedImageFormats().contains(formatHint_);
 	}
 
 	bool save(const std::wstring& filename)
 	{
-		QImageWriter writer(QString::fromStdWString(filename));
+		const QString path = QString::fromStdWString(filename);
+		// GIF has no Qt encoder: LibreMerge's own, as FreeImage gives
+		// upstream one
+		if (QFileInfo(path).suffix().compare(QLatin1String("gif"), Qt::CaseInsensitive) == 0)
+			return lm_imgwrite::writeGif(path, { image_ }, { 0 }, 0);
+		QImageWriter writer(path);
 		return writer.write(image_);
 	}
 
@@ -294,10 +302,10 @@ private:
 	FipShim shim_;
 };
 
-// Multi-page sources (animated GIF, multi-page TIFF) are readable and
-// comparable page by page. Writing multi-page files back is not supported
-// by Qt's encoders, so save() reports failure and the UI keeps those
-// panes read-only, unlike WinMerge/FreeImage which can re-encode them.
+// Multi-page sources (animated GIF, multi-page TIFF): every page read as the
+// file opens, as FreeImage's multi-page bitmap holds them, an animation's
+// delays and looping with them; saved back as upstream's saveU does, by the
+// file's extension, through the encoders Qt lacks (ImageWriters.hpp).
 class MultiPageImages
 {
 public:
@@ -306,14 +314,14 @@ public:
 
 	bool close()
 	{
-		filename_.clear();
 		pages_.clear();
-		pageCount_ = 0;
+		delays_.clear();
+		loopCount_ = 0;
 		return true;
 	}
 
-	bool isValid() const { return pageCount_ > 0; }
-	int getPageCount() const { return pageCount_; }
+	bool isValid() const { return !pages_.isEmpty(); }
+	int getPageCount() const { return static_cast<int>(pages_.size()); }
 
 	bool load(const std::wstring& filename)
 	{
@@ -325,32 +333,46 @@ public:
 		if (suffix == QLatin1String("svg") || suffix == QLatin1String("pdf"))
 			return false;
 		QImageReader reader(QString::fromStdWString(filename));
-		if (!reader.canRead())
+		reader.setAutoTransform(false);
+		if (!reader.canRead() || reader.imageCount() <= 1)
 			return false;
-		int count = reader.imageCount();
-		if (count <= 1)
+		// frame after frame, each with the delay before the next one (a
+		// looping animation reads on from its start: the count says when to
+		// stop)
+		const int count = reader.imageCount();
+		for (int i = 0; i < count; ++i)
+		{
+			// (TIFF's reader stays on its page: go to the next one)
+			if (i > 0)
+				reader.jumpToImage(i);
+			const QImage page = reader.read();
+			if (page.isNull())
+				break;
+			pages_.append(page);
+			delays_.append(qMax(0, reader.nextImageDelay()));
+		}
+		loopCount_ = reader.loopCount();
+		if (pages_.size() <= 1)
+		{
+			close();
 			return false;
-		filename_ = QString::fromStdWString(filename);
-		pageCount_ = count;
+		}
 		return true;
 	}
 
-	bool save(const std::wstring&) { return false; }
+	bool save(const std::wstring& filename)
+	{
+		const QString path = QString::fromStdWString(filename);
+		const QString suffix = QFileInfo(path).suffix().toLower();
+		if (suffix == QLatin1String("gif"))
+			return lm_imgwrite::writeGif(path, pages_, delays_, loopCount_);
+		if (suffix == QLatin1String("tif") || suffix == QLatin1String("tiff"))
+			return lm_imgwrite::writeTiff(path, pages_);
+		return false; // no other format holds pages
+	}
 
 	Image getImage(int page)
 	{
-		if (!filename_.isEmpty())
-		{
-			QImageReader reader(filename_);
-			reader.setAutoTransform(false);
-			if (reader.jumpToImage(page))
-			{
-				QImage img = reader.read();
-				if (!img.isNull())
-					return Image(img);
-			}
-			return Image();
-		}
 		if (page >= 0 && page < pages_.size())
 			return Image(pages_[page]);
 		return Image();
@@ -358,18 +380,20 @@ public:
 
 	void insertPage(int page, const Image& image)
 	{
-		pages_.insert(std::min<qsizetype>(page, pages_.size()), image.qimage());
-		pageCount_ = pages_.size();
+		const qsizetype at = std::min<qsizetype>(qMax(0, page), pages_.size());
+		pages_.insert(at, image.qimage());
+		delays_.insert(at, delays_.value(at, delays_.isEmpty() ? 0 : delays_.last()));
 	}
 
 	void replacePage(int page, const Image& image)
 	{
+		// (the page keeps its delay: copyAnimationMetadata upstream)
 		if (page >= 0 && page < pages_.size())
 			pages_[page] = image.qimage();
 	}
 
 private:
-	QString filename_;
 	QList<QImage> pages_;
-	int pageCount_ = 0;
+	QList<int> delays_;   // milliseconds before the next page
+	int loopCount_ = 0;   // QImageReader's: -1 for ever
 };
