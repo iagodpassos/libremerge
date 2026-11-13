@@ -2970,6 +2970,39 @@ void TableCompareView::buildCellMenu(int side, QMenu *menu)
 	connect(undoItem, &QAction::triggered, this, &TableCompareView::undo);
 	QAction *redoItem = addItem(tr("&Redo"), QStringLiteral("cellRedo"), !m_redoStack.isEmpty());
 	connect(redoItem, &QAction::triggered, this, &TableCompareView::redo);
+
+	// upstream's Open submenu (a table is its text view); of it, the
+	// external editor of Options > System
+	menu->addSeparator();
+	QMenu *open = menu->addMenu(tr("Op&en"));
+	QAction *withEditor = open->addAction(tr("With &External Editor"));
+	withEditor->setObjectName(QStringLiteral("cellOpenWithEditor"));
+	withEditor->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_E));
+	withEditor->setShortcutVisibleInContextMenu(true);
+	withEditor->setEnabled(!m_sides[side].path.isEmpty());
+	connect(withEditor, &QAction::triggered, this, [this, side]() { openWithExternalEditor(side); });
+}
+
+void TableCompareView::openWithExternalEditor(int side)
+{
+	if (side < 0 || side >= m_paneCount)
+		side = activeSide();
+	const Side &s = m_sides[side];
+	if (s.path.isEmpty())
+		return;
+	// the row of the current cell, the next one of the file's own when it
+	// is a filler, and the line it starts on: rows of quoted line breaks
+	// take more than one
+	int realRow = -1;
+	const int modelRow = m_tables[side]->currentIndex().row();
+	for (int r = qMax(0, modelRow); r < m_modelRows.size() && realRow < 0; ++r)
+		realRow = m_viewToReal[side].value(m_modelRows.at(r), -1);
+	if (realRow < 0)
+		realRow = qMax(0, static_cast<int>(s.rawLines.size()) - 1);
+	int line = 1;
+	for (int r = 0; r < realRow && r < s.rawLines.size(); ++r)
+		line += static_cast<int>(s.rawLines.at(r).count(QLatin1Char('\n'))) + 1;
+	lm::openInExternalEditor(this, s.path, line);
 }
 
 void TableCompareView::selectCellsForTest(int side, int fromRow, int fromColumn, int toRow,

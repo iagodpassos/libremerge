@@ -592,6 +592,15 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <translation>Afegeix aquest canvi als F&amp;iltres de substitució</translation>
     </message>
     <message>
+        <source>Op&amp;en</source>
+        <translation>O&amp;bre</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Amb l&apos;editor &amp;extern</translation>
+    </message>
+    <message>
         <source>G&amp;o to Line %1</source>
         <translatorcomment>After WinMerge&apos;s &quot;G&amp;o to Line %1&quot;.</translatorcomment>
         <translation>Ves a la &amp;línia %1</translation>
@@ -1955,6 +1964,23 @@ Potser el fitxer és només de lectura?</translation>
     <message>
         <source>&amp;Hide Items</source>
         <translation>&amp;Amaga els elements</translation>
+    </message>
+    <message>
+        <source>&amp;Open Left</source>
+        <translation>Obre l&apos;&amp;esquerra</translation>
+    </message>
+    <message>
+        <source>Open Midd&amp;le</source>
+        <translation>Obre el del mi&amp;g</translation>
+    </message>
+    <message>
+        <source>O&amp;pen Right</source>
+        <translation>Obre la &amp;dreta</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Amb l&apos;editor &amp;extern</translation>
     </message>
     <message>
         <source>Copy %1 to %2</source>
@@ -6019,6 +6045,15 @@ Esborreu el filtre de visualització o ajusteu-ne la configuració per a mostrar
         <source>&amp;Redo</source>
         <translatorcomment>After WinMerge&apos;s &quot;&amp;Redo&quot;.</translatorcomment>
         <translation>&amp;Refés</translation>
+    </message>
+    <message>
+        <source>Op&amp;en</source>
+        <translation>O&amp;bre</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Amb l&apos;editor &amp;extern</translation>
     </message>
     <message>
         <source>Save As</source>

@@ -642,6 +642,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestFolderEnterOpt(QStringLiteral("selftest-folder-enter"),
 		QStringLiteral("Press Enter on the folder comparison's items: folders expand and collapse, files open (for testing)"));
 	parser.addOption(selftestFolderEnterOpt);
+	QCommandLineOption selftestExternalEditorOpt(QStringLiteral("selftest-external-editor"),
+		QStringLiteral("Open > With External Editor in the file, table and folder windows (for testing)"));
+	parser.addOption(selftestExternalEditorOpt);
 	QCommandLineOption selftestSystemPageOpt(QStringLiteral("selftest-system-page"),
 		QStringLiteral("Options > System: the Trash, the external editor, the user data, filter and temp folders (for testing)"));
 	parser.addOption(selftestSystemPageOpt);
@@ -14871,6 +14874,139 @@ int main(int argc, char *argv[])
 					fileTab = true;
 			check(fileTab, "the window: Enter in the folder tab opens the file comparison");
 		}
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestExternalEditorOpt))
+	{
+		// WinMerge's Open > With External Editor: the panes' menu and
+		// Ctrl+Alt+E (OnOpenFileWithEditor), a table's, and the folder
+		// window's Open Left, Middle and Right (OnCtxtDirOpenWithEditor)
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QDir().mkpath(QFileInfo(path).path());
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 30; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		mgr->Set(OPT_EXT_EDITOR_CMD, std::string("ed +$linenum $file"));
+		QList<QStringList> started;
+		lm::setExternalEditorForTest([&started](const QStringList &command) {
+			started.append(command);
+			return true;
+		});
+		const QString root = dir.path();
+		const QString a = root + QStringLiteral("/a.txt");
+		const QString b = root + QStringLiteral("/b.txt");
+		write(a, "1\n2\n3\n4\n5\n");
+		write(b, "1\n2\nX\n4\n5\n");
+		{
+			MainWindow window;
+			window.openFileComparison({ a, b });
+			settle();
+			auto *view = window.findChild<FileCompareView *>();
+			if (view == nullptr)
+				return 2;
+			view->setCursorViewLineForTest(0, 3);
+			QMenu menu;
+			view->buildPaneMenu(0, &menu);
+			QAction *item = menu.findChild<QAction *>(QStringLiteral("paneOpenWithEditor"));
+			check(item != nullptr && item->isEnabled()
+					&& item->shortcut() == QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_E),
+				"file: the panes' menu has Open > With External Editor, Ctrl+Alt+E");
+			if (item != nullptr)
+				item->trigger();
+			check(started.value(0) == QStringList({ QStringLiteral("ed"), QStringLiteral("+4"), a }),
+				"file: the pane's file at the cursor's line");
+			view->setCursorViewLineForTest(1, 1);
+			auto *key = window.findChild<QAction *>(QStringLiteral("fileOpenWithEditor"));
+			if (key != nullptr)
+				key->trigger();
+			check(key != nullptr && key->shortcut() == QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_E)
+					&& started.value(1) == QStringList({ QStringLiteral("ed"), QStringLiteral("+2"), b }),
+				"file: Ctrl+Alt+E opens the active pane's");
+		}
+		started.clear();
+		{
+			// a quoted cell over two lines: the next row starts a line later
+			const QString t1 = root + QStringLiteral("/t1.csv");
+			const QString t2 = root + QStringLiteral("/t2.csv");
+			write(t1, "id,name\n1,\"multi\nline\"\n2,b\n");
+			write(t2, "id,name\n1,\"multi\nline\"\n2,c\n");
+			MainWindow window;
+			window.openTableComparison({ t1, t2 });
+			settle();
+			auto *table = window.findChild<TableCompareView *>();
+			if (table == nullptr)
+				return 2;
+			// (the first line heads the grid: "2,b" is its second row)
+			table->selectCellsForTest(0, 1, 0, 1, 0);
+			QMenu menu;
+			table->buildCellMenu(0, &menu);
+			QAction *item = menu.findChild<QAction *>(QStringLiteral("cellOpenWithEditor"));
+			if (item != nullptr)
+				item->trigger();
+			check(item != nullptr && started.value(0) == QStringList({ QStringLiteral("ed"),
+					QStringLiteral("+4"), t1 }),
+				"table: the file at the line its current row starts on");
+		}
+		started.clear();
+		{
+			write(root + QStringLiteral("/L/x.txt"), "1\n");
+			write(root + QStringLiteral("/R/x.txt"), "2\n");
+			write(root + QStringLiteral("/L/y.txt"), "only\n");
+			write(root + QStringLiteral("/L/sub/z.txt"), "1\n");
+			write(root + QStringLiteral("/R/sub/z.txt"), "1\n");
+			QSettings().setValue(QStringLiteral("FolderCompare/TreeView"), true);
+			FolderCompareView view;
+			view.start({ root + QStringLiteral("/L"), root + QStringLiteral("/R") });
+			for (int i = 0; i < 300 && view.isComparing(); ++i)
+				settle();
+			const auto action = [&view](const char *name) {
+				auto *menu = new QMenu(&view);
+				view.buildContextMenuForTest(menu);
+				return menu->findChild<QAction *>(QLatin1String(name));
+			};
+			view.selectRowsForTest({ QStringLiteral("x.txt") });
+			QAction *left = action("openLeftWithEditor");
+			QAction *right = action("openRightWithEditor");
+			check(left != nullptr && left->isEnabled() && right != nullptr && right->isEnabled()
+					&& action("openMiddleWithEditor") == nullptr,
+				"folder: Open Left and Open Right, no Middle in 2-way");
+			if (right != nullptr)
+				right->trigger();
+			check(started.value(0) == QStringList({ QStringLiteral("ed"), QStringLiteral("+1"),
+					root + QStringLiteral("/R/x.txt") }),
+				"folder: the right side's file");
+			view.selectRowsForTest({ QStringLiteral("y.txt") });
+			check(action("openLeftWithEditor")->isEnabled() && !action("openRightWithEditor")->isEnabled(),
+				"folder: a side the file is not on is off");
+			view.selectRowsForTest({ QStringLiteral("sub") });
+			check(!action("openLeftWithEditor")->isEnabled(), "folder: a folder does not open in an editor");
+			QSettings().remove(QStringLiteral("FolderCompare/TreeView"));
+		}
+		lm::setExternalEditorForTest({});
 		return ok ? 0 : 1;
 	}
 

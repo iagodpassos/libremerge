@@ -80,6 +80,7 @@ run_one selftest-folder-hide-items
 run_one selftest-selector-arrows
 run_one selftest-project
 run_one selftest-system-page
+run_one selftest-external-editor
 run_one selftest-codepage
 run_one selftest-folder-selection
 run_one selftest-hex

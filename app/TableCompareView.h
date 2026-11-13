@@ -126,6 +126,10 @@ public:
 	/** A cell's context menu (upstream's IDR_POPUP_MERGEVIEW, as far as it
 	    goes in a table). */
 	void buildCellMenu(int side, QMenu *menu);
+	/** Open > With External Editor (Ctrl+Alt+E): a side's file, the active
+	    one's by default, in the editor of Options > System, at the line
+	    its current row starts on. */
+	void openWithExternalEditor(int side = -1);
 	/** Upstream's typing in its table: a cell of a grid's row takes a new
 	    value, only that cell of the line written anew (a row a side does
 	    not have becomes one of its file), into the undo history, and the

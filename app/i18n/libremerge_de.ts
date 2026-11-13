@@ -569,6 +569,16 @@ Bitte deaktivieren Sie den Anzeigefilter oder passen Sie die Filtereinstellungen
         <translation>Diese Änderung zu den Ersetzungsfiltern hinzuf&amp;ügen</translation>
     </message>
     <message>
+        <source>Op&amp;en</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Op&amp;en&quot;.</translatorcomment>
+        <translation>Öffn&amp;en</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Mit e&amp;xternem Editor</translation>
+    </message>
+    <message>
         <source>G&amp;o to Line %1</source>
         <translation>Gehe zu &amp;Zeile %1</translation>
     </message>
@@ -1765,6 +1775,23 @@ Patches sind nicht betroffen.</translation>
     <message>
         <source>&amp;Hide Items</source>
         <translation>Objekte v&amp;erstecken</translation>
+    </message>
+    <message>
+        <source>&amp;Open Left</source>
+        <translation>&amp;Links öffnen</translation>
+    </message>
+    <message>
+        <source>Open Midd&amp;le</source>
+        <translation>&amp;Mitte öffnen</translation>
+    </message>
+    <message>
+        <source>O&amp;pen Right</source>
+        <translation>&amp;Rechts öffnen</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Mit e&amp;xternem Editor</translation>
     </message>
     <message>
         <source>Copy %1 to %2</source>
@@ -5683,6 +5710,16 @@ Bitte deaktivieren Sie den Anzeigefilter oder passen Sie die Filtereinstellungen
     <message>
         <source>&amp;Redo</source>
         <translation>&amp;Wiederherstellen</translation>
+    </message>
+    <message>
+        <source>Op&amp;en</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Op&amp;en&quot;.</translatorcomment>
+        <translation>Öffn&amp;en</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Mit e&amp;xternem Editor</translation>
     </message>
     <message>
         <source>Save As</source>

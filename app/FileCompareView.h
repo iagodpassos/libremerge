@@ -238,6 +238,10 @@ public:
 	    pane, the active one when none is given: a line of a file, or a
 	    difference by its number. */
 	void showGoTo(int fromPane = -1);
+	/** Open > With External Editor (Ctrl+Alt+E, OnOpenFileWithEditor): a
+	    pane's file, the active one's by default, in the editor of Options >
+	    System, at the cursor's line. */
+	void openWithExternalEditor(int side = -1);
 	/** Go to's shortcut, upstream's Ctrl+G; on the Mac the Control key,
 	    as Command+G finds the next match there. */
 	static QKeySequence goToShortcut();

@@ -5560,6 +5560,29 @@ void FileCompareView::buildPaneMenu(int side, QMenu *menu)
 	QAction *goTo = addItem(nullptr, tr("&Go to..."), QStringLiteral("paneGoTo"), true,
 		goToShortcut());
 	connect(goTo, &QAction::triggered, this, [this, side]() { showGoTo(side); });
+
+	// upstream's Open submenu; of it, the external editor of Options >
+	// System (OnOpenFileWithEditor)
+	menu->addSeparator();
+	QMenu *open = menu->addMenu(tr("Op&en"));
+	QAction *withEditor = open->addAction(tr("With &External Editor"));
+	withEditor->setObjectName(QStringLiteral("paneOpenWithEditor"));
+	withEditor->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_E));
+	withEditor->setShortcutVisibleInContextMenu(true);
+	withEditor->setEnabled(!m_sides[side].path.isEmpty());
+	connect(withEditor, &QAction::triggered, this, [this, side]() { openWithExternalEditor(side); });
+}
+
+void FileCompareView::openWithExternalEditor(int side)
+{
+	if (side < 0 || side >= m_paneCount)
+		side = m_activePane;
+	const QString path = m_sides[side].path;
+	if (path.isEmpty())
+		return;
+	// the file's line at the cursor (ComputeRealLine, from 1)
+	const int line = realLineOfView(side, m_panes[side]->textCursor().blockNumber()) + 1;
+	lm::openInExternalEditor(this, path, line);
 }
 
 bool FileCompareView::lineHiddenForTest(int viewLine) const

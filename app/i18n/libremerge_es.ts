@@ -574,6 +574,15 @@ Desactive el filtro de visualización o ajuste la configuración del filtro para
         <translation>Añadir a los &amp;Filtros de sustitución</translation>
     </message>
     <message>
+        <source>Op&amp;en</source>
+        <translation>A&amp;brir</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Con &amp;editor externo</translation>
+    </message>
+    <message>
         <source>G&amp;o to Line %1</source>
         <translation>Ir a &amp;línea %1</translation>
     </message>
@@ -1769,6 +1778,23 @@ El archivo puede ser de solo lectura.</translation>
     <message>
         <source>&amp;Hide Items</source>
         <translation>Ocultar ele&amp;mentos</translation>
+    </message>
+    <message>
+        <source>&amp;Open Left</source>
+        <translation>Abrir archiv&amp;o izquierdo</translation>
+    </message>
+    <message>
+        <source>Open Midd&amp;le</source>
+        <translation>Abrir archivo centra&amp;l</translation>
+    </message>
+    <message>
+        <source>O&amp;pen Right</source>
+        <translation>Abrir archivo &amp;derecho</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Con &amp;editor externo</translation>
     </message>
     <message>
         <source>Copy %1 to %2</source>
@@ -5689,6 +5715,15 @@ Desactive el filtro de visualización o ajuste la configuración del filtro para
     <message>
         <source>&amp;Redo</source>
         <translation>&amp;Rehacer</translation>
+    </message>
+    <message>
+        <source>Op&amp;en</source>
+        <translation>A&amp;brir</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Con &amp;editor externo</translation>
     </message>
     <message>
         <source>Save As</source>

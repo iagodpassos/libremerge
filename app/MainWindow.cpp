@@ -457,6 +457,9 @@ MainWindow::MainWindow(QWidget *parent)
 		[](auto *view) { view->copyFromLeft(); });
 	addKey("mergeCopyFromRight", QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Left),
 		[](auto *view) { view->copyFromRight(); });
+	// Open > With External Editor of the panes' menu (ID_FILE_OPEN_WITHEDITOR)
+	addKey("fileOpenWithEditor", QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_E),
+		[](auto *view) { view->openWithExternalEditor(); });
 	addKey("editDiffToClipboard1", QKeySequence(Qt::CTRL | Qt::Key_1),
 		[](auto *view) { view->copySelectedDiffToClipboard(0); });
 	addKey("editDiffToClipboard2", QKeySequence(Qt::CTRL | Qt::Key_2),

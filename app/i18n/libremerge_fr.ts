@@ -571,6 +571,16 @@ Veuillez effacer le filtre d&apos;affichage ou modifier les paramètres de filtr
         <translation>Ajouter aux &amp;filtres de substitution</translation>
     </message>
     <message>
+        <source>Op&amp;en</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Op&amp;en&quot;.</translatorcomment>
+        <translation>Ou&amp;vrir</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Avec un éditeur &amp;externe</translation>
+    </message>
+    <message>
         <source>G&amp;o to Line %1</source>
         <translatorcomment>After WinMerge&apos;s &quot;G&amp;o to Line %1&quot;.</translatorcomment>
         <translation>Atteindre la &amp;ligne %1</translation>
@@ -1765,6 +1775,24 @@ Le fichier est peut-être en lecture seule.</translation>
     <message>
         <source>&amp;Hide Items</source>
         <translation>&amp;Masquer les éléments</translation>
+    </message>
+    <message>
+        <source>&amp;Open Left</source>
+        <translation>Ouvrir &amp;Gauche</translation>
+    </message>
+    <message>
+        <source>Open Midd&amp;le</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Open Midd&amp;le&quot;.</translatorcomment>
+        <translation>Ouvrir Mi&amp;lieu</translation>
+    </message>
+    <message>
+        <source>O&amp;pen Right</source>
+        <translation>Ouvrir &amp;Droite</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Avec un éditeur &amp;externe</translation>
     </message>
     <message>
         <source>Copy %1 to %2</source>
@@ -5700,6 +5728,16 @@ Veuillez effacer le filtre d&apos;affichage ou modifier les paramètres de filtr
     <message>
         <source>&amp;Redo</source>
         <translation>&amp;Rétablir</translation>
+    </message>
+    <message>
+        <source>Op&amp;en</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Op&amp;en&quot;.</translatorcomment>
+        <translation>Ou&amp;vrir</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translatorcomment>After WinMerge&apos;s &quot;With &amp;External Editor	Ctrl+Alt+E&quot;.</translatorcomment>
+        <translation>Avec un éditeur &amp;externe</translation>
     </message>
     <message>
         <source>Save As</source>

@@ -788,6 +788,37 @@ void FolderCompareView::buildContextMenu(QMenu *menu)
 		hide->setObjectName(QStringLiteral("hideItems"));
 		hide->setEnabled(!m_tree->selectedItems().isEmpty());
 		connect(hide, &QAction::triggered, this, [this]() { hideSelectedItems(); });
+		// then upstream's Open Left, Middle and Right submenus; of them, the
+		// external editor of Options > System, for a selection of files
+		// there on that side (OnUpdateCtxtDirOpenWithEditor). Its
+		// "Ctrl+Alt+E" is the file window's: a folder window takes no key
+		menu->addSeparator();
+		const QList<QTreeWidgetItem *> rows = selectedResultRows();
+		const bool everyRowListed = rows.size() == m_tree->selectedItems().size();
+		const struct { const char *text; const char *name; int side; bool middle; } opens[] = {
+			{ QT_TR_NOOP("&Open Left"), "openLeftWithEditor", 0, false },
+			{ QT_TR_NOOP("Open Midd&le"), "openMiddleWithEditor", 1, true },
+			{ QT_TR_NOOP("O&pen Right"), "openRightWithEditor", m_sides - 1, false },
+		};
+		for (const auto &open : opens)
+		{
+			if (open.middle && m_sides < 3)
+				continue; // (removed in a 2-way comparison, as upstream does)
+			const int side = open.side;
+			bool openable = !rows.isEmpty() && everyRowListed;
+			for (QTreeWidgetItem *row : rows)
+				openable = openable && row->data(0, RoleIsFile).toBool()
+					&& !sidePath(row, side).isEmpty();
+			QMenu *submenu = menu->addMenu(tr(open.text));
+			QAction *withEditor = submenu->addAction(tr("With &External Editor"));
+			withEditor->setObjectName(QLatin1String(open.name));
+			withEditor->setEnabled(openable);
+			connect(withEditor, &QAction::triggered, this, [this, side]() {
+				for (QTreeWidgetItem *row : selectedResultRows())
+					if (row->data(0, RoleIsFile).toBool() && !sidePath(row, side).isEmpty())
+						lm::openInExternalEditor(this, sidePath(row, side));
+			});
+		}
 	};
 
 	if (m_sides == 2)

@@ -515,6 +515,14 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
         <translation>Adicionar aos &amp;Filtros de Substituição</translation>
     </message>
     <message>
+        <source>Op&amp;en</source>
+        <translation>A&amp;brir</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translation>Com o &amp;Editor Externo</translation>
+    </message>
+    <message>
         <source>G&amp;o to Line %1</source>
         <translation>I&amp;r para a Linha %1</translation>
     </message>
@@ -1631,6 +1639,22 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>&amp;Hide Items</source>
         <translation>&amp;Ocultar Itens</translation>
+    </message>
+    <message>
+        <source>&amp;Open Left</source>
+        <translation>Abrir o &amp;Esquerdo</translation>
+    </message>
+    <message>
+        <source>Open Midd&amp;le</source>
+        <translation>Abrir o do &amp;Meio</translation>
+    </message>
+    <message>
+        <source>O&amp;pen Right</source>
+        <translation>A&amp;brir o Direito</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translation>Com o &amp;Editor Externo</translation>
     </message>
     <message>
         <source>Copy %1 to %2</source>
@@ -5218,6 +5242,14 @@ Limpe o filtro de exibição ou ajuste o filtro para mostrar todas as linhas ant
     <message>
         <source>&amp;Redo</source>
         <translation>&amp;Refazer</translation>
+    </message>
+    <message>
+        <source>Op&amp;en</source>
+        <translation>A&amp;brir</translation>
+    </message>
+    <message>
+        <source>With &amp;External Editor</source>
+        <translation>Com o &amp;Editor Externo</translation>
     </message>
     <message>
         <source>Save As</source>
