@@ -764,6 +764,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestIgnoredDiffsOpt(QStringLiteral("selftest-ignored-diffs"),
 		QStringLiteral("Count the ignored differences apart in the status bar and in Go To (for testing)"));
 	parser.addOption(selftestIgnoredDiffsOpt);
+	QCommandLineOption selftestWrapLinesOpt(QStringLiteral("selftest-wrap-lines"),
+		QStringLiteral("Exercise View > Wrap Lines: the panes wrapped and kept aligned (for testing)"));
+	parser.addOption(selftestWrapLinesOpt);
 	QCommandLineOption selftestViewEolOpt(QStringLiteral("selftest-view-eol"),
 		QStringLiteral("Exercise View Whitespace, View EOL and Convert Line Endings (for testing)"));
 	parser.addOption(selftestViewEolOpt);
@@ -10032,6 +10035,315 @@ int main(int argc, char *argv[])
 		}
 		lm::saveLineFilters(false, LineFiltersList());
 		printf("ignored diffs: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestWrapLinesOpt))
+	{
+		// WinMerge's Wrap Lines (CMergeEditView::OnViewWordWrap): the lines
+		// wrap at the pane's width, each as tall as on the side where it
+		// wraps the most (GetEmptySubLines)
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return 2;
+		const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+		QByteArray left;
+		QByteArray right;
+		QByteArray words;
+		for (int w = 0; w < 40; ++w)
+			words += "word" + QByteArray::number(w) + ' ';
+		for (int i = 1; i <= 80; ++i)
+		{
+			const QByteArray number = QByteArray::number(i);
+			if (i % 10 == 3)
+			{
+				// a long line on the left, a short one on the right
+				left += "long " + number + ": " + words + "end\n";
+				right += "short " + number + "\n";
+			}
+			else if (i % 10 == 7)
+			{
+				// long on both sides, differing
+				left += "both " + number + ": " + words + "left\n";
+				right += "both " + number + ": " + words + words + "right\n";
+			}
+			else
+			{
+				left += "line " + number + "\n";
+				right += "line " + number + "\n";
+			}
+		}
+		MainWindow window;
+		window.resize(1000, 600);
+		window.show();
+		window.openFileComparison({ write("wrap_l.txt", left), write("wrap_r.txt", right) });
+		QCoreApplication::processEvents();
+		auto *view = window.findChild<FileCompareView *>();
+		auto *wrap = window.findChild<QAction *>(QStringLiteral("wrapLinesAction"));
+		if (view == nullptr || wrap == nullptr)
+			return 2;
+		DiffTextEdit *panes[2] = { view->paneForTest(0), view->paneForTest(1) };
+		const auto aligned = [&panes](int first, int last, int *badLine = nullptr) {
+			for (int v = first; v <= last; ++v)
+			{
+				const int a = panes[0]->lineBottomForTest(v);
+				const int b = panes[1]->lineBottomForTest(v);
+				if (a != b)
+				{
+					if (badLine != nullptr)
+						*badLine = v;
+					printf("  line %d ends at %d on the left, %d on the right\n", v, a, b);
+					return false;
+				}
+			}
+			return true;
+		};
+		const auto shoot = [&shots, &window](const char *name) {
+			if (!shots.isEmpty())
+				window.grab().save(QDir(shots).filePath(QString::fromLatin1(name)));
+		};
+		check(!mgr->GetBool(OPT_WORDWRAP), "off by default");
+		shoot("wrap-0-off.png");
+		wrap->trigger();
+		QCoreApplication::processEvents();
+		check(mgr->GetBool(OPT_WORDWRAP) && panes[0]->wrapLines() && panes[1]->wrapLines(),
+			"the menu turns it on, for both panes");
+		const QTextBlock longBlock = panes[0]->document()->findBlockByNumber(2);
+		const int leftRows = panes[0]->naturalRows(longBlock);
+		const int rightRows = panes[1]->naturalRows(panes[1]->document()->findBlockByNumber(2));
+		printf("  line 3 takes %d rows on the left, %d on the right; blank rows: %d and %d\n",
+			leftRows, rightRows, panes[0]->paddingRows(2), panes[1]->paddingRows(2));
+		check(leftRows > 1 && rightRows == 1 && panes[1]->paddingRows(2) == leftRows - 1
+			&& panes[0]->paddingRows(2) == 0, "a long line wraps, the other side gets blank rows");
+		check(aligned(0, 30), "the lines stay aligned");
+		printf("  scroll range: left %d (%d rows), right %d (%d rows)\n",
+			panes[0]->verticalScrollBar()->maximum(), panes[0]->document()->lineCount(),
+			panes[1]->verticalScrollBar()->maximum(), panes[1]->document()->lineCount());
+		check(panes[0]->verticalScrollBar()->maximum() == panes[1]->verticalScrollBar()->maximum(),
+			"both panes scroll as far");
+		shoot("wrap-1-on.png");
+
+		// scrolled so the top row is one of the blank ones
+		const int lineTop = longBlock.firstLineNumber();
+		for (int into = 1; into <= leftRows - 1; ++into)
+		{
+			panes[0]->verticalScrollBar()->setValue(lineTop + into);
+			QCoreApplication::processEvents();
+			printf("  scrolled %d rows into line 3: line 4 starts at %d on the left, %d on the right\n",
+				into, panes[0]->lineBottomForTest(2), panes[1]->lineBottomForTest(2));
+			check(aligned(3, 20), "scrolled into a line's blank rows: still aligned");
+			if (into == 2)
+				shoot("wrap-2-scrolled.png");
+		}
+		// and coming up into them from below
+		panes[0]->verticalScrollBar()->setValue(lineTop + 9);
+		QCoreApplication::processEvents();
+		for (int into = leftRows - 1; into >= 1; --into)
+		{
+			panes[1]->verticalScrollBar()->setValue(lineTop + into);
+			QCoreApplication::processEvents();
+			check(aligned(3, 20), "scrolled up into them: still aligned");
+		}
+		panes[0]->verticalScrollBar()->setValue(0);
+
+		// a narrower window wraps more
+		window.resize(700, 600);
+		QCoreApplication::processEvents();
+		const int narrower = panes[0]->naturalRows(panes[0]->document()->findBlockByNumber(2));
+		check(narrower > leftRows && panes[1]->paddingRows(2) == narrower - 1 && aligned(0, 30),
+			"a narrower window: more rows, still aligned");
+		shoot("wrap-3-narrow.png");
+
+		window.resize(1000, 600);
+		QCoreApplication::processEvents();
+		panes[0]->verticalScrollBar()->setValue(0);
+		QCoreApplication::processEvents();
+
+		// the location pane counts rows (CLocationView goes by sub-lines)
+		{
+			const int rows3 = panes[0]->naturalRows(panes[0]->document()->findBlockByNumber(2));
+			bool band = false;
+			for (const LocationPane::Band &b : view->locationPaneForTest()->bandsForTest())
+				band = band || (b.side == 0 && b.firstLine == 2 && b.lastLine == 2 + rows3 - 1);
+			check(band, "the location pane: a wrapped line's band is as tall as its rows");
+			panes[0]->verticalScrollBar()->setValue(lineTop + 2);
+			QCoreApplication::processEvents();
+			check(view->locationPaneForTest()->viewFirstForTest() == lineTop + 2
+				&& view->locationPaneForTest()->viewCountForTest() == panes[0]->visibleLineCount(),
+				"and its view rectangle is the rows on screen");
+			panes[0]->verticalScrollBar()->setValue(0);
+			QCoreApplication::processEvents();
+		}
+
+		// the next differences come on screen (ShowDiff, by sub-lines: the
+		// last line's first row is what IsDiffVisible looks at, so a last
+		// line of many rows can go on under the bottom, as upstream's does)
+		{
+			bool onScreen = true;
+			for (int step = 0; step < 12; ++step)
+			{
+				view->gotoNextDiff();
+				QCoreApplication::processEvents();
+				const int line = panes[0]->textCursor().blockNumber();
+				const int top = line > 0 ? panes[0]->lineBottomForTest(line - 1) : 0;
+				const int bottom = panes[0]->lineBottomForTest(line);
+				const int height = panes[0]->viewport()->height() - panes[0]->rowShiftForTest();
+				if (top < 0 || top >= height || !aligned(qMax(0, line - 2), line + 2))
+				{
+					printf("  difference %d at line %d (row %d, %d rows): ends at %d of %d; top row %d, rows on screen %d\n",
+						step, line, panes[0]->document()->findBlockByNumber(line).firstLineNumber(),
+						panes[0]->document()->findBlockByNumber(line).lineCount(), bottom, height,
+						panes[0]->verticalScrollBar()->value(), panes[0]->visibleLineCount());
+					onScreen = false;
+				}
+			}
+			check(onScreen, "Next Difference brings each on screen, the panes aligned");
+		}
+
+		// Page Down keeps the panes aligned
+		{
+			panes[0]->verticalScrollBar()->setValue(0);
+			panes[0]->setFocus();
+			QCoreApplication::processEvents();
+			bool kept = true;
+			for (int step = 0; step < 4; ++step)
+			{
+				QKeyEvent down(QEvent::KeyPress, Qt::Key_PageDown, Qt::NoModifier);
+				QCoreApplication::sendEvent(panes[0], &down);
+				QCoreApplication::processEvents();
+				const int first = panes[0]->firstVisibleLine();
+				kept = kept && aligned(first + 1, first + 12)
+					&& panes[0]->verticalScrollBar()->value() == panes[1]->verticalScrollBar()->value();
+			}
+			check(kept, "Page Down: the panes stay aligned");
+			shoot("wrap-5-paged.png");
+			panes[0]->verticalScrollBar()->setValue(0);
+			QCoreApplication::processEvents();
+		}
+
+		// typing makes a line longer: the rows follow
+		view->typeAtForTest(1, 0, QString(QStringLiteral("typed ")).repeated(30));
+		QCoreApplication::processEvents();
+		QCoreApplication::processEvents();
+		check(panes[1]->naturalRows(panes[1]->document()->findBlockByNumber(0)) > 1
+			&& panes[0]->paddingRows(0) > 0 && aligned(0, 30), "typing a line long: the other side's blank rows follow");
+		shoot("wrap-4-typed.png");
+
+		wrap->trigger();
+		QCoreApplication::processEvents();
+		check(!mgr->GetBool(OPT_WORDWRAP) && !panes[0]->wrapLines() && panes[1]->paddingRows(2) == 0,
+			"and off again: no blank rows");
+
+		// a table: its own option (OPT_WORDWRAP_TABLE), its cells wrapped at
+		// their column's width, the rows as tall on both sides
+		{
+			MainWindow tableWindow;
+			tableWindow.resize(1000, 600);
+			tableWindow.show();
+			QByteArray longCell;
+			for (int w = 0; w < 30; ++w)
+				longCell += "cell" + QByteArray::number(w) + ' ';
+			tableWindow.openFileComparison({ write("wrap_l.csv", "id,text,more\n1,short,x\n2," + longCell + ",y\n3,z,z\n"),
+				write("wrap_r.csv", "id,text,more\n1,short,x\n2,brief,y\n3,z,z\n") });
+			QCoreApplication::processEvents();
+			auto *grid = tableWindow.findChild<TableCompareView *>();
+			auto *tableWrap = tableWindow.findChild<QAction *>(QStringLiteral("wrapLinesAction"));
+			if (grid == nullptr || tableWrap == nullptr)
+				return 2;
+			QTableView *tables[2] = { grid->tableForTest(0), grid->tableForTest(1) };
+			const auto tallest = [&tables]() {
+				int row = -1;
+				int height = 0;
+				for (int r = 0; r < tables[0]->model()->rowCount(); ++r)
+					if (tables[0]->rowHeight(r) > height)
+					{
+						height = tables[0]->rowHeight(r);
+						row = r;
+					}
+				return row;
+			};
+			const int base = tables[0]->verticalHeader()->defaultSectionSize();
+			check(tables[0]->rowHeight(tallest()) == base, "a table: rows of one line at first");
+			tableWrap->trigger();
+			QCoreApplication::processEvents();
+			const int row = tallest();
+			printf("  the long cell's row: %d px on the left, %d on the right (one line: %d)\n",
+				tables[0]->rowHeight(row), tables[1]->rowHeight(row), base);
+			check(mgr->GetBool(OPT_WORDWRAP_TABLE) && !mgr->GetBool(OPT_WORDWRAP) && grid->wrapLines(),
+				"the menu turns on the tables' option, not the text's");
+			check(tables[0]->rowHeight(row) > base && tables[1]->rowHeight(row) == tables[0]->rowHeight(row),
+				"a long cell wraps, its row as tall on both sides");
+			if (!shots.isEmpty())
+				tableWindow.grab().save(QDir(shots).filePath(QStringLiteral("wrap-6-table.png")));
+			const int before = tables[0]->rowHeight(row);
+			tables[0]->setColumnWidth(1, 260);
+			QCoreApplication::processEvents();
+			QCoreApplication::processEvents();
+			check(tables[0]->rowHeight(row) < before && tables[1]->rowHeight(row) == tables[0]->rowHeight(row),
+				"a wider column: fewer rows, both sides alike");
+			tableWrap->trigger();
+			QCoreApplication::processEvents();
+			check(!mgr->GetBool(OPT_WORDWRAP_TABLE) && tables[0]->rowHeight(row) == base
+				&& tables[1]->rowHeight(row) == base, "and off again: rows of one line");
+			if (!shots.isEmpty())
+				tableWindow.grab().save(QDir(shots).filePath(QStringLiteral("wrap-7-table-off.png")));
+		}
+
+		// how long a big file takes (a probe, not a check)
+		if (qEnvironmentVariableIsSet("LM_WRAP_PROBE"))
+		{
+			QByteArray bigLeft;
+			QByteArray bigRight;
+			for (int i = 0; i < 20000; ++i)
+			{
+				const QByteArray number = QByteArray::number(i);
+				bigLeft += (i % 10 == 3 ? "long " + number + ": " + words : "line " + number) + '\n';
+				bigRight += (i % 50 == 7 ? "changed " + number : "line " + number) + '\n';
+			}
+			MainWindow big;
+			big.resize(1000, 600);
+			big.show();
+			big.openFileComparison({ write("big_l.txt", bigLeft), write("big_r.txt", bigRight) });
+			QCoreApplication::processEvents();
+			auto *bigWrap = big.findChild<QAction *>(QStringLiteral("wrapLinesAction"));
+			QElapsedTimer timer;
+			timer.start();
+			bigWrap->trigger();
+			QCoreApplication::processEvents();
+			printf("  20000 lines: wrap on in %lld ms\n", (long long)timer.restart());
+			big.resize(800, 600);
+			QCoreApplication::processEvents();
+			printf("  resized in %lld ms\n", (long long)timer.restart());
+			auto *bigView = big.findChild<FileCompareView *>();
+			bigView->paneForTest(0)->verticalScrollBar()->setValue(50000);
+			QCoreApplication::processEvents();
+			printf("  scrolled to the middle in %lld ms\n", (long long)timer.restart());
+			bigView->typeAtForTest(1, 100, QStringLiteral("x"));
+			QCoreApplication::processEvents();
+			QCoreApplication::processEvents();
+			printf("  a key typed in %lld ms\n", (long long)timer.restart());
+			bigWrap->trigger();
+			QCoreApplication::processEvents();
+			printf("  wrap off in %lld ms\n", (long long)timer.restart());
+		}
 		return ok ? 0 : 1;
 	}
 

@@ -3573,6 +3573,11 @@ Patches sind nicht betroffen.</translation>
         <translation>Z&amp;eilenunterschiede anzeigen</translation>
     </message>
     <message>
+        <source>W&amp;rap Lines</source>
+        <translatorcomment>After WinMerge&apos;s &quot;W&amp;rap Lines&quot;.</translatorcomment>
+        <translation>Zeilen um&amp;brechen</translation>
+    </message>
+    <message>
         <source>Next &amp;Pane</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Nächster &amp;Ausschnitt</translation>

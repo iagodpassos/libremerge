@@ -8,17 +8,175 @@
 #include <QContextMenuEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
+#include <QFontInfo>
+#include <QFontMetricsF>
 #include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QScrollBar>
 #include <QPlainTextDocumentLayout>
 #include <QTextBlock>
 #include <QTextBoundaryFinder>
+#include <QTextLayout>
 #include <QTimer>
+#include <QtMath>
 #include <QUrl>
+
+/**
+ * QPlainTextDocumentLayout with CCrystalTextView's empty sub-lines: a line
+ * can be given blank rows under its own (GetEmptySubLines), which take
+ * room on screen and in the scroll range as its own rows do. Qt's layout
+ * counts a line's rows when it lays the line out, so the count is made
+ * again with the blank rows whenever it does.
+ */
+class PaddedDocumentLayout : public QPlainTextDocumentLayout
+{
+public:
+	explicit PaddedDocumentLayout(QTextDocument *document)
+		: QPlainTextDocumentLayout(document) {}
+
+	int padding(int blockNumber) const { return m_padding.value(blockNumber); }
+
+	void setPadding(const QList<int> &padding)
+	{
+		// counted again even when the same: a new width lays the lines
+		// out again, with their own rows only
+		m_padding = padding;
+		{
+			const QSignalBlocker blocker(this);
+			for (QTextBlock block = document()->begin(); block.isValid(); block = block.next())
+				applyRows(block);
+		}
+		emit documentSizeChanged(documentSize());
+		emit update();
+	}
+
+	/** width: what the pane gives the text (its viewport's). */
+	int naturalRows(const QTextBlock &block, int width) const
+	{
+		if (!block.isValid())
+			return 0;
+		const QTextLayout *layout = block.layout();
+		if (layout != nullptr && layout->lineCount() > 0)
+			return layout->lineCount();
+		// a line that cannot be wider than the pane takes one row, without
+		// laying it out (Qt lays out the lines on screen only)
+		if (fitsOneRow(block, width))
+			return 1;
+		// Qt lays a line out when its size is first asked for
+		const QSignalBlocker blocker(const_cast<PaddedDocumentLayout *>(this));
+		QPlainTextDocumentLayout::blockBoundingRect(block);
+		layout = block.layout();
+		return layout != nullptr ? qMax(1, layout->lineCount()) : 1;
+	}
+
+	/** The height of a row of a line. */
+	qreal rowHeight(const QTextBlock &block) const
+	{
+		const QTextLayout *layout = block.layout();
+		if (layout != nullptr && layout->lineCount() > 0)
+			return layout->lineAt(0).height();
+		return QFontMetricsF(document()->defaultFont()).height();
+	}
+
+	QRectF blockBoundingRect(const QTextBlock &block) const override
+	{
+		QRectF rect = QPlainTextDocumentLayout::blockBoundingRect(block);
+		if (!block.isValid() || !block.isVisible())
+			return rect;
+		const int rows = m_padding.value(block.blockNumber());
+		if (rows <= 0)
+			return rect;
+		// a line Qt has just laid out counts its own rows only: with its
+		// blank ones again, and the scroll range told (as Qt tells it of a
+		// line it lays out)
+		auto *self = const_cast<PaddedDocumentLayout *>(this);
+		if (self->applyRows(block))
+			emit self->documentSizeChanged(documentSize());
+		rect.setHeight(rect.height() + rows * rowHeight(block));
+		return rect;
+	}
+
+	void documentChanged(int from, int charsRemoved, int charsAdded) override
+	{
+		QPlainTextDocumentLayout::documentChanged(from, charsRemoved, charsAdded);
+		if (m_padding.isEmpty())
+			return;
+		// the lines laid out again count their own rows only
+		QTextBlock block = document()->findBlock(from);
+		const QTextBlock last = document()->findBlock(from + charsAdded);
+		bool changed = false;
+		while (block.isValid())
+		{
+			changed = applyRows(block) || changed;
+			if (block == last)
+				break;
+			block = block.next();
+		}
+		if (changed)
+			emit documentSizeChanged(documentSize());
+	}
+
+private:
+	/** Whether a line's text cannot reach the width of the pane: plain
+	    characters at most as wide as the font's widest (a tab to its tab
+	    stop), the rest left for the layout to measure. */
+	bool fitsOneRow(const QTextBlock &block, int paneWidth) const
+	{
+		// as QPlainTextDocumentLayout::layoutBlock takes the width, with a
+		// pixel to spare either side
+		const qreal width = paneWidth - 2 * document()->documentMargin() - 2;
+		if (width <= 0)
+			return false;
+		const QFont font = document()->defaultFont();
+		if (font != m_measuredFont)
+		{
+			// the widest a plain character can be, for the font in use
+			const QFontMetricsF metrics(font);
+			m_glyph = QFontInfo(font).fixedPitch()
+				? metrics.horizontalAdvance(QLatin1Char('M')) : metrics.maxWidth();
+			m_measuredFont = font;
+		}
+		const qreal glyph = m_glyph;
+		const qreal tab = document()->defaultTextOption().tabStopDistance();
+		qreal reach = 0;
+		const QString text = block.text();
+		for (const QChar c : text)
+		{
+			const char16_t u = c.unicode();
+			if (u == u'\t')
+				reach += qMax(tab, glyph);
+			else if (u >= 0x20 && u < 0x7F)
+				reach += glyph;
+			else
+				return false;
+			if (reach > width)
+				return false;
+		}
+		return true;
+	}
+
+	bool applyRows(const QTextBlock &block)
+	{
+		if (!block.isVisible())
+			return false;
+		// a line not laid out is one the pane's width holds (fitsOneRow)
+		const QTextLayout *layout = block.layout();
+		const int own = layout != nullptr && layout->lineCount() > 0 ? layout->lineCount() : 1;
+		const int rows = own + qMax(0, m_padding.value(block.blockNumber()));
+		if (block.lineCount() == rows)
+			return false;
+		const_cast<QTextBlock &>(block).setLineCount(rows);
+		return true;
+	}
+
+	QList<int> m_padding;
+	mutable QFont m_measuredFont;
+	mutable qreal m_glyph = 0;
+};
 
 namespace
 {
@@ -69,7 +227,14 @@ bool insertsText(const QKeyEvent *event)
 DiffTextEdit::DiffTextEdit(QWidget *parent)
 	: QPlainTextEdit(parent)
 {
+	// a document of its own, with the layout that gives a line blank rows
+	// (Wrap Lines), set before anything holds on to the first document
+	auto *doc = new QTextDocument(this);
+	m_layout = new PaddedDocumentLayout(doc);
+	doc->setDocumentLayout(m_layout);
+	setDocument(doc);
 	m_gutter = new GutterWidget(this);
+	connect(verticalScrollBar(), &QScrollBar::rangeChanged, this, [this]() { fitScrollRange(); });
 	connect(this, &QPlainTextEdit::blockCountChanged,
 		this, &DiffTextEdit::updateGutterWidth);
 	connect(this, &QPlainTextEdit::updateRequest,
@@ -144,7 +309,8 @@ int DiffTextEdit::lineBottomForTest(int viewLine) const
 	if (!block.isValid() || !block.isVisible())
 		return -1;
 	const QRectF geometry = blockBoundingGeometry(block).translated(contentOffset());
-	return qRound(geometry.top()) + qRound(blockBoundingRect(block).height());
+	// from the top of what shows of the viewport (moved up over a blank row)
+	return qRound(geometry.top() + blockBoundingRect(block).height()) - m_rowShift;
 }
 
 bool DiffTextEdit::spansHiddenLine(int from, int to) const
@@ -311,9 +477,12 @@ void DiffTextEdit::applyTabStops()
 void DiffTextEdit::changeEvent(QEvent *event)
 {
 	QPlainTextEdit::changeEvent(event);
-	// another text size, other columns
+	// another text size, other columns (and other rows, wrapped)
 	if (event->type() == QEvent::FontChange)
+	{
 		applyTabStops();
+		emit resized();
+	}
 }
 
 int DiffTextEdit::cellCount(const QString &grapheme) const
@@ -890,12 +1059,15 @@ int DiffTextEdit::firstVisibleLine() const
 
 int DiffTextEdit::visibleLineCount() const
 {
-	int lineHeight = qRound(blockBoundingRect(firstVisibleBlock()).height());
+	// wrapped, a line is as tall as its rows: the rows that fit, as
+	// upstream's GetScreenLines counts them
+	int lineHeight = m_wrapLines ? qRound(m_layout->rowHeight(firstVisibleBlock()))
+		: qRound(blockBoundingRect(firstVisibleBlock()).height());
 	// a document not laid out yet (a comparison just opened) has no
 	// line height to measure: the font's
 	if (lineHeight <= 0)
 		lineHeight = fontMetrics().lineSpacing();
-	return viewport()->height() / qMax(1, lineHeight);
+	return (viewport()->height() - m_rowShift) / qMax(1, lineHeight);
 }
 
 bool DiffTextEdit::linesOnScreen(int first, int last) const
@@ -909,10 +1081,11 @@ bool DiffTextEdit::linesOnScreen(int first, int last) const
 		bottom = bottom.previous();
 	if (!top.isValid() || !bottom.isValid() || top.blockNumber() > bottom.blockNumber())
 		return false;
-	const qreal begin = blockBoundingGeometry(top).translated(contentOffset()).top();
+	// from the top of what shows (the viewport moved up over a blank row)
+	const qreal begin = blockBoundingGeometry(top).translated(contentOffset()).top() - m_rowShift;
 	const qreal end = blockBoundingGeometry(bottom).translated(contentOffset()).top()
-		+ blockBoundingRect(bottom).height();
-	const qreal screen = viewport()->height();
+		+ blockBoundingRect(bottom).height() - m_rowShift;
+	const qreal screen = viewport()->height() - m_rowShift;
 	return begin >= 0 && end <= screen && end - begin < screen;
 }
 
@@ -992,6 +1165,32 @@ void DiffTextEdit::paintWhitespace(QPaintEvent *event)
 void DiffTextEdit::paintEvent(QPaintEvent *event)
 {
 	QPlainTextEdit::paintEvent(event);
+	if (m_wrapLines)
+	{
+		// a line's blank rows take its difference's color, as the line's
+		// own rows do (Qt paints a full-width selection row by row)
+		QPainter painter(viewport());
+		QTextBlock block = firstVisibleBlock();
+		const QPointF offset = contentOffset();
+		while (block.isValid())
+		{
+			const QRectF geometry = blockBoundingGeometry(block).translated(offset);
+			if (geometry.top() > event->rect().bottom())
+				break;
+			const int rows = m_layout->padding(block.blockNumber());
+			if (rows > 0 && block.isVisible() && block.layout() != nullptr)
+			{
+				const QBrush brush = lineBackground(block);
+				if (brush.style() != Qt::NoBrush)
+				{
+					const qreal own = block.layout()->lineCount() * m_layout->rowHeight(block);
+					painter.fillRect(QRectF(0, geometry.top() + own, viewport()->width(),
+						rows * m_layout->rowHeight(block)), brush);
+				}
+			}
+			block = block.next();
+		}
+	}
 	if (m_viewWhitespace || m_eolGlyphOf)
 		paintWhitespace(event);
 	if (m_hasHiddenLines)
@@ -1037,6 +1236,150 @@ void DiffTextEdit::paintEvent(QPaintEvent *event)
 	}
 }
 
+void DiffTextEdit::setWrapLines(bool on)
+{
+	if (on == m_wrapLines)
+		return;
+	m_wrapLines = on;
+	// CCrystalTextView::WrapLine breaks at a word's end where it can, in
+	// the middle of one that does not fit
+	setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+	setLineWrapMode(on ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
+	if (!on)
+		setPaddingRows({});
+}
+
+void DiffTextEdit::scrollContentsBy(int dx, int dy)
+{
+	QPlainTextEdit::scrollContentsBy(dx, dy);
+	updateRowShift();
+}
+
+void DiffTextEdit::updateRowShift()
+{
+	int shift = 0;
+	if (m_wrapLines)
+	{
+		// Qt's QPlainTextEditPrivate::verticalOffset puts a line's first
+		// row at the top when the row scrolled to is past the line's own
+		const int value = verticalScrollBar()->value();
+		const QTextBlock block = document()->findBlockByLineNumber(value);
+		if (block.isValid() && block.isVisible() && block.layout() != nullptr
+			&& m_layout->padding(block.blockNumber()) > 0)
+		{
+			// as far up as Qt takes the other panes, to a row's text bottom:
+			// lineAt(row - 1).naturalTextRect().bottom()
+			const int row = value - block.firstLineNumber();
+			const QTextLayout *layout = block.layout();
+			if (row > layout->lineCount())
+				shift = qFloor((row - 1) * m_layout->rowHeight(block)
+					+ layout->lineAt(0).naturalTextRect().height());
+		}
+	}
+	applyRowShift(shift);
+}
+
+void DiffTextEdit::applyRowShift(int shift)
+{
+	if (shift == m_rowShift)
+		return;
+	m_rowShift = shift;
+	m_shifting = true;
+	updateGutterWidth();
+	const QRect cr = contentsRect();
+	m_gutter->setGeometry(QRect(cr.left(), cr.top() - m_rowShift, gutterWidth(),
+		cr.height() + m_rowShift));
+	m_shifting = false;
+}
+
+int DiffTextEdit::pixelsAboveTop() const
+{
+	const QTextBlock block = firstVisibleBlock();
+	if (!block.isValid())
+		return 0;
+	return qRound(-blockBoundingGeometry(block).translated(contentOffset()).top()) + m_rowShift;
+}
+
+void DiffTextEdit::nudgeTop(int pixels)
+{
+	if (m_wrapLines && pixels != 0)
+		applyRowShift(m_rowShift + pixels);
+}
+
+void DiffTextEdit::fitScrollRange()
+{
+	if (m_fittingRange || !m_wrapLines || isVisible() == false)
+		return;
+	// QPlainTextEditPrivate::_q_adjustScrollbars, with the rows of the
+	// last screen counted blank ones and all
+	QTextDocument *doc = document();
+	const qreal visible = viewport()->rect().height() - m_rowShift - doc->documentMargin() - 1;
+	qreal y = 0;
+	int fromBottom = 0;
+	for (QTextBlock block = doc->lastBlock(); block.isValid(); block = block.previous())
+	{
+		if (!block.isVisible())
+			continue;
+		const qreal height = m_layout->blockBoundingRect(block).height();
+		const int rows = block.lineCount();
+		y += height;
+		if (y > visible)
+		{
+			const qreal rowHeight = m_layout->rowHeight(block);
+			int row = 0;
+			while (row < rows && row * rowHeight < y - visible)
+				++row;
+			fromBottom += rows - row;
+			break;
+		}
+		fromBottom += rows;
+	}
+	const int maximum = qMax(0, doc->lineCount() - fromBottom);
+	QScrollBar *bar = verticalScrollBar();
+	if (bar->maximum() == maximum)
+		return;
+	m_fittingRange = true;
+	bar->setMaximum(maximum);
+	m_fittingRange = false;
+}
+
+int DiffTextEdit::naturalRows(const QTextBlock &block) const
+{
+	return m_layout->naturalRows(block, viewport()->width());
+}
+
+void DiffTextEdit::setPaddingRows(const QList<int> &rows)
+{
+	m_layout->setPadding(rows);
+	fitScrollRange();
+	updateRowShift();
+	viewport()->update();
+	m_gutter->update();
+}
+
+int DiffTextEdit::paddingRows(int viewLine) const
+{
+	return m_layout->padding(viewLine);
+}
+
+QBrush DiffTextEdit::lineBackground(const QTextBlock &block) const
+{
+	// the difference's full-width selection over the line, the last one
+	// drawn winning as it does on the line's own rows
+	QBrush brush;
+	const int position = block.position();
+	for (const QTextEdit::ExtraSelection &selection : m_baseSelections)
+	{
+		if (!selection.format.boolProperty(QTextFormat::FullWidthSelection))
+			continue;
+		const int start = selection.cursor.selectionStart();
+		const int end = selection.cursor.selectionEnd();
+		if (start <= position && position <= end)
+			brush = selection.format.background();
+	}
+	return brush;
+}
+
 int DiffTextEdit::gutterWidth() const
 {
 	int digits = 1;
@@ -1047,7 +1390,7 @@ int DiffTextEdit::gutterWidth() const
 
 void DiffTextEdit::updateGutterWidth()
 {
-	setViewportMargins(gutterWidth(), 0, 0, 0);
+	setViewportMargins(gutterWidth(), -m_rowShift, 0, 0);
 }
 
 void DiffTextEdit::updateGutter(const QRect &rect, int dy)
@@ -1065,8 +1408,11 @@ void DiffTextEdit::resizeEvent(QResizeEvent *event)
 	scheduleMarkerRefresh();
 	QPlainTextEdit::resizeEvent(event);
 	const QRect cr = contentsRect();
-	m_gutter->setGeometry(QRect(cr.left(), cr.top(), gutterWidth(), cr.height()));
-	emit resized();
+	m_gutter->setGeometry(QRect(cr.left(), cr.top() - m_rowShift, gutterWidth(),
+		cr.height() + m_rowShift));
+	// the viewport moved up over a blank row is not a new size
+	if (!m_shifting)
+		emit resized();
 }
 
 void DiffTextEdit::paintGutter(QPaintEvent *event)
@@ -1097,7 +1443,10 @@ void DiffTextEdit::paintGutter(QPaintEvent *event)
 				// DrawMargin: the numbers in COLORINDEX_NORMALTEXT on the
 				// margin's COLORINDEX_SELMARGIN
 				painter.setPen(palette().color(QPalette::Text));
-				painter.drawText(0, top, width - 6, bottom - top,
+				// a wrapped line has its number on its first row
+				const int height = m_wrapLines
+					? qRound(m_layout->rowHeight(block)) : bottom - top;
+				painter.drawText(0, top, width - 6, height,
 					Qt::AlignRight | Qt::AlignVCenter, QString::number(number));
 			}
 			// the boundary over hidden lines starts in the margin

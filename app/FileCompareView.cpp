@@ -1824,7 +1824,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 	connect(m_locationPane, &LocationPane::gotoRequested, this,
 		[this](int line, int side, bool moveAnchor) {
 			if (side < m_paneCount)
-				gotoLine(viewLineOfShown(line), false, side, moveAnchor);
+				gotoLine(viewOfScrollRow(line), false, side, moveAnchor);
 		});
 	connect(m_locationPane, &LocationPane::centerRequested, this,
 		&FileCompareView::centerShownLine);
@@ -1964,6 +1964,16 @@ FileCompareView::FileCompareView(QWidget *parent)
 					return;
 				userEdited(m_panes[i]->inTextDrop());
 			});
+		// Wrap Lines: the blank rows that keep the panes aligned, worked
+		// out again when a pane's text or width changes (a change of the
+		// highlighting's formats alone leaves the rows as they are)
+		connect(m_panes[i]->document(), &QTextDocument::contentsChange,
+			this, [this](int, int removed, int added) {
+				if (removed != added)
+					scheduleWrapPadding();
+			});
+		// (once for the panes that change size together)
+		connect(m_panes[i], &DiffTextEdit::resized, this, [this]() { scheduleWrapPadding(); });
 		// QTextDocument's own modified tracking ignores syntax-highlight
 		// format changes, unlike contentsChange
 		connect(m_panes[i]->document(), &QTextDocument::modificationChanged,
@@ -1993,7 +2003,7 @@ FileCompareView::FileCompareView(QWidget *parent)
 		PaneSearch::Context context;
 		context.eol = [this, i]() { return m_sides[i].eol; };
 		context.editable = [this, i]() { return !m_readOnly[i]; };
-		context.shownLine = [this](int viewLine) { return shownLineOfView(viewLine); };
+		context.shownLine = [this](int viewLine) { return scrollRowOfView(viewLine); };
 		m_search[i] = new PaneSearch(m_panes[i], std::move(context), this);
 	}
 
@@ -2484,6 +2494,80 @@ void FileCompareView::refreshViewOptions()
 		option.setFlags(flags);
 		m_diffPaneEdits[side]->document()->setDefaultTextOption(option);
 	}
+	// Wrap Lines (CMergeEditView::SetWordWrapping): every pane of the
+	// window, its lines as tall as on the side where they wrap the most
+	const bool wrap = mgr != nullptr && mgr->GetBool(OPT_WORDWRAP);
+	if (wrap != m_wrapLines)
+	{
+		m_wrapLines = wrap;
+		const int top = m_panes[m_activePane]->verticalScrollBar()->value();
+		for (int side = 0; side < 3; ++side)
+			m_panes[side]->setWrapLines(wrap);
+		updateWrapPadding();
+		if (!wrap)
+		{
+			m_rowBefore.clear();
+			syncScroll(m_activePane, top);
+			updateLocationBands();
+		}
+	}
+}
+
+void FileCompareView::scheduleWrapPadding()
+{
+	if (!m_wrapLines || m_wrapPending)
+		return;
+	m_wrapPending = true;
+	QTimer::singleShot(0, this, [this]() {
+		m_wrapPending = false;
+		updateWrapPadding();
+	});
+}
+
+void FileCompareView::updateWrapPadding()
+{
+	if (!m_wrapLines)
+		return;
+	// CMergeEditView::GetEmptySubLines: each view line takes, on every
+	// side, the rows it takes where it wraps the most; the other sides get
+	// blank rows under it
+	QTextBlock blocks[3];
+	QList<int> rows[3];
+	for (int side = 0; side < m_paneCount; ++side)
+		blocks[side] = m_panes[side]->document()->begin();
+	m_rowBefore.assign(1, 0);
+	for (;;)
+	{
+		bool any = false;
+		int natural[3] = {};
+		int most = 0;
+		for (int side = 0; side < m_paneCount; ++side)
+		{
+			if (!blocks[side].isValid())
+				continue;
+			any = true;
+			natural[side] = blocks[side].isVisible()
+				? m_panes[side]->naturalRows(blocks[side]) : 0;
+			most = qMax(most, natural[side]);
+		}
+		if (!any)
+			break;
+		for (int side = 0; side < m_paneCount; ++side)
+		{
+			if (!blocks[side].isValid())
+				continue;
+			rows[side].append(blocks[side].isVisible() ? most - natural[side] : 0);
+			blocks[side] = blocks[side].next();
+		}
+		m_rowBefore.push_back(m_rowBefore.back() + most);
+	}
+	const int top = m_panes[m_activePane]->verticalScrollBar()->value();
+	for (int side = 0; side < m_paneCount; ++side)
+		m_panes[side]->setPaddingRows(rows[side]);
+	m_panes[m_activePane]->verticalScrollBar()->setValue(top);
+	syncScroll(m_activePane, m_panes[m_activePane]->verticalScrollBar()->value());
+	// the location pane counts the rows
+	updateLocationBands();
 }
 
 void FileCompareView::updateEncodingLabels(int side)
@@ -3390,6 +3474,17 @@ void FileCompareView::applyHighlights()
 		m_panes[side]->setGutterLineColors(gutterColors);
 	}
 
+	updateLocationBands();
+
+	updateDiffPane();
+}
+
+/** The location pane's bands and ribbons, in the lines or rows the panes
+    scroll by: worked out again with the highlights, and with Wrap Lines
+    when the rows change. */
+void FileCompareView::updateLocationBands()
+{
+	const lm::DiffColors &C = lm::diffColors();
 	// location pane: upstream's blocks (CLocationView::CalculateBlocks and
 	// OnDraw). It draws the significant differences only, cut where the
 	// lines of a file give way to filler, each part in the colors its first
@@ -3402,12 +3497,10 @@ void FileCompareView::applyHighlights()
 	const bool showMoved = mgr != nullptr && mgr->GetBool(OPT_CMP_MOVED_BLOCKS)
 		&& m_paneCount == 2 && !m_diffStale;
 	const int viewLines = m_panes[0]->document()->blockCount();
-	// the lines that show, when the display filter hides some
-	const auto shownOf = [this](int viewLine) {
-		if (m_shownBefore.empty())
-			return viewLine;
-		return m_shownBefore[qBound(0, viewLine, static_cast<int>(m_shownBefore.size()) - 1)];
-	};
+	// the lines that show, when the display filter hides some, or with
+	// Wrap Lines their rows (CLocationView::CalculateBlocks goes by
+	// GetSubLineIndex)
+	const auto shownOf = [this](int viewLine) { return scrollRowOfView(viewLine); };
 	for (size_t b = 0; b < m_blocks.size(); ++b)
 	{
 		const Block &block = m_blocks[b];
@@ -3482,19 +3575,17 @@ void FileCompareView::applyHighlights()
 			ribbons.push_back(ribbon);
 		}
 	}
-	const int totalLines = m_shownBefore.empty() ? viewLines
-		: m_shownBefore[static_cast<int>(m_shownBefore.size()) - 1];
-	m_locationPane->setBands(std::move(bands), qMax(1, totalLines));
+	m_locationPane->setBands(std::move(bands), qMax(1, scrollRowCount()));
 	m_locationPane->setRibbons(std::move(ribbons), C.moved, C.selMoved);
 	updateLocationViewport();
-
-	updateDiffPane();
 }
 
 void FileCompareView::updateLocationViewport()
 {
 	int first = m_panes[0]->firstVisibleLine();
-	if (!m_shownBefore.empty())
+	if (!m_rowBefore.empty())
+		first = m_panes[0]->verticalScrollBar()->value(); // the top row
+	else if (!m_shownBefore.empty())
 		first = m_shownBefore[qBound(0, first, static_cast<int>(m_shownBefore.size()) - 1)];
 	m_locationPane->setViewport(first, m_panes[0]->visibleLineCount());
 }
@@ -4049,11 +4140,14 @@ int FileCompareView::diffScrollLine(int blockIndex) const
 	const DiffTextEdit *edit = m_panes[qBound(0, m_activePane, m_paneCount - 1)];
 	const int top = edit->verticalScrollBar()->value();
 	const int screenLines = edit->visibleLineCount();
-	const int start = shownLineOfView(block.viewBegin);
-	const int end = shownLineOfView(qMax(block.viewBegin, block.viewEnd));
+	// in rows, with Wrap Lines (GetSubLineIndex): end is the last line's
+	// first row
+	const int start = scrollRowOfView(block.viewBegin);
+	const int lastLine = qMax(block.viewBegin, block.viewEnd);
+	const int end = scrollRowOfView(lastLine);
 	// upstream's height, the last line's sublines plus one: a line more
 	// than the difference has
-	const int height = end - start + 1 + 1;
+	const int height = end - start + scrollRowsOfView(lastLine) + 1;
 	if (start >= top && end < top + screenLines - contextLinesBelow
 		&& height < screenLines)
 		return -1;
@@ -5617,6 +5711,38 @@ int FileCompareView::shownLineOfView(int viewLine) const
 	return m_shownBefore[qBound(0, viewLine, static_cast<int>(m_shownBefore.size()) - 1)];
 }
 
+/** What the panes scroll by and the location pane counts: the lines that
+    show, or with Wrap Lines their rows (upstream's sub-lines,
+    GetSubLineIndex). */
+int FileCompareView::scrollRowOfView(int viewLine) const
+{
+	if (m_rowBefore.empty())
+		return shownLineOfView(viewLine);
+	return m_rowBefore[qBound(0, viewLine, static_cast<int>(m_rowBefore.size()) - 1)];
+}
+
+int FileCompareView::viewOfScrollRow(int row) const
+{
+	if (m_rowBefore.empty())
+		return viewLineOfShown(row);
+	const auto it = std::upper_bound(m_rowBefore.begin(), m_rowBefore.end(), row);
+	return qMax(0, static_cast<int>(it - m_rowBefore.begin()) - 1);
+}
+
+int FileCompareView::scrollRowsOfView(int viewLine) const
+{
+	return scrollRowOfView(viewLine + 1) - scrollRowOfView(viewLine);
+}
+
+int FileCompareView::scrollRowCount() const
+{
+	if (!m_rowBefore.empty())
+		return m_rowBefore.back();
+	if (!m_shownBefore.empty())
+		return m_shownBefore.back();
+	return m_panes[0]->document()->blockCount();
+}
+
 /** The file's line at a view line (ComputeRealLine): a filler line stands
     for the file's next line. Upstream gives the filler after a file's
     end the line past it, a line the file does not have ("Go to Line 101"
@@ -5644,7 +5770,7 @@ void FileCompareView::gotoLine(int line, bool realLine, int pane, bool moveAncho
 		const int count = static_cast<int>(m_realToView[pane].size());
 		viewLine = count > 0 ? m_realToView[pane][qBound(0, line, count - 1)] : 0;
 	}
-	const int top = qMax(0, shownLineOfView(viewLine) - m_panes[pane]->visibleLineCount() / 2);
+	const int top = qMax(0, scrollRowOfView(viewLine) - m_panes[pane]->visibleLineCount() / 2);
 	m_syncing = true;
 	for (int p = 0; p < m_paneCount; ++p)
 	{
@@ -5689,7 +5815,7 @@ void FileCompareView::showLocationMenu(const QPoint &globalPos, int side, int li
 	// the file whose bar it is over (the first one between the bars); off
 	// the bars' height it has no number and is grey
 	const int realLine = side >= 0 && side < m_paneCount
-		? realLineOfView(side, viewLineOfShown(line)) : -1;
+		? realLineOfView(side, viewOfScrollRow(line)) : -1;
 	QAction *gotoLineAction = menu.addAction(tr("G&o to Line %1")
 		.arg(realLine >= 0 ? QString::number(realLine + 1) : QString()));
 	gotoLineAction->setObjectName(QStringLiteral("locationGotoLine"));
@@ -5821,6 +5947,21 @@ void FileCompareView::syncScroll(int pane, int value)
 	{
 		if (i != pane)
 			m_panes[i]->verticalScrollBar()->setValue(value);
+	}
+	if (m_wrapLines)
+	{
+		// the rows to the pixel of the pane scrolled (Qt's offset in a
+		// wrapped line keeps a fraction that depends on the way there)
+		const int line = m_panes[pane]->firstVisibleLine();
+		const int above = m_panes[pane]->pixelsAboveTop();
+		for (int i = 0; i < m_paneCount; ++i)
+		{
+			if (i == pane || m_panes[i]->firstVisibleLine() != line)
+				continue;
+			const int off = above - m_panes[i]->pixelsAboveTop();
+			if (off != 0 && qAbs(off) <= 2)
+				m_panes[i]->nudgeTop(off);
+		}
 	}
 	m_syncing = false;
 }

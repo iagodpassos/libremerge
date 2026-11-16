@@ -3862,6 +3862,10 @@ Potser el fitxer és només de lectura?</translation>
         <translation>&amp;Mostra les diferències de la línia</translation>
     </message>
     <message>
+        <source>W&amp;rap Lines</source>
+        <translation>A&amp;justa les línies</translation>
+    </message>
+    <message>
         <source>Next &amp;Pane</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Subfinestra &amp;següent</translation>

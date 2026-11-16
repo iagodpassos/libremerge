@@ -779,6 +779,34 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(viewMenu, &QMenu::aboutToShow, this, syncLineDiffsAction);
 	connect(m_tabs, &QTabWidget::currentChanged, this, syncLineDiffsAction);
 	syncLineDiffsAction();
+	// WinMerge's Wrap Lines (CMergeEditView::OnViewWordWrap): the text
+	// windows' option, or in a table the tables' own (OPT_WORDWRAP_TABLE);
+	// the open windows of the kind showing it (RefreshOptions)
+	QAction *wrapAction = viewMenu->addAction(tr("W&rap Lines"));
+	wrapAction->setObjectName(QStringLiteral("wrapLinesAction"));
+	wrapAction->setCheckable(true);
+	connect(wrapAction, &QAction::triggered, this, [this, tableView]() {
+		COptionsMgr *mgr = GetOptionsMgr();
+		if (mgr == nullptr)
+			return;
+		const bool table = tableView() != nullptr;
+		const String &option = table ? OPT_WORDWRAP_TABLE : OPT_WORDWRAP;
+		mgr->SaveOption(option, !mgr->GetBool(option));
+		for (int i = 0; i < m_tabs->count(); ++i)
+		{
+			if (auto *file = qobject_cast<FileCompareView *>(m_tabs->widget(i)); file != nullptr && !table)
+				file->refreshViewOptions();
+			else if (auto *grid = qobject_cast<TableCompareView *>(m_tabs->widget(i)); grid != nullptr && table)
+				grid->refreshWrapLines();
+		}
+	});
+	connect(viewMenu, &QMenu::aboutToShow, this, [wrapAction, fileView, tableView]() {
+		COptionsMgr *mgr = GetOptionsMgr();
+		const bool table = tableView() != nullptr;
+		wrapAction->setEnabled(fileView() != nullptr || table);
+		wrapAction->setChecked(mgr != nullptr
+			&& mgr->GetBool(table ? OPT_WORDWRAP_TABLE : OPT_WORDWRAP));
+	});
 	viewMenu->addSeparator();
 	addMenuAction(viewMenu, tr("Next &Pane"), QKeySequence(Qt::Key_F6),
 		[fileView, tableView, imageView, hexView]() {

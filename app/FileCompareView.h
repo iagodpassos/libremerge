@@ -547,9 +547,22 @@ private:
 	void setMovedBlocks(bool detect);
 	int viewLineOfShown(int shownLine) const;
 	int shownLineOfView(int viewLine) const;
+	int scrollRowOfView(int viewLine) const;
+	int viewOfScrollRow(int row) const;
+	int scrollRowsOfView(int viewLine) const;
+	int scrollRowCount() const;
 	int realLineOfView(int side, int viewLine) const;
 	void syncScroll(int pane, int value);
 	void syncHScroll(int pane, int value);
+	/** Wrap Lines: the blank rows under the lines of each pane that keep
+	    the panes aligned, worked out now or once the current event is
+	    done (after an edit, which a rebuild of the alignment may follow). */
+	void updateWrapPadding();
+	void updateLocationBands();
+	void scheduleWrapPadding();
+	bool m_wrapLines = false;
+	bool m_wrapPending = false;
+	std::vector<int> m_rowBefore; // with Wrap Lines: the rows before each view line
 	void hideLines();
 	void applyHiddenLines();
 	bool blockFiltered(int blockIndex) const;

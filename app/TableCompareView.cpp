@@ -25,6 +25,7 @@
 #include <QScrollBar>
 #include <QSettings>
 #include <QStyledItemDelegate>
+#include <QTextLayout>
 #include <QTableView>
 #include <QTimer>
 #include <QTemporaryFile>
@@ -217,6 +218,54 @@ class CellDelegate : public QStyledItemDelegate
 public:
 	using QStyledItemDelegate::QStyledItemDelegate;
 
+	/** Wrap Lines in a table (OPT_WORDWRAP_TABLE): a cell's text wraps at
+	    its column's width, at a word's end where it can and in the middle
+	    of one that does not fit, as CCrystalParser::WrapLine breaks it
+	    (Qt's own item text breaks at words only). */
+	void setWrapLines(bool on) { m_wrap = on; }
+
+	void paint(QPainter *painter, const QStyleOptionViewItem &option,
+		const QModelIndex &index) const override
+	{
+		if (!m_wrap)
+		{
+			QStyledItemDelegate::paint(painter, option, index);
+			return;
+		}
+		QStyleOptionViewItem item = option;
+		initStyleOption(&item, index);
+		const QString text = item.text;
+		item.text.clear();
+		const QWidget *widget = item.widget;
+		QStyle *style = widget != nullptr ? widget->style() : QApplication::style();
+		// the cell as Qt draws it, without its text
+		style->drawControl(QStyle::CE_ItemViewItem, &item, painter, widget);
+		if (text.isEmpty())
+			return;
+		const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, widget) + 1;
+		const QRect area = style->subElementRect(QStyle::SE_ItemViewItemText, &item, widget)
+			.adjusted(margin, 0, -margin, 0);
+		const QPalette::ColorGroup group = !(item.state & QStyle::State_Enabled)
+			? QPalette::Disabled
+			: (item.state & QStyle::State_Active) ? QPalette::Normal : QPalette::Inactive;
+		painter->save();
+		painter->setFont(item.font);
+		painter->setPen(item.palette.color(group, (item.state & QStyle::State_Selected)
+			? QPalette::HighlightedText : QPalette::Text));
+		painter->setClipRect(item.rect);
+		// from the row's first line down, as upstream's text lays a row out:
+		// the first line where a row of one line has its text
+		int base = item.rect.height();
+		if (const auto *table = qobject_cast<const QTableView *>(widget))
+			base = table->verticalHeader()->defaultSectionSize();
+		const qreal first = qMax(0.0, (base - QFontMetricsF(item.font).height()) / 2.0);
+		QTextOption wrap((item.displayAlignment & Qt::AlignHorizontal_Mask) | Qt::AlignTop);
+		wrap.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+		painter->drawText(QRectF(area.left(), item.rect.top() + first, area.width(),
+			item.rect.height() - first), text, wrap);
+		painter->restore();
+	}
+
 	QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &,
 		const QModelIndex &) const override
 	{
@@ -225,7 +274,9 @@ public:
 		editor->setFrameShape(QFrame::NoFrame);
 		editor->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 		editor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-		editor->setLineWrapMode(QPlainTextEdit::NoWrap);
+		// wrapped as the cell shows it
+		editor->setLineWrapMode(m_wrap ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap);
+		editor->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
 		editor->installEventFilter(const_cast<CellDelegate *>(this));
 		return editor;
 	}
@@ -290,7 +341,40 @@ protected:
 		}
 		return QStyledItemDelegate::eventFilter(object, event);
 	}
+
+private:
+	bool m_wrap = false;
 };
+
+/** The rows a cell's text takes in a width, wrapped as CellDelegate draws
+    it: a row for each of its own lines and more where a line is wider. */
+int wrappedLines(const QString &text, qreal width, const QFont &font)
+{
+	const QFontMetricsF metrics(font);
+	int rows = 0;
+	for (const QString &line : text.split(QLatin1Char('\n')))
+	{
+		if (width <= 0 || metrics.horizontalAdvance(line) <= width)
+		{
+			++rows;
+			continue;
+		}
+		QTextLayout layout(line, font);
+		QTextOption option;
+		option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+		layout.setTextOption(option);
+		layout.beginLayout();
+		int count = 0;
+		for (QTextLine row = layout.createLine(); row.isValid(); row = layout.createLine())
+		{
+			row.setLineWidth(width);
+			++count;
+		}
+		layout.endLayout();
+		rows += qMax(1, count);
+	}
+	return qMax(1, rows);
+}
 
 /** The grid of a side, with a rule under each row that hidden rows
     follow: upstream's editor draws its boundary line there, in the colour
@@ -829,6 +913,16 @@ TableCompareView::TableCompareView(QWidget *parent)
 		m_tables[i]->setSelectionBehavior(QAbstractItemView::SelectItems);
 		m_tables[i]->horizontalHeader()->setDefaultSectionSize(110);
 		m_tables[i]->verticalHeader()->setDefaultSectionSize(22);
+		// a column of another width wraps its cells into other rows
+		connect(m_tables[i]->horizontalHeader(), &QHeaderView::sectionResized, this, [this]() {
+			if (!m_wrapLines || m_fitPending)
+				return;
+			m_fitPending = true;
+			QTimer::singleShot(0, this, [this]() {
+				m_fitPending = false;
+				fitRowHeights();
+			});
+		});
 		m_tables[i]->setAlternatingRowColors(false);
 		column->addWidget(m_tables[i], 1);
 		tables->addWidget(m_columns[i], 1);
@@ -909,6 +1003,7 @@ TableCompareView::TableCompareView(QWidget *parent)
 	applyTheme();
 	connect(lm::Theme::instance(), &lm::Theme::changed,
 		this, [this]() { applyTheme(); });
+	refreshWrapLines();
 }
 
 void TableCompareView::applyTheme()
@@ -1283,12 +1378,17 @@ void TableCompareView::rebuildModel()
 }
 
 /** Upstream's table draws the line breaks a quoted cell keeps as lines of
-    its row: such a row is as tall as its cell of the most lines, on both
-    sides, so that the rows stay side by side. */
+    its row, and with Wrap Lines the rows a cell's text wraps into at its
+    column's width (CCrystalParser::WrapLine, nMaxBreaks over the cells):
+    such a row is as tall as its cell of the most lines, on both sides, so
+    that the rows stay side by side. */
 void TableCompareView::fitRowHeights()
 {
 	const int base = m_tables[0]->verticalHeader()->defaultSectionSize();
 	const int lineSpacing = m_tables[0]->fontMetrics().lineSpacing();
+	// the width a cell's text has: its column's, less the item's margins
+	QStyle *style = m_tables[0]->style();
+	const int margin = 2 * (style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, m_tables[0]) + 1);
 	for (int modelRow = 0; modelRow < m_modelRows.size(); ++modelRow)
 	{
 		const int viewRow = m_modelRows.at(modelRow);
@@ -1299,17 +1399,42 @@ void TableCompareView::fitRowHeights()
 			if (real < 0 || real >= static_cast<int>(m_sides[side].cells.size()))
 				continue;
 			const QString &row = m_sides[side].rawLines.value(real);
-			if (!row.contains(QLatin1Char('\n')) && !row.contains(QLatin1Char('\r')))
+			if (!m_wrapLines && !row.contains(QLatin1Char('\n')) && !row.contains(QLatin1Char('\r')))
 				continue;
-			for (const QString &cell : m_sides[side].cells[real])
-				lines = qMax(lines,
-					static_cast<int>(displayText(cell).count(QLatin1Char('\n'))) + 1);
+			const QStringList &cells = m_sides[side].cells[real];
+			for (int column = 0; column < cells.size(); ++column)
+			{
+				const QString text = displayText(cells.at(column));
+				lines = qMax(lines, m_wrapLines
+					? wrappedLines(text, m_tables[side]->columnWidth(column) - margin,
+						m_tables[side]->font())
+					: static_cast<int>(text.count(QLatin1Char('\n'))) + 1);
+			}
 		}
-		if (lines > 1)
-			for (int side = 0; side < m_paneCount; ++side)
-				m_tables[side]->verticalHeader()->resizeSection(modelRow,
-					base + (lines - 1) * lineSpacing);
+		const int height = base + (lines - 1) * lineSpacing;
+		for (int side = 0; side < m_paneCount; ++side)
+		{
+			QHeaderView *header = m_tables[side]->verticalHeader();
+			if (header->sectionSize(modelRow) != height)
+				header->resizeSection(modelRow, height);
+		}
 	}
+}
+
+void TableCompareView::refreshWrapLines()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	const bool wrap = mgr != nullptr && mgr->GetBool(OPT_WORDWRAP_TABLE);
+	if (wrap == m_wrapLines)
+		return;
+	m_wrapLines = wrap;
+	for (QTableView *table : m_tables)
+	{
+		if (auto *delegate = dynamic_cast<CellDelegate *>(table->itemDelegate()))
+			delegate->setWrapLines(wrap);
+		table->viewport()->update();
+	}
+	fitRowHeights();
 }
 
 /** CMergeDoc::HideLines, its display filter part: a row the filter's

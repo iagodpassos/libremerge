@@ -157,6 +157,11 @@ public:
 	/** The cells' differences shown or not, as "View line differences"
 	    now says. */
 	void refreshLineDifferences();
+	/** WinMerge's Wrap Lines for the tables (OPT_WORDWRAP_TABLE): the
+	    cells wrap at their column's width, the rows as tall as the cell
+	    of the most rows on both sides. */
+	void refreshWrapLines();
+	bool wrapLines() const { return m_wrapLines; }
 	/** WinMerge's OnFileReload, past its save prompt: both files are
 	    read from disk again, the undo history goes and the current row
 	    is selected again. Nothing is touched when a file cannot be
@@ -411,6 +416,8 @@ private:
 	};
 	CurrentCell m_curCell;
 	bool m_syncing = false;
+	bool m_wrapLines = false;
+	bool m_fitPending = false;
 	bool m_ignoreEol = false; // Yes to the question, for this comparison
 	std::optional<QChar> m_delimiterOverride;
 	std::optional<QChar> m_quoteOverride;

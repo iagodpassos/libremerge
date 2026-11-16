@@ -125,6 +125,7 @@ run_one selftest-color-schemes
 run_one selftest-color-pages
 run_one selftest-archive-options
 run_one selftest-view-eol
+run_one selftest-wrap-lines
 run_one selftest-identical
 run_one selftest-reload
 run_one selftest-compare-options

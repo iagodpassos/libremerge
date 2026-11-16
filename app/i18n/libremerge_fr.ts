@@ -3598,6 +3598,11 @@ Le fichier est peut-être en lecture seule.</translation>
         <translation>&amp;Afficher les différences de ligne</translation>
     </message>
     <message>
+        <source>W&amp;rap Lines</source>
+        <translatorcomment>After WinMerge&apos;s &quot;W&amp;rap Lines&quot;.</translatorcomment>
+        <translation>Retour à la li&amp;gne automatique</translation>
+    </message>
+    <message>
         <source>Next &amp;Pane</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Volet &amp;suivant</translation>

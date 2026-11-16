@@ -3253,6 +3253,10 @@ O arquivo pode ser somente leitura.</translation>
         <translation>&amp;Ver Diferenças de Linha</translation>
     </message>
     <message>
+        <source>W&amp;rap Lines</source>
+        <translation>&amp;Quebrar Linhas</translation>
+    </message>
+    <message>
         <source>Next &amp;Pane</source>
         <translation>Próximo &amp;Painel</translation>
     </message>

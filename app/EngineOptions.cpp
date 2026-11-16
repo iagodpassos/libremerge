@@ -393,6 +393,9 @@ void installEngineOptions()
 	// what the View menu's View Whitespace and View EOL leave
 	options.InitOption(OPT_VIEW_WHITESPACE, false);
 	options.InitOption(OPT_VIEW_EOL, false);
+	// and Wrap Lines, for text and for tables apart
+	options.InitOption(OPT_WORDWRAP, false);
+	options.InitOption(OPT_WORDWRAP_TABLE, false);
 	options.InitOption(OPT_COPY_GRANULARITY, 3);
 	options.InitOption(OPT_WORDDIFF_HIGHLIGHT, true);
 	options.InitOption(OPT_BREAK_ON_WORDS, false);

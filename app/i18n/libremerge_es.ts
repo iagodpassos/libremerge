@@ -3591,6 +3591,10 @@ El archivo puede ser de solo lectura.</translation>
         <translation>&amp;Mostrar diferencias de línea</translation>
     </message>
     <message>
+        <source>W&amp;rap Lines</source>
+        <translation>&amp;Ajuste de líneas</translation>
+    </message>
+    <message>
         <source>Next &amp;Pane</source>
         <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
         <translation>Panel &amp;siguiente</translation>

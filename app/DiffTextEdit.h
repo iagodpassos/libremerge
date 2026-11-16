@@ -25,6 +25,8 @@ inline bool isGhostBlock(const QTextBlock &block)
 	return block.userData() != nullptr && block.length() <= 1;
 }
 
+class PaddedDocumentLayout;
+
 /**
  * QPlainTextEdit with a line-number gutter. The gutter background can be
  * tinted per line to mirror the diff highlighting, and the numbering can
@@ -134,6 +136,8 @@ public:
 	/** Where a shown line ends in the viewport, -1 for a hidden one (for
 	    tests of what is drawn under it). */
 	int lineBottomForTest(int viewLine) const;
+	/** How far the viewport is moved up over a blank row (for tests). */
+	int rowShiftForTest() const { return m_rowShift; }
 	/** Remove the text between two positions the way upstream's editor
 	    does around hidden lines (CCrystalTextBuffer::DeleteText): every
 	    stretch of visible lines goes on its own and the hidden lines
@@ -152,6 +156,25 @@ public:
 	    wider than one and a half taking two. */
 	int actualOffset(const QTextBlock &block, int positionInBlock) const;
 
+	/** WinMerge's Wrap Lines (CCrystalTextView::SetWordWrapping): the
+	    lines wrap at the pane's width instead of going on sideways. */
+	void setWrapLines(bool on);
+	bool wrapLines() const { return m_wrapLines; }
+	/** The rows a line takes at the pane's width (laid out now if it was
+	    not yet), without the blank rows under it. */
+	int naturalRows(const QTextBlock &block) const;
+	/** CMergeEditView::GetEmptySubLines: blank rows under each view line
+	    (rows[viewLine]), for a line to take as many rows as on the side
+	    where it wraps the most; an empty list takes them all away. */
+	void setPaddingRows(const QList<int> &rows);
+	int paddingRows(int viewLine) const;
+	/** The pixels of the line at the top that are above the pane's top. */
+	int pixelsAboveTop() const;
+	/** Move what shows up by some pixels more: Qt leaves a wrapped line's
+	    row a fraction of a pixel off by how it was scrolled to, which the
+	    compare view evens out with the pane scrolled. */
+	void nudgeTop(int pixels);
+
 	int gutterWidth() const;
 	void paintGutter(QPaintEvent *event);
 
@@ -169,6 +192,7 @@ protected:
 	bool event(QEvent *event) override;
 	void changeEvent(QEvent *event) override;
 	void paintEvent(QPaintEvent *event) override;
+	void scrollContentsBy(int dx, int dy) override;
 	void paintWhitespace(QPaintEvent *event);
 	void mouseDoubleClickEvent(QMouseEvent *event) override;
 	void mouseReleaseEvent(QMouseEvent *event) override;
@@ -217,7 +241,24 @@ private:
 	    what combines with it. */
 	int cellCount(const QString &grapheme) const;
 
+	/** The background a view line's difference paints it in, none for a
+	    line no difference colors (for its blank rows). */
+	QBrush lineBackground(const QTextBlock &block) const;
+	/** Qt shows a line from its first row when the top row is one of its
+	    blank ones: the viewport goes up by the rows above, under the
+	    pane's top, for the top row to be the one scrolled to. */
+	void updateRowShift();
+	void applyRowShift(int shift);
+	/** The scroll range with the blank rows counted in the rows of the
+	    last screen, as upstream's GetSubLineCount counts them. */
+	void fitScrollRange();
+
 	QWidget *m_gutter;
+	PaddedDocumentLayout *m_layout = nullptr;
+	bool m_wrapLines = false;
+	int m_rowShift = 0;        // pixels the viewport is moved up
+	bool m_shifting = false;   // while the viewport is moved
+	bool m_fittingRange = false;
 	int m_tabSize = 4;
 	bool m_insertTabs = true;
 	bool m_hasHiddenLines = false;
