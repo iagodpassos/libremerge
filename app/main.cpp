@@ -80,6 +80,7 @@
 #include "SubeditList.h"
 #include "ColorButton.h"
 #include "SyntaxHighlighter.h"
+#include "Icons.h"
 #include "TextDefinition.h"
 #include "SyntaxColors.h"
 #include <windows.h> // ports: COLOR_*
@@ -12041,6 +12042,33 @@ int main(int argc, char *argv[])
 				"without subfolders: a folder on the left alone goes with Show Left Unique Items");
 		}
 		QSettings().remove(treeKey);
+		// the icons (GetColImage): WinMerge's, by the result and the kind
+		// of the files compared, the sides of an item not on every one
+		const auto icon = [](FolderCompareView &view, const char *name, lm::DiffImage expected)
+		{
+			const bool same = view.rowIconForTest(QLatin1String(name)).cacheKey()
+				== lm::diffImage(expected).cacheKey();
+			if (!same)
+				printf("icon of %s: not the expected one\n", name);
+			return same;
+		};
+		using D = lm::DiffImage;
+		const bool icons = icon(two, "same.txt", D::TextSame)
+			&& icon(two, "diff.txt", D::TextDiff)
+			&& icon(two, "data.bin", D::BinDiff)
+			&& icon(two, "left.txt", D::LUnique)
+			&& icon(two, "right.txt", D::RUnique)
+			&& icon(three, "alldiff.txt", D::TextDiff)
+			&& icon(three, "middleonly.txt", D::MUnique)
+			&& icon(three, "noleft.txt", D::LMissing)
+			// every image there, at WinMerge's smallest size at least
+			&& [] {
+				for (int i = 0; i <= static_cast<int>(D::ImageSame); ++i)
+					if (lm::diffImage(static_cast<D>(i)).availableSizes().isEmpty())
+						return false;
+				return true;
+			}();
+		report(icons, "icons");
 		printf("show filters: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
