@@ -5488,7 +5488,8 @@ int main(int argc, char *argv[])
 			}
 
 			// --- the tree and the flat list go by different rules for a
-			// folder the filter leaves out ---
+			// folder the filter leaves out; the list has no row for a folder
+			// on both sides (RedisplayChildren), only for its files ---
 			QAction *tree = treeAction(view);
 			if (tree == nullptr)
 				return 1;
@@ -5503,9 +5504,9 @@ int main(int argc, char *argv[])
 			say("!build\\ in the list shows", buildInList);
 			say("!lib\\ in the list shows", libInList);
 			check(buildInTree == every
-				&& buildInList == without(every, { QStringLiteral("build"), QStringLiteral("out.txt") })
-				&& libInList == every,
-				"folders: left out in the tree only when empty-handed, in the list unless they hold a folder");
+				&& buildInList == without(files, { QStringLiteral("out.txt") })
+				&& libInList == files,
+				"folders: left out in the tree only when empty-handed, in the list with their files unless they hold a folder");
 			apply(view, QStringLiteral("*.*|de:Name contains \"deep\""));
 			const QStringList deepInList = shownOf(view, every);
 			tree->setChecked(true);
@@ -5513,9 +5514,8 @@ int main(int argc, char *argv[])
 			const QStringList deepInTree = shownOf(view, every);
 			say("de:Name contains \"deep\" in the list shows", deepInList);
 			say("de:Name contains \"deep\" in the tree shows", deepInTree);
-			check(deepInList == without(every, { QStringLiteral("out.txt"),
-					QStringLiteral("liba.txt"), QStringLiteral("innerb.txt"),
-					QStringLiteral("build"), QStringLiteral("lib"), QStringLiteral("inner") })
+			check(deepInList == without(files, { QStringLiteral("out.txt"),
+					QStringLiteral("liba.txt"), QStringLiteral("innerb.txt") })
 				&& deepInTree == every,
 				"folders: a folder condition, by the list's rule and by the tree's");
 
@@ -11946,6 +11946,79 @@ int main(int argc, char *argv[])
 				{ QStringLiteral("middleonly.txt") })
 			&& check(three, threeRows, F::ShowMissingLeftOnly,
 				{ QStringLiteral("noleft.txt") });
+
+		// folders (IsShowable, RedisplayChildren): in the tree by their
+		// result; in the flat list of a comparison with its subfolders not
+		// at all when on every side; without the subfolders by side alone
+		const QString l3 = dir.filePath(QStringLiteral("L3"));
+		const QString r3 = dir.filePath(QStringLiteral("R3"));
+		write(l3 + QStringLiteral("/samedir/s.txt"), "x\n");
+		write(r3 + QStringLiteral("/samedir/s.txt"), "x\n");
+		write(l3 + QStringLiteral("/diffdir/d.txt"), "x\n");
+		write(r3 + QStringLiteral("/diffdir/d.txt"), "y\n");
+		write(l3 + QStringLiteral("/leftdir/l.txt"), "x\n");
+		const auto showIdentical = [](FolderCompareView &view, bool on)
+		{
+			for (int f = 0; f < FolderCompareView::ShowFilterCount; ++f)
+				view.setShowFilterForTest(static_cast<F>(f),
+					f != FolderCompareView::ShowSkipped);
+			view.setShowFilterForTest(F::ShowIdentical, on);
+		};
+		const auto shown = [](FolderCompareView &view, std::initializer_list<const char *> names)
+		{
+			QStringList rows;
+			for (const char *name : names)
+				if (view.rowShownForTest(QLatin1String(name)))
+					rows.append(QLatin1String(name));
+			return rows.join(QLatin1Char(' '));
+		};
+		const auto report = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const QString treeKey = QStringLiteral("FolderCompare/TreeView");
+		QSettings().setValue(treeKey, true);
+		{
+			FolderCompareView view;
+			run(QStringList{ l3, r3 }, view);
+			showIdentical(view, false);
+			report(shown(view, { "samedir", "s.txt", "diffdir", "d.txt", "leftdir" })
+					== QStringLiteral("diffdir d.txt leftdir") && view.hiddenRowsForTest() == 2,
+				"tree, Show Identical Items off: the identical folder hides with its file");
+			showIdentical(view, true);
+			report(shown(view, { "samedir", "s.txt", "diffdir", "d.txt", "leftdir" })
+					== QStringLiteral("samedir s.txt diffdir d.txt leftdir"),
+				"tree, Show Identical Items on: every folder");
+		}
+		QSettings().setValue(treeKey, false);
+		{
+			FolderCompareView view;
+			run(QStringList{ l3, r3 }, view);
+			showIdentical(view, true);
+			report(shown(view, { "samedir", "s.txt", "diffdir", "d.txt", "leftdir", "l.txt" })
+					== QStringLiteral("s.txt d.txt leftdir l.txt") && view.hiddenRowsForTest() == 0,
+				"flat list: no row for a folder on both sides, one for a folder on one");
+			showIdentical(view, false);
+			report(shown(view, { "samedir", "s.txt", "diffdir", "d.txt", "leftdir", "l.txt" })
+					== QStringLiteral("d.txt leftdir l.txt") && view.hiddenRowsForTest() == 1,
+				"flat list, Show Identical Items off: the identical file goes, counted alone");
+		}
+		QSettings().setValue(treeKey, true);
+		{
+			FolderCompareView view;
+			view.setRecursive(false);
+			run(QStringList{ l3, r3 }, view);
+			showIdentical(view, false);
+			report(shown(view, { "samedir", "diffdir", "leftdir" })
+					== QStringLiteral("samedir diffdir leftdir"),
+				"without subfolders, Tree View on: the folders by side alone");
+			view.setShowFilterForTest(F::ShowUniqueLeft, false);
+			report(shown(view, { "samedir", "diffdir", "leftdir" })
+					== QStringLiteral("samedir diffdir"),
+				"without subfolders: a folder on the left alone goes with Show Left Unique Items");
+		}
+		QSettings().remove(treeKey);
 		printf("show filters: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
