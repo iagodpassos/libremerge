@@ -699,14 +699,14 @@ int main(int argc, char *argv[])
 		QStringLiteral("Toggle the folder view's View menu filters, 2- and 3-way, and verify (for testing)"));
 	parser.addOption(selftestShowFiltersOpt);
 	parser.addOption(QCommandLineOption(QStringLiteral("install-desktop-integration"),
-		QStringLiteral("Linux AppImage: add LibreMerge to the applications menu")));
+		QStringLiteral("Linux AppImage: add LibreMerge to the applications menu and Dolphin's context menu")));
 	parser.addOption(QCommandLineOption(QStringLiteral("remove-desktop-integration"),
-		QStringLiteral("Linux AppImage: remove it from the applications menu")));
+		QStringLiteral("Linux AppImage: remove it from the applications menu and Dolphin's context menu")));
 	parser.addOption(QCommandLineOption(QStringLiteral("data-home"),
 		QStringLiteral("With the two options above: the data directory to use instead of $XDG_DATA_HOME or ~/.local/share"),
 		QStringLiteral("dir")));
 	QCommandLineOption selftestDesktopOpt(QStringLiteral("selftest-desktop-integration"),
-		QStringLiteral("Install and remove the menu integration in a scratch data home (for testing)"));
+		QStringLiteral("Install and remove the menu and Dolphin integration in a scratch data home (for testing)"));
 	parser.addOption(selftestDesktopOpt);
 	QCommandLineOption screenshotAboutOpt(QStringLiteral("screenshot-about"),
 		QStringLiteral("Render the About box (and its contributors list) to <file> and exit (for testing)"),
@@ -1583,7 +1583,7 @@ int main(int argc, char *argv[])
 		file.close();
 		const QString expectedExec = QStringLiteral(
 			"Exec=\"") + home + QStringLiteral("/My Apps/LibreMerge\\\\$1.AppImage\" %F");
-		ok = ok && written.size() == 7 && entry.contains(expectedExec)
+		ok = ok && written.size() == 8 && entry.contains(expectedExec)
 			&& entry.contains(QStringLiteral("TryExec=") + launcher)
 			&& entry.contains(QStringLiteral("Name=LibreMerge"))
 			&& entry.contains(QStringLiteral("Icon=libremerge"))
@@ -1594,9 +1594,32 @@ int main(int argc, char *argv[])
 		if (!ok)
 			fprintf(stderr, "%s\n%s\n", qPrintable(error), qPrintable(entry));
 
+		// Dolphin's service menu: the same launcher, its marker in the
+		// main group, and executable, or KIO refuses to run it
+		const QString serviceMenu =
+			home + QStringLiteral("/kio/servicemenus/libremerge.desktop");
+		QFile menuFile(serviceMenu);
+		if (!menuFile.open(QIODevice::ReadOnly))
+			std::exit(2);
+		const QString menu = QString::fromUtf8(menuFile.readAll());
+		menuFile.close();
+		const int action = menu.indexOf(QStringLiteral("[Desktop Action compare]"));
+		const bool menuOk = menu.contains(expectedExec)
+			&& menu.contains(QStringLiteral("X-KDE-MinNumberOfUrls=1"))
+			&& menu.contains(QStringLiteral("X-KDE-MaxNumberOfUrls=3"))
+			&& action > 0 && menu.indexOf(QStringLiteral("X-LibreMerge-Launcher=")) < action
+			&& menu.indexOf(expectedExec) > action
+			&& !menu.contains(QStringLiteral("TryExec="))
+			&& QFileInfo(serviceMenu).isExecutable();
+		printf("service menu ok: %d\n", menuOk);
+		if (!menuOk)
+			fprintf(stderr, "%s\n", qPrintable(menu));
+		ok = ok && menuOk;
+
 		QStringList removed;
 		ok = lm::removeDesktopIntegration(home, &removed, &error) && ok
-			&& removed.size() == 7 && !QFileInfo::exists(desktopFile)
+			&& removed.size() == 8 && !QFileInfo::exists(desktopFile)
+			&& !QFileInfo::exists(serviceMenu)
 			&& !QFileInfo::exists(home + QStringLiteral("/icons/hicolor/16x16/apps/libremerge.png"));
 		printf("removed: %lld files\n", static_cast<long long>(removed.size()));
 

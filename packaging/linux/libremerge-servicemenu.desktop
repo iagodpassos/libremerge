@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Service
 MimeType=inode/directory;application/octet-stream;
-X-KDE-MinNumberOfUrls=2
+X-KDE-MinNumberOfUrls=1
 X-KDE-MaxNumberOfUrls=3
 Actions=compare
 

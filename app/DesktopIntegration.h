@@ -7,7 +7,8 @@
 /**
  * Applications-menu integration for the Linux AppImage: a user-level
  * .desktop entry pointing at the AppImage file plus the hicolor icons,
- * the job AppImageLauncher or a distribution package would otherwise do.
+ * the job AppImageLauncher or a distribution package would otherwise do,
+ * and the same Dolphin context-menu entry the packages install.
  * Used by `--install-desktop-integration` / `--remove-desktop-integration`
  * (also what the Homebrew cask runs after installing on Linux).
  */
@@ -21,7 +22,8 @@ QString desktopDataHome();
     running from one, else this executable. */
 QString desktopLauncher();
 
-/** Write <dataHome>/applications/libremerge.desktop and the icons. */
+/** Write <dataHome>/applications/libremerge.desktop, the icons and
+    <dataHome>/kio/servicemenus/libremerge.desktop (Dolphin). */
 bool installDesktopIntegration(const QString &dataHome, const QString &launcher,
 	QStringList *written, QString *error);
 

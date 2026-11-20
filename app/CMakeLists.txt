@@ -87,10 +87,14 @@ qt_add_resources(LibreMerge "about"
 )
 
 # Linux desktop integration (--install-desktop-integration): the packaged
-# desktop entry, retargeted at the AppImage, and the hicolor icons
-set(LM_DESKTOP_FILES ${CMAKE_SOURCE_DIR}/packaging/linux/libremerge.desktop)
+# desktop entry and Dolphin service menu, retargeted at the AppImage, and
+# the hicolor icons
+set(LM_DESKTOP_FILES ${CMAKE_SOURCE_DIR}/packaging/linux/libremerge.desktop
+  ${CMAKE_SOURCE_DIR}/packaging/linux/libremerge-servicemenu.desktop)
 set_source_files_properties(${CMAKE_SOURCE_DIR}/packaging/linux/libremerge.desktop
   PROPERTIES QT_RESOURCE_ALIAS libremerge.desktop)
+set_source_files_properties(${CMAKE_SOURCE_DIR}/packaging/linux/libremerge-servicemenu.desktop
+  PROPERTIES QT_RESOURCE_ALIAS servicemenu.desktop)
 foreach(_size 16 32 64 128 256 512)
   set(_icon ${CMAKE_SOURCE_DIR}/packaging/linux/icons/libremerge-${_size}.png)
   set_source_files_properties(${_icon}
@@ -227,8 +231,10 @@ if(UNIX AND NOT APPLE)
   install(TARGETS LibreMerge RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
   install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/libremerge.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-  # Dolphin's context menu (KDE): "Compare with LibreMerge" on two or three
+  # Dolphin's context menu (KDE): "Compare with LibreMerge" on one to three
   # selected files or folders, like WinMerge's shell extension on Windows
+  # (one opens the selection window with it); also what the AppImage's
+  # --install-desktop-integration writes
   install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/libremerge-servicemenu.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/kio/servicemenus
     RENAME libremerge.desktop

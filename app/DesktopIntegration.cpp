@@ -26,6 +26,12 @@ QString desktopFilePath(const QString &dataHome)
 	return dataHome + QStringLiteral("/applications/libremerge.desktop");
 }
 
+// the user's copy shadows a packaged one of the same name
+QString serviceMenuPath(const QString &dataHome)
+{
+	return dataHome + QStringLiteral("/kio/servicemenus/libremerge.desktop");
+}
+
 QString iconPath(const QString &dataHome, int size)
 {
 	return dataHome + QStringLiteral("/icons/hicolor/%1x%1/apps/libremerge.png")
@@ -58,6 +64,92 @@ QByteArray readAll(const QString &path)
 {
 	QFile file(path);
 	return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+}
+
+/** A bundled entry with its Exec lines pointed at the launcher and the
+    marker added to [Desktop Entry]; TryExec only where the desktop reads
+    it, the applications menu (Dolphin ignores it in service menus). */
+bool writeEntry(const QString &resource, const QString &target,
+	const QString &launcher, bool tryExec, QFileDevice::Permissions permissions,
+	QStringList *written, QString *error)
+{
+	const QString entry = QString::fromUtf8(readAll(resource));
+	if (entry.isEmpty())
+	{
+		if (error != nullptr)
+			*error = QStringLiteral("the bundled %1 is missing").arg(resource);
+		return false;
+	}
+	QStringList lines;
+	bool inMainGroup = false;
+	const auto closeMainGroup = [&]() {
+		if (!inMainGroup)
+			return;
+		while (!lines.isEmpty() && lines.last().isEmpty())
+			lines.removeLast();
+		if (tryExec)
+			lines.append(QStringLiteral("TryExec=%1").arg(launcher));
+		lines.append(kMarkerKey + QLatin1Char('=') + launcher);
+		inMainGroup = false;
+	};
+	for (const QString &line : entry.split(QLatin1Char('\n')))
+	{
+		if (line.startsWith(QLatin1Char('[')))
+		{
+			if (inMainGroup)
+			{
+				closeMainGroup();
+				lines.append(QString());
+			}
+			inMainGroup = line == QLatin1String("[Desktop Entry]");
+		}
+		if (line.startsWith(QLatin1String("Exec=")))
+			lines.append(QStringLiteral("Exec=%1 %F").arg(quoteExecArgument(launcher)));
+		else if (!line.startsWith(QLatin1String("TryExec=")))
+			lines.append(line);
+	}
+	closeMainGroup();
+	while (!lines.isEmpty() && lines.last().isEmpty())
+		lines.removeLast();
+
+	QDir().mkpath(QFileInfo(target).absolutePath());
+	QFile out(target);
+	if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
+	{
+		if (error != nullptr)
+			*error = QStringLiteral("cannot write %1: %2").arg(target, out.errorString());
+		return false;
+	}
+	out.write((lines.join(QLatin1Char('\n')) + QLatin1Char('\n')).toUtf8());
+	out.close();
+	QFile::setPermissions(target, permissions);
+	if (written != nullptr)
+		written->append(target);
+	return true;
+}
+
+/** Remove an entry when LibreMerge wrote it; false (and left in place)
+    when it lacks the marker. */
+bool removeEntry(const QString &path, QStringList *removed, QString *error)
+{
+	if (!QFileInfo(path).isFile())
+		return true;
+	if (!QString::fromUtf8(readAll(path)).contains(kMarkerKey + QLatin1Char('=')))
+	{
+		if (error != nullptr)
+			*error = QStringLiteral("%1 was not written by LibreMerge; left in place")
+				.arg(path);
+		return false;
+	}
+	if (!QFile::remove(path))
+	{
+		if (error != nullptr)
+			*error = QStringLiteral("cannot remove %1").arg(path);
+		return false;
+	}
+	if (removed != nullptr)
+		removed->append(path);
+	return true;
 }
 
 /** Refresh the menu and icon caches when the tools are around; desktops
@@ -102,44 +194,12 @@ QString desktopLauncher()
 bool installDesktopIntegration(const QString &dataHome, const QString &launcher,
 	QStringList *written, QString *error)
 {
-	QString entry = QString::fromUtf8(
-		readAll(QStringLiteral(":/desktop/libremerge.desktop")));
-	if (entry.isEmpty())
-	{
-		if (error != nullptr)
-			*error = QStringLiteral("the bundled desktop entry is missing");
-		return false;
-	}
+	const QFileDevice::Permissions readable = QFileDevice::ReadOwner
+		| QFileDevice::WriteOwner | QFileDevice::ReadGroup | QFileDevice::ReadOther;
 	// same entry as the distribution packages, pointed at this launcher
-	QStringList lines;
-	for (const QString &line : entry.split(QLatin1Char('\n')))
-	{
-		if (line.startsWith(QLatin1String("Exec=")))
-		{
-			lines.append(QStringLiteral("Exec=%1 %F").arg(quoteExecArgument(launcher)));
-			lines.append(QStringLiteral("TryExec=%1").arg(launcher));
-		}
-		else if (!line.startsWith(QLatin1String("TryExec=")))
-			lines.append(line);
-	}
-	while (!lines.isEmpty() && lines.last().isEmpty())
-		lines.removeLast();
-	lines.append(kMarkerKey + QLatin1Char('=') + launcher);
-
-	const QString desktopFile = desktopFilePath(dataHome);
-	QDir().mkpath(QFileInfo(desktopFile).absolutePath());
-	QFile out(desktopFile);
-	if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
-	{
-		if (error != nullptr)
-			*error = QStringLiteral("cannot write %1: %2")
-				.arg(desktopFile, out.errorString());
+	if (!writeEntry(QStringLiteral(":/desktop/libremerge.desktop"),
+			desktopFilePath(dataHome), launcher, true, readable, written, error))
 		return false;
-	}
-	out.write((lines.join(QLatin1Char('\n')) + QLatin1Char('\n')).toUtf8());
-	out.close();
-	if (written != nullptr)
-		written->append(desktopFile);
 
 	for (const int size : kIconSizes)
 	{
@@ -153,37 +213,28 @@ bool installDesktopIntegration(const QString &dataHome, const QString &launcher,
 			return false;
 		}
 		// resource copies come out read-only
-		QFile::setPermissions(target, QFileDevice::ReadOwner
-			| QFileDevice::WriteOwner | QFileDevice::ReadGroup | QFileDevice::ReadOther);
+		QFile::setPermissions(target, readable);
 		if (written != nullptr)
 			written->append(target);
 	}
+
+	// Dolphin's context menu, as the packages install it; KIO runs a
+	// service menu outside the system directories only when it is
+	// executable (KDesktopFile::isAuthorizedDesktopFile)
+	const bool ok = writeEntry(QStringLiteral(":/desktop/servicemenu.desktop"),
+		serviceMenuPath(dataHome), launcher, false,
+		readable | QFileDevice::ExeOwner | QFileDevice::ExeGroup | QFileDevice::ExeOther,
+		written, error);
 	refreshCaches(dataHome);
-	return true;
+	return ok;
 }
 
 bool removeDesktopIntegration(const QString &dataHome, QStringList *removed,
 	QString *error)
 {
-	const QString desktopFile = desktopFilePath(dataHome);
-	if (QFileInfo(desktopFile).isFile())
-	{
-		if (!QString::fromUtf8(readAll(desktopFile)).contains(kMarkerKey + QLatin1Char('=')))
-		{
-			if (error != nullptr)
-				*error = QStringLiteral("%1 was not written by LibreMerge; left in place")
-					.arg(desktopFile);
-			return false;
-		}
-		if (!QFile::remove(desktopFile))
-		{
-			if (error != nullptr)
-				*error = QStringLiteral("cannot remove %1").arg(desktopFile);
-			return false;
-		}
-		if (removed != nullptr)
-			removed->append(desktopFile);
-	}
+	if (!removeEntry(desktopFilePath(dataHome), removed, error)
+		|| !removeEntry(serviceMenuPath(dataHome), removed, error))
+		return false;
 	for (const int size : kIconSizes)
 	{
 		// only icons identical to LibreMerge's own
@@ -243,7 +294,8 @@ int runDesktopIntegrationCommand(int argc, char *argv[])
 		return 1;
 	}
 	if (install)
-		std::printf("LibreMerge is in the applications menu, launching %s\n",
+		std::printf("LibreMerge is in the applications menu and Dolphin's context menu,"
+			" launching %s\n",
 			qPrintable(desktopLauncher()));
 	return 0;
 #endif

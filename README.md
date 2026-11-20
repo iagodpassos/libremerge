@@ -82,15 +82,15 @@ ctest --test-dir build        # engine test suite (417 tests)
 chmod +x LibreMerge-<version>-x86_64.AppImage && ./LibreMerge-<version>-x86_64.AppImage
 ```
 
-To add the AppImage to your applications menu (GNOME, KDE and others), run it once with `--install-desktop-integration`; it writes a menu entry pointing at the AppImage and its icons under `~/.local/share`, and `--remove-desktop-integration` takes them out again.
+To add the AppImage to your applications menu (GNOME, KDE and others), run it once with `--install-desktop-integration`; it writes a menu entry pointing at the AppImage, its icons and the Dolphin context-menu entry below under `~/.local/share`, and `--remove-desktop-integration` takes them out again.
 
-**Homebrew on Linux**: the same cask installs the AppImage for your architecture into `~/Applications`, adds it to the applications menu and puts a `libremerge` command on your PATH (glibc 2.35+ as above):
+**Homebrew on Linux**: the same cask installs the AppImage for your architecture into `~/Applications`, adds it to the applications menu and to Dolphin's context menu, and puts a `libremerge` command on your PATH (glibc 2.35+ as above):
 
 ```sh
 brew install --cask iagodpassos/tap/libremerge
 ```
 
-**Dolphin (KDE)**: an install from source (`cmake --install`, and so the PKGBUILD below) adds *Compare with LibreMerge* to Dolphin's context menu when two or three files or folders are selected.
+**Dolphin (KDE)**: the AppImage's desktop integration, the Homebrew cask and an install from source (`cmake --install`, and so the PKGBUILD below) add *Compare with LibreMerge* to Dolphin's context menu when one to three files or folders are selected, like WinMerge's shell extension: two or three are compared, and one opens the selection window with it filled in.
 
 **Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` in this repository builds and installs cleanly with `makepkg -si`.
 
