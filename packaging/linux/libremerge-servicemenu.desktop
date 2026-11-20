@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Service
+MimeType=inode/directory;application/octet-stream;
+X-KDE-MinNumberOfUrls=2
+X-KDE-MaxNumberOfUrls=3
+Actions=compare
+
+[Desktop Action compare]
+Name=Compare with LibreMerge
+Name[ca]=Compara amb el LibreMerge
+Name[de]=Mit LibreMerge vergleichen
+Name[es]=Comparar con LibreMerge
+Name[fr]=Comparer avec LibreMerge
+Name[pt_BR]=Comparar no LibreMerge
+Icon=libremerge
+Exec=libremerge %F

@@ -227,6 +227,13 @@ if(UNIX AND NOT APPLE)
   install(TARGETS LibreMerge RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
   install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/libremerge.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+  # Dolphin's context menu (KDE): "Compare with LibreMerge" on two or three
+  # selected files or folders, like WinMerge's shell extension on Windows
+  install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/libremerge-servicemenu.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/kio/servicemenus
+    RENAME libremerge.desktop
+    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
+      WORLD_READ WORLD_EXECUTE)
   install(FILES
     ${CMAKE_SOURCE_DIR}/packaging/linux/io.github.iagodpassos.libremerge.appdata.xml
     DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)

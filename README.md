@@ -90,6 +90,8 @@ To add the AppImage to your applications menu (GNOME, KDE and others), run it on
 brew install --cask iagodpassos/tap/libremerge
 ```
 
+**Dolphin (KDE)**: an install from source (`cmake --install`, and so the PKGBUILD below) adds *Compare with LibreMerge* to Dolphin's context menu when two or three files or folders are selected.
+
 **Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` in this repository builds and installs cleanly with `makepkg -si`.
 
 Other formats (native .deb packages, Flatpak) come back if there is demand — open an issue if you need one and it moves up the list.
