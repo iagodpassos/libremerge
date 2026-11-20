@@ -2,6 +2,8 @@
 #pragma once
 
 #include <QIcon>
+#include <QKeySequence>
+#include <QString>
 
 namespace lm
 {
@@ -31,9 +33,16 @@ enum class Icon
 	DeleteRight,
 	DeleteBoth,
 	DiffPane,
+	CopyRightNext,
+	CopyLeftNext,
 };
 
 QIcon icon(Icon id);
+
+/** A toolbar button's tooltip: its text and, when it has one, the menu
+    shortcut as the platform writes it ("\u2325\u2192" on macOS,
+    "Alt+Right" elsewhere). */
+QString toolTip(const QString &text, const QKeySequence &shortcut = QKeySequence());
 
 /** Restyle every toolbar under root for the current theme and re-render
     the icons of actions tagged with their lm::Icon in QAction::data(). */

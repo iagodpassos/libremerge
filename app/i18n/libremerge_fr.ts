@@ -231,6 +231,16 @@
         <translation>Copier vers la Gauche</translation>
     </message>
     <message>
+        <source>Copy to Right and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right and Advance\tCtrl+Alt+Right&quot;.</translatorcomment>
+        <translation>Copier vers la Droite et Avancer</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;to Left and Advance\tCtrl+Alt+Left&quot;.</translatorcomment>
+        <translation>Copier vers la Gauche et Avancer</translation>
+    </message>
+    <message>
         <source>Copy All to Right</source>
         <translatorcomment>After WinMerge&apos;s &quot;\nCopy All to Right&quot;.</translatorcomment>
         <translation>Tout copier vers la droite</translation>
@@ -2033,6 +2043,16 @@ Le fichier est peut-être en lecture seule.</translation>
         <translation>Copier vers la Gauche</translation>
     </message>
     <message>
+        <source>Copy to Right and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right and Advance\tCtrl+Alt+Right&quot;.</translatorcomment>
+        <translation>Copier vers la Droite et Avancer</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;to Left and Advance\tCtrl+Alt+Left&quot;.</translatorcomment>
+        <translation>Copier vers la Gauche et Avancer</translation>
+    </message>
+    <message>
         <source>Copy All to Right</source>
         <translatorcomment>After WinMerge&apos;s &quot;\nCopy All to Right&quot;.</translatorcomment>
         <translation>Tout copier vers la droite</translation>
@@ -2659,6 +2679,16 @@ Le fichier est peut-être en lecture seule.</translation>
         <source>Copy to Left</source>
         <translatorcomment>After WinMerge&apos;s &quot;Cop&amp;y to Left\tAlt+Left&quot;.</translatorcomment>
         <translation>Copier vers la Gauche</translation>
+    </message>
+    <message>
+        <source>Copy to Right and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right and Advance\tCtrl+Alt+Right&quot;.</translatorcomment>
+        <translation>Copier vers la Droite et Avancer</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;to Left and Advance\tCtrl+Alt+Left&quot;.</translatorcomment>
+        <translation>Copier vers la Gauche et Avancer</translation>
     </message>
     <message>
         <source>Copy All to Right</source>
@@ -5458,6 +5488,16 @@ de 2	à 2
         <source>Copy to Left</source>
         <translatorcomment>After WinMerge&apos;s &quot;Cop&amp;y to Left\tAlt+Left&quot;.</translatorcomment>
         <translation>Copier vers la Gauche</translation>
+    </message>
+    <message>
+        <source>Copy to Right and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right and Advance\tCtrl+Alt+Right&quot;.</translatorcomment>
+        <translation>Copier vers la Droite et Avancer</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;to Left and Advance\tCtrl+Alt+Left&quot;.</translatorcomment>
+        <translation>Copier vers la Gauche et Avancer</translation>
     </message>
     <message>
         <source>Copy All to Right</source>

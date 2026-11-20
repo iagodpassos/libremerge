@@ -44,6 +44,7 @@
 #include <QCompleter>
 #include <QFileSystemModel>
 #include <QImage>
+#include <QToolBar>
 #include <QPushButton>
 #include <QScrollBar>
 #include <QTableView>
@@ -89,6 +90,7 @@
 #include "ImageWriters.hpp"
 #include "BinaryFiles.h"
 #include "HexCompareView.h"
+#include "Icons.h"
 #include "HexView.h"
 #include "HexDialogs.h"
 #include "FilepathEdit.h"
@@ -767,6 +769,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestWrapLinesOpt(QStringLiteral("selftest-wrap-lines"),
 		QStringLiteral("Exercise View > Wrap Lines: the panes wrapped and kept aligned (for testing)"));
 	parser.addOption(selftestWrapLinesOpt);
+	QCommandLineOption selftestCopyAdvanceButtonsOpt(QStringLiteral("selftest-copy-advance-buttons"),
+		QStringLiteral("Check the Copy and Advance toolbar buttons and the shortcuts the toolbar tooltips name (for testing)"));
+	parser.addOption(selftestCopyAdvanceButtonsOpt);
 	QCommandLineOption selftestViewEolOpt(QStringLiteral("selftest-view-eol"),
 		QStringLiteral("Exercise View Whitespace, View EOL and Convert Line Endings (for testing)"));
 	parser.addOption(selftestViewEolOpt);
@@ -10038,6 +10043,200 @@ int main(int argc, char *argv[])
 		return ok ? 0 : 1;
 	}
 
+	if (parser.isSet(selftestCopyAdvanceButtonsOpt))
+	{
+		// WinMerge's ID_L2RNEXT and ID_R2LNEXT toolbar buttons
+		// (ToolbarButtons.cpp): between the copies and the copy-alls, at
+		// work in the text and table windows, always disabled in the
+		// binary and image ones (OnUpdateL2RNext)
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const auto write = [&dir](const char *name, const QByteArray &bytes)
+		{
+			const QString path = dir.filePath(QString::fromLatin1(name));
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly))
+				std::exit(2);
+			f.write(bytes);
+			return path;
+		};
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const QString shots = qEnvironmentVariable("LIBREMERGE_SELFTEST_SHOTS");
+		const auto settle = []() {
+			for (int i = 0; i < 4; ++i)
+			{
+				QThread::msleep(20);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto toolbarOf = [](QWidget *view) -> QToolBar * {
+			for (QToolBar *bar : view->findChildren<QToolBar *>())
+				for (QAction *action : bar->actions())
+					if (action->data().isValid()
+						&& action->data().toInt() == static_cast<int>(lm::Icon::CopyRightNext))
+						return bar;
+			return nullptr;
+		};
+		const auto toolAction = [&toolbarOf](QWidget *view, lm::Icon icon) -> QAction * {
+			if (QToolBar *bar = toolbarOf(view))
+				for (QAction *action : bar->actions())
+					if (action->data().isValid() && action->data().toInt() == static_cast<int>(icon))
+						return action;
+			return nullptr;
+		};
+		// the copy buttons in WinMerge's order, separators as -1
+		const auto copyGroup = [&toolbarOf](QWidget *view) {
+			QToolBar *bar = toolbarOf(view);
+			if (bar == nullptr)
+				return false;
+			QList<int> icons;
+			for (QAction *action : bar->actions())
+				icons.append(action->isSeparator() ? -1
+					: action->data().isValid() ? action->data().toInt() : -2);
+			const QList<int> group{ static_cast<int>(lm::Icon::CopyRight),
+				static_cast<int>(lm::Icon::CopyLeft), -1,
+				static_cast<int>(lm::Icon::CopyRightNext),
+				static_cast<int>(lm::Icon::CopyLeftNext), -1,
+				static_cast<int>(lm::Icon::CopyAllRight),
+				static_cast<int>(lm::Icon::CopyAllLeft) };
+			for (int i = 0; i + group.size() <= icons.size(); ++i)
+				if (icons.mid(i, group.size()) == group)
+					return true;
+			return false;
+		};
+		const auto advanceButtons = [&toolAction](QWidget *view, bool enabled) {
+			QAction *right = toolAction(view, lm::Icon::CopyRightNext);
+			QAction *left = toolAction(view, lm::Icon::CopyLeftNext);
+			return right != nullptr && left != nullptr
+				&& right->isEnabled() == enabled && left->isEnabled() == enabled;
+		};
+		const auto native = [](const QKeySequence &key) {
+			return key.toString(QKeySequence::NativeText);
+		};
+
+		MainWindow window;
+		window.resize(1100, 600);
+		window.show();
+
+		// text: the copy lands on the next difference
+		window.openFileComparison({
+			write("adv_l.txt", "same\nleft 1\nsame\nleft 2\nsame\nleft 3\nsame\n"),
+			write("adv_r.txt", "same\nright 1\nsame\nright 2\nsame\nright 3\nsame\n") });
+		settle();
+		auto *text = window.findChild<FileCompareView *>();
+		if (text == nullptr)
+			return 2;
+		check(copyGroup(text), "text: the buttons between the copies and copy-alls");
+		check(advanceButtons(text, true), "text: both enabled");
+		QAction *right = toolAction(text, lm::Icon::CopyRightNext);
+		QAction *left = toolAction(text, lm::Icon::CopyLeftNext);
+		QAction *undo = toolAction(text, lm::Icon::Undo);
+		QAction *first = toolAction(text, lm::Icon::FirstDiff);
+		if (right == nullptr || left == nullptr || undo == nullptr || first == nullptr)
+			return 2;
+		printf("  tooltips: \"%s\", \"%s\", \"%s\"\n", qPrintable(right->toolTip()),
+			qPrintable(undo->toolTip()), qPrintable(first->toolTip()));
+		check(right->toolTip() == QStringLiteral("%1 (%2)").arg(right->text(),
+				native(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right)))
+			&& left->toolTip() == QStringLiteral("%1 (%2)").arg(left->text(),
+				native(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left))),
+			"text: the tooltips name the menu's shortcuts");
+		check(undo->toolTip() == QStringLiteral("%1 (%2)").arg(undo->text(),
+				native(QKeySequence(QKeySequence::Undo)))
+			&& first->toolTip() == QStringLiteral("%1 (%2)").arg(first->text(),
+				native(QKeySequence(Qt::ALT | Qt::Key_Home))),
+			"the other tooltips too, as the platform writes them");
+#ifndef Q_OS_MACOS
+		{
+			// no macOS glyphs (command, option, shift) on other platforms
+			bool plain = true;
+			for (QAction *action : toolbarOf(text)->actions())
+				for (const char16_t glyph : { u'⌘', u'⌥', u'⇧' })
+					plain = plain && !action->toolTip().contains(QChar(glyph));
+			check(plain, "no macOS key glyphs off macOS");
+		}
+#endif
+		if (!shots.isEmpty())
+		{
+			for (const bool dark : { false, true })
+			{
+				lm::Theme::instance()->setMode(dark ? lm::ThemeMode::Dark : lm::ThemeMode::Light);
+				settle();
+				toolbarOf(text)->grab().save(QStringLiteral("%1/copy-advance-%2.png")
+					.arg(shots, QLatin1String(dark ? "dark" : "light")));
+			}
+			lm::Theme::instance()->setMode(lm::ThemeMode::System);
+			settle();
+		}
+		const auto lineOf = [text](int side, int line) {
+			return text->paneForTest(side)->document()->findBlockByNumber(line).text();
+		};
+		text->gotoFirstDiff();
+		right->trigger();
+		settle();
+		printf("  after Copy to Right and Advance: right line 2 \"%s\", current %d\n",
+			qPrintable(lineOf(1, 1)), text->currentDiffForTest());
+		check(lineOf(1, 1) == QStringLiteral("left 1") && text->currentDiffForTest() == 1,
+			"text: copies to the right and lands on the next");
+		left->trigger();
+		settle();
+		printf("  after Copy to Left and Advance: left line 4 \"%s\", current %d\n",
+			qPrintable(lineOf(0, 3)), text->currentDiffForTest());
+		check(lineOf(0, 3) == QStringLiteral("right 2") && text->currentDiffForTest() == 2,
+			"text: copies to the left and lands on the next");
+
+		// table: the copy already lands on the next difference
+		window.openTableComparison(write("adv_l.csv", "a,b\n1,2\n3,4\n5,6\n7,8\n"),
+			write("adv_r.csv", "a,b\n1,X\n3,4\n5,Y\n7,8\n"));
+		settle();
+		auto *table = window.findChild<TableCompareView *>();
+		if (table == nullptr)
+			return 2;
+		check(copyGroup(table), "table: the buttons between the copies and copy-alls");
+		check(advanceButtons(table, true), "table: both enabled");
+		table->gotoFirstDiff();
+		const int before = table->diffCount();
+		toolAction(table, lm::Icon::CopyRightNext)->trigger();
+		settle();
+		printf("  table right: %s, current %d\n",
+			qPrintable(table->rawLinesForTest(1).join(QLatin1Char('|'))),
+			table->currentDiffForTest());
+		check(table->rawLinesForTest(1).value(1) == QStringLiteral("1,2")
+			&& table->diffCount() == before - 1, "table: copies to the right");
+
+		// binary and image: shown, never enabled
+		window.openHexComparison({ write("adv_l.bin", QByteArray("\x01\x02\x03\x04", 4)),
+			write("adv_r.bin", QByteArray("\x01\x09\x03\x04", 4)) });
+		settle();
+		auto *hex = window.findChild<HexCompareView *>();
+		if (hex == nullptr)
+			return 2;
+		check(copyGroup(hex), "binary: the buttons between the copies and copy-alls");
+		check(advanceButtons(hex, false), "binary: both disabled, as WinMerge");
+
+		QImage red(8, 8, QImage::Format_RGB32);
+		red.fill(Qt::red);
+		QImage blue(8, 8, QImage::Format_RGB32);
+		blue.fill(Qt::blue);
+		const QString redPath = dir.filePath(QStringLiteral("adv_l.png"));
+		const QString bluePath = dir.filePath(QStringLiteral("adv_r.png"));
+		if (!red.save(redPath) || !blue.save(bluePath))
+			return 2;
+		window.openImageComparison({ redPath, bluePath });
+		settle();
+		auto *image = window.findChild<ImageCompareView *>();
+		if (image == nullptr)
+			return 2;
+		check(copyGroup(image), "image: the buttons between the copies and copy-alls");
+		check(advanceButtons(image, false), "image: both disabled, as WinMerge");
+		return ok ? 0 : 1;
+	}
 	if (parser.isSet(selftestWrapLinesOpt))
 	{
 		// WinMerge's Wrap Lines (CMergeEditView::OnViewWordWrap): the lines

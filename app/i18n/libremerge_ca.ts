@@ -243,6 +243,16 @@
         <translation>Copia a l&apos;esquerra</translation>
     </message>
     <message>
+        <source>Copy to Right and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right and Advance\tCtrl+Alt+Right&quot;.</translatorcomment>
+        <translation>Copia a la dreta i avança</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;to Left and Advance\tCtrl+Alt+Left&quot;.</translatorcomment>
+        <translation>Copia a l&apos;esquerra i avança</translation>
+    </message>
+    <message>
         <source>Copy All to Right</source>
         <translatorcomment>After WinMerge&apos;s &quot;\nCopy All to Right&quot;.</translatorcomment>
         <translation>Copia-ho tot a la dreta</translation>
@@ -2223,6 +2233,16 @@ Potser el fitxer és només de lectura?</translation>
         <translation>Copia a l&apos;esquerra</translation>
     </message>
     <message>
+        <source>Copy to Right and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right and Advance\tCtrl+Alt+Right&quot;.</translatorcomment>
+        <translation>Copia a la dreta i avança</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;to Left and Advance\tCtrl+Alt+Left&quot;.</translatorcomment>
+        <translation>Copia a l&apos;esquerra i avança</translation>
+    </message>
+    <message>
         <source>Copy All to Right</source>
         <translatorcomment>After WinMerge&apos;s &quot;\nCopy All to Right&quot;.</translatorcomment>
         <translation>Copia-ho tot a la dreta</translation>
@@ -2851,6 +2871,16 @@ Potser el fitxer és només de lectura?</translation>
         <source>Copy to Left</source>
         <translatorcomment>After WinMerge&apos;s &quot;Cop&amp;y to Left\tAlt+Left&quot;.</translatorcomment>
         <translation>Copia a l&apos;esquerra</translation>
+    </message>
+    <message>
+        <source>Copy to Right and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right and Advance\tCtrl+Alt+Right&quot;.</translatorcomment>
+        <translation>Copia a la dreta i avança</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;to Left and Advance\tCtrl+Alt+Left&quot;.</translatorcomment>
+        <translation>Copia a l&apos;esquerra i avança</translation>
     </message>
     <message>
         <source>Copy All to Right</source>
@@ -5760,6 +5790,16 @@ de2	a2
         <source>Copy to Left</source>
         <translatorcomment>After WinMerge&apos;s &quot;Cop&amp;y to Left\tAlt+Left&quot;.</translatorcomment>
         <translation>Copia a l&apos;esquerra</translation>
+    </message>
+    <message>
+        <source>Copy to Right and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;C&amp;opy to Right and Advance\tCtrl+Alt+Right&quot;.</translatorcomment>
+        <translation>Copia a la dreta i avança</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translatorcomment>After WinMerge&apos;s &quot;Copy &amp;to Left and Advance\tCtrl+Alt+Left&quot;.</translatorcomment>
+        <translation>Copia a l&apos;esquerra i avança</translation>
     </message>
     <message>
         <source>Copy All to Right</source>

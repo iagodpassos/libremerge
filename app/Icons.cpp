@@ -89,6 +89,17 @@ void drawArrowH(QPainter &p, bool right, qreal y, qreal fromX, qreal toX,
 	p.drawLine(QPointF(toX + dir * head, y + head), QPointF(toX, y));
 }
 
+/** Small green arrow pointing down: on to the next difference. */
+void drawArrowDown(QPainter &p, qreal x, qreal fromY, qreal toY)
+{
+	p.setPen(linePen(kGreen, 2.2));
+	p.setBrush(Qt::NoBrush);
+	p.drawLine(QPointF(x, fromY), QPointF(x, toY));
+	const qreal head = 4.0;
+	p.drawLine(QPointF(x - head, toY - head), QPointF(x, toY));
+	p.drawLine(QPointF(x + head, toY - head), QPointF(x, toY));
+}
+
 void drawGoldBar(QPainter &p, qreal y)
 {
 	p.setPen(linePen(kGold, 3.2));
@@ -169,6 +180,20 @@ QIcon icon(Icon id)
 		return renderIcon([](QPainter &p) {
 			drawPaneOutline(p, QRectF(18.5, 8, 9, 16));
 			drawArrowH(p, false, 16, 15, 4, kGold);
+		});
+	case Icon::CopyRightNext:
+		// WinMerge's l2r_next: the copy with a small arrow down to the
+		// next difference
+		return renderIcon([](QPainter &p) {
+			drawPaneOutline(p, QRectF(4.5, 4, 9, 14));
+			drawArrowH(p, true, 11, 17, 28, kGold);
+			drawArrowDown(p, 22.5, 17.5, 28.5);
+		});
+	case Icon::CopyLeftNext:
+		return renderIcon([](QPainter &p) {
+			drawPaneOutline(p, QRectF(18.5, 4, 9, 14));
+			drawArrowH(p, false, 11, 15, 4, kGold);
+			drawArrowDown(p, 9.5, 17.5, 28.5);
 		});
 	case Icon::CopyAllRight:
 		return renderIcon([](QPainter &p) {
@@ -284,6 +309,14 @@ QIcon icon(Icon id)
 		});
 	}
 	return QIcon();
+}
+
+QString toolTip(const QString &text, const QKeySequence &shortcut)
+{
+	if (shortcut.isEmpty())
+		return text;
+	return QStringLiteral("%1 (%2)").arg(text,
+		shortcut.toString(QKeySequence::NativeText));
 }
 
 void applyToolbarTheme(QWidget *root)

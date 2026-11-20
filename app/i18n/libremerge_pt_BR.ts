@@ -212,6 +212,14 @@
         <translation>Copiar para a Esquerda</translation>
     </message>
     <message>
+        <source>Copy to Right and Advance</source>
+        <translation>Copiar para a Direita e Avançar</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translation>Copiar para a Esquerda e Avançar</translation>
+    </message>
+    <message>
         <source>Copy All to Right</source>
         <translation>Copiar Tudo para a Direita</translation>
     </message>
@@ -1898,6 +1906,14 @@ O arquivo pode ser somente leitura.</translation>
         <translation>Copiar para a Esquerda</translation>
     </message>
     <message>
+        <source>Copy to Right and Advance</source>
+        <translation>Copiar para a Direita e Avançar</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translation>Copiar para a Esquerda e Avançar</translation>
+    </message>
+    <message>
         <source>Copy All to Right</source>
         <translation>Copiar Tudo para a Direita</translation>
     </message>
@@ -2423,6 +2439,14 @@ O arquivo pode ser somente leitura.</translation>
     <message>
         <source>Copy to Left</source>
         <translation>Copiar para a Esquerda</translation>
+    </message>
+    <message>
+        <source>Copy to Right and Advance</source>
+        <translation>Copiar para a Direita e Avançar</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translation>Copiar para a Esquerda e Avançar</translation>
     </message>
     <message>
         <source>Copy All to Right</source>
@@ -4999,6 +5023,14 @@ de2	para2
     <message>
         <source>Copy to Left</source>
         <translation>Copiar para a Esquerda</translation>
+    </message>
+    <message>
+        <source>Copy to Right and Advance</source>
+        <translation>Copiar para a Direita e Avançar</translation>
+    </message>
+    <message>
+        <source>Copy to Left and Advance</source>
+        <translation>Copiar para a Esquerda e Avançar</translation>
     </message>
     <message>
         <source>Copy All to Right</source>

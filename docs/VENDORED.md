@@ -134,10 +134,10 @@ comment, which Qt Linguist shows next to it:
 
 | Catalog | WinMerge's, unchanged | Fitted | LibreMerge's own | Left in English upstream | Changed in review |
 |---|---|---|---|---|---|
-| German | 802 | 204 | 258 | 3 | 3 |
-| Spanish | 790 | 214 | 256 | 10 | 0 |
-| Catalan | 463 | 209 | 258 | 340 | 0 |
-| French | 800 | 227 | 240 | 3 | 0 |
+| German | 802 | 212 | 258 | 3 | 3 |
+| Spanish | 790 | 222 | 256 | 10 | 0 |
+| Catalan | 463 | 217 | 258 | 340 | 0 |
+| French | 800 | 235 | 240 | 3 | 0 |
 
 The texts WinMerge's translators wrote stay as they are, the odd ones
 included: a text follows WinMerge's wording until a review says

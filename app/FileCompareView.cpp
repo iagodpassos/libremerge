@@ -1755,49 +1755,56 @@ FileCompareView::FileCompareView(QWidget *parent)
 	// keyboard shortcuts live on the main window's menu (they route to
 	// the current tab); the toolbar only mentions them in tooltips
 	auto addToolAction = [this, toolbar](lm::Icon icon, const QString &text,
-		const QString &shortcutHint, auto slot) -> QAction * {
+		const QKeySequence &shortcut, auto slot) -> QAction * {
 		QAction *action = toolbar->addAction(lm::icon(icon), text);
 		action->setData(static_cast<int>(icon)); // re-rendered on theme change
-		action->setToolTip(shortcutHint.isEmpty() ? text
-			: QStringLiteral("%1 (%2)").arg(text, shortcutHint));
+		action->setToolTip(lm::toolTip(text, shortcut));
 		connect(action, &QAction::triggered, this, slot);
 		return action;
 	};
 	addToolAction(lm::Icon::FirstDiff, tr("First Difference"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x96"), [this]() { gotoFirstDiff(); });
+		QKeySequence(Qt::ALT | Qt::Key_Home), [this]() { gotoFirstDiff(); });
 	addToolAction(lm::Icon::PrevDiff, tr("Previous Difference"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x91"), [this]() { gotoPrevDiff(); });
+		QKeySequence(Qt::ALT | Qt::Key_Up), [this]() { gotoPrevDiff(); });
 	addToolAction(lm::Icon::NextDiff, tr("Next Difference"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x93"), [this]() { gotoNextDiff(); });
+		QKeySequence(Qt::ALT | Qt::Key_Down), [this]() { gotoNextDiff(); });
 	addToolAction(lm::Icon::LastDiff, tr("Last Difference"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x98"), [this]() { gotoLastDiff(); });
+		QKeySequence(Qt::ALT | Qt::Key_End), [this]() { gotoLastDiff(); });
 	toolbar->addSeparator();
 	m_actCopyFromLeft = addToolAction(lm::Icon::CopyRight, tr("Copy to Right"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x92"), [this]() { copyToRight(); });
+		QKeySequence(Qt::ALT | Qt::Key_Right), [this]() { copyToRight(); });
 	m_actCopyFromRight = addToolAction(lm::Icon::CopyLeft, tr("Copy to Left"),
-		QString::fromUtf8("\xE2\x8C\xA5\xE2\x86\x90"),
+		QKeySequence(Qt::ALT | Qt::Key_Left),
 		[this]() { copyToLeft(); });
-	addToolAction(lm::Icon::CopyAllRight, tr("Copy All to Right"),
-		QString(), [this]() { copyAllToRight(); });
-	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"),
-		QString(), [this]() { copyAllToLeft(); });
+	// WinMerge's copy-and-advance buttons (ID_L2RNEXT, ID_R2LNEXT in
+	// ToolbarButtons.cpp), between the copies and the copy-alls
 	toolbar->addSeparator();
-	addToolAction(lm::Icon::Undo, tr("Undo"), QString::fromUtf8("\xE2\x8C\x98Z"),
+	addToolAction(lm::Icon::CopyRightNext, tr("Copy to Right and Advance"),
+		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right), [this]() { copyToRight(true); });
+	addToolAction(lm::Icon::CopyLeftNext, tr("Copy to Left and Advance"),
+		QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left), [this]() { copyToLeft(true); });
+	toolbar->addSeparator();
+	addToolAction(lm::Icon::CopyAllRight, tr("Copy All to Right"),
+		QKeySequence(), [this]() { copyAllToRight(); });
+	addToolAction(lm::Icon::CopyAllLeft, tr("Copy All to Left"),
+		QKeySequence(), [this]() { copyAllToLeft(); });
+	toolbar->addSeparator();
+	addToolAction(lm::Icon::Undo, tr("Undo"), QKeySequence(QKeySequence::Undo),
 		[this]() { undoActive(); });
 	addToolAction(lm::Icon::Redo, tr("Redo"),
-		QString::fromUtf8("\xE2\x87\xA7\xE2\x8C\x98Z"), [this]() { redoActive(); });
+		QKeySequence(QKeySequence::Redo), [this]() { redoActive(); });
 	toolbar->addSeparator();
-	addToolAction(lm::Icon::Swap, tr("Swap Panes"), QString(),
+	addToolAction(lm::Icon::Swap, tr("Swap Panes"), QKeySequence(),
 		[this]() { swapSides(); });
-	addToolAction(lm::Icon::Refresh, tr("Recompare"), QStringLiteral("F5"),
+	addToolAction(lm::Icon::Refresh, tr("Recompare"), QKeySequence(Qt::Key_F5),
 		[this]() { refreshByUser(); });
 	m_actSave = addToolAction(lm::Icon::Save, tr("Save"),
-		QString::fromUtf8("\xE2\x8C\x98S"),
+		QKeySequence(QKeySequence::Save),
 		[this]() { QString error; saveModified(&error); });
 	m_actSave->setEnabled(false);
 	toolbar->addSeparator();
 	m_actDiffPane = addToolAction(lm::Icon::DiffPane, tr("Diff Pane"),
-		QString(), [this]() {});
+		QKeySequence(), [this]() {});
 	m_actDiffPane->setCheckable(true);
 	m_actDiffPane->setChecked(
 		QSettings().value(QStringLiteral("FileCompare/DiffPane"), true).toBool());
@@ -1806,9 +1813,9 @@ FileCompareView::FileCompareView(QWidget *parent)
 		m_diffPaneWidget->setVisible(on);
 		updateDiffPane();
 	});
-	addToolAction(lm::Icon::Find, tr("Find"), QString::fromUtf8("\xE2\x8C\x98""F"),
+	addToolAction(lm::Icon::Find, tr("Find"), QKeySequence(QKeySequence::Find),
 		[this]() { showFind(); });
-	addToolAction(lm::Icon::Options, tr("Comparison Options"), QString(),
+	addToolAction(lm::Icon::Options, tr("Comparison Options"), QKeySequence(),
 		[this]() { emit optionsRequested(); });
 	layout->addWidget(toolbar);
 
