@@ -697,6 +697,23 @@ DiffTextEdit::IndentRules DiffTextEdit::indentRules() const
 	return m_indentRulesHook ? m_indentRulesHook() : IndentRules();
 }
 
+int DiffTextEdit::unindentCount(const QTextBlock &block, int pos) const
+{
+	// back to the tab stop before the column (as Shift+Tab takes the
+	// cursor), over the whitespace before pos that is not a tab
+	const QString text = block.text();
+	const int offset = actualOffset(block, pos);
+	int target = offset / m_tabSize * m_tabSize;
+	if (target == offset && target > 0)
+		target -= m_tabSize;
+	int count = 0;
+	while (count < pos && text.at(pos - count - 1).isSpace()
+		&& text.at(pos - count - 1) != QLatin1Char('\t')
+		&& actualOffset(block, pos - count) > target)
+		++count;
+	return count;
+}
+
 void DiffTextEdit::autoIndent(const IndentRules &rules)
 {
 	QTextCursor cursor = textCursor();
@@ -709,21 +726,22 @@ void DiffTextEdit::autoIndent(const IndentRules &rules)
 	// (upstream reads the character before an empty line's text as its
 	// last one: none here)
 	const QChar last = length > 0 ? line.at(length - 1) : QChar();
-	// GNU's: after a closing bracket alone on its line, a level less, a
-	// tab or the spaces upstream counts from the indentation's characters
+	// GNU's: after a closing bracket alone on its line, a level less, the
+	// tab before it or the spaces back to the tab stop before its column
 	if (rules.braceGnu && pos > 0 && pos == length - 1 && isCloseBracket(last))
 	{
 		if (line.at(pos - 1) == QLatin1Char('\t'))
 			--pos;
 		else
-			pos = qMax(0, pos - (m_tabSize - pos % m_tabSize));
+			pos -= unindentCount(previous, pos);
 	}
 	QString indent = line.left(pos);
 	// after an opening bracket that ends the line, a level more: a tab, or
-	// the spaces up to the next tab stop counted the same way
+	// the spaces up to the next tab stop from the indentation's column
+	// (upstream counts its characters, as on Tab)
 	if ((rules.braceAnsi || rules.braceGnu) && isOpenBracket(last))
 		indent += m_insertTabs ? QStringLiteral("\t")
-			: QString(m_tabSize - pos % m_tabSize, QLatin1Char(' '));
+			: QString(m_tabSize - actualOffset(previous, pos) % m_tabSize, QLatin1Char(' '));
 	if (!indent.isEmpty())
 		cursor.insertText(indent);
 }
@@ -742,24 +760,25 @@ void DiffTextEdit::bracketIndent(QChar typed, const IndentRules &rules)
 	if (rules.braceGnu && isOpenBracket(typed))
 	{
 		// GNU's: an opening bracket alone on its line goes in a level,
-		// before it a tab or the spaces up to the next tab stop, counted
-		// from the indentation's characters
+		// before it a tab or the spaces up to the next tab stop from its
+		// column
 		if (pos != length - 1)
 			return;
 		edit.setPosition(block.position() + x - 1);
 		edit.insertText(m_insertTabs ? QStringLiteral("\t")
-			: QString(m_tabSize - pos % m_tabSize, QLatin1Char(' ')));
+			: QString(m_tabSize - actualOffset(block, pos) % m_tabSize, QLatin1Char(' ')));
 	}
 	else if ((rules.braceAnsi || rules.braceGnu) && isCloseBracket(typed))
 	{
 		// a closing bracket alone on a line after the first goes back a
-		// level: the tab before it, or as many characters as upstream
-		// counts from the bracket's character to the next tab stop
+		// level: the tab before it, or the spaces back to the tab stop
+		// before its column
 		if (block.blockNumber() == 0 || pos == 0 || pos != length - 1)
 			return;
-		int count = 1;
-		if (line.at(pos - 1) != QLatin1Char('\t'))
-			count = qMin(m_tabSize - (x - 1) % m_tabSize, length - 1);
+		const int count = line.at(pos - 1) == QLatin1Char('\t') ? 1
+			: unindentCount(block, x - 1);
+		if (count == 0)
+			return;
 		edit.setPosition(block.position() + x - 1 - count);
 		edit.setPosition(block.position() + x - 1, QTextCursor::KeepAnchor);
 		edit.removeSelectedText();

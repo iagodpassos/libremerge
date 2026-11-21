@@ -195,6 +195,14 @@ says so in a comment:
 - Tab with "Insert spaces" (`CCrystalEditView::OnEditTab`) inserts spaces
   up to the next tab stop from the cursor's column. Upstream counts from
   the cursor's character, which a tab before the cursor puts out of step.
+- The auto-indent's brackets (`CCrystalEditView::OnEditOperation`) go by
+  the columns too: with "Insert spaces" a level more takes the spaces up
+  to the next tab stop from the indentation's column, and a level less (a
+  closing bracket typed alone on its line, or Enter after one in a syntax
+  with GNU's braces) takes the spaces back to the tab stop before it.
+  Upstream counts the indentation's characters, which a tab among them
+  puts out of step, and goes back by the distance to the next tab stop,
+  so 5 spaces went back to 2 with a tab size of 4.
 - The Codepage page leaves out the "Restart required." upstream writes
   under its two detection boxes (`IDD_PROPPAGE_CODEPAGE`): the detection
   applies to the next file opened, in WinMerge as well

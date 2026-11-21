@@ -18294,7 +18294,7 @@ int main(int argc, char *argv[])
 			undoSteps = 0;
 			press(pane, Qt::Key_BraceRight, QStringLiteral("}"));
 			check(text(pane, 3) == QStringLiteral("}") && column(pane) == 1,
-				"C: a closing brace typed alone goes back as many spaces as upstream counts");
+				"C: a closing brace typed alone goes back to the tab stop before it");
 			check(undoSteps == 1, "C: the brace and the level less, one undo step");
 			QObject::disconnect(undoCounter);
 			pane->document()->undo();
@@ -18342,6 +18342,51 @@ int main(int argc, char *argv[])
 			check(text(pane, 4) == QStringLiteral(")") && column(pane) == 1,
 				"C with tabs: a bracket composed alone goes back as typed");
 		}
+		// the levels go by the columns, to the tab stops (upstream counts
+		// the indentation's characters and goes back by the distance to
+		// the next tab stop)
+		lm::setTabsForTest(4, false);
+		write(dir.filePath(QStringLiteral("left.c")), "int f()\n{\n\t  if (x) {\n     y;\n}\n");
+		{
+			FileCompareView view;
+			openC(view);
+			DiffTextEdit *pane = view.paneForTest(0);
+			place(pane, 2, 11);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 3) == QStringLiteral("\t    ") && column(pane) == 5,
+				"columns: Enter after \"\\t  if (x) {\" goes in to the next tab stop");
+			press(pane, Qt::Key_BraceRight, QStringLiteral("}"));
+			check(text(pane, 3) == QStringLiteral("\t}") && column(pane) == 2,
+				"columns: a closing brace alone after a tab and spaces goes back to the tab stop");
+			place(pane, 4, 7);
+			press(pane, Qt::Key_Return);
+			press(pane, Qt::Key_BraceRight, QStringLiteral("}"));
+			check(text(pane, 5) == QStringLiteral("    }") && column(pane) == 5,
+				"columns: a closing brace alone after 5 spaces goes back to 4");
+		}
+		write(dir.filePath(QStringLiteral("left.py")), "x = [\n\t 1,\n     ]\n");
+		write(dir.filePath(QStringLiteral("right.py")), "x = [\n\t 2,\n     ]\n");
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(dir.filePath(QStringLiteral("left.py")),
+					dir.filePath(QStringLiteral("right.py")), &error))
+				return 2;
+			view.resize(900, 400);
+			view.show();
+			settle();
+			DiffTextEdit *pane = view.paneForTest(0);
+			place(pane, 2, 6);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 3) == QStringLiteral("    ") && column(pane) == 4,
+				"columns: Python, Enter after \"     ]\" goes back to 4");
+			place(pane, 1, 4);
+			press(pane, Qt::Key_Return);
+			press(pane, Qt::Key_ParenLeft, QStringLiteral("("));
+			check(text(pane, 2) == QStringLiteral("\t    (") && column(pane) == 6,
+				"columns: Python, an opening bracket alone after a tab and a space goes in to the tab stop");
+		}
+
 		// LibreMerge's own option off: the indentation alone
 		lm::setTabsForTest(4, false);
 		write(dir.filePath(QStringLiteral("left.c")), "int f()\n{\n  if (x) {\n}\n");

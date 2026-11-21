@@ -251,6 +251,13 @@ private:
 	    goes back a level and, with GNU's rules, an opening one alone on
 	    its line goes in a level. */
 	void bracketIndent(QChar typed, const IndentRules &rules);
+	/** The whitespace before a position of a line that takes its
+	    indentation back a level, to the tab stop before its column. The
+	    levels go by the columns: upstream counts the indentation's
+	    characters, which a tab among them puts out of step, and goes back
+	    by the distance to the next tab stop, 5 spaces going back to 2
+	    with a tab size of 4. */
+	int unindentCount(const QTextBlock &block, int pos) const;
 	/** The lines a selection over more than one line indents or
 	    unindents, and where it ends once they are done. */
 	struct TabifyRange
