@@ -150,6 +150,22 @@ public:
 	void setTabSize(int tabSize);
 	int tabSize() const { return m_tabSize; }
 	void setInsertTabs(bool insertTabs) { m_insertTabs = insertTabs; }
+	/** What WinMerge's auto-indent (CCrystalEditView::OnEditOperation)
+	    follows, from the flags of the pane's syntax type
+	    (CCrystalTextView::GetFlags): SRCOPT_AUTOINDENT keeps the
+	    indentation, SRCOPT_BRACEANSI and SRCOPT_BRACEGNU add the brackets'
+	    rules. Asked for at each key; without a hook the indentation is
+	    kept with no brackets' rules, as for plain text. */
+	struct IndentRules
+	{
+		bool autoIndent = true;
+		bool braceAnsi = false;
+		bool braceGnu = false;
+	};
+	void setIndentRulesHook(std::function<IndentRules()> hook)
+	{
+		m_indentRulesHook = std::move(hook);
+	}
 	/** CCrystalTextView::CalculateActualOffset: the column a position of
 	    a line is at on screen, from 0, a tab going on to the next tab
 	    stop, a control character taking three columns and a character
@@ -225,9 +241,16 @@ private:
 	    keys. */
 	void editTab();
 	void editUntab();
-	/** CCrystalEditView::OnEditOperation's auto-indent: once Enter has
-	    started a line, the whitespace the line before it starts with. */
-	void autoIndent();
+	IndentRules indentRules() const;
+	/** CCrystalEditView::OnEditOperation's auto-indent, once Enter has
+	    started a line: the whitespace the line before it starts with, a
+	    level more when that line ends in an opening bracket and, with
+	    GNU's rules, a level less when it is a closing one alone. */
+	void autoIndent(const IndentRules &rules);
+	/** The same once a bracket is typed: a closing one alone on its line
+	    goes back a level and, with GNU's rules, an opening one alone on
+	    its line goes in a level. */
+	void bracketIndent(QChar typed, const IndentRules &rules);
 	/** The lines a selection over more than one line indents or
 	    unindents, and where it ends once they are done. */
 	struct TabifyRange
@@ -264,7 +287,8 @@ private:
 	bool m_fittingRange = false;
 	int m_tabSize = 4;
 	bool m_insertTabs = true;
-	bool m_autoIndenting = false; // while Enter itself is handled
+	bool m_autoIndenting = false; // while the key auto-indent follows is handled
+	std::function<IndentRules()> m_indentRulesHook;
 	bool m_hasHiddenLines = false;
 	bool m_inTextDrop = false;
 	bool m_movingCursor = false;

@@ -256,6 +256,7 @@ private:
 	QLineEdit *m_editTabSize = nullptr;
 	QRadioButton *m_radInsertTabs = nullptr;
 	QRadioButton *m_radInsertSpaces = nullptr;
+	QCheckBox *m_chkAutoIndentBrackets = nullptr;
 	// Editor > Compare/Merge
 	QCheckBox *m_chkAutomaticRescan = nullptr;
 	QComboBox *m_cmbCopyGranularity = nullptr;

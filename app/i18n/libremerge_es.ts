@@ -4991,6 +4991,16 @@ Por favor, use valores entre 1 y %1.</translation>
         <translation>Insertar e&amp;spacios</translation>
     </message>
     <message>
+        <source>Auto-indent at &amp;brackets</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Sangría automática en &amp;llaves y paréntesis</translation>
+    </message>
+    <message>
+        <source>After a line ending in {, (, [ or &lt;, Enter indents the new line one level more, and a }, ), ] or &gt; typed alone on a line goes back one level, as WinMerge does in the file&apos;s syntax. Turned off, Enter only keeps the indentation of the line above.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Tras una línea que termina en {, (, [ o &lt;, Intro sangra la nueva línea un nivel más, y un }, ), ] o &gt; escrito solo en una línea retrocede un nivel, como hace WinMerge en la sintaxis del archivo. Desactivado, Intro solo mantiene la sangría de la línea anterior.</translation>
+    </message>
+    <message>
         <source>&amp;Automatic rescan</source>
         <translation>Volver a comparar &amp;automáticamente</translation>
     </message>

@@ -385,6 +385,8 @@ void installEngineOptions()
 	options.InitOption(OPT_ALLOW_MIXED_EOL, false);
 	options.InitOption(OPT_TAB_SIZE, 4, 0, 64);
 	options.InitOption(OPT_TAB_TYPE, 0, 0, 1); // 0 means tabs inserted
+	// and LibreMerge's own: the auto-indent's brackets, as upstream's
+	options.InitOption(kOptAutoIndentBrackets, true);
 	// its Compare/Merge page: the rescan after edits, what a copy with
 	// text selected takes in (3, by character), and how differences
 	// inside the lines show (character or word level, and what ends a
@@ -490,6 +492,18 @@ void setTabsForTest(int tabSize, bool insertTabs)
 		mgr->Set(OPT_TAB_SIZE, tabSize);
 		mgr->Set(OPT_TAB_TYPE, insertTabs ? 0 : 1);
 	}
+}
+
+bool autoIndentBrackets()
+{
+	COptionsMgr *mgr = GetOptionsMgr();
+	return mgr == nullptr || mgr->GetBool(kOptAutoIndentBrackets);
+}
+
+void setAutoIndentBracketsForTest(bool on)
+{
+	if (COptionsMgr *mgr = GetOptionsMgr())
+		mgr->Set(kOptAutoIndentBrackets, on);
 }
 
 void setInterfaceLanguage(const QString &language)

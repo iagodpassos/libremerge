@@ -4449,6 +4449,14 @@ Checando identidade binária...</translation>
         <translation>Inserir &amp;espaços</translation>
     </message>
     <message>
+        <source>Auto-indent at &amp;brackets</source>
+        <translation>Recuo automático por &amp;chaves e parênteses</translation>
+    </message>
+    <message>
+        <source>After a line ending in {, (, [ or &lt;, Enter indents the new line one level more, and a }, ), ] or &gt; typed alone on a line goes back one level, as WinMerge does in the file&apos;s syntax. Turned off, Enter only keeps the indentation of the line above.</source>
+        <translation>Depois de uma linha que termina em {, (, [ ou &lt;, o Enter recua a nova linha um nível a mais, e um }, ), ] ou &gt; digitado sozinho numa linha volta um nível, como o WinMerge faz na sintaxe do arquivo. Desligado, o Enter só mantém o recuo da linha de cima.</translation>
+    </message>
+    <message>
         <source>&amp;Automatic rescan</source>
         <translation>&amp;Reescaneamento automático</translation>
     </message>

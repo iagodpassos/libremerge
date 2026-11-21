@@ -676,7 +676,8 @@ void OptionsDialog::loadMessageBoxes()
 
 /** WinMerge's Editor page (PropEditor): the highlighting and the parsers
     it takes, from the built-in ones and Tree-sitter's, the original EOL
-    and the tabs. The rendering mode (GDI or one of DirectWrite's) is
+    and the tabs, with LibreMerge's own box for the auto-indent's
+    brackets. The rendering mode (GDI or one of DirectWrite's) is
     Windows' own, which upstream turns off where DirectWrite is missing. */
 QWidget *OptionsDialog::buildEditorPage()
 {
@@ -710,6 +711,15 @@ QWidget *OptionsDialog::buildEditorPage()
 	m_radInsertSpaces = new QRadioButton(tr("Insert &spaces"), tabs);
 	m_radInsertSpaces->setObjectName(QStringLiteral("insertSpaces"));
 	tabsLayout->addWidget(m_radInsertSpaces);
+	// LibreMerge's own, after the tabs the brackets' levels are made of:
+	// upstream's auto-indent always follows the brackets
+	m_chkAutoIndentBrackets = new QCheckBox(tr("Auto-indent at &brackets"), tabs);
+	m_chkAutoIndentBrackets->setObjectName(QStringLiteral("autoIndentBrackets"));
+	m_chkAutoIndentBrackets->setToolTip(tr("After a line ending in {, (, [ or <, Enter "
+		"indents the new line one level more, and a }, ), ] or > typed alone on a line "
+		"goes back one level, as WinMerge does in the file's syntax. Turned off, Enter "
+		"only keeps the indentation of the line above."));
+	tabsLayout->addWidget(m_chkAutoIndentBrackets);
 	box->addWidget(tabs);
 
 	box->addStretch(1);
@@ -1864,6 +1874,7 @@ void OptionsDialog::load()
 		m_editTabSize->setText(QString::number(mgr->GetInt(OPT_TAB_SIZE)));
 		(mgr->GetInt(OPT_TAB_TYPE) == 0 ? m_radInsertTabs : m_radInsertSpaces)
 			->setChecked(true);
+		m_chkAutoIndentBrackets->setChecked(mgr->GetBool(lm::kOptAutoIndentBrackets));
 		m_chkAutomaticRescan->setChecked(mgr->GetBool(OPT_AUTOMATIC_RESCAN));
 		m_cmbCopyGranularity->setCurrentIndex(mgr->GetInt(OPT_COPY_GRANULARITY));
 		m_chkViewLineDiffs->setChecked(mgr->GetBool(OPT_WORDDIFF_HIGHLIGHT));
@@ -1969,6 +1980,7 @@ void OptionsDialog::save()
 		mgr->SaveOption(OPT_TAB_SIZE,
 			std::clamp(m_editTabSize->text().toInt(), 1, kMaxTabSize));
 		mgr->SaveOption(OPT_TAB_TYPE, m_radInsertTabs->isChecked() ? 0 : 1);
+		mgr->SaveOption(lm::kOptAutoIndentBrackets, m_chkAutoIndentBrackets->isChecked());
 		mgr->SaveOption(OPT_AUTOMATIC_RESCAN, m_chkAutomaticRescan->isChecked());
 		mgr->SaveOption(OPT_COPY_GRANULARITY, m_cmbCopyGranularity->currentIndex());
 		mgr->SaveOption(OPT_WORDDIFF_HIGHLIGHT, m_chkViewLineDiffs->isChecked());
@@ -2129,6 +2141,7 @@ void OptionsDialog::restoreDefaults(int page)
 		m_chkMixedEol->setChecked(false);
 		m_editTabSize->setText(QStringLiteral("4"));
 		m_radInsertTabs->setChecked(true);
+		m_chkAutoIndentBrackets->setChecked(true);
 		break;
 	case EditorCompareMergePage:
 		if (COptionsMgr *mgr = GetOptionsMgr())

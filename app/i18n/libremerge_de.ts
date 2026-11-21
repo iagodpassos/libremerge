@@ -4994,6 +4994,16 @@ Drücken Sie &apos;Zurücksetzen&apos;, um alle Meldungen wieder sichtbar zu sch
         <translation>&amp;Leerzeichen einfügen</translation>
     </message>
     <message>
+        <source>Auto-indent at &amp;brackets</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Automatisch einrücken bei &amp;Klammern</translation>
+    </message>
+    <message>
+        <source>After a line ending in {, (, [ or &lt;, Enter indents the new line one level more, and a }, ), ] or &gt; typed alone on a line goes back one level, as WinMerge does in the file&apos;s syntax. Turned off, Enter only keeps the indentation of the line above.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Nach einer Zeile, die auf {, (, [ oder &lt; endet, rückt die Eingabetaste die neue Zeile um eine Ebene weiter ein, und ein allein in einer Zeile eingegebenes }, ), ] oder &gt; rückt eine Ebene zurück, wie WinMerge es in der Syntax der Datei tut. Ausgeschaltet behält die Eingabetaste nur die Einrückung der Zeile darüber.</translation>
+    </message>
+    <message>
         <source>&amp;Automatic rescan</source>
         <translation>&amp;Automatisch aktualisieren</translation>
     </message>

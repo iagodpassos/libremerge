@@ -5301,6 +5301,16 @@ Useu valors entre 1 i %1.</translation>
         <translation>In&amp;sereix espais</translation>
     </message>
     <message>
+        <source>Auto-indent at &amp;brackets</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Sagnat automàtic a les &amp;claus i parèntesis</translation>
+    </message>
+    <message>
+        <source>After a line ending in {, (, [ or &lt;, Enter indents the new line one level more, and a }, ), ] or &gt; typed alone on a line goes back one level, as WinMerge does in the file&apos;s syntax. Turned off, Enter only keeps the indentation of the line above.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Després d&apos;una línia que acaba en {, (, [ o &lt;, la tecla de retorn sagna la línia nova un nivell més, i un }, ), ] o &gt; escrit sol en una línia torna enrere un nivell, com fa WinMerge en la sintaxi del fitxer. Desactivat, la tecla de retorn només conserva el sagnat de la línia de dalt.</translation>
+    </message>
+    <message>
         <source>&amp;Automatic rescan</source>
         <translation>Reexploració &amp;automàtica</translation>
     </message>

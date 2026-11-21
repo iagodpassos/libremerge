@@ -4984,6 +4984,16 @@ Vérification de l&apos;identité binaire...</translation>
         <translation>Insérer des e&amp;spaces</translation>
     </message>
     <message>
+        <source>Auto-indent at &amp;brackets</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Indentation automatique aux &amp;accolades et parenthèses</translation>
+    </message>
+    <message>
+        <source>After a line ending in {, (, [ or &lt;, Enter indents the new line one level more, and a }, ), ] or &gt; typed alone on a line goes back one level, as WinMerge does in the file&apos;s syntax. Turned off, Enter only keeps the indentation of the line above.</source>
+        <translatorcomment>LibreMerge&apos;s own text: not in WinMerge&apos;s catalog.</translatorcomment>
+        <translation>Après une ligne se terminant par {, (, [ ou &lt;, Entrée indente la nouvelle ligne d&apos;un niveau de plus, et un }, ), ] ou &gt; tapé seul sur une ligne revient d&apos;un niveau, comme le fait WinMerge dans la syntaxe du fichier. Désactivé, Entrée conserve seulement l&apos;indentation de la ligne précédente.</translation>
+    </message>
+    <message>
         <source>&amp;Automatic rescan</source>
         <translation>&amp;Actualiser automatiquement</translation>
     </message>

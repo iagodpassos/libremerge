@@ -23,6 +23,7 @@
 #include <QImageWriter>
 #include <QStandardPaths>
 #include <QTemporaryFile>
+#include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QFocusEvent>
 #include <QFontMetricsF>
@@ -1841,18 +1842,24 @@ int main(int argc, char *argv[])
 		// Editor > General: "Highlight syntax" on, "Built-in first" by default
 		{
 			const QList<QCheckBox *> editorBoxes = boxes(OptionsDialog::EditorPage);
-			auto *mode = dialog.pageForTest(OptionsDialog::EditorPage)->findChild<QComboBox *>();
-			// (and "Preserve original EOL" off)
-			ok = ok && editorBoxes.size() == 2 && mode != nullptr && mode->count() == 4;
+			QWidget *editorPage = dialog.pageForTest(OptionsDialog::EditorPage);
+			auto *mode = editorPage->findChild<QComboBox *>();
+			// (and "Preserve original EOL" off, LibreMerge's own box for the
+			// auto-indent's brackets on)
+			auto *mixedEol = editorPage->findChild<QCheckBox *>(QStringLiteral("mixedEol"));
+			auto *brackets = editorPage->findChild<QCheckBox *>(QStringLiteral("autoIndentBrackets"));
+			ok = ok && editorBoxes.size() == 3 && mixedEol != nullptr && brackets != nullptr
+				&& mode != nullptr && mode->count() == 4;
 			if (ok)
 			{
 				editorBoxes.first()->setChecked(false);
-				editorBoxes.last()->setChecked(true);
+				mixedEol->setChecked(true);
+				brackets->setChecked(false);
 				mode->setCurrentIndex(3);
 				dialog.selectCategoryForTest(9);
 				dialog.restoreDefaultsForTest();
-				ok = editorBoxes.first()->isChecked() && !editorBoxes.last()->isChecked()
-					&& mode->currentIndex() == 1;
+				ok = editorBoxes.first()->isChecked() && !mixedEol->isChecked()
+					&& brackets->isChecked() && mode->currentIndex() == 1;
 			}
 			printf("editor page: %s\n", ok ? "ok" : "wrong");
 		}
@@ -17996,10 +18003,17 @@ int main(int argc, char *argv[])
 			auto *size = page->findChild<QLineEdit *>(QStringLiteral("tabSize"));
 			auto *tabs = page->findChild<QRadioButton *>(QStringLiteral("insertTabs"));
 			auto *spaces = page->findChild<QRadioButton *>(QStringLiteral("insertSpaces"));
-			if (size == nullptr || tabs == nullptr || spaces == nullptr)
+			auto *brackets = page->findChild<QCheckBox *>(QStringLiteral("autoIndentBrackets"));
+			if (size == nullptr || tabs == nullptr || spaces == nullptr || brackets == nullptr)
 				return 2;
 			check(size->text() == QStringLiteral("4") && tabs->isChecked() && !spaces->isChecked(),
 				"page: a tab size of 4 and Insert tabs by default");
+			// LibreMerge's own box: the auto-indent's brackets, on by default
+			check(brackets->isChecked() && lm::autoIndentBrackets(),
+				"page: the brackets' auto-indent on by default");
+			brackets->setChecked(false);
+			dialog.saveForTest();
+			check(!lm::autoIndentBrackets(), "page: the brackets' auto-indent saved off");
 			const QString outOfRange =
 				OptionsDialog::tr("Tab size value is out of range. Please use 1 - %1.").arg(64);
 			size->setText(QStringLiteral("70"));
@@ -18024,8 +18038,10 @@ int main(int argc, char *argv[])
 			check(lm::tabSize() == 1 && !lm::insertTabs(), "page: 0 saved as 1, and Insert spaces");
 			dialog.selectCategoryForTest(9); // Editor > General
 			dialog.restoreDefaultsForTest();
-			check(size->text() == QStringLiteral("4") && tabs->isChecked(),
-				"page: Defaults bring 4 and Insert tabs back");
+			check(size->text() == QStringLiteral("4") && tabs->isChecked() && brackets->isChecked(),
+				"page: Defaults bring 4, Insert tabs and the brackets back");
+			dialog.saveForTest();
+			check(lm::autoIndentBrackets(), "page: the brackets' auto-indent saved on again");
 			messages.clear();
 		}
 
@@ -18152,7 +18168,10 @@ int main(int argc, char *argv[])
 	{
 		// WinMerge's auto-indent (CCrystalEditView::OnEditOperation): Enter
 		// keeps the indentation of its line, in one undo step with it, except
-		// in overwrite mode; braces change nothing
+		// in overwrite mode; in a syntax with brackets (SRCOPT_BRACEANSI,
+		// SRCOPT_BRACEGNU) a level more after an opening one and a level less
+		// at a closing one typed alone, unless LibreMerge's own option turns
+		// the brackets off
 		QTemporaryDir dir;
 		if (!dir.isValid())
 			return 2;
@@ -18244,30 +18263,170 @@ int main(int argc, char *argv[])
 			pane->setOverwriteMode(false);
 		}
 
-		// C: the indentation alone, the braces typed as they are
+		// C (SRCOPT_BRACEANSI), with spaces: a level more after an opening
+		// bracket, up to the next tab stop as upstream counts it from the
+		// indentation's characters, and a closing one typed alone goes back
 		write(dir.filePath(QStringLiteral("left.c")), "int f()\n{\n  if (x) {\n}\n");
 		write(dir.filePath(QStringLiteral("right.c")), "int f()\n{\n  if (y) {\n}\n");
-		lm::setTabsForTest(4, false);
+		const auto openC = [&](FileCompareView &view)
 		{
-			FileCompareView view;
 			QString error;
 			if (!view.compare(dir.filePath(QStringLiteral("left.c")),
 					dir.filePath(QStringLiteral("right.c")), &error))
+				std::exit(2);
+			view.resize(900, 400);
+			view.show();
+			settle();
+		};
+		lm::setTabsForTest(4, false);
+		{
+			FileCompareView view;
+			openC(view);
+			DiffTextEdit *pane = view.paneForTest(0);
+			int undoSteps = 0;
+			const QMetaObject::Connection undoCounter = QObject::connect(pane->document(),
+				&QTextDocument::undoCommandAdded, [&undoSteps]() { ++undoSteps; });
+			place(pane, 2, 10);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 3) == QStringLiteral("    ") && column(pane) == 4,
+				"C: Enter after \"  if (x) {\" goes in up to the next tab stop");
+			check(undoSteps == 1, "C: Enter and the level more, one undo step");
+			undoSteps = 0;
+			press(pane, Qt::Key_BraceRight, QStringLiteral("}"));
+			check(text(pane, 3) == QStringLiteral("}") && column(pane) == 1,
+				"C: a closing brace typed alone goes back as many spaces as upstream counts");
+			check(undoSteps == 1, "C: the brace and the level less, one undo step");
+			QObject::disconnect(undoCounter);
+			pane->document()->undo();
+			check(text(pane, 3) == QStringLiteral("    ") && column(pane) == 4,
+				"C: one undo takes the brace and the level less back");
+			// any of the brackets, closing ) ] > as well
+			press(pane, Qt::Key_BracketRight, QStringLiteral("]"));
+			check(text(pane, 3) == QStringLiteral("]"), "C: a closing square bracket alone goes back too");
+			pane->document()->undo();
+			// not with more than the bracket on the line
+			press(pane, Qt::Key_X, QStringLiteral("x"));
+			press(pane, Qt::Key_BraceRight, QStringLiteral("}"));
+			check(text(pane, 3) == QStringLiteral("    x}"), "C: a brace after text stays where it is typed");
+			// after an unindented opening bracket, a whole tab's worth
+			place(pane, 1, 1);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 2) == QStringLiteral("    ") && column(pane) == 4,
+				"C: Enter after \"{\" goes in a whole level");
+			// after a line that ends in no bracket, the indentation alone
+			place(pane, 0, 7);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 1).isEmpty() && column(pane) == 0,
+				"C: Enter after an unindented line, no indentation");
+		}
+		// with tabs: a tab more, and the tab before a closing one goes
+		lm::setTabsForTest(4, true);
+		write(dir.filePath(QStringLiteral("left.c")), "int f()\n{\n\tif (x) {\n}\n");
+		{
+			FileCompareView view;
+			openC(view);
+			DiffTextEdit *pane = view.paneForTest(0);
+			place(pane, 2, 9);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 3) == QStringLiteral("\t\t") && column(pane) == 2,
+				"C with tabs: Enter after \"\\tif (x) {\" adds a tab");
+			press(pane, Qt::Key_BraceRight, QStringLiteral("}"));
+			check(text(pane, 3) == QStringLiteral("\t}") && column(pane) == 2,
+				"C with tabs: a closing brace alone takes a tab away");
+			// composed input is typing too
+			press(pane, Qt::Key_Return);
+			check(text(pane, 4) == QStringLiteral("\t"), "C with tabs: Enter after \"\\t}\" keeps the tab");
+			QInputMethodEvent composed;
+			composed.setCommitString(QStringLiteral(")"));
+			QApplication::sendEvent(pane, &composed);
+			check(text(pane, 4) == QStringLiteral(")") && column(pane) == 1,
+				"C with tabs: a bracket composed alone goes back as typed");
+		}
+		// LibreMerge's own option off: the indentation alone
+		lm::setTabsForTest(4, false);
+		write(dir.filePath(QStringLiteral("left.c")), "int f()\n{\n  if (x) {\n}\n");
+		lm::setAutoIndentBracketsForTest(false);
+		{
+			FileCompareView view;
+			openC(view);
+			DiffTextEdit *pane = view.paneForTest(0);
+			place(pane, 2, 10);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 3) == QStringLiteral("  ") && column(pane) == 2,
+				"brackets off: Enter after \"  if (x) {\" keeps its two spaces, no more");
+			press(pane, Qt::Key_BraceRight, QStringLiteral("}"));
+			check(text(pane, 3) == QStringLiteral("  }"), "brackets off: a closing brace stays where it is typed");
+			place(pane, 1, 1);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 2).isEmpty() && column(pane) == 0,
+				"brackets off: Enter after \"{\", no indentation");
+		}
+		lm::setAutoIndentBracketsForTest(true);
+		// "Highlight syntax" off: plain text's rules (SRC_PLAIN)
+		lm::setSyntaxHighlightForTest(false, 1);
+		{
+			FileCompareView view;
+			openC(view);
+			DiffTextEdit *pane = view.paneForTest(0);
+			place(pane, 2, 10);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 3) == QStringLiteral("  "),
+				"highlighting off: Enter after \"  if (x) {\" keeps the indentation alone");
+		}
+		lm::setSyntaxHighlightForTest(true, 1);
+
+		// Python (SRCOPT_BRACEGNU): an opening bracket alone goes in a
+		// level, and after a closing one alone Enter goes back one
+		write(dir.filePath(QStringLiteral("left.py")), "x = [\n    1,\n    ]\n");
+		write(dir.filePath(QStringLiteral("right.py")), "x = [\n    2,\n    ]\n");
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(dir.filePath(QStringLiteral("left.py")),
+					dir.filePath(QStringLiteral("right.py")), &error))
 				return 2;
 			view.resize(900, 400);
 			view.show();
 			settle();
 			DiffTextEdit *pane = view.paneForTest(0);
-			place(pane, 2, 10);
+			place(pane, 0, 5);
 			press(pane, Qt::Key_Return);
-			check(text(pane, 3) == QStringLiteral("  ") && column(pane) == 2,
-				"C: Enter after \"  if (x) {\" keeps its two spaces, no more");
-			press(pane, Qt::Key_BraceRight, QStringLiteral("}"));
-			check(text(pane, 3) == QStringLiteral("  }"), "C: a closing brace stays where it is typed");
-			place(pane, 1, 1);
+			check(text(pane, 1) == QStringLiteral("    ") && column(pane) == 4,
+				"Python: Enter after \"x = [\" goes in a level");
+			press(pane, Qt::Key_ParenLeft, QStringLiteral("("));
+			check(text(pane, 1) == QStringLiteral("        (") && column(pane) == 9,
+				"Python: an opening bracket alone goes in a level more");
+			pane->document()->undo();
+			pane->document()->undo();
+			check(text(pane, 1) == QStringLiteral("    1,"), "Python: two undos take both back");
+			place(pane, 2, 5);
 			press(pane, Qt::Key_Return);
-			check(text(pane, 2).isEmpty() && column(pane) == 0,
-				"C: Enter after an unindented line, no indentation");
+			check(text(pane, 3).isEmpty() && column(pane) == 0,
+				"Python: Enter after \"    ]\" goes back a level");
+		}
+
+		// a long indentation is brought into view (EnsureVisible)
+		write(dir.filePath(QStringLiteral("left.txt")), QByteArray(400, ' ') + "alpha\nbeta\n");
+		write(dir.filePath(QStringLiteral("right.txt")), QByteArray(400, ' ') + "alpha\ngamma\n");
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(dir.filePath(QStringLiteral("left.txt")),
+					dir.filePath(QStringLiteral("right.txt")), &error))
+				return 2;
+			view.resize(900, 400);
+			view.show();
+			settle();
+			DiffTextEdit *pane = view.paneForTest(0);
+			place(pane, 0, 405);
+			pane->ensureCursorVisible();
+			settle();
+			press(pane, Qt::Key_Return);
+			settle();
+			const QRect cursor = pane->cursorRect();
+			check(column(pane) == 400 && cursor.left() >= 0
+					&& cursor.right() <= pane->viewport()->width(),
+				"a long indentation: the cursor is in view after Enter");
 		}
 		printf("auto-indent: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;

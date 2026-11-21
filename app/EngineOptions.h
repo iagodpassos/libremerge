@@ -45,6 +45,14 @@ int tabSize();
 bool insertTabs();
 /** Set both in memory only (for tests). */
 void setTabsForTest(int tabSize, bool insertTabs);
+/** LibreMerge's own option of the Editor page, which upstream does not
+    have: whether the auto-indent follows the brackets as the syntax type
+    says (SRCOPT_BRACEANSI, SRCOPT_BRACEGNU), as WinMerge's always does.
+    On by default; off, Enter only keeps the indentation. Its key, and
+    set in memory only (for tests). */
+inline const char kOptAutoIndentBrackets[] = "Settings/AutoIndentBrackets";
+bool autoIndentBrackets();
+void setAutoIndentBracketsForTest(bool on);
 /** WinMerge's "Preserve original EOL" (OPT_ALLOW_MIXED_EOL): each line is
     compared and saved with its own line ending, and set in memory only
     (for tests). */

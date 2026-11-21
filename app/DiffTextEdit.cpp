@@ -222,6 +222,28 @@ bool insertsText(const QKeyEvent *event)
 		|| first.category() == QChar::Other_PrivateUse;
 }
 
+/** The brackets of upstream's auto-indent (isopenbrace, isclosebrace). */
+bool isOpenBracket(QChar c)
+{
+	return c == QLatin1Char('{') || c == QLatin1Char('(') || c == QLatin1Char('[')
+		|| c == QLatin1Char('<');
+}
+
+bool isCloseBracket(QChar c)
+{
+	return c == QLatin1Char('}') || c == QLatin1Char(')') || c == QLatin1Char(']')
+		|| c == QLatin1Char('>');
+}
+
+/** The whitespace a line starts with, in characters. */
+int leadingSpaces(const QString &line)
+{
+	int pos = 0;
+	while (pos < line.size() && line.at(pos).isSpace())
+		++pos;
+	return pos;
+}
+
 } // namespace
 
 DiffTextEdit::DiffTextEdit(QWidget *parent)
@@ -670,39 +692,114 @@ void DiffTextEdit::editUntab()
 	ensureCursorVisible();
 }
 
-void DiffTextEdit::autoIndent()
+DiffTextEdit::IndentRules DiffTextEdit::indentRules() const
+{
+	return m_indentRulesHook ? m_indentRulesHook() : IndentRules();
+}
+
+void DiffTextEdit::autoIndent(const IndentRules &rules)
 {
 	QTextCursor cursor = textCursor();
 	const QTextBlock previous = cursor.block().previous();
 	if (!previous.isValid() || cursor.positionInBlock() != 0)
 		return;
 	const QString line = previous.text();
-	int pos = 0;
-	while (pos < line.size() && line.at(pos).isSpace())
-		++pos;
-	if (pos > 0)
-		cursor.insertText(line.left(pos));
+	const int length = line.size();
+	int pos = leadingSpaces(line);
+	// (upstream reads the character before an empty line's text as its
+	// last one: none here)
+	const QChar last = length > 0 ? line.at(length - 1) : QChar();
+	// GNU's: after a closing bracket alone on its line, a level less, a
+	// tab or the spaces upstream counts from the indentation's characters
+	if (rules.braceGnu && pos > 0 && pos == length - 1 && isCloseBracket(last))
+	{
+		if (line.at(pos - 1) == QLatin1Char('\t'))
+			--pos;
+		else
+			pos = qMax(0, pos - (m_tabSize - pos % m_tabSize));
+	}
+	QString indent = line.left(pos);
+	// after an opening bracket that ends the line, a level more: a tab, or
+	// the spaces up to the next tab stop counted the same way
+	if ((rules.braceAnsi || rules.braceGnu) && isOpenBracket(last))
+		indent += m_insertTabs ? QStringLiteral("\t")
+			: QString(m_tabSize - pos % m_tabSize, QLatin1Char(' '));
+	if (!indent.isEmpty())
+		cursor.insertText(indent);
+}
+
+void DiffTextEdit::bracketIndent(QChar typed, const IndentRules &rules)
+{
+	const int x = textCursor().positionInBlock();
+	const QTextBlock block = textCursor().block();
+	const QString line = block.text();
+	// the bracket typed is the character before the cursor
+	if (x == 0 || line.at(x - 1) != typed)
+		return;
+	const int length = line.size();
+	const int pos = leadingSpaces(line);
+	QTextCursor edit(document());
+	if (rules.braceGnu && isOpenBracket(typed))
+	{
+		// GNU's: an opening bracket alone on its line goes in a level,
+		// before it a tab or the spaces up to the next tab stop, counted
+		// from the indentation's characters
+		if (pos != length - 1)
+			return;
+		edit.setPosition(block.position() + x - 1);
+		edit.insertText(m_insertTabs ? QStringLiteral("\t")
+			: QString(m_tabSize - pos % m_tabSize, QLatin1Char(' ')));
+	}
+	else if ((rules.braceAnsi || rules.braceGnu) && isCloseBracket(typed))
+	{
+		// a closing bracket alone on a line after the first goes back a
+		// level: the tab before it, or as many characters as upstream
+		// counts from the bracket's character to the next tab stop
+		if (block.blockNumber() == 0 || pos == 0 || pos != length - 1)
+			return;
+		int count = 1;
+		if (line.at(pos - 1) != QLatin1Char('\t'))
+			count = qMin(m_tabSize - (x - 1) % m_tabSize, length - 1);
+		edit.setPosition(block.position() + x - 1 - count);
+		edit.setPosition(block.position() + x - 1, QTextCursor::KeepAnchor);
+		edit.removeSelectedText();
+	}
 }
 
 /** What a key is about to remove stops at the hidden lines: the
     selection it types over, cuts or deletes, or the stretch a Backspace
     or a Delete takes without one. Tab and Shift+Tab are upstream's own
-    commands. */
+    commands, and Enter and the brackets are followed by its auto-indent. */
 void DiffTextEdit::keyPressEvent(QKeyEvent *event)
 {
-	// Enter keeps the indentation, except in overwrite mode (OnEditOperation's
-	// !m_bOvrMode): the key and the indentation as one undo step
-	if (!isReadOnly() && !m_autoIndenting && !overwriteMode()
-		&& event->matches(QKeySequence::InsertParagraphSeparator))
+	// the auto-indent (OnEditOperation): Enter, except in overwrite mode
+	// (!m_bOvrMode), and a bracket typed alone (a CE_ACTION_TYPING of one
+	// character); the key and what auto-indent does as one undo step, the
+	// cursor then brought into view (EnsureVisible)
+	if (!isReadOnly() && !m_autoIndenting)
 	{
-		QTextCursor group(document());
-		group.beginEditBlock();
-		m_autoIndenting = true;
-		keyPressEvent(event);
-		m_autoIndenting = false;
-		autoIndent();
-		group.endEditBlock();
-		return;
+		const bool enter = !overwriteMode()
+			&& event->matches(QKeySequence::InsertParagraphSeparator);
+		const QString typed = event->text();
+		const bool bracket = !enter && typed.size() == 1 && insertsText(event)
+			&& (isOpenBracket(typed.at(0)) || isCloseBracket(typed.at(0)));
+		const IndentRules rules = enter || bracket ? indentRules() : IndentRules();
+		if ((enter || bracket) && rules.autoIndent
+			&& (enter || rules.braceAnsi || rules.braceGnu))
+		{
+			QTextCursor group(document());
+			group.beginEditBlock();
+			m_autoIndenting = true;
+			keyPressEvent(event);
+			m_autoIndenting = false;
+			if (enter)
+				autoIndent(rules);
+			else
+				bracketIndent(typed.at(0), rules);
+			group.endEditBlock();
+			ensureCursorVisible();
+			return;
+		}
 	}
 	if (!isReadOnly())
 	{
@@ -780,6 +877,26 @@ void DiffTextEdit::keyPressEvent(QKeyEvent *event)
 
 void DiffTextEdit::inputMethodEvent(QInputMethodEvent *event)
 {
+	// a bracket composed is a bracket typed, for the auto-indent
+	const QString typed = event->commitString();
+	if (!isReadOnly() && !m_autoIndenting && typed.size() == 1
+		&& event->preeditString().isEmpty() && event->replacementLength() == 0
+		&& (isOpenBracket(typed.at(0)) || isCloseBracket(typed.at(0))))
+	{
+		const IndentRules rules = indentRules();
+		if (rules.autoIndent && (rules.braceAnsi || rules.braceGnu))
+		{
+			QTextCursor group(document());
+			group.beginEditBlock();
+			m_autoIndenting = true;
+			inputMethodEvent(event);
+			m_autoIndenting = false;
+			bracketIndent(typed.at(0), rules);
+			group.endEditBlock();
+			ensureCursorVisible();
+			return;
+		}
+	}
 	// composed input replaces the selection as typing does
 	if (m_hasHiddenLines && !isReadOnly() && selectionSpansHiddenLine()
 		&& (!event->commitString().isEmpty() || !event->preeditString().isEmpty()

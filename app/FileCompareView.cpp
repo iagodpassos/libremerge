@@ -1942,6 +1942,21 @@ FileCompareView::FileCompareView(QWidget *parent)
 		// RefreshOptions)
 		m_panes[i]->setTabSize(lm::tabSize());
 		m_panes[i]->setInsertTabs(lm::insertTabs());
+		// the auto-indent by the flags of the pane's syntax type
+		// (CCrystalEditView::DoSetTextType, GetFlags), plain text's with
+		// "Highlight syntax" off; the brackets' rules unless LibreMerge's
+		// own option turns them off
+		m_panes[i]->setIndentRulesHook([this, i]() {
+			const LangServices::TextDefinition *def = LangServices::GetTextType(
+				static_cast<LangServices::LanguageId>(syntaxType(i)));
+			const unsigned flags = def != nullptr ? def->flags : SRCOPT_AUTOINDENT;
+			const bool brackets = lm::autoIndentBrackets();
+			DiffTextEdit::IndentRules rules;
+			rules.autoIndent = (flags & SRCOPT_AUTOINDENT) != 0;
+			rules.braceAnsi = brackets && (flags & SRCOPT_BRACEANSI) != 0;
+			rules.braceGnu = brackets && (flags & SRCOPT_BRACEGNU) != 0;
+			return rules;
+		});
 		// debug spy: LM_DEBUG_EDITS=1 prints every real document edit
 		if (qEnvironmentVariableIsSet("LM_DEBUG_EDITS"))
 			connect(m_panes[i]->document(), &QTextDocument::contentsChange,
