@@ -18375,6 +18375,37 @@ int main(int argc, char *argv[])
 		}
 		lm::setSyntaxHighlightForTest(true, 1);
 
+		// Shift+Enter breaks the line as Enter does, with the auto-indent
+		// (upstream's OnChar takes both as VK_RETURN): no line separator
+		// (U+2028) inside the line, for a save to write
+		{
+			FileCompareView view;
+			openC(view);
+			DiffTextEdit *pane = view.paneForTest(0);
+			const int lines = pane->document()->blockCount();
+			const auto broken = [&]()
+			{
+				return pane->document()->blockCount() == lines + 1
+					&& text(pane, 2) == QStringLiteral("  if (x) {")
+					&& text(pane, 3) == QStringLiteral("    ") && column(pane) == 4
+					&& !pane->document()->toPlainText().contains(QChar(0x2028));
+			};
+			place(pane, 2, 10);
+			QKeyEvent shiftEnter(QEvent::KeyPress, Qt::Key_Return, Qt::ShiftModifier,
+				QStringLiteral("\r"));
+			QApplication::sendEvent(pane, &shiftEnter);
+			check(broken(), "Shift+Enter: breaks the line and goes in a level, as Enter");
+			pane->document()->undo();
+			check(pane->document()->blockCount() == lines
+					&& text(pane, 2) == QStringLiteral("  if (x) {"),
+				"Shift+Enter: one undo takes it back");
+			place(pane, 2, 10);
+			QKeyEvent keypad(QEvent::KeyPress, Qt::Key_Enter,
+				Qt::ShiftModifier | Qt::KeypadModifier, QStringLiteral("\r"));
+			QApplication::sendEvent(pane, &keypad);
+			check(broken(), "Shift+Enter on the keypad: the same");
+		}
+
 		// Python (SRCOPT_BRACEGNU): an opening bracket alone goes in a
 		// level, and after a closing one alone Enter goes back one
 		write(dir.filePath(QStringLiteral("left.py")), "x = [\n    1,\n    ]\n");

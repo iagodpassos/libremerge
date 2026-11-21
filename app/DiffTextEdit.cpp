@@ -778,6 +778,19 @@ void DiffTextEdit::keyPressEvent(QKeyEvent *event)
 	// cursor then brought into view (EnsureVisible)
 	if (!isReadOnly() && !m_autoIndenting)
 	{
+		// Shift+Enter breaks the line as Enter does, upstream's OnChar
+		// taking both as VK_RETURN, where Qt puts a line separator
+		// (U+2028) inside the line, which a save would write as it is.
+		// Qt's other keys for one (the Mac's Control+Return and
+		// Control+O) do the same
+		if (event->matches(QKeySequence::InsertLineSeparator))
+		{
+			QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier,
+				QStringLiteral("\r"), event->isAutoRepeat(), event->count());
+			keyPressEvent(&enter);
+			event->setAccepted(enter.isAccepted());
+			return;
+		}
 		const bool enter = !overwriteMode()
 			&& event->matches(QKeySequence::InsertParagraphSeparator);
 		const QString typed = event->text();
