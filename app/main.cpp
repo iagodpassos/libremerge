@@ -602,6 +602,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestEditorTabsOpt(QStringLiteral("selftest-editor-tabs"),
 		QStringLiteral("Exercise the tabs of Options > Editor: the tab size, the Tab and Shift+Tab keys and the column in the status bar (for testing)"));
 	parser.addOption(selftestEditorTabsOpt);
+	QCommandLineOption selftestAutoIndentOpt(QStringLiteral("selftest-auto-indent"),
+		QStringLiteral("Exercise the editor's auto-indent: the indentation Enter keeps (for testing)"));
+	parser.addOption(selftestAutoIndentOpt);
 	QCommandLineOption selftestEolOpt(QStringLiteral("selftest-eol"),
 		QStringLiteral("Exercise the line endings: files of mixed endings kept, real endings compared and the question about files that end their lines otherwise (for testing)"));
 	parser.addOption(selftestEolOpt);
@@ -18142,6 +18145,131 @@ int main(int argc, char *argv[])
 					QStringLiteral("three") }),
 			"the lines as edited, once compared again");
 		check(messages.isEmpty(), "no message on the way");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestAutoIndentOpt))
+	{
+		// WinMerge's auto-indent (CCrystalEditView::OnEditOperation): Enter
+		// keeps the indentation of its line, in one undo step with it, except
+		// in overwrite mode; braces change nothing
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%s: %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto write = [](const QString &path, const QByteArray &bytes)
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+				std::exit(2);
+			f.write(bytes);
+		};
+		const auto settle = []()
+		{
+			for (int i = 0; i < 50; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto press = [](QWidget *widget, int key, const QString &text = QString())
+		{
+			QKeyEvent event(QEvent::KeyPress, key, Qt::NoModifier, text);
+			QApplication::sendEvent(widget, &event);
+		};
+		const auto place = [](DiffTextEdit *pane, int viewLine, int pos)
+		{
+			QTextCursor cursor(pane->document()->findBlockByNumber(viewLine));
+			cursor.setPosition(cursor.position() + pos);
+			pane->setTextCursor(cursor);
+		};
+		const auto text = [](DiffTextEdit *pane, int viewLine)
+		{
+			return pane->document()->findBlockByNumber(viewLine).text();
+		};
+		const auto column = [](DiffTextEdit *pane) { return pane->textCursor().positionInBlock(); };
+
+		// plain text: the indentation, tabs and spaces as they are
+		write(dir.filePath(QStringLiteral("left.txt")), "\t  alpha {\nbeta\n");
+		write(dir.filePath(QStringLiteral("right.txt")), "\t  alpha {\ngamma\n");
+		lm::setTabsForTest(4, true);
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(dir.filePath(QStringLiteral("left.txt")),
+					dir.filePath(QStringLiteral("right.txt")), &error))
+				return 2;
+			view.resize(900, 400);
+			view.show();
+			settle();
+			DiffTextEdit *pane = view.paneForTest(0);
+			int undoSteps = 0;
+			const QMetaObject::Connection undoCounter = QObject::connect(pane->document(),
+				&QTextDocument::undoCommandAdded, [&undoSteps]() { ++undoSteps; });
+			place(pane, 0, 10);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 0) == QStringLiteral("\t  alpha {") && text(pane, 1) == QStringLiteral("\t  ")
+					&& pane->textCursor().blockNumber() == 1 && column(pane) == 3,
+				"plain text: Enter keeps the tab and the spaces");
+			QObject::disconnect(undoCounter);
+			check(undoSteps == 1, "plain text: Enter and its indentation, one undo step");
+			pane->document()->undo();
+			check(text(pane, 0) == QStringLiteral("\t  alpha {") && text(pane, 1) == QStringLiteral("beta"),
+				"plain text: one undo takes both back");
+			// Enter inside the indentation: what is before the cursor
+			place(pane, 0, 1);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 0) == QStringLiteral("\t") && text(pane, 1) == QStringLiteral("\t  alpha {")
+					&& column(pane) == 1,
+				"plain text: Enter in the indentation keeps what is before it");
+			pane->document()->undo();
+			// a brace alone stays where it is typed
+			place(pane, 1, 0);
+			press(pane, Qt::Key_Return);
+			press(pane, Qt::Key_Up);
+			press(pane, Qt::Key_Space, QStringLiteral(" "));
+			press(pane, Qt::Key_Space, QStringLiteral(" "));
+			press(pane, Qt::Key_BraceRight, QStringLiteral("}"));
+			check(text(pane, 1) == QStringLiteral("  }"), "plain text: a closing brace stays where it is typed");
+			// overwrite mode: no indentation
+			pane->setOverwriteMode(true);
+			place(pane, 0, 10);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 1).isEmpty() && column(pane) == 0, "overwrite mode: no indentation");
+			pane->setOverwriteMode(false);
+		}
+
+		// C: the indentation alone, the braces typed as they are
+		write(dir.filePath(QStringLiteral("left.c")), "int f()\n{\n  if (x) {\n}\n");
+		write(dir.filePath(QStringLiteral("right.c")), "int f()\n{\n  if (y) {\n}\n");
+		lm::setTabsForTest(4, false);
+		{
+			FileCompareView view;
+			QString error;
+			if (!view.compare(dir.filePath(QStringLiteral("left.c")),
+					dir.filePath(QStringLiteral("right.c")), &error))
+				return 2;
+			view.resize(900, 400);
+			view.show();
+			settle();
+			DiffTextEdit *pane = view.paneForTest(0);
+			place(pane, 2, 10);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 3) == QStringLiteral("  ") && column(pane) == 2,
+				"C: Enter after \"  if (x) {\" keeps its two spaces, no more");
+			press(pane, Qt::Key_BraceRight, QStringLiteral("}"));
+			check(text(pane, 3) == QStringLiteral("  }"), "C: a closing brace stays where it is typed");
+			place(pane, 1, 1);
+			press(pane, Qt::Key_Return);
+			check(text(pane, 2).isEmpty() && column(pane) == 0,
+				"C: Enter after an unindented line, no indentation");
+		}
+		printf("auto-indent: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}
 

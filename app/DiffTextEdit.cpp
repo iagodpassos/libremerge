@@ -670,12 +670,40 @@ void DiffTextEdit::editUntab()
 	ensureCursorVisible();
 }
 
+void DiffTextEdit::autoIndent()
+{
+	QTextCursor cursor = textCursor();
+	const QTextBlock previous = cursor.block().previous();
+	if (!previous.isValid() || cursor.positionInBlock() != 0)
+		return;
+	const QString line = previous.text();
+	int pos = 0;
+	while (pos < line.size() && line.at(pos).isSpace())
+		++pos;
+	if (pos > 0)
+		cursor.insertText(line.left(pos));
+}
+
 /** What a key is about to remove stops at the hidden lines: the
     selection it types over, cuts or deletes, or the stretch a Backspace
     or a Delete takes without one. Tab and Shift+Tab are upstream's own
     commands. */
 void DiffTextEdit::keyPressEvent(QKeyEvent *event)
 {
+	// Enter keeps the indentation, except in overwrite mode (OnEditOperation's
+	// !m_bOvrMode): the key and the indentation as one undo step
+	if (!isReadOnly() && !m_autoIndenting && !overwriteMode()
+		&& event->matches(QKeySequence::InsertParagraphSeparator))
+	{
+		QTextCursor group(document());
+		group.beginEditBlock();
+		m_autoIndenting = true;
+		keyPressEvent(event);
+		m_autoIndenting = false;
+		autoIndent();
+		group.endEditBlock();
+		return;
+	}
 	if (!isReadOnly())
 	{
 		const Qt::KeyboardModifiers modifiers = event->modifiers() & ~Qt::KeypadModifier;

@@ -225,6 +225,9 @@ private:
 	    keys. */
 	void editTab();
 	void editUntab();
+	/** CCrystalEditView::OnEditOperation's auto-indent: once Enter has
+	    started a line, the whitespace the line before it starts with. */
+	void autoIndent();
 	/** The lines a selection over more than one line indents or
 	    unindents, and where it ends once they are done. */
 	struct TabifyRange
@@ -261,6 +264,7 @@ private:
 	bool m_fittingRange = false;
 	int m_tabSize = 4;
 	bool m_insertTabs = true;
+	bool m_autoIndenting = false; // while Enter itself is handled
 	bool m_hasHiddenLines = false;
 	bool m_inTextDrop = false;
 	bool m_movingCursor = false;
