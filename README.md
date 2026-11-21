@@ -139,7 +139,6 @@ Not yet: `-or`, auto-merge (`-al`, `-am`, `-ar`) and plugins; LibreMerge says so
 
 ## Known limitations
 
-- Archive comparison works on extracted copies: edits are not packed back into the archive (WinMerge behaves the same)
 - Image comparison: PDF files compare on macOS only (the AppImage carries no Qt PDF module)
 
 ## Support
