@@ -125,8 +125,14 @@ endif()
 # FilterEngine generated sources: lexer via re2c, parser via lemon
 find_program(RE2C_EXECUTABLE re2c REQUIRED)
 find_program(LEMON_EXECUTABLE lemon REQUIRED)
-find_file(LEMON_TEMPLATE lempar.c PATHS
-  /opt/homebrew/opt/lemon/share/lemon /usr/share/lemon /usr/local/share/lemon)
+# lemon's parser template: next to where lemon is installed (share/lemon
+# beside its bin), under the prefixes CMake searches (a Flatpak's /app),
+# or in the usual places
+get_filename_component(LEMON_BIN_DIR "${LEMON_EXECUTABLE}" DIRECTORY)
+find_file(LEMON_TEMPLATE lempar.c
+  HINTS "${LEMON_BIN_DIR}/../share/lemon"
+  PATH_SUFFIXES share/lemon
+  PATHS /opt/homebrew/opt/lemon/share/lemon /usr/share/lemon /usr/local/share/lemon)
 set(FILTER_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR}/filtergen)
 file(MAKE_DIRECTORY ${FILTER_GEN_DIR})
 add_custom_command(
