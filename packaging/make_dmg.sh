@@ -33,7 +33,10 @@ if [ -d "$QT_DEPS" ] && [ -d "$ROOT/deps/icu" ] && [ -d "$ROOT/deps/poco" ] \
     -DCMAKE_DISABLE_FIND_PACKAGE_GTest=ON > /dev/null
 else
   echo "==> Release build (Homebrew toolchain, arm64-only)"
-  BUILD="$ROOT/build-release"
+  # a folder of its own: macdeployqt deploys in place, and a qt.conf left
+  # in the development build's bundle would send that build's Qt looking
+  # for its plugins and translations inside it
+  BUILD="$ROOT/build-dmg"
   QT_BIN="$(brew --prefix qt)/bin"
   QT_TRANSLATIONS="$(brew --prefix)/share/qt/translations"
   cmake -S "$ROOT" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release > /dev/null
