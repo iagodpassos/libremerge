@@ -140,6 +140,12 @@ Not yet: `-or`, auto-merge (`-al`, `-am`, `-ar`) and plugins; LibreMerge says so
 ## Known limitations
 
 - Image comparison: PDF files compare on macOS only (the AppImage carries no Qt PDF module)
+- On GNOME, Ctrl+Alt+Left and Ctrl+Alt+Right (Copy to Left and Advance, Copy to Right and Advance) switch workspaces and never reach LibreMerge; the toolbar buttons and the Merge menu still do it, and these commands leave GNOME's workspace switch on its other keys (Super+Page Up/Down and Super+Alt+Left/Right):
+
+  ```sh
+  gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-left "['<Super>Page_Up', '<Super><Alt>Left']"
+  gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-right "['<Super>Page_Down', '<Super><Alt>Right']"
+  ```
 
 ## Support
 
