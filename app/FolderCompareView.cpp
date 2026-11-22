@@ -1689,7 +1689,7 @@ void FolderCompareView::deleteRows(const QList<QTreeWidgetItem *> &rows,
 			const QString path = sidePath(row, side);
 			if (path.isEmpty())
 				continue;
-			const bool gone = trash ? QFile::moveToTrash(path)
+			const bool gone = trash ? lm::moveToTrash(path)
 				: QFileInfo(path).isDir() ? QDir(path).removeRecursively() : QFile::remove(path);
 			if (!gone)
 				ok = false;

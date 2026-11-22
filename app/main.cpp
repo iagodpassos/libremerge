@@ -128,6 +128,8 @@
 #include "Theme.h"
 #ifdef LM_HAVE_PORTAL
 #include "PortalAppearance.h"
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
 #include <QDBusVariant>
 #endif
 #ifdef Q_OS_MACOS
@@ -613,6 +615,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestWindowPlacementOpt(QStringLiteral("selftest-window-placement"),
 		QStringLiteral("Close the window and open it again: its place, size and maximized state come back (for testing)"));
 	parser.addOption(selftestWindowPlacementOpt);
+	QCommandLineOption selftestTrashPortalOpt(QStringLiteral("selftest-trash-portal"),
+		QStringLiteral("Move files and folders to the Trash through the XDG Trash portal, as in a Flatpak sandbox (for testing)"));
+	parser.addOption(selftestTrashPortalOpt);
 	QCommandLineOption selftestEolOpt(QStringLiteral("selftest-eol"),
 		QStringLiteral("Exercise the line endings: files of mixed endings kept, real endings compared and the question about files that end their lines otherwise (for testing)"));
 	parser.addOption(selftestEolOpt);
@@ -18179,6 +18184,108 @@ int main(int argc, char *argv[])
 			"the lines as edited, once compared again");
 		check(messages.isEmpty(), "no message on the way");
 		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestTrashPortalOpt))
+	{
+		// the Trash a Flatpak sandbox reaches through
+		// org.freedesktop.portal.Trash, as Options > System sends what
+		// a folder comparison deletes or a copy writes over to it
+#ifdef LM_HAVE_PORTAL
+		const QDBusConnection bus = QDBusConnection::sessionBus();
+		if (!bus.isConnected() || !bus.interface()->isServiceRegistered(
+				QStringLiteral("org.freedesktop.portal.Desktop")))
+		{
+			// a portal is started on demand: ask for it once
+			QDBusConnection::sessionBus().interface()->startService(
+				QStringLiteral("org.freedesktop.portal.Desktop"));
+		}
+		if (!bus.isConnected() || !bus.interface()->isServiceRegistered(
+				QStringLiteral("org.freedesktop.portal.Desktop")))
+		{
+			printf("trash portal: skipped, no portal on the session bus\n");
+			return 0;
+		}
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-58s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		// in a Flatpak sandbox as it finds itself there, elsewhere forced
+		const bool sandboxed = QFile::exists(QStringLiteral("/.flatpak-info"));
+		printf("  %s\n", sandboxed ? "in a Flatpak sandbox" : "portal forced, no sandbox");
+		lm::setTrashPortalForTest(!sandboxed);
+		// in the home folder, on the Trash's own disk
+		QTemporaryDir dir(QDir::homePath() + QStringLiteral("/lm-trash-XXXXXX"));
+		if (!dir.isValid())
+			return 2;
+		const QString tag = QStringLiteral("lm-trash-%1").arg(QCoreApplication::applicationPid());
+		const auto write = [](const QString &path, const QByteArray &bytes) {
+			QFile f(path);
+			return f.open(QIODevice::WriteOnly) && f.write(bytes) == bytes.size();
+		};
+		// where the Trash keeps what it was given: the portal's, under the
+		// home folder, and the application's own XDG_DATA_HOME
+		const QStringList trashes{ QDir::homePath() + QStringLiteral("/.local/share/Trash"),
+			QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+				+ QStringLiteral("/Trash") };
+		const auto inTrash = [&trashes](const QString &name) {
+			for (const QString &trash : trashes)
+				if (QFileInfo::exists(trash + QStringLiteral("/files/") + name))
+					return true;
+			return false;
+		};
+		const QString file = dir.filePath(tag + QStringLiteral(".txt"));
+		const QString folder = dir.filePath(tag + QStringLiteral("-dir"));
+		if (!write(file, "one\n") || !QDir().mkpath(folder)
+				|| !write(folder + QStringLiteral("/inside.txt"), "two\n"))
+			return 2;
+		check(lm::moveToTrash(file) && !QFileInfo::exists(file) && inTrash(tag + QStringLiteral(".txt")),
+			"a file goes to the Trash");
+		check(lm::moveToTrash(folder) && !QFileInfo::exists(folder) && inTrash(tag + QStringLiteral("-dir")),
+			"a folder goes to the Trash, with what is in it");
+		check(!lm::moveToTrash(dir.filePath(QStringLiteral("missing.txt"))),
+			"a file that is not there is not trashed");
+		// a link: the portal takes none, and the folder it points to stays
+		const QString target = dir.filePath(QStringLiteral("kept"));
+		const QString link = dir.filePath(tag + QStringLiteral("-link"));
+		if (!QDir().mkpath(target) || !QFile::link(target, link))
+			return 2;
+		check(!lm::moveToTrash(link) && QFileInfo(link).isSymLink() && QFileInfo::exists(target),
+			"a link is not trashed, nor what it points to");
+		// a copy over a file: the old one to the Trash, the new one in place
+		GetOptionsMgr()->Set(OPT_USE_RECYCLE_BIN, true);
+		const QString source = dir.filePath(QStringLiteral("source.txt"));
+		const QString over = dir.filePath(tag + QStringLiteral("-over.txt"));
+		if (!write(source, "new\n") || !write(over, "old\n"))
+			return 2;
+		check(lm::copyRecursively(source, over) && inTrash(tag + QStringLiteral("-over.txt")),
+			"a copy over a file sends the old one to the Trash");
+		QFile copied(over);
+		check(copied.open(QIODevice::ReadOnly) && copied.readAll() == "new\n",
+			"and the copy takes its place");
+		// what this test put in the Trash goes
+		for (const QString &trash : trashes)
+		{
+			for (const QString &sub : { QStringLiteral("/files"), QStringLiteral("/info") })
+			{
+				QDir entries(trash + sub);
+				for (const QFileInfo &entry : entries.entryInfoList(
+						{ tag + QLatin1Char('*') }, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot))
+				{
+					if (entry.isDir())
+						QDir(entry.filePath()).removeRecursively();
+					else
+						QFile::remove(entry.filePath());
+				}
+			}
+		}
+		return ok ? 0 : 1;
+#else
+		printf("trash portal: skipped, no portal on this platform\n");
+		return 0;
+#endif
 	}
 
 	if (parser.isSet(selftestWindowPlacementOpt))

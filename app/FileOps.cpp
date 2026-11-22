@@ -16,8 +16,76 @@
 #include "OptionsDef.h"
 #include "OptionsMgr.h"
 
+#ifdef LM_HAVE_PORTAL
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusUnixFileDescriptor>
+#include <cerrno>
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
 namespace lm
 {
+
+namespace
+{
+
+bool &trashPortalForTest()
+{
+	static bool on = false;
+	return on;
+}
+
+#ifdef LM_HAVE_PORTAL
+/** org.freedesktop.portal.Trash's TrashFile, handed the file open for
+    reading and writing (what the portal asks of an application allowed
+    to trash it), a folder as a path only, as GLib's
+    g_trash_portal_trash_file opens them. The portal takes no path opened
+    without following a link, and following one would trash what it
+    points to: a link is not trashed. */
+bool trashThroughPortal(const QString &path)
+{
+	const QByteArray name = QFile::encodeName(path);
+	int fd = ::open(name.constData(), O_RDWR | O_CLOEXEC | O_NOFOLLOW);
+#ifdef O_PATH
+	if (fd < 0 && errno == EISDIR)
+		fd = ::open(name.constData(), O_PATH | O_CLOEXEC);
+#endif
+	if (fd < 0)
+		return false;
+	QDBusMessage call = QDBusMessage::createMethodCall(
+		QStringLiteral("org.freedesktop.portal.Desktop"),
+		QStringLiteral("/org/freedesktop/portal/desktop"),
+		QStringLiteral("org.freedesktop.portal.Trash"), QStringLiteral("TrashFile"));
+	call << QVariant::fromValue(QDBusUnixFileDescriptor(fd)); // a copy of it
+	::close(fd);
+	// 1 when the file went to the Trash, 0 when it did not
+	const QDBusMessage reply = QDBusConnection::sessionBus().call(call, QDBus::Block, 30000);
+	return reply.type() == QDBusMessage::ReplyMessage && !reply.arguments().isEmpty()
+		&& reply.arguments().constFirst().toUInt() == 1;
+}
+#endif
+
+} // namespace
+
+bool moveToTrash(const QString &path)
+{
+#ifdef LM_HAVE_PORTAL
+	// a Flatpak sandbox: its Trash would be the sandbox's own folder,
+	// another mount the files cannot be moved to (GLib's
+	// glib_should_use_portal looks for the same file)
+	static const bool sandboxed = QFile::exists(QStringLiteral("/.flatpak-info"));
+	if (sandboxed || trashPortalForTest())
+		return trashThroughPortal(path);
+#endif
+	return QFile::moveToTrash(path);
+}
+
+void setTrashPortalForTest(bool on)
+{
+	trashPortalForTest() = on;
+}
 
 bool copyRecursively(const QString &src, const QString &dst)
 {
@@ -41,7 +109,7 @@ bool copyRecursively(const QString &src, const QString &dst)
 	if (QFile::exists(dst))
 	{
 		if (lm::useRecycleBin())
-			QFile::moveToTrash(dst);
+			moveToTrash(dst);
 		else
 			QFile::remove(dst);
 	}

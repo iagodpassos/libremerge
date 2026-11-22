@@ -14,6 +14,14 @@ namespace lm
     to the Trash first (recoverable overwrite). */
 bool copyRecursively(const QString &src, const QString &dst);
 
+/** Move a file or a folder to the Trash (WinMerge's FOF_ALLOWUNDO). In a
+    Flatpak sandbox QFile::moveToTrash reaches no Trash of the user's, so
+    the request goes to the Trash portal there, as GLib's g_file_trash
+    does in one. */
+bool moveToTrash(const QString &path);
+/** Send the requests to the portal outside a sandbox too (for tests). */
+void setTrashPortalForTest(bool on);
+
 /** The modification time a file had before a save, when the "Preserve
     file time" option (WinMerge's OPT_PRESERVE_FILETIMES) is on; an
     invalid time otherwise, or when the file does not exist yet. */
