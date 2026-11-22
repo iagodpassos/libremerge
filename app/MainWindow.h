@@ -89,6 +89,17 @@ public:
 	    identical, more when different, -1 an error or none yet. */
 	int lastCompareResult() const { return m_lastCompareResult; }
 
+	/** WinMerge's CMainFrame::ActivateFrame, the first time the window
+	    shows: the place and size it was last closed with (the profile's
+	    Settings/MainLeft, MainTop, MainRight and MainBottom), none when
+	    none was saved or its corner would be off the screens. Returns
+	    whether it was then maximized (MainMax), for the caller to show
+	    it so unless the command line minimizes it. */
+	bool restoreWindowPlacement();
+	/** CMainFrame::OnClose: the window's place and size when not
+	    maximized, and whether it is maximized, for the next start. */
+	void saveWindowPlacement();
+
 	/** Route paths dropped on the window or opened via Finder/Dock. */
 	void handleIncomingPaths(const QStringList &paths);
 	/** Close the untouched blank comparison the startup opened, when a
@@ -138,6 +149,8 @@ protected:
 	void keyPressEvent(QKeyEvent *event) override;
 	bool eventFilter(QObject *watched, QEvent *event) override;
 	void changeEvent(QEvent *event) override;
+	void moveEvent(QMoveEvent *event) override;
+	void resizeEvent(QResizeEvent *event) override;
 
 private slots:
 	void newComparison();
@@ -200,6 +213,12 @@ private:
 	QTimer *m_fileCheckTimer; // the posted check
 	bool m_checkingFiles = false;
 	bool m_askingToClose = false; // closeEvent is waiting for an answer
+	/** The window's place and size when not maximized, as last known
+	    while it was not minimized: GNOME's window manager takes the
+	    maximized state away from a maximized window it minimizes, and
+	    Qt's normalGeometry() is then the maximized one. */
+	QRect m_normalPlacement;
+	void noteNormalPlacement();
 	QElapsedTimer m_lastFileQuestion; // since the reload question closed
 	QHash<QString, lm::FileStamp> m_watchedStamps; // as the watcher last saw them
 	// the command line's: Esc closes LibreMerge (-e), and closing when the

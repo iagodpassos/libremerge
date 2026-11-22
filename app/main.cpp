@@ -7,6 +7,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QScreen>
 #include <QCommandLineParser>
 #include <QFileInfo>
 #include <QLibraryInfo>
@@ -331,13 +332,16 @@ int runCommandLine(const lm::CommandLine &cmd)
 	// StarPrompt), counted before the first screen asks whether it is due
 	lm::StarPrompt::instance()->noteAppStarted();
 	MainWindow window;
+	// the place and size it was closed with, maximized if it was, unless
+	// the command line minimizes it (CMainFrame::ActivateFrame)
+	const bool savedMaximized = window.restoreWindowPlacement();
 #ifdef Q_OS_MACOS
 	lm::installMacServices(&window);
 #endif
 	window.openFromCommandLine(cmd);
 	if (cmd.showWindow == lm::CommandLine::ShowWindow::Minimize)
 		window.showMinimized();
-	else if (cmd.showWindow == lm::CommandLine::ShowWindow::Maximize)
+	else if (cmd.showWindow == lm::CommandLine::ShowWindow::Maximize || savedMaximized)
 		window.showMaximized();
 	else
 		window.show();
@@ -606,6 +610,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestAutoIndentOpt(QStringLiteral("selftest-auto-indent"),
 		QStringLiteral("Exercise the editor's auto-indent: the indentation Enter keeps (for testing)"));
 	parser.addOption(selftestAutoIndentOpt);
+	QCommandLineOption selftestWindowPlacementOpt(QStringLiteral("selftest-window-placement"),
+		QStringLiteral("Close the window and open it again: its place, size and maximized state come back (for testing)"));
+	parser.addOption(selftestWindowPlacementOpt);
 	QCommandLineOption selftestEolOpt(QStringLiteral("selftest-eol"),
 		QStringLiteral("Exercise the line endings: files of mixed endings kept, real endings compared and the question about files that end their lines otherwise (for testing)"));
 	parser.addOption(selftestEolOpt);
@@ -18171,6 +18178,133 @@ int main(int argc, char *argv[])
 					QStringLiteral("three") }),
 			"the lines as edited, once compared again");
 		check(messages.isEmpty(), "no message on the way");
+		return ok ? 0 : 1;
+	}
+
+	if (parser.isSet(selftestWindowPlacementOpt))
+	{
+		// WinMerge's CMainFrame::OnClose and ActivateFrame: the window's
+		// place and size when not maximized (Settings/MainLeft, MainTop,
+		// MainRight, MainBottom) and whether it is maximized (MainMax),
+		// saved as it closes and taken as it next opens
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-60s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		// a window system takes its time (the Mac's full screen animates)
+		const auto waitFor = [](const std::function<bool()> &done)
+		{
+			for (int i = 0; i < 300 && !done(); ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+			for (int i = 0; i < 20; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto settle = [&waitFor]() { waitFor([]() { return false; }); };
+		const auto profile = [](const char *entry) {
+			return GetOptionsMgr()->GetInt(String("Settings/") + entry);
+		};
+		const auto setProfile = [](const char *entry, int value) {
+			const String name = String("Settings/") + entry;
+			if (!GetOptionsMgr()->Get(name).IsInt())
+				GetOptionsMgr()->InitOption(name, value);
+			GetOptionsMgr()->SaveOption(name, value);
+		};
+		const QRect placed(150, 120, 900, 600);
+		// a Wayland compositor places windows itself and tells no client
+		// where, nor that it minimized one: there the size alone comes
+		// back, and a maximized window minimized is still maximized
+		const bool positions = QGuiApplication::platformName() != QLatin1String("wayland");
+		const auto savedPlaced = [&profile, &placed, positions]() {
+			return profile("MainRight") - profile("MainLeft") == placed.width()
+				&& profile("MainBottom") - profile("MainTop") == placed.height()
+				&& (!positions || (profile("MainLeft") == placed.left()
+					&& profile("MainTop") == placed.top()));
+		};
+		const auto isPlaced = [&placed, positions](const QRect &rect) {
+			return positions ? rect == placed : rect.size() == placed.size();
+		};
+		{
+			MainWindow window;
+			check(!window.restoreWindowPlacement() && window.size() == QSize(1100, 700),
+				"none saved: the default size, not maximized");
+			window.setGeometry(placed);
+			window.show();
+			settle();
+			window.close();
+			settle();
+			check(savedPlaced() && profile("MainMax") == 0,
+				"closed: the place and size saved, not maximized");
+		}
+		{
+			MainWindow window;
+			check(!window.restoreWindowPlacement() && isPlaced(window.geometry()),
+				"opened again: the place and size it was closed with");
+			window.show();
+			waitFor([&window]() { return window.isVisible(); });
+			printf("  shown at %d,%d %dx%d\n", window.geometry().x(), window.geometry().y(),
+				window.geometry().width(), window.geometry().height());
+			// where it was, the window's frame around it as before
+			check(isPlaced(window.geometry()), "shown again where it was");
+			window.showMaximized();
+			waitFor([&window]() { return window.isMaximized(); });
+			window.close();
+			settle();
+			check(profile("MainMax") == 1 && savedPlaced(),
+				"closed maximized: maximized, and the size it had before");
+		}
+		{
+			MainWindow window;
+			check(window.restoreWindowPlacement() && isPlaced(window.geometry()),
+				"opened again: maximized, over the size it had before");
+			window.showMaximized();
+			waitFor([&window]() { return window.isMaximized(); });
+			check(window.isMaximized(), "shown maximized");
+			window.showMinimized();
+			waitFor([&window]() { return window.isMinimized(); });
+			window.close();
+			settle();
+			// (GNOME's window manager takes the maximized state away from
+			// a window it minimizes)
+			check((profile("MainMax") == 0 || !positions) && savedPlaced(),
+				"closed minimized: not maximized, the size it had before");
+		}
+		{
+			// full screen (the Mac's) is upstream's none: not maximized
+			MainWindow window;
+			window.restoreWindowPlacement();
+			window.show();
+			waitFor([&window]() { return window.isVisible(); });
+			window.showFullScreen();
+			waitFor([&window]() { return window.isFullScreen(); });
+			window.close();
+			settle();
+			check(profile("MainMax") == 0 && savedPlaced(),
+				"closed in full screen: the size it had before, not maximized");
+		}
+		{
+			// a corner off every screen (a screen gone since): none taken,
+			// maximized or not
+			const QRect desktop = QGuiApplication::primaryScreen()->virtualGeometry();
+			setProfile("MainLeft", desktop.right() + 500);
+			setProfile("MainRight", desktop.right() + 1400);
+			setProfile("MainMax", 1);
+			MainWindow window;
+			check(!window.restoreWindowPlacement() && window.size() == QSize(1100, 700),
+				"off the screens: the default, not maximized");
+			setProfile("MainLeft", 150);
+			setProfile("MainRight", 150);
+			MainWindow empty;
+			check(!empty.restoreWindowPlacement() && empty.size() == QSize(1100, 700),
+				"no width saved: the default, not maximized");
+		}
 		return ok ? 0 : 1;
 	}
 

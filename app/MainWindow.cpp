@@ -14,6 +14,9 @@
 #include <QDragEnterEvent>
 #include <QFileOpenEvent>
 #include <QMimeData>
+#include <QMoveEvent>
+#include <QResizeEvent>
+#include <QScreen>
 #include <QSettings>
 #include <QDialogButtonBox>
 #include <QFileDialog>
@@ -1121,6 +1124,8 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::changeEvent(QEvent *event)
 {
 	QMainWindow::changeEvent(event);
+	if (event->type() == QEvent::WindowStateChange)
+		noteNormalPlacement();
 #ifdef Q_OS_MACOS
 	if (event->type() == QEvent::ActivationChange && isActiveWindow())
 		lm::setHelpMenu(m_helpMenu);
@@ -2868,6 +2873,91 @@ void MainWindow::handleEscape()
 		closeTab(m_tabs->currentIndex());
 }
 
+namespace
+{
+
+/** CMergeApp::GetProfileInt and WriteProfileInt: a value of the profile,
+    the option "section/entry", which comes to be as it is first used. */
+int profileInt(const char *section, const char *entry, int defaultValue)
+{
+	COptionsMgr *options = GetOptionsMgr();
+	if (options == nullptr)
+		return defaultValue;
+	const String name = String(section) + "/" + entry;
+	if (!options->Get(name).IsInt())
+		options->InitOption(name, defaultValue);
+	return options->GetInt(name);
+}
+
+void writeProfileInt(const char *section, const char *entry, int value)
+{
+	COptionsMgr *options = GetOptionsMgr();
+	if (options == nullptr)
+		return;
+	const String name = String(section) + "/" + entry;
+	if (!options->Get(name).IsInt())
+		options->InitOption(name, value);
+	options->SaveOption(name, value);
+}
+
+} // namespace
+
+bool MainWindow::restoreWindowPlacement()
+{
+	const int left = profileInt("Settings", "MainLeft", 0);
+	const int top = profileInt("Settings", "MainTop", 0);
+	const int right = profileInt("Settings", "MainRight", 0);
+	const int bottom = profileInt("Settings", "MainBottom", 0);
+	const QRect rect(left, top, right - left, bottom - top);
+	if (rect.width() <= 0 || rect.height() <= 0)
+		return false;
+	// the top-left corner on the desktop, with a 20-point margin against
+	// a window lost off it (a screen gone since): otherwise the window
+	// opens as it would with none saved, maximized or not
+	if (!screen()->virtualGeometry().contains(rect.topLeft() + QPoint(20, 20)))
+		return false;
+	setGeometry(rect);
+	return profileInt("Settings", "MainMax", 0) != 0;
+}
+
+void MainWindow::noteNormalPlacement()
+{
+	if (windowState() & Qt::WindowMinimized)
+		return;
+	const QRect normal = normalGeometry();
+	if (normal.isValid())
+		m_normalPlacement = normal;
+}
+
+void MainWindow::moveEvent(QMoveEvent *event)
+{
+	QMainWindow::moveEvent(event);
+	noteNormalPlacement();
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+	QMainWindow::resizeEvent(event);
+	noteNormalPlacement();
+}
+
+void MainWindow::saveWindowPlacement()
+{
+	// GetWindowPlacement's rcNormalPosition: the window as it is when not
+	// maximized (its client area here, as setGeometry takes it back), and
+	// whether it is maximized; minimized it is not, nor in full screen,
+	// which upstream has none of
+	noteNormalPlacement();
+	const QRect normal = m_normalPlacement.isValid() ? m_normalPlacement : geometry();
+	writeProfileInt("Settings", "MainLeft", normal.left());
+	writeProfileInt("Settings", "MainTop", normal.top());
+	writeProfileInt("Settings", "MainRight", normal.left() + normal.width());
+	writeProfileInt("Settings", "MainBottom", normal.top() + normal.height());
+	const Qt::WindowStates state = windowState();
+	writeProfileInt("Settings", "MainMax", (state & Qt::WindowMaximized)
+		&& !(state & (Qt::WindowMinimized | Qt::WindowFullScreen)) ? 1 : 0);
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
 	// WinMerge's "ask when closing multiple windows", off by default; an
@@ -2883,6 +2973,9 @@ void MainWindow::closeEvent(QCloseEvent *event)
 			return;
 		}
 	}
+	// the window's place and size, for the next start (OnClose saves them
+	// here, before the comparisons are asked to close)
+	saveWindowPlacement();
 
 	// every comparison with unsaved changes offers to save them first, and
 	// one Cancel keeps the window open: what WinMerge's OnClose does with

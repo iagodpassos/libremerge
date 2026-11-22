@@ -73,6 +73,7 @@ run_one selftest-table-ignore-column
 run_one selftest-tree-sitter
 run_one selftest-editor-tabs
 run_one selftest-auto-indent
+run_one selftest-window-placement
 run_one selftest-eol
 run_one selftest-command-line
 run_one selftest-subfolders
