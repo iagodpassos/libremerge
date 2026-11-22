@@ -10152,6 +10152,22 @@ int main(int argc, char *argv[])
 		const auto native = [](const QKeySequence &key) {
 			return key.toString(QKeySequence::NativeText);
 		};
+		// a toolbar's shortcuts as the platform writes them: Copy to Left's
+		// Alt+Left, and no macOS glyph (command, option, shift, control) in
+		// any tooltip on other platforms (issue #23 saw them on Linux)
+		const auto nativeTooltips = [&toolbarOf, &toolAction, &native](QWidget *view) {
+			QAction *copy = toolAction(view, lm::Icon::CopyLeft);
+			if (copy == nullptr || copy->toolTip() != QStringLiteral("%1 (%2)").arg(copy->text(),
+					native(QKeySequence(Qt::ALT | Qt::Key_Left))))
+				return false;
+#ifndef Q_OS_MACOS
+			for (QAction *action : toolbarOf(view)->actions())
+				for (const char16_t glyph : { u'⌘', u'⌥', u'⇧', u'⌃' })
+					if (action->toolTip().contains(QChar(glyph)))
+						return false;
+#endif
+			return true;
+		};
 
 		MainWindow window;
 		window.resize(1100, 600);
@@ -10185,16 +10201,7 @@ int main(int argc, char *argv[])
 			&& first->toolTip() == QStringLiteral("%1 (%2)").arg(first->text(),
 				native(QKeySequence(Qt::ALT | Qt::Key_Home))),
 			"the other tooltips too, as the platform writes them");
-#ifndef Q_OS_MACOS
-		{
-			// no macOS glyphs (command, option, shift) on other platforms
-			bool plain = true;
-			for (QAction *action : toolbarOf(text)->actions())
-				for (const char16_t glyph : { u'⌘', u'⌥', u'⇧' })
-					plain = plain && !action->toolTip().contains(QChar(glyph));
-			check(plain, "no macOS key glyphs off macOS");
-		}
-#endif
+		check(nativeTooltips(text), "text: the shortcuts as the platform writes them");
 		if (!shots.isEmpty())
 		{
 			for (const bool dark : { false, true })
@@ -10233,6 +10240,7 @@ int main(int argc, char *argv[])
 			return 2;
 		check(copyGroup(table), "table: the buttons between the copies and copy-alls");
 		check(advanceButtons(table, true), "table: both enabled");
+		check(nativeTooltips(table), "table: the shortcuts as the platform writes them");
 		table->gotoFirstDiff();
 		const int before = table->diffCount();
 		toolAction(table, lm::Icon::CopyRightNext)->trigger();
@@ -10252,6 +10260,7 @@ int main(int argc, char *argv[])
 			return 2;
 		check(copyGroup(hex), "binary: the buttons between the copies and copy-alls");
 		check(advanceButtons(hex, false), "binary: both disabled, as WinMerge");
+		check(nativeTooltips(hex), "binary: the shortcuts as the platform writes them");
 
 		QImage red(8, 8, QImage::Format_RGB32);
 		red.fill(Qt::red);
@@ -10268,6 +10277,7 @@ int main(int argc, char *argv[])
 			return 2;
 		check(copyGroup(image), "image: the buttons between the copies and copy-alls");
 		check(advanceButtons(image, false), "image: both disabled, as WinMerge");
+		check(nativeTooltips(image), "image: the shortcuts as the platform writes them");
 		return ok ? 0 : 1;
 	}
 	if (parser.isSet(selftestWrapLinesOpt))
