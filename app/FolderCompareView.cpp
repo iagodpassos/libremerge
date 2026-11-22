@@ -967,6 +967,17 @@ bool FolderCompareView::rowShownForTest(const QString &name) const
 void FolderCompareView::applyShowFilters()
 {
 	const bool treeMode = m_actTreeMode->isChecked();
+	// the flat list of a comparison with its subfolders has no row for a
+	// folder on every side, its files carrying its place: RedisplayChildren
+	// adds an item only for !m_bRecursive || !isDirectory() || !existAll()
+	const auto unlisted = [this, treeMode](const lm::FolderCompareItem *item) {
+		if (treeMode || !m_recursive || item == nullptr || !item->isDir)
+			return false;
+		for (int side = 0; side < m_result.sides; ++side)
+			if (item->path[side].isEmpty())
+				return false;
+		return true;
+	};
 	// the display filter asks the engine about the items of this
 	// comparison (Redisplay hands it the context every time)
 	m_displayFilter.bind(m_result);
@@ -1020,7 +1031,7 @@ void FolderCompareView::applyShowFilters()
 			if (parent >= 0 && !showable[parent])
 				showable[i] = 0;
 			if (rows[i] != nullptr)
-				rows[i]->setHidden(!showable[i]);
+				rows[i]->setHidden(!showable[i] || unlisted(&m_result.items.at(i)));
 		}
 	}
 
@@ -1036,7 +1047,8 @@ void FolderCompareView::applyShowFilters()
 		if (!hidden)
 			continue;
 		(*it)->setSelected(false);
-		if ((*it)->data(0, RoleCategory).isValid()) // not a node made for the tree
+		// not a node made for the tree, nor a folder the flat list leaves out
+		if ((*it)->data(0, RoleCategory).isValid() && !unlisted(resultItem(*it)))
 			++m_hiddenRows;
 	}
 	if (!m_job)
