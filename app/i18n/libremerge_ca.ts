@@ -5659,6 +5659,10 @@ Restart required.&quot;.</translatorcomment>
         <translation>Error</translation>
     </message>
     <message>
+        <source>Item aborted</source>
+        <translation>Element avortat</translation>
+    </message>
+    <message>
         <source> (middle and right are identical)</source>
         <translatorcomment>After WinMerge&apos;s &quot; (Middle and right are identical)&quot;.</translatorcomment>
         <translation> (Mig i dreta són idèntics)</translation>

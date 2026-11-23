@@ -5331,6 +5331,10 @@ Restart required.&quot;.</translatorcomment>
         <translation>Erreur</translation>
     </message>
     <message>
+        <source>Item aborted</source>
+        <translation>Élément abandonné</translation>
+    </message>
+    <message>
         <source> (middle and right are identical)</source>
         <translatorcomment>After WinMerge&apos;s &quot; (Middle and right are identical)&quot;.</translatorcomment>
         <translation> (Milieu et Droite sont identiques)</translation>

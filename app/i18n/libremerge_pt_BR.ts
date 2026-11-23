@@ -4879,6 +4879,10 @@ $linenum: Número da linha atual do cursor</translation>
         <translation>Erro</translation>
     </message>
     <message>
+        <source>Item aborted</source>
+        <translation>Item abortado</translation>
+    </message>
+    <message>
         <source> (middle and right are identical)</source>
         <translation> (meio e direita são idênticos)</translation>
     </message>

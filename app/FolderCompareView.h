@@ -78,6 +78,10 @@ public:
 	QString rowResultForTest(const QString &name) const;
 	/** The icon in a row's Name column. */
 	QIcon rowIconForTest(const QString &name) const;
+	/** The comparison's result, and the list filled again from another
+	    one (for tests). */
+	const lm::FolderCompareResult &resultForTest() const { return m_result; }
+	void populateForTest(const lm::FolderCompareResult &result) { populate(result); }
 	/** The compare method shown on the status bar (for tests). */
 	QString compareMethodTextForTest() const;
 	/** The file filter this comparison ran with, as the status bar shows

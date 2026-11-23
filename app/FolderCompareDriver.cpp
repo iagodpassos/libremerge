@@ -40,12 +40,15 @@ QString sideString(const String &s)
 	return QString::fromUtf8(s.data(), static_cast<int>(s.size()));
 }
 
-/** WinMerge's ColStatusGet decision ladder; the order matters (skipped
-    before unique, unique before the missing-on-one-side cases). */
+/** WinMerge's ColStatusGet decision ladder; the order matters (an error
+    or an abort first, skipped before unique, unique before the
+    missing-on-one-side cases). */
 FolderCompareItem::Category classify(const DIFFITEM &di, int sides)
 {
 	if (di.diffcode.isResultError())
 		return FolderCompareItem::Error;
+	if (di.diffcode.isResultAbort())
+		return FolderCompareItem::Aborted;
 	if (di.diffcode.isResultFiltered())
 		return FolderCompareItem::Skipped;
 	if (di.diffcode.isSideFirstOnly())
@@ -96,6 +99,13 @@ private:
 };
 
 } // namespace
+
+FolderCompareItem::Category classifyForTest(unsigned diffcode, int sides)
+{
+	DIFFITEM di;
+	di.diffcode.diffcode = diffcode;
+	return classify(di, sides);
+}
 
 FolderCompareJob::FolderCompareJob(int sides)
 	: m_stats(new CompareStats(sides))

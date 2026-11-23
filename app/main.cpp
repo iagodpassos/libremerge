@@ -12069,6 +12069,32 @@ int main(int argc, char *argv[])
 				return true;
 			}();
 		report(icons, "icons");
+		// an item a cancel stopped comparing (CMPABORT): "Item aborted"
+		// after an error and before anything else, WinMerge's image, on
+		// show whatever the result filters say, and counted nowhere
+		const unsigned fileBoth = DIFFCODE::FILE | DIFFCODE::BOTH;
+		report(lm::classifyForTest(fileBoth | DIFFCODE::CMPABORT, 2) == lm::FolderCompareItem::Aborted
+				&& lm::classifyForTest(fileBoth | DIFFCODE::CMPERR, 2) == lm::FolderCompareItem::Error
+				&& lm::classifyForTest(DIFFCODE::FILE | DIFFCODE::FIRST | DIFFCODE::CMPABORT, 2)
+					== lm::FolderCompareItem::Aborted,
+			"aborted: the engine's CMPABORT, after an error, before a side");
+		{
+			lm::FolderCompareResult aborted = two.resultForTest();
+			for (lm::FolderCompareItem &item : aborted.items)
+				if (item.name == QLatin1String("diff.txt"))
+				{
+					item.category = lm::FolderCompareItem::Aborted;
+					--aborted.different;
+				}
+			two.populateForTest(aborted);
+			two.setShowFilterForTest(F::ShowDifferent, false);
+			two.setShowFilterForTest(F::ShowIdentical, false);
+			report(two.rowResultForTest(QStringLiteral("diff.txt"))
+					== QCoreApplication::translate("QObject", "Item aborted")
+					&& icon(two, "diff.txt", D::Abort)
+					&& two.rowShownForTest(QStringLiteral("diff.txt")),
+				"aborted: its text, its image, and on show with the different and identical hidden");
+		}
 		printf("show filters: %s\n", ok ? "ok" : "FAILED");
 		return ok ? 0 : 1;
 	}

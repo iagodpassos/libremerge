@@ -5339,6 +5339,10 @@ Restart required.&quot;.</translatorcomment>
         <translation>Error</translation>
     </message>
     <message>
+        <source>Item aborted</source>
+        <translation>Elemento cancelado</translation>
+    </message>
+    <message>
         <source> (middle and right are identical)</source>
         <translatorcomment>After WinMerge&apos;s &quot; (Middle and right are identical)&quot;.</translatorcomment>
         <translation> (Central y derecho son idénticos)</translation>

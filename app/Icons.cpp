@@ -329,7 +329,7 @@ QIcon diffImage(DiffImage image)
 		"notequalfile", "equalfile", "fileunknown", "equalbinary", "binarydiff",
 		"lfolder", "mfolder", "rfolder", "lmissingfolder", "mmissingfolder", "rmissingfolder",
 		"fileskip", "folderskip", "notequalfolder", "equalfolder", "folder",
-		"error", "folderup",
+		"error", "folderup", "aborted",
 		"notequaltextfile", "equaltextfile", "notequalimage", "equalimage",
 	};
 	static_assert(std::size(names) == static_cast<size_t>(DiffImage::ImageSame) + 1,

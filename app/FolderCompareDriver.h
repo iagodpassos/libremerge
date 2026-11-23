@@ -33,6 +33,8 @@ struct FolderCompareItem
 		Error,
 		NotCompared,   ///< result unknown after a copy/delete (WinMerge's
 		               ///  NOCMP; a recompare resolves it)
+		Aborted,       ///< WinMerge's CMPABORT: the content compare a cancel
+		               ///  stopped in the middle of the item
 	};
 
 	/** WinMerge's COMPAREFLAGS3WAY: which pair stayed identical when a
@@ -114,6 +116,10 @@ private:
 	std::atomic<bool> m_abort{false};
 	std::unique_ptr<CompareStats> m_stats;
 };
+
+/** The category the engine's result code of an item gives it (WinMerge's
+    ColStatusGet ladder), for tests. */
+FolderCompareItem::Category classifyForTest(unsigned diffcode, int sides);
 
 /** Run a synchronous 2-way folder comparison (full content compare)
     with the engine's DirScan machinery. Safe to call from a worker

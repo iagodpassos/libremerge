@@ -160,6 +160,7 @@ QString categoryText(lm::FolderCompareItem::Category category,
 		return QObject::tr("Does not exist on the right");
 	case lm::FolderCompareItem::Skipped: return QObject::tr("Skipped");
 	case lm::FolderCompareItem::Error: return QObject::tr("Error");
+	case lm::FolderCompareItem::Aborted: return QObject::tr("Item aborted");
 	case lm::FolderCompareItem::NotCompared: return QString();
 	}
 	return {};
@@ -176,6 +177,7 @@ QIcon categoryIcon(lm::FolderCompareItem::Category category,
 	switch (category)
 	{
 	case Item::Error: return lm::diffImage(D::Error);
+	case Item::Aborted: return lm::diffImage(D::Abort);
 	case Item::Skipped: return image(D::DirSkip, D::Skip);
 	case Item::LeftOnly: return image(D::LDirUnique, D::LUnique);
 	case Item::MiddleOnly: return image(D::MDirUnique, D::MUnique);
