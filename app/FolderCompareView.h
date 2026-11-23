@@ -76,6 +76,8 @@ public:
 	int rowCategoryForTest(const QString &name) const;
 	/** The Result column text of a row by file name (for tests). */
 	QString rowResultForTest(const QString &name) const;
+	/** The icon in a row's Name column. */
+	QIcon rowIconForTest(const QString &name) const;
 	/** The compare method shown on the status bar (for tests). */
 	QString compareMethodTextForTest() const;
 	/** The file filter this comparison ran with, as the status bar shows

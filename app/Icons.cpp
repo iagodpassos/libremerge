@@ -4,7 +4,10 @@
 #include "Icons.h"
 
 #include <functional>
+#include <iterator>
 #include <QApplication>
+#include <QFile>
+#include <QHash>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
@@ -317,6 +320,36 @@ QString toolTip(const QString &text, const QKeySequence &shortcut)
 		return text;
 	return QStringLiteral("%1 (%2)").arg(text,
 		shortcut.toString(QKeySequence::NativeText));
+}
+
+QIcon diffImage(DiffImage image)
+{
+	static const char *const names[] = {
+		"lfile", "mfile", "rfile", "lmissing", "mmissing", "rmissing",
+		"notequalfile", "equalfile", "fileunknown", "equalbinary", "binarydiff",
+		"lfolder", "mfolder", "rfolder", "lmissingfolder", "mmissingfolder", "rmissingfolder",
+		"fileskip", "folderskip", "notequalfolder", "equalfolder", "folder",
+		"error", "folderup",
+		"notequaltextfile", "equaltextfile", "notequalimage", "equalimage",
+	};
+	static_assert(std::size(names) == static_cast<size_t>(DiffImage::ImageSame) + 1,
+		"a name for every image");
+	// one icon per image, each with the sizes WinMerge's .ico holds
+	static QHash<int, QIcon> cache;
+	const int index = static_cast<int>(image);
+	auto found = cache.constFind(index);
+	if (found != cache.constEnd())
+		return *found;
+	QIcon made;
+	for (const int size : { 16, 24, 32, 48 })
+	{
+		const QString path = QStringLiteral(":/diffimages/%1-%2.png")
+			.arg(QLatin1String(names[index])).arg(size);
+		if (QFile::exists(path))
+			made.addFile(path, QSize(size, size));
+	}
+	cache.insert(index, made);
+	return made;
 }
 
 void applyToolbarTheme(QWidget *root)

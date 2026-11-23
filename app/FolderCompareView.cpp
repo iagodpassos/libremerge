@@ -165,6 +165,49 @@ QString categoryText(lm::FolderCompareItem::Category category,
 	return {};
 }
 
+/** GetColImage: WinMerge's image of an item, by its result and, for
+    files a content compare took, their kind. */
+QIcon categoryIcon(lm::FolderCompareItem::Category category,
+	lm::FolderCompareItem::FileType type, bool isDir)
+{
+	using Item = lm::FolderCompareItem;
+	using D = lm::DiffImage;
+	const auto image = [isDir](D dir, D file) { return lm::diffImage(isDir ? dir : file); };
+	switch (category)
+	{
+	case Item::Error: return lm::diffImage(D::Error);
+	case Item::Skipped: return image(D::DirSkip, D::Skip);
+	case Item::LeftOnly: return image(D::LDirUnique, D::LUnique);
+	case Item::MiddleOnly: return image(D::MDirUnique, D::MUnique);
+	// the second of two sides is the right one
+	case Item::RightOnly: return image(D::RDirUnique, D::RUnique);
+	case Item::MissingLeft: return image(D::LDirMissing, D::LMissing);
+	case Item::MissingMiddle: return image(D::MDirMissing, D::MMissing);
+	case Item::MissingRight: return image(D::RDirMissing, D::RMissing);
+	case Item::Identical:
+		switch (type)
+		{
+		case Item::TextFiles: return image(D::DirSame, D::TextSame);
+		case Item::BinaryFiles: return image(D::DirSame, D::BinSame);
+		case Item::ImageFiles: return image(D::DirSame, D::ImageSame);
+		case Item::UnknownType: break;
+		}
+		return image(D::DirSame, D::Same);
+	case Item::Different:
+		switch (type)
+		{
+		case Item::TextFiles: return image(D::DirDiff, D::TextDiff);
+		case Item::BinaryFiles: return image(D::DirDiff, D::BinDiff);
+		case Item::ImageFiles: return image(D::DirDiff, D::ImageDiff);
+		case Item::UnknownType: break;
+		}
+		return image(D::DirDiff, D::Diff);
+	case Item::NotCompared: break;
+	}
+	// DIFFIMG_DIR, DIFFIMG_FILE: no result
+	return image(D::Dir, D::File);
+}
+
 /** WinMerge's COMPAREFLAGS3WAY suffix on the Result column. */
 QString threeWayText(lm::FolderCompareItem::ThreeWayInfo info)
 {
@@ -246,6 +289,7 @@ void FolderCompareView::setRowCategory(QTreeWidgetItem *row,
 		? QObject::tr("Folder: %1").arg(text) : text);
 	row->setData(0, RoleCategory, static_cast<int>(category));
 	row->setData(0, RoleThreeWay, static_cast<int>(threeWay));
+	row->setIcon(ColName, categoryIcon(category, type, isDir));
 	// OnCustomDraw: the items in the scheme's colors, unless the folder
 	// comparison colors none (OPT_DIRCLR_USE_COLORS)
 	QColor color;
@@ -922,6 +966,12 @@ int FolderCompareView::rowCategoryForTest(const QString &name) const
 	return row != nullptr ? row->data(0, RoleCategory).toInt() : -1;
 }
 
+QIcon FolderCompareView::rowIconForTest(const QString &name) const
+{
+	const QTreeWidgetItem *row = findRowByName(name);
+	return row != nullptr ? row->icon(ColName) : QIcon();
+}
+
 QString FolderCompareView::rowResultForTest(const QString &name) const
 {
 	QTreeWidgetItem *row = findRowByName(name);
@@ -1416,7 +1466,7 @@ void FolderCompareView::rebuildRows()
 	{
 		auto *up = new FolderRow(m_tree);
 		up->setText(ColName, QStringLiteral(".."));
-		up->setIcon(ColName, style()->standardIcon(QStyle::SP_FileDialogToParent));
+		up->setIcon(ColName, lm::diffImage(lm::DiffImage::DirUp)); // DIFFIMG_DIRUP
 		up->setData(0, RoleParentFolder, true);
 		up->setData(0, RoleIsFile, false);
 		up->setData(0, RoleName, QStringLiteral(".."));
@@ -1449,6 +1499,7 @@ QTreeWidgetItem *FolderCompareView::folderNode(const QString &folder,
 		? new FolderRow(parent) : new FolderRow(m_tree);
 	row->setText(ColName, name);
 	row->setText(ColFolder, parentFolder);
+	row->setIcon(ColName, lm::diffImage(lm::DiffImage::Dir));
 	for (int i = 0; i < m_sides; ++i)
 	{
 		const QString path = m_roots[i] + QLatin1Char('/') + folder;
