@@ -50,8 +50,12 @@ public:
 		const QStringList &hiddenItems = {});
 	/** Two or three sides, each a folder or an archive: archives are
 	    extracted to temp folders and the lot opens as a folder
-	    comparison (WinMerge's DecompressArchive flow). */
-	void openArchiveComparison(const QStringList &sources);
+	    comparison (WinMerge's DecompressArchive flow), with or without
+	    the subfolders and with the hidden items as a folder comparison
+	    takes them (CMainFrame::DoFileOrFolderOpen's bRecurse and
+	    OpenFolderParams). */
+	void openArchiveComparison(const QStringList &sources,
+		std::optional<bool> recursive = {}, const QStringList &hiddenItems = {});
 
 	/** A folder, or an archive standing in for one (the sides a folder
 	    comparison accepts), as Options > Archive Support says. */

@@ -184,6 +184,14 @@ public:
 	{
 		m_tempDirs = std::move(dirs);
 	}
+	/** CTempPathContext's m_strRoot and m_strDisplayRoot: the folders an
+	    archive comparison started in (an archive's extraction, a plain
+	    folder as it is) and what they stand for (the archive's path). */
+	void setArchiveRoots(const QStringList &roots, const QStringList &sources)
+	{
+		m_archiveRoots = roots;
+		m_archiveSources = sources;
+	}
 
 public slots:
 	void recompare();
@@ -259,9 +267,12 @@ private:
 	    with Ctrl held; a side the folder is not on is offered to be
 	    created first (CreateFoldersPair). */
 	void openFolderRow(QTreeWidgetItem *row);
-	/** CheckAllowUpwardDirectory: the folders the compared ones are in,
-	    empty when one of them is not there. */
-	QStringList parentFolders() const;
+	/** CheckAllowUpwardDirectory: whether a comparison without its
+	    subfolders has a ".." (Never: none), one that goes nowhere (No:
+	    disabled, at an archive's root) or one up to the folders the
+	    compared ones are in (Regular, those in parents). */
+	enum class Upward { Never, No, Regular };
+	Upward upwardDirectory(QStringList *parents) const;
 	/** CDirView::OpenParentDirectory: the parent folders, in this window
 	    or one of its own with Ctrl held. */
 	void openParentFolders();
@@ -301,6 +312,8 @@ private:
 	QStringList m_hiddenItems; // hidden by the user, in the order hidden
 	QSet<QString> m_hiddenSet; // the same, to look them up
 	std::vector<std::unique_ptr<QTemporaryDir>> m_tempDirs;
+	QStringList m_archiveRoots;
+	QStringList m_archiveSources;
 	lm::FolderCompareResult m_result;
 	lm::FolderDisplayFilter m_displayFilter;
 	DisplayFilterBar *m_filterBar = nullptr; // exists while it is shown

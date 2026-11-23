@@ -2091,7 +2091,7 @@ void MainWindow::openFolderComparison(const QStringList &dirs, std::optional<boo
 		if (!QFileInfo(dir).isDir())
 		{
 			// an archive among the sides: extract, then compare
-			openArchiveComparison(dirs);
+			openArchiveComparison(dirs, recursive, hiddenItems);
 			return;
 		}
 	auto *view = new FolderCompareView(this);
@@ -2144,7 +2144,8 @@ void MainWindow::openFolderComparison(const QStringList &dirs, std::optional<boo
 	nameTab();
 }
 
-void MainWindow::openArchiveComparison(const QStringList &sources)
+void MainWindow::openArchiveComparison(const QStringList &sources,
+	std::optional<bool> recursive, const QStringList &hiddenItems)
 {
 	// WinMerge's DecompressArchive handles every side on its own: archives
 	// are extracted to temporary folders, folders are compared in place,
@@ -2234,6 +2235,9 @@ void MainWindow::openArchiveComparison(const QStringList &sources)
 			wireFolderRowSync(view);
 		});
 	view->adoptTempDirs(std::move(temps));
+	view->setArchiveRoots(roots, sources);
+	view->setRecursive(recursive.value_or(lm::includeSubfolders()));
+	view->setHiddenItems(hiddenItems);
 	// the tab carries the sources' names, not the temp paths
 	QStringList names;
 	for (const QString &source : sources)

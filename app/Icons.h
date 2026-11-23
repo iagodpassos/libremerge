@@ -73,6 +73,7 @@ enum class DiffImage
 	Dir,          ///< folder: a folder with no result
 	Error,        ///< error
 	DirUp,        ///< folderup: the ".." item
+	DirUpDisable, ///< folderup_disable: a ".." that goes nowhere
 	Abort,        ///< aborted: an item a cancel stopped comparing
 	TextDiff,     ///< notequaltextfile
 	TextSame,     ///< equaltextfile

@@ -825,6 +825,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption selftestArchiveMixedOpt(QStringLiteral("selftest-archive-mixed"),
 		QStringLiteral("Compare a folder against an archive, 2- and 3-way (for testing)"));
 	parser.addOption(selftestArchiveMixedOpt);
+	QCommandLineOption selftestArchiveUpOpt(QStringLiteral("selftest-archive-up"),
+		QStringLiteral("An archive compared without its subfolders: \"..\" disabled at its root, going up inside it (for testing)"));
+	parser.addOption(selftestArchiveUpOpt);
 	QCommandLineOption selftestMnemonicsOpt(QStringLiteral("selftest-menu-mnemonics"),
 		QStringLiteral("Verify that no two items of a menu share an accelerator letter in the UI language (for testing)"));
 	parser.addOption(selftestMnemonicsOpt);
@@ -838,6 +841,110 @@ int main(int argc, char *argv[])
 		QStringLiteral("Verify which actions macOS merged into the application menu (for testing)"));
 	parser.addOption(selftestAppMenuOpt);
 	parser.process(app);
+
+	if (parser.isSet(selftestArchiveUpOpt))
+	{
+		// WinMerge's CheckAllowUpwardDirectory in an archive's folders
+		// (CTempPathContext): at their root a ".." that goes nowhere,
+		// DIFFIMG_DIRUP_DISABLE, none when the global filter leaves the
+		// archives out, and inside them one that goes up
+		QTemporaryDir dir;
+		if (!dir.isValid())
+			return 2;
+		const QString left = dir.filePath(QStringLiteral("left.zip"));
+		const QString right = dir.filePath(QStringLiteral("right.zip"));
+		if (!writeTestArchive(left, false, { { "top.txt", "one\n" }, { "sub/inner.txt", "left\n" } })
+				|| !writeTestArchive(right, false, { { "top.txt", "one\n" }, { "sub/inner.txt", "right\n" } }))
+			return 2;
+		bool ok = true;
+		const auto check = [&ok](bool condition, const char *what)
+		{
+			printf("%-62s %s\n", what, condition ? "ok" : "FAILED");
+			ok = ok && condition;
+		};
+		const auto waitFor = [](FolderCompareView *view) {
+			for (int i = 0; i < 400 && view->isComparingForTest(); ++i)
+			{
+				QThread::msleep(25);
+				QCoreApplication::processEvents();
+			}
+			for (int i = 0; i < 10; ++i)
+			{
+				QThread::msleep(10);
+				QCoreApplication::processEvents();
+			}
+		};
+		const auto upIs = [](FolderCompareView *view, lm::DiffImage image) {
+			return view->rowIconForTest(QStringLiteral("..")).cacheKey()
+				== lm::diffImage(image).cacheKey();
+		};
+		GetOptionsMgr()->Set(OPT_CMP_INCLUDE_SUBDIRS, false);
+		{
+			MainWindow window;
+			window.openArchiveComparison({ left, right });
+			auto *view = window.findChild<FolderCompareView *>();
+			if (view == nullptr)
+				return 1;
+			waitFor(view);
+			const QStringList atRoot = view->roots();
+			check(upIs(view, lm::DiffImage::DirUpDisable),
+				"at the archives' root: a disabled \"..\"");
+			view->activateRowForTest(QStringLiteral(".."));
+			waitFor(view);
+			check(view->roots() == atRoot && window.findChildren<FolderCompareView *>().size() == 1,
+				"which goes nowhere");
+			view->activateRowForTest(QStringLiteral("sub"));
+			waitFor(view);
+			check(view->roots() != atRoot && upIs(view, lm::DiffImage::DirUp),
+				"in a folder of theirs: one that goes up");
+			view->activateRowForTest(QStringLiteral(".."));
+			waitFor(view);
+			check(view->roots() == atRoot && upIs(view, lm::DiffImage::DirUpDisable),
+				"up to their root, where it is disabled again");
+		}
+		{
+			// a project's way in (OpenFolderParams): without the
+			// subfolders, an item hidden, archives or not
+			GetOptionsMgr()->Set(OPT_CMP_INCLUDE_SUBDIRS, true);
+			MainWindow window;
+			window.openFolderComparison({ left, right }, false, { QStringLiteral("top.txt") });
+			auto *view = window.findChild<FolderCompareView *>();
+			if (view == nullptr)
+				return 1;
+			waitFor(view);
+			check(upIs(view, lm::DiffImage::DirUpDisable)
+					&& !view->rowShownForTest(QStringLiteral("top.txt"))
+					&& view->rowShownForTest(QStringLiteral("sub")),
+				"from a project: its subfolders setting and its hidden items");
+			GetOptionsMgr()->Set(OPT_CMP_INCLUDE_SUBDIRS, false);
+		}
+		{
+			// the global filter takes no .zip: no ".." at all
+			lm::useFileFilterMask(QStringLiteral("*.txt"));
+			MainWindow window;
+			window.openArchiveComparison({ left, right });
+			auto *view = window.findChild<FolderCompareView *>();
+			if (view == nullptr)
+				return 1;
+			waitFor(view);
+			check(view->rowIconForTest(QStringLiteral("..")).isNull()
+					&& !view->rowIconForTest(QStringLiteral("top.txt")).isNull(),
+				"with a global filter that leaves the archives out: none");
+			lm::useFileFilterMask(QStringLiteral("*.*"));
+		}
+		{
+			// plain folders as before: up to the folders they are in
+			QDir().mkpath(dir.filePath(QStringLiteral("a/x")));
+			QDir().mkpath(dir.filePath(QStringLiteral("b/x")));
+			FolderCompareView view;
+			view.setRecursive(false);
+			view.start(dir.filePath(QStringLiteral("a/x")), dir.filePath(QStringLiteral("b/x")));
+			waitFor(&view);
+			check(upIs(&view, lm::DiffImage::DirUp), "plain folders: one that goes up");
+		}
+		printf("archive up: %s\n", ok ? "ok" : "FAILED");
+		return ok ? 0 : 1;
+	}
 
 	if (parser.isSet(selftestArchiveMixedOpt))
 	{
