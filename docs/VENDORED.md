@@ -337,6 +337,18 @@ and its numbers (`DrawMargin`), the folder items by result
   colors that upstream's `ChooseColor` keeps in the options
   (`Options::CustomColors`) and a scheme saves.
 
+## Item icons of the folder comparison
+
+`app/diffimages` holds WinMerge's own icons of the folder comparison's
+items, taken from `Src/res` at `700da377c` (GPL-2.0-or-later, the design
+credited to WinMerge's contributors in its `Docs/Users/Contributors.txt`):
+every image of `DiffImageListUtils::InitializeDiffImageList` but the web
+page ones, as one PNG per size each `.ico` holds, the image of the most
+colors of that size, pixel for pixel. Which image an item gets follows
+`GetColImage`. Most were brought in by @KrokusPokus in PR #27; `aborted`
+and `folderup_disable` came after, the same way. Their own README in that
+folder says how they were converted.
+
 ## Deliberately excluded (and why)
 
 - **All MFC GUI code** (`*Dlg`, `*Bar`, `*Menu`, `*View`, `*Frm`, `*Doc`, `Src/Common` widgets): MFC is Windows-only and non-redistributable. The UI is rebuilt in Qt.
