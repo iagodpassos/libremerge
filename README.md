@@ -96,6 +96,10 @@ brew install --cask iagodpassos/tap/libremerge
 
 Other formats (native .deb packages, Flatpak) come back if there is demand — open an issue if you need one and it moves up the list.
 
+## FreeBSD
+
+LibreMerge has a FreeBSD port, maintained independently downstream of this repository and kept in step with its releases: [libremerge-freebsd](https://github.com/AlfredoLlaquet/libremerge-freebsd). For FreeBSD, get it from there.
+
 ## Use with git
 
 LibreMerge works as git's merge and diff tool. Conflicts open in the familiar three-pane layout, with the merged result in the middle pane.
