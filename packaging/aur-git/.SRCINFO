@@ -1,0 +1,28 @@
+pkgbase = libremerge-git
+	pkgdesc = Diff and merge tool for files, folders and CSV tables - a Qt port of the WinMerge engine (main branch)
+	pkgver = 1.5.0.r20.gba0db92
+	pkgrel = 1
+	url = https://github.com/iagodpassos/libremerge
+	arch = x86_64
+	arch = aarch64
+	license = GPL-3.0-or-later
+	checkdepends = gtest
+	makedepends = git
+	makedepends = cmake
+	makedepends = ninja
+	makedepends = boost
+	makedepends = re2c
+	makedepends = lemon
+	depends = qt6-base
+	depends = qt6-wayland
+	depends = qt6-imageformats
+	depends = poco
+	depends = icu
+	depends = libarchive
+	depends = hicolor-icon-theme
+	provides = libremerge
+	conflicts = libremerge
+	source = libremerge::git+https://github.com/iagodpassos/libremerge.git#branch=main
+	sha256sums = SKIP
+
+pkgname = libremerge-git

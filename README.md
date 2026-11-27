@@ -92,7 +92,7 @@ brew install --cask iagodpassos/tap/libremerge
 
 **Dolphin (KDE)**: the AppImage's desktop integration, the Homebrew cask and an install from source (`cmake --install`, and so the PKGBUILD below) add *Compare with LibreMerge* to Dolphin's context menu when one to three files or folders are selected, like WinMerge's shell extension: two or three are compared, and one opens the selection window with it filled in.
 
-**Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` on the `main` branch builds and installs the latest release with `makepkg -si`; the copy inside a release tag still points to the version before it, as it is updated right after each release is tagged.
+**Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` on the `main` branch builds and installs the latest release with `makepkg -si`; the copy inside a release tag still points to the version before it, as it is updated right after each release is tagged. To try what is on `main` before it is released, `packaging/aur-git/PKGBUILD` builds the branch itself (as `libremerge-git`, in place of `libremerge`).
 
 Other formats (native .deb packages, Flatpak) come back if there is demand — open an issue if you need one and it moves up the list.
 
