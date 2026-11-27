@@ -94,7 +94,9 @@ brew install --cask iagodpassos/tap/libremerge
 
 **Arch Linux**: an AUR package is on the way. Meanwhile, `packaging/aur/PKGBUILD` on the `main` branch builds and installs the latest release with `makepkg -si`; the copy inside a release tag still points to the version before it, as it is updated right after each release is tagged. To try what is on `main` before it is released, `packaging/aur-git/PKGBUILD` builds the branch itself (as `libremerge-git`, in place of `libremerge`).
 
-Other formats (native .deb packages, Flatpak) come back if there is demand — open an issue if you need one and it moves up the list.
+**Flatpak**: [`packaging/flatpak`](packaging/flatpak) has a manifest that builds LibreMerge on the KDE runtime, and its README says how to build and install it yourself; LibreMerge is not on Flathub yet.
+
+Native .deb packages come back if there is demand: open an issue if you need them and they move up the list.
 
 ## FreeBSD and OpenBSD
 

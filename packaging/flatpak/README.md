@@ -30,6 +30,7 @@ for the files git hands over:
 git difftool --extcmd="flatpak run io.github.iagodpassos.libremerge"
 ```
 
-Known limit inside the sandbox: delete to the Trash fails, as
-`QFile::moveToTrash` does not reach the host's Trash from there (the Trash
-portal would).
+Inside the sandbox, deleting to the Trash and the copies that write over a
+file go through the desktop's Trash portal (`org.freedesktop.portal.Trash`),
+which takes the file opened by LibreMerge: a symbolic link, or a file it
+cannot open for writing, is not sent there.

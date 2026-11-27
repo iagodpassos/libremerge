@@ -102,25 +102,13 @@ modules:
       # Upstream's CMake downloads the Tree-sitter grammars at configure time
       # unless it finds the archives in this folder (same switch as its PKGBUILD).
       - -DLM_TREE_SITTER_DOWNLOAD_DIR=/run/build/libremerge/tree-sitter-archives
-      # tests/ is configured unconditionally and would download GoogleTest.
-      # Point it at the sources below instead; nothing from tests/ is built.
-      - -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=/run/build/libremerge/googletest
-      # The engine only looks for lemon's template under /usr and Homebrew.
-      - -DLEMON_TEMPLATE=/app/share/lemon/lempar.c
-      # Let "ninja install" run without building the test suite first.
-      - -DCMAKE_SKIP_INSTALL_ALL_DEPENDENCY=ON
-    make-args:
-      - LibreMerge
+      # Without the unit tests, which would download GoogleTest.
+      - -DLM_BUILD_TESTS=OFF
     sources:
       - type: git
         url: https://github.com/iagodpassos/libremerge.git
-        tag: v1.5.0
-        commit: 5eeb80ea1e6d55b20cf6edf69a1a4d2993fa858f
-      - type: git
-        url: https://github.com/google/googletest.git
-        tag: v1.18.0
-        commit: 063de7e9578f82b369302001269680b4b1553359
-        dest: googletest
+        tag: v1.6.0
+        commit: ba460801d54bc492b6230aa7eb060d11859bea60
       # Tree-sitter grammars at the commits and checksums pinned in
       # engine/TreeSitterGrammars.cmake.
       - type: file
