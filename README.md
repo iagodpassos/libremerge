@@ -96,9 +96,9 @@ brew install --cask iagodpassos/tap/libremerge
 
 Other formats (native .deb packages, Flatpak) come back if there is demand — open an issue if you need one and it moves up the list.
 
-## FreeBSD
+## FreeBSD and OpenBSD
 
-LibreMerge has a FreeBSD port, maintained independently downstream of this repository and kept in step with its releases: [libremerge-freebsd](https://github.com/AlfredoLlaquet/libremerge-freebsd). For FreeBSD, get it from there.
+LibreMerge has ports for FreeBSD and OpenBSD, with binary packages and instructions to build from source, maintained independently downstream of this repository and kept in step with its releases: [libremerge-bsd](https://github.com/AlfredoLlaquet/libremerge-bsd). For FreeBSD or OpenBSD, get it from there.
 
 ## Use with git
 
